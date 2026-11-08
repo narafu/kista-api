@@ -30,6 +30,6 @@ public class TradingOrderPlanner {
                 .map(o -> Order.fromPlanned(o, account.id(), strategyCycleId))
                 .toList();
         orderPort.saveAll(planned);
-        log.info("[{}] 계획 주문 {}건 저장 (PLANNED)", account.nickname(), planned.size());
+        log.info("[accountId={}] 계획 주문 {}건 저장 (PLANNED)", account.id(), planned.size());
     }
 }

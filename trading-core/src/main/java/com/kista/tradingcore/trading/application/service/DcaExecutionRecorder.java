@@ -54,7 +54,7 @@ class DcaExecutionRecorder {
 
     private void adminAlertIfNeeded(Strategy strategy, LocalDate tradeDate, String ruleKey, DcaSkipReason reason, String detail) {
         if (reason == DcaSkipReason.DATA_UNAVAILABLE || reason == DcaSkipReason.EXCHANGE_API_ERROR) {
-            // 시세·수량 조회·거래소 API 실패는 사용자 미주문 알림과 별개로 관리자에게도 알린다 (spec 5.7)
+            // 시세·수량 조회·거래소 API 실패는 사용자 미주문 알림과 별개로 관리자에게도 알린다
             String label = reason == DcaSkipReason.DATA_UNAVAILABLE ? "[DCA 데이터 실패]" : "[DCA 거래소 오류]";
             eventPublisher.publishEvent(new TradingErrorEvent(null,
                     label + " strategyId=" + strategy.id() + ", " + strategy.ticker() + ", rule=" + ruleKey + ", " + tradeDate + " — " + detail));

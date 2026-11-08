@@ -28,6 +28,7 @@ import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
+import com.kista.tradingcore.trading.application.service.support.OwnedStrategy;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -70,8 +71,9 @@ class TradingPreviewService {
     // 내부적으로 previewBatch()에 위임한다 — 단건과 배치를 별도 코드 경로로 유지할 이유가 없다.
     @Transactional(readOnly = true)
     NextOrdersPreview preview(UUID strategyId, UUID requesterId) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
+        Strategy strategy = owned.strategy();
+        Account account = owned.account();
         // 코인 DCA는 실행 루프(CryptoDcaRoundExecutor) 전용이라 미리보기 경로가 없다 — 주식 DCA는 plan() 정규 경로로 미리보기
         if (TradingAccount.from(account).brokerRef().broker().isCryptoExchange()) throw new DcaManualExecutionUnsupportedException();
         // 계산 실패로 생략된 전략은 404(사이클 없음)로 오인되지 않도록 원래 예외를 그대로 전파
@@ -158,7 +160,7 @@ class TradingPreviewService {
             }
             try {
                 planResultsByStrategyId.put(strategy.id(),
-                        planBuilder.build(strategy, account, cycle, today, "batch:" + strategy.id(), prevCloseCache));
+                        planBuilder.build(strategy, account, cycle, today, account.id(), prevCloseCache));
             } catch (RuntimeException e) {
                 // 아래 최종 루프가 캐시 누락을 감지해 동일 계산을 재시도하며, 그때 실패하면 그대로 전파된다
                 log.warn("[strategyId={}] 배치 미리보기 사전 계산 실패, 재시도 예정: error={}",
@@ -180,14 +182,14 @@ class TradingPreviewService {
                 // 생략" 처리와 동일한 부분 실패 허용 정책이다. 한 전략의 지속적 계산 실패가 preview(단건)
                 // 호출 시 계좌 내 다른(건강한) 전략까지 실패시키는 회귀를 막는다.
                 try {
-                    planResult = planBuilder.build(strategy, account, cycle, today, "preview:" + strategy.id(), prevCloseCache);
+                    planResult = planBuilder.build(strategy, account, cycle, today, account.id(), prevCloseCache);
                 } catch (RuntimeException e) {
                     log.warn("[strategyId={}] 배치 미리보기 재시도도 실패 — 이 전략만 생략: error={}", strategy.id(), e.getMessage());
                     failures.put(strategy.id(), e);
                     continue;
                 }
             }
-            previews.put(strategy.id(), buildPreview(strategy, account, cycle, today,
+            previews.put(strategy.id(), buildPreview(strategy, cycle, today,
                     todayOrdersByStrategyId.get(strategy.id()), latestPositions.get(cycle.id()), planResult, totalAccountPlannedBuy, freshBuyByStrategyId, freshSellByStrategyId, freshCorrectionByStrategyId));
         }
         // 휴장 skip은 필요 주문이 없으므로 브로커 경고 조회·첨부를 생략한다
@@ -261,7 +263,7 @@ class TradingPreviewService {
         return previews;
     }
 
-    private NextOrdersPreview buildPreview(Strategy strategy, TradingAccount account, StrategyCycle currentCycle, LocalDate today,
+    private NextOrdersPreview buildPreview(Strategy strategy, StrategyCycle currentCycle, LocalDate today,
                                             List<Order> todayOrders, CyclePosition latestPosition,
                                             StrategyOrderPlanBuilder.PlanResult planResult,
                                             BigDecimal totalAccountPlannedBuy, Map<UUID, BigDecimal> freshBuyByStrategyId,
@@ -272,19 +274,7 @@ class TradingPreviewService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal otherStrategiesPlannedBuyUsd = totalAccountPlannedBuy.subtract(thisStrategyPlannedBuy);
 
-        // 최신 사이클이 종료됨(endDate 존재) — 청산 후 재등록 실패로 남은 상태. findLatestByStrategyId가
-        // 종료 여부를 안 가리므로 여기서 별도로 걸러야 종료된 사이클 기준 주문이 나가지 않는다.
-        // startDate==endDate==오늘(당일 등록·당일 청산)인 경우와 겹칠 수 있어 시작예정일 체크보다 먼저 판정한다
-        if (currentCycle.endDate() != null) {
-            return new NextOrdersPreview(today, null, List.of(), NextOrdersPreview.SkipReason.CYCLE_ENDED,
-                    todayOrders, otherStrategiesPlannedBuyUsd, null, null, null);
-        }
-        // 시작예정일 미도래 사이클은 계획 계산 자체를 건너뛴다 — TradingService.filterScheduledStart와 동일 기준(tradeDate > startDate)
-        if (!today.isAfter(currentCycle.startDate())) {
-            return new NextOrdersPreview(today, null, List.of(), NextOrdersPreview.SkipReason.SCHEDULED_START_NOT_REACHED,
-                    todayOrders, otherStrategiesPlannedBuyUsd, null, null, null);
-        }
-
+        // 종료 사이클·시작예정일 미도래는 사전계산 루프가 skip 결과(planResult)로 채워 두므로 여기서 다시 판정하지 않는다
         if (planResult.isSkip()) {
             return new NextOrdersPreview(today, null, List.of(), planResult.skipReason(), todayOrders, otherStrategiesPlannedBuyUsd, null, null, null);
         }

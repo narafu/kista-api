@@ -61,6 +61,7 @@ com.kista.tradingcore.web/           :trading-core · CLOSED · (NamedInterface 
 ### 소유권 검증 패턴
 - `account.verifyOwnedBy(requesterId)` — 불일치 시 `SecurityException`(403 매핑은 `ProblemDetailMappings.GENERIC`이 공급). 서비스는 `AccountPort.requireOwnedAccount(accountId, requesterId)`(`findByIdOrThrow` + `verifyOwnedBy`)를 쓴다(`AccountStatisticsService` 등)
 - 전략·사이클 소유권은 `strategy.accountId()`가 요청 계좌와 일치하는지로 검증한다(예: `TradingInternalQueryController.requireStrategyOwnedByAccount`)
+- 전략 소유권과 계좌 조회를 함께 하는 trading 서비스는 `OwnedStrategy.load(...)`(`trading/application/service/support/OwnedStrategy` — `strategyPort.findByIdOrThrow` + `accountPort.requireOwnedAccount`, record `strategy`·`account`)를 공용 통로로 쓴다. 검증 기준은 위와 같다. stats는 모듈 경계상 별도로 둔다(`InvestmentPointsQueryService`)
 
 ### JPA Auditing
 - `BaseAuditEntity`(`createdAt`+`updatedAt`) 또는 `BaseCreatedAtEntity`(`createdAt`만)를 상속한다(`com.kista.shared.platform.persistence`) — `updated_at` 컬럼 없는 엔티티에 `BaseAuditEntity` 금지(`ddl-auto: validate` 실패)

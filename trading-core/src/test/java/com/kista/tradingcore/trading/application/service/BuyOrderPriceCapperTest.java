@@ -192,7 +192,7 @@ class BuyOrderPriceCapperTest {
         CycleOrderStrategy.PlanContext.InfiniteInputs inputs = new CycleOrderStrategy.PlanContext.InfiniteInputs(
                 20, new BigDecimal("50.00"), new BigDecimal("100.00"), true, false);
         CycleOrderStrategy.PlanContext ctx = new CycleOrderStrategy.PlanContext(
-                balance, StrategyTicker.SOXL, TODAY, "test", inputs, null, null, null);
+                balance, StrategyTicker.SOXL, TODAY, null, inputs, null, null, null);
         return strategy.plan(ctx).orElseThrow();
     }
 

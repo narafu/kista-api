@@ -1,6 +1,5 @@
 package com.kista.tradingcore.stats.domain.model;
 
-import com.kista.tradingcore.trading.domain.model.Strategy;
 
 import java.math.BigDecimal;
 import com.kista.shared.kernel.StrategyType;

@@ -40,12 +40,12 @@ class OrderSubmitter {
         try {
             orderPort.markSubmitting(order.id());
         } catch (OrderStateConflictException e) {
-            log.info("[orderId={}] [{}] 접수 직전 주문이 취소·정리됨 — 접수 생략", order.id(), accountLabel);
+            log.info("[orderId={}] [accountId={}] 접수 직전 주문이 취소·정리됨 — 접수 생략", order.id(), order.accountId());
             return new Submission(Outcome.SKIPPED, null);
         } catch (Exception e) {
             // 일시적 DB 오류 — HTTP 없이 이 주문만 건너뛴다(남은 주문 접수는 계속). 커밋 응답 단계 오류면 이미 SUBMITTING일 수 있다
-            log.error("[orderId={}] [{}] {} {} 접수 선점 실패 — 이 주문 접수 생략",
-                    order.id(), accountLabel, order.direction(), order.ticker(), e);
+            log.error("[orderId={}] [accountId={}] {} {} 접수 선점 실패 — 이 주문 접수 생략",
+                    order.id(), order.accountId(), order.direction(), order.ticker(), e);
             eventPublisher.publishEvent(new TradingErrorEvent(null, "[%s %s %s 선점 실패] orderId=%s — 미접수(DB 상태 PLANNED 또는 SUBMITTING 확인 필요): %s"
                     .formatted(accountLabel, order.ticker(), order.direction(), order.id(), e.getMessage())));
             return new Submission(Outcome.SKIPPED, null);
@@ -75,8 +75,8 @@ class OrderSubmitter {
             cancelRacedOrder(order, result.externalOrderId(), account, accountLabel);
             return new Submission(Outcome.SKIPPED, null);
         } catch (Exception e) {
-            log.error("[{}] {} {} 증권사 접수 완료됐으나 DB PLACED 기록 실패 — 수동 확인 필요 (externalOrderId={})",
-                    accountLabel, order.direction(), order.ticker(), result.externalOrderId(), e);
+            log.error("[orderId={}] [accountId={}] {} {} 증권사 접수 완료됐으나 DB PLACED 기록 실패 — 수동 확인 필요 (externalOrderId={})",
+                    order.id(), order.accountId(), order.direction(), order.ticker(), result.externalOrderId(), e);
             eventPublisher.publishEvent(new TradingErrorEvent(null,
                     "[DB 불일치] %s %s %s 증권사 접수 완료 후 PLACED 기록 실패 — orderId=%s, externalOrderId=%s. DB는 SUBMITTING이라 자동 재접수되지 않음 — 런북으로 정정"
                             .formatted(accountLabel, order.ticker(), order.direction(), order.id(), result.externalOrderId())));
@@ -94,7 +94,7 @@ class OrderSubmitter {
     // 증권사의 잔고·수량 부족 거절(BUY 주문가능금액·SELL 판매가능수량)은 운영 오류가 아니라 사용자 조치 사안 — 관리자 이벤트 없이 INSUFFICIENT_FUNDS로 돌려 호출자가 사용자 알림으로 묶는다
     private Submission rejected(Order order, String accountLabel, Exception e) {
         boolean insufficientFunds = BrokerApiException.isInsufficientFundsRejection(e);
-        log.warn("[{}] {} {} 주문 접수 실패{}: {}", accountLabel, order.direction(), order.ticker(), insufficientFunds ? (order.direction() == OrderDirection.BUY ? "(잔고 부족)" : "(보유 수량 부족)") : "", e.getMessage());
+        log.warn("[orderId={}] [accountId={}] {} {} 주문 접수 실패{}: {}", order.id(), order.accountId(), order.direction(), order.ticker(), insufficientFunds ? (order.direction() == OrderDirection.BUY ? "(잔고 부족)" : "(보유 수량 부족)") : "", e.getMessage());
         if (!insufficientFunds) {
             eventPublisher.publishEvent(new TradingErrorEvent(null, "[%s %s %s 접수 실패] orderId=%s — %s"
                     .formatted(accountLabel, order.ticker(), order.direction(), order.id(), e.getMessage())));
@@ -102,7 +102,7 @@ class OrderSubmitter {
         try {
             orderPort.markFailed(order.id());
         } catch (OrderStateConflictException conflict) {
-            log.info("[orderId={}] [{}] 접수 실패 주문이 그 사이 정리됨 — FAILED 기록 생략", order.id(), accountLabel);
+            log.info("[orderId={}] [accountId={}] 접수 실패 주문이 그 사이 정리됨 — FAILED 기록 생략", order.id(), order.accountId());
         } catch (Exception dbError) {
             // FAILED를 못 써 SUBMITTING 잔류 — 재접수되지 않으므로 결과 불명과 같은 정정 대상
             return unknown(order, accountLabel, dbError);
@@ -112,8 +112,8 @@ class OrderSubmitter {
 
     // 결과 불명 — 증권사가 접수했을 수 있어 FAILED로 쓰지 않는다(FAILED는 슬롯을 비워 재실행이 같은 leg를 다시 만든다)
     private Submission unknown(Order order, String accountLabel, Exception e) {
-        log.error("[orderId={}] [{}] {} {} 주문 접수 결과 불명 — SUBMITTING 유지",
-                order.id(), accountLabel, order.direction(), order.ticker(), e);
+        log.error("[orderId={}] [accountId={}] {} {} 주문 접수 결과 불명 — SUBMITTING 유지",
+                order.id(), order.accountId(), order.direction(), order.ticker(), e);
         eventPublisher.publishEvent(new TradingErrorEvent(null,
                 "[접수 결과 불명] %s %s %s orderId=%s — %s. 자동 재접수되지 않음 — 증권사 확인 후 런북 정정"
                         .formatted(accountLabel, order.ticker(), order.direction(), order.id(), e.getMessage())));
@@ -126,28 +126,28 @@ class OrderSubmitter {
             CancelOutcome outcome = brokerOrderCorrectionPort.cancel(new CancelInstruction(order.ticker(), externalOrderId), account);
             boolean filled = switch (outcome) {
                 case CANCELLED -> {
-                    log.warn("[orderId={}] [{}] {} {} 접수 중 DB 주문 상태가 바뀜 — 증권사 주문 즉시 취소 (externalOrderId={})",
-                            order.id(), accountLabel, order.direction(), order.ticker(), externalOrderId);
+                    log.warn("[orderId={}] [accountId={}] {} {} 접수 중 DB 주문 상태가 바뀜 — 증권사 주문 즉시 취소 (externalOrderId={})",
+                            order.id(), order.accountId(), order.direction(), order.ticker(), externalOrderId);
                     yield false;
                 }
                 case ALREADY_CANCELED -> {
                     // 증권사에서 이미 취소·만료 — DB와 맞는 상태라 알림 불필요
-                    log.warn("[orderId={}] [{}] {} {} 접수 중 DB 주문 상태가 바뀜 — 증권사에서 이미 취소됨 (externalOrderId={})",
-                            order.id(), accountLabel, order.direction(), order.ticker(), externalOrderId);
+                    log.warn("[orderId={}] [accountId={}] {} {} 접수 중 DB 주문 상태가 바뀜 — 증권사에서 이미 취소됨 (externalOrderId={})",
+                            order.id(), order.accountId(), order.direction(), order.ticker(), externalOrderId);
                     yield false;
                 }
                 case ALREADY_FILLED -> true;
             };
             if (filled) {
-                log.error("[orderId={}] [{}] {} {} 접수 중 DB 주문 상태가 바뀌었으나 증권사에서 이미 체결됨 — DB 정정 필요 (externalOrderId={})",
-                        order.id(), accountLabel, order.direction(), order.ticker(), externalOrderId);
+                log.error("[orderId={}] [accountId={}] {} {} 접수 중 DB 주문 상태가 바뀌었으나 증권사에서 이미 체결됨 — DB 정정 필요 (externalOrderId={})",
+                        order.id(), order.accountId(), order.direction(), order.ticker(), externalOrderId);
                 eventPublisher.publishEvent(new TradingErrorEvent(null,
                         "[취소 경합] %s %s %s 접수 직후 DB 주문 상태가 바뀌었으나 증권사에서 이미 체결됨 — orderId=%s, externalOrderId=%s. DB 정정 필요"
                                 .formatted(accountLabel, order.ticker(), order.direction(), order.id(), externalOrderId)));
             }
         } catch (Exception e) {
-            log.error("[{}] {} {} 접수 중 상태가 바뀐 주문의 증권사 취소 실패 — 수동 취소 필요 (externalOrderId={})",
-                    accountLabel, order.direction(), order.ticker(), externalOrderId, e);
+            log.error("[orderId={}] [accountId={}] {} {} 접수 중 상태가 바뀐 주문의 증권사 취소 실패 — 수동 취소 필요 (externalOrderId={})",
+                    order.id(), order.accountId(), order.direction(), order.ticker(), externalOrderId, e);
             eventPublisher.publishEvent(new TradingErrorEvent(null,
                     "[취소 경합] %s %s %s 접수 직후 DB 주문 상태가 바뀌어 증권사 취소를 시도했으나 실패 — orderId=%s, externalOrderId=%s. 증권사에서 수동 취소 필요"
                             .formatted(accountLabel, order.ticker(), order.direction(), order.id(), externalOrderId)));
@@ -161,7 +161,7 @@ class OrderSubmitter {
         } catch (OrderStateConflictException conflict) {
             throw conflict;
         } catch (Exception first) {
-            log.warn("markPlaced 1차 실패 — 1초 후 재시도: {}", first.getMessage());
+            log.warn("[orderId={}] markPlaced 1차 실패 — 1초 후 재시도: {}", orderId, first.getMessage());
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException _) {

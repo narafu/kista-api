@@ -211,7 +211,7 @@ public class BacktestEngine {
                 state.value, command.vrBandWidth(), state.poolLimit, state.poolUsed,
                 refClose, refClose, command.vrRecurringAmount());
         CycleOrderStrategy.PlanContext ctx = new CycleOrderStrategy.PlanContext(
-                state.balance, command.ticker(), candle.date(), "backtest", null, null, vrInputs);
+                state.balance, command.ticker(), candle.date(), null, null, null, vrInputs);
 
         Optional<CycleOrderStrategy.OrderPlan> plan = strategies.of(StrategyType.VR).plan(ctx);
         List<PlannedOrder> orders = plan.map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
@@ -272,7 +272,7 @@ public class BacktestEngine {
         CycleOrderStrategy.PlanContext.InfiniteInputs infiniteInputs = new CycleOrderStrategy.PlanContext.InfiniteInputs(
                 state.divisionCount, refClose, state.starPointPrice(), state.reverseMode, state.isFirstReverseDay);
         CycleOrderStrategy.PlanContext ctx = new CycleOrderStrategy.PlanContext(
-                state.balance, command.ticker(), candle.date(), "backtest", infiniteInputs, null, null);
+                state.balance, command.ticker(), candle.date(), null, infiniteInputs, null, null);
 
         Optional<CycleOrderStrategy.OrderPlan> plan = strategies.of(StrategyType.INFINITE).plan(ctx);
         List<PlannedOrder> orders = plan.map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
@@ -345,7 +345,7 @@ public class BacktestEngine {
                 new CycleOrderStrategy.PlanContext.PrivacyInputs(
                         state.cycleStartAmount, base == null ? null : base.toPlan(), refClose);
         CycleOrderStrategy.PlanContext ctx = new CycleOrderStrategy.PlanContext(
-                state.balance, command.ticker(), candle.date(), "backtest", null, privacyInputs, null);
+                state.balance, command.ticker(), candle.date(), null, null, privacyInputs, null);
 
         List<PlannedOrder> orders = strategies.of(StrategyType.PRIVACY).plan(ctx)
                 .map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());

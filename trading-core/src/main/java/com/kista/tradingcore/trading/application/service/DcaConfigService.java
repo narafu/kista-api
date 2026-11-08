@@ -6,6 +6,7 @@ import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.tradingcore.trading.application.port.output.StrategyDcaDetailPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
+import com.kista.tradingcore.trading.application.service.support.OwnedStrategy;
 import com.kista.tradingcore.trading.application.port.output.StrategyVersionPort;
 import com.kista.tradingcore.trading.application.usecase.DcaConfigUseCase;
 import com.kista.tradingcore.trading.domain.model.Strategy;
@@ -32,8 +33,9 @@ class DcaConfigService implements DcaConfigUseCase {
     @Override
     @Transactional
     public void updateConfig(UUID strategyId, UUID requesterId, DcaStrategyConfig requested) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
+        Strategy strategy = owned.strategy();
+        Account account = owned.account();
         strategy.requireNotArchived();
         if (!strategy.isDca()) throw new IllegalArgumentException("DCA 전략이 아닙니다.");
         requested.requireCompatible(account.broker().getMarket()); // 수정도 등록과 같은 시장 규칙 — executionHour 수정 가능

@@ -2,7 +2,6 @@ package com.kista.tradingcore.trading.adapter.in.web.dto;
 
 import com.kista.tradingcore.trading.domain.creation.VrRampInput;
 import com.kista.tradingcore.trading.domain.model.RegisterStrategyCommand;
-import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.UpdateStrategyCommand;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;

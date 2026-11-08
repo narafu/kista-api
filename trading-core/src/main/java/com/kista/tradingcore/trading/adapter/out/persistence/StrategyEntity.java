@@ -1,7 +1,6 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
 import com.kista.shared.platform.persistence.BaseAuditEntity;
-import com.kista.tradingcore.trading.domain.model.Strategy;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;

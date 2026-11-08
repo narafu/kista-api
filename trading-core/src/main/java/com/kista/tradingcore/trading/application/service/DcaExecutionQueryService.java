@@ -5,6 +5,7 @@ import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalend
 import com.kista.tradingcore.trading.application.port.output.DcaExecutionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
+import com.kista.tradingcore.trading.application.service.support.OwnedStrategy;
 import com.kista.tradingcore.trading.application.usecase.DcaExecutionQuery;
 import com.kista.tradingcore.trading.domain.model.DcaExecution;
 import com.kista.tradingcore.trading.domain.model.DcaExecutionFilter;
@@ -35,8 +36,7 @@ class DcaExecutionQueryService implements DcaExecutionQuery {
     @Override
     @Transactional(readOnly = true)
     public DcaExecutionPage list(UUID strategyId, UUID requesterId, DcaExecutionFilter filter, int page, int size) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        Strategy strategy = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId).strategy();
         if (!strategy.isDca()) throw new IllegalArgumentException("DCA 전략이 아닙니다.");
 
         int safePage = Math.max(page, 0);

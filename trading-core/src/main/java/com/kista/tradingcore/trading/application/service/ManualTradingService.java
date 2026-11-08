@@ -1,4 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
+import com.kista.tradingcore.trading.application.service.support.OwnedStrategy;
 import com.kista.tradingcore.trading.application.service.support.TradingOrderPlanner;
 
 import com.kista.tradingcore.account.application.port.output.AccountPort;
@@ -54,10 +55,11 @@ class ManualTradingService {
     // package-private: DstInfo 주입으로 단위 테스트에서 개장 여부를 결정론적으로 고정
     List<Order> execute(UUID strategyId, UUID requesterId, DstInfo dst) {
         // 동기 검증: 소유권·상태
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
+        OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
+        Strategy strategy = owned.strategy();
         // 소유권 검증은 Account 애그리게이트로 끝내고, 이후 실행 경로는 투영(TradingAccount)만 사용
-        TradingAccount account = TradingAccount.from(accountPort.requireOwnedAccount(strategy.accountId(), requesterId));
-        if (strategy.isDca()) throw new DcaManualExecutionUnsupportedException(); // DCA는 배치 전용(spec 7.5)
+        TradingAccount account = TradingAccount.from(owned.account());
+        if (strategy.isDca()) throw new DcaManualExecutionUnsupportedException(); // DCA는 배치 전용
         if (!strategy.isActive())
             throw new IllegalStateException("활성 상태의 전략만 수동 실행할 수 있습니다.");
 
@@ -79,15 +81,15 @@ class ManualTradingService {
         // (전일종가 조회는 내부적으로 BrokerCallGuard.wrap 경유 브로커 호출이라 실패 시 raw 예외가 나올 수 있음 — 아래서 동일 패턴으로 흡수)
         StrategyOrderPlanBuilder.PlanResult result;
         try {
-            result = planBuilder.build(strategy, account, currentCycle, today, account.nickname(), Map.of());
+            result = planBuilder.build(strategy, account, currentCycle, today, account.id(), Map.of());
         } catch (Exception e) {
-            log.warn("[{}] 계획 계산 실패 — 바로주문 중단: account={}, ticker={}, error={}",
-                    account.nickname(), account.id(), strategy.ticker().name(), e.getMessage());
+            log.warn("[accountId={}] 계획 계산 실패 — 바로주문 중단: ticker={}, error={}",
+                    account.id(), strategy.ticker().name(), e.getMessage());
             throw queryFailure(eventPublisher, e);
         }
         if (result.isSkip()) {
             // NO_CYCLE_HISTORY(사이클 이력 없음)는 데이터 무결성 오류에 준하므로 조용한 무동작이 아닌 시끄러운 실패로 승격 —
-            // 그 외(PRIVACY 기준매매표 미수신 등)는 pre-Task3 ManualTradingService도 조용히 스킵했으므로 회귀 아님, 그대로 유지
+            // 그 외(PRIVACY 기준매매표 미수신 등)는 기존 수동 실행도 조용히 스킵했던 동작이라 그대로 유지
             if (result.skipReason() == SkipReason.NO_CYCLE_HISTORY) {
                 throw new ManualTradingException("전략 실행 이력이 없어 수동 실행할 수 없습니다");
             }
@@ -118,8 +120,8 @@ class ManualTradingService {
                 try {
                     fit = ledgerBudget.fit(strategy.type(), preparedOrders, ledgerBudget.remaining(currentCycle, today));
                 } catch (Exception e) {
-                    log.warn("[{}] 원장 조회 실패 — 바로주문 중단: account={}, ticker={}, error={}",
-                            account.nickname(), account.id(), strategy.ticker().name(), e.getMessage());
+                    log.warn("[accountId={}] 원장 조회 실패 — 바로주문 중단: ticker={}, error={}",
+                            account.id(), strategy.ticker().name(), e.getMessage());
                     throw queryFailure(eventPublisher, e);
                 }
                 if (fit.rejected()) throw new ManualTradingException("전략 원장 예수금이 부족합니다.");
@@ -141,7 +143,7 @@ class ManualTradingService {
 
     // BUY 가격 캡 판단용 현재가 — 조회 실패 시 캡 미적용(null이면 prepareForAllocation이 원본 그대로 반환)
     private BigDecimal fetchStartPriceOrNull(Strategy strategy, TradingAccount account) {
-        return BrokerCallGuard.tryGet(account.nickname() + " 캡 판단용 현재가",
+        return BrokerCallGuard.tryGet("캡 판단용 현재가 조회: accountId=" + account.id(),
                 () -> priceFetcher.fetchPrices(List.of(strategy.ticker()), account.brokerRef()).get(strategy.ticker())).orElse(null);
     }
 
@@ -156,7 +158,7 @@ class ManualTradingService {
             if (orderPort.findAtOpenPlannedByCycleAndDate(cycle.id(), today).isEmpty()) return;
             // BUY cap 판단용 최신 현재가 재조회 — 단일 전략 수동 실행이라 ticker 1개(배치 불필요)
             BigDecimal currentPrice = priceFetcher.fetchPrices(List.of(strategy.ticker()), account.brokerRef()).get(strategy.ticker());
-            log.info("[{}] 개장 후 수동 실행 — AT_OPEN 주문 접수", account.nickname());
+            log.info("[accountId={}] 개장 후 수동 실행 — AT_OPEN 주문 접수", account.id());
             orderExecutor.placeAtOpenOrders(today, account, cycle, currentPrice, position, vrPosition, strategy);
         }
     }

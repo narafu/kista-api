@@ -7,19 +7,13 @@ import com.kista.tradingcore.trading.application.service.support.TradingParallel
 import com.kista.tradingcore.trading.application.service.support.TradingBalanceLoader;
 import com.kista.tradingcore.trading.application.service.support.TradingBatchRunState;
 
-import com.kista.shared.kernel.Broker;
-import com.kista.tradingcore.broker.domain.model.PriceSnapshot;
-import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.trading.domain.model.*;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.tradingcore.matching.domain.model.*;
 import com.kista.shared.kernel.StrategyTicker;
-import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.trading.application.port.output.*;
-import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
-import com.kista.tradingcore.trading.application.event.BatchInterruptedEvent;
 import com.kista.tradingcore.trading.application.event.MarketClosedEvent;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import lombok.RequiredArgsConstructor;
@@ -34,9 +28,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -243,8 +234,9 @@ class TradingService {
             log.info("마감 리포트 재개 — 대상 {}건 (전체 {}건)", targets.size(), contexts.size());
 
             // 마감 전이면 남은 시간만 대기 — 이미 지났으면 마감 알림도 이전 프로세스가 보냈을 수 있어 생략
-            if (dst.waitUntilPostClose(Instant.now(clock)).isPositive()) {
-                waitFor("마감 시각", dst.waitUntilPostClose(Instant.now(clock)), dst);
+            Duration untilPostClose = dst.waitUntilPostClose(Instant.now(clock));
+            if (untilPostClose.isPositive()) {
+                waitFor("마감 시각", untilPostClose, dst);
                 marketEventNotifier.notifyMarketClose();
             }
             if (targets.isEmpty()) {
@@ -350,7 +342,7 @@ class TradingService {
         // 가격 스냅샷 + PRIVACY 기준 매매표 일괄 조회 (개장 전 현시점, 내일 기준 — FIDA가 미리 송신했을 경우)
         TradingPriceFetcher.PriceContext priceCtx = screenPrivacyBase(priceFetcher.loadPriceContext(started, tradeDate), tradeDate, "개장 배치");
 
-        // KIS DCA MOO/LOO는 개장 경매 참여를 위해 개장 전에 접수한다(spec 5.6) — 나머지 AT_OPEN은 개장 후 기존 흐름
+        // KIS DCA MOO/LOO는 개장 경매 참여를 위해 개장 전에 접수한다 — 나머지 AT_OPEN은 개장 후 기존 흐름
         try {
             placePreOpenDcaOrders(started, tradeDate, priceCtx);
         } catch (RuntimeException e) {

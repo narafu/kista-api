@@ -4,7 +4,6 @@ import com.kista.shared.kernel.DcaExecutionStatus;
 import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.platform.persistence.BaseCreatedAtEntity;
-import com.kista.tradingcore.trading.domain.model.DcaExecution;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
-import com.kista.tradingcore.trading.domain.model.Strategy;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;

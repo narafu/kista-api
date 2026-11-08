@@ -5,6 +5,7 @@ import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeValidationReport;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
@@ -14,6 +15,7 @@ import java.time.LocalDate;
 // 저장 때 경고로 통과한 기준표(예: 보유 중인데 매도 없음)도 배치 계획 직전 재점검에서 이슈가 있으면 기준표를 쓰지 않는다(null).
 // 전략을 배치에서 빼지 않고 기준표만 비우는 이유: "기준표 미수신"과 같은 경로를 타 신규 PRIVACY 주문은 만들지 않되,
 // 그날 이미 PLANNED·PLACED된 주문(바로 주문·재개 등)은 그대로 접수·체결 기록·리포트까지 이어지게 하기 위해서다.
+@Slf4j
 @Component
 @RequiredArgsConstructor
 class PrivacyBaseGuard {
@@ -32,8 +34,9 @@ class PrivacyBaseGuard {
                             + report.summary()));
         } catch (RuntimeException e) {
             // 점검 자체가 실패하면 안전하게 차단(fail-closed)
+            log.error("PRIVACY 기준 매매표 점검 실패: batchLabel={}, tradeDate={}", batchLabel, tradeDate, e);
             eventPublisher.publishEvent(new TradingErrorEvent(null,
-                    "[PRIVACY] " + batchLabel + " 기준 매매표 점검 실패 — 신규 PRIVACY 주문 생성 skip (거래일 " + tradeDate + ")"));
+                    "[PRIVACY] " + batchLabel + " 기준 매매표 점검 실패 — 신규 PRIVACY 주문 생성 skip (거래일 " + tradeDate + "): " + e.getMessage()));
         }
         return null;
     }
@@ -43,7 +46,8 @@ class PrivacyBaseGuard {
         if (base == null) return false;
         try {
             return !validationService.inspect(base).hasIssues();
-        } catch (RuntimeException _) {
+        } catch (RuntimeException e) {
+            log.warn("PRIVACY 기준 매매표 점검 실패(사용 불가 판정): {}", e.getMessage());
             return false;
         }
     }

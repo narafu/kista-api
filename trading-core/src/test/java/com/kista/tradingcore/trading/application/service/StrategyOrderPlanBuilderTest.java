@@ -69,7 +69,7 @@ class StrategyOrderPlanBuilderTest {
         when(balanceLoader.tryLoadBalance(strategy))
                 .thenReturn(new TradingBalanceLoader.BalanceLoad(null, SkipReason.NO_CYCLE_HISTORY));
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label", Map.of());
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, account.id(), Map.of());
 
         assertThat(result.isSkip()).isTrue();
         assertThat(result.skipReason()).isEqualTo(SkipReason.NO_CYCLE_HISTORY);
@@ -84,10 +84,10 @@ class StrategyOrderPlanBuilderTest {
         when(orderStrategy.requiresPrevClose()).thenReturn(true);
         when(pricePort.getPrevClose(StrategyTicker.SOXL, account.brokerRef())).thenReturn(new BigDecimal("21.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of());
-        when(orderComputer.compute(balance, strategy, new BigDecimal("21.00"), today, cycle, null, "label", null, null))
+        when(orderComputer.compute(balance, strategy, new BigDecimal("21.00"), today, cycle, null, account.id(), null, null))
                 .thenReturn(Optional.of(plan));
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label", Map.of());
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, account.id(), Map.of());
 
         assertThat(result.isSkip()).isFalse();
         assertThat(result.plan()).isSameAs(plan);
@@ -108,16 +108,16 @@ class StrategyOrderPlanBuilderTest {
         when(pricePort.getPrevClose(StrategyTicker.TQQQ, account.brokerRef())).thenReturn(new BigDecimal("100.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of());
         when(orderComputer.compute(eq(balance), eq(vrStrategy), nullable(BigDecimal.class),
-                eq(today), eq(vrCycle), eq(null), eq("vr-preview"), eq(null), eq(null)))
+                eq(today), eq(vrCycle), eq(null), eq(account.id()), eq(null), eq(null)))
                 .thenReturn(Optional.of(plan));
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(vrStrategy, account, vrCycle, today, "vr-preview", Map.of());
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(vrStrategy, account, vrCycle, today, account.id(), Map.of());
 
         assertThat(result.isSkip()).isFalse();
         assertThat(result.plan()).isSameAs(plan);
         verify(pricePort).getPrevClose(StrategyTicker.TQQQ, account.brokerRef());
         verify(orderComputer).compute(balance, vrStrategy, new BigDecimal("100.00"),
-                today, vrCycle, null, "vr-preview", null, null);
+                today, vrCycle, null, account.id(), null, null);
     }
 
     @Test
@@ -127,10 +127,10 @@ class StrategyOrderPlanBuilderTest {
                 .thenReturn(new TradingBalanceLoader.BalanceLoad(balance, null));
         when(orderStrategy.requiresPrevClose()).thenReturn(false);
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of());
-        when(orderComputer.compute(balance, strategy, null, today, cycle, null, "label", null, null))
+        when(orderComputer.compute(balance, strategy, null, today, cycle, null, account.id(), null, null))
                 .thenReturn(Optional.of(plan));
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label", Map.of());
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, account.id(), Map.of());
 
         assertThat(result.isSkip()).isFalse();
         verify(pricePort, never()).getPrevClose(any(), any());
@@ -143,11 +143,11 @@ class StrategyOrderPlanBuilderTest {
                 .thenReturn(new TradingBalanceLoader.BalanceLoad(balance, null));
         when(orderStrategy.requiresPrevClose()).thenReturn(true);
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of());
-        when(orderComputer.compute(balance, strategy, new BigDecimal("22.00"), today, cycle, null, "label", null, null))
+        when(orderComputer.compute(balance, strategy, new BigDecimal("22.00"), today, cycle, null, account.id(), null, null))
                 .thenReturn(Optional.of(plan));
         Map<StrategyTicker, BigDecimal> prevCloseCache = Map.of(StrategyTicker.SOXL, new BigDecimal("22.00"));
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label", prevCloseCache);
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, account.id(), prevCloseCache);
 
         assertThat(result.isSkip()).isFalse();
         assertThat(result.plan()).isSameAs(plan);
@@ -162,10 +162,10 @@ class StrategyOrderPlanBuilderTest {
         when(orderStrategy.requiresPrevClose()).thenReturn(true);
         when(pricePort.getPrevClose(StrategyTicker.SOXL, account.brokerRef())).thenReturn(new BigDecimal("21.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of());
-        when(orderComputer.compute(balance, strategy, new BigDecimal("21.00"), today, cycle, null, "label", null, null))
+        when(orderComputer.compute(balance, strategy, new BigDecimal("21.00"), today, cycle, null, account.id(), null, null))
                 .thenReturn(Optional.of(plan));
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label", Map.of());
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, account.id(), Map.of());
 
         assertThat(result.isSkip()).isFalse();
         verify(pricePort).getPrevClose(StrategyTicker.SOXL, account.brokerRef());
@@ -177,10 +177,10 @@ class StrategyOrderPlanBuilderTest {
         when(balanceLoader.tryLoadBalance(strategy))
                 .thenReturn(new TradingBalanceLoader.BalanceLoad(balance, null));
         when(orderStrategy.requiresPrevClose()).thenReturn(false);
-        when(orderComputer.compute(balance, strategy, null, today, cycle, null, "label", null, null))
+        when(orderComputer.compute(balance, strategy, null, today, cycle, null, account.id(), null, null))
                 .thenReturn(Optional.empty());
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label", Map.of());
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, account.id(), Map.of());
 
         assertThat(result.isSkip()).isTrue();
         assertThat(result.skipReason()).isEqualTo(SkipReason.NO_PRIVACY_BASE);
@@ -199,7 +199,7 @@ class StrategyOrderPlanBuilderTest {
         when(privacyTradePort.findTodayTrade(today)).thenReturn(Optional.of(base));
         when(privacyBaseGuard.usable(base)).thenReturn(false);
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(privacy, account, cycle, today, "label", Map.of());
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(privacy, account, cycle, today, account.id(), Map.of());
 
         assertThat(result.isSkip()).isTrue();
         assertThat(result.skipReason()).isEqualTo(SkipReason.PRIVACY_BASE_BLOCKED);
@@ -219,10 +219,10 @@ class StrategyOrderPlanBuilderTest {
         when(orderStrategy.requiresPrevClose()).thenReturn(false);
         when(privacyTradePort.findTodayTrade(today)).thenReturn(Optional.of(base));
         when(privacyBaseGuard.usable(base)).thenReturn(true);
-        when(orderComputer.compute(balance, privacy, null, today, cycle, base, "label", null, null))
+        when(orderComputer.compute(balance, privacy, null, today, cycle, base, account.id(), null, null))
                 .thenReturn(Optional.of(plan));
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(privacy, account, cycle, today, "label", Map.of());
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(privacy, account, cycle, today, account.id(), Map.of());
 
         assertThat(result.plan()).isSameAs(plan);
     }

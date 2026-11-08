@@ -102,7 +102,7 @@ class DcaCycleOrderStrategyTest {
                 .map(r -> new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, List.of(new BigDecimal("100")), null,
                         null, null, null, cash, null)).toList();
         var plan = strategy.plan(new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy.PlanContext(
-                new AccountBalance(0, null, BigDecimal.ZERO), StrategyTicker.UPRO, DAY, "t", null, null, null,
+                new AccountBalance(0, null, BigDecimal.ZERO), StrategyTicker.UPRO, DAY, null, null, null, null,
                 new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy.PlanContext.DcaPlanInputs(due))).orElseThrow();
         assertThat(plan.orders()).extracting(PlannedOrder::quantity).containsExactly(2, 1);
     }

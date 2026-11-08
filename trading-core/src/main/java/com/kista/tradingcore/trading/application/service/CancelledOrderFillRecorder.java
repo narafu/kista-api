@@ -38,7 +38,7 @@ class CancelledOrderFillRecorder {
                         () -> executionPort.getExecutions(key.tradeDate(), key.tradeDate(), key.ticker(), ref))
                         .ifPresent(executions -> write(orders, OrderFill.byExternalOrderId(executions)));
             } catch (RuntimeException e) {
-                log.warn("취소 주문 체결 기록 실패 — {} {}: {}", key.ticker(), key.tradeDate(), e.toString());
+                log.warn("[accountId={}] 취소 주문 체결 기록 실패 — {} {}: {}", ref.id(), key.ticker(), key.tradeDate(), e.getMessage());
             }
         });
     }
@@ -52,7 +52,7 @@ class CancelledOrderFillRecorder {
                 BigDecimal avg = fill == null || fill.quantity().signum() == 0 ? null : fill.avgPrice();
                 stateWriter.recordCancelledFill(order.id(), quantity, avg);
             } catch (RuntimeException e) {
-                log.warn("[orderId={}] 취소 체결 기록 실패: {}", order.id(), e.toString());
+                log.warn("[orderId={}] 취소 체결 기록 실패: {}", order.id(), e.getMessage());
             }
         }
     }

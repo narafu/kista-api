@@ -37,7 +37,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -50,7 +49,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @RequiredArgsConstructor
 class DcaPlanInputCollector {
 
-    private static final int CANDLE_COUNT = 250;            // SMA 최대 200 + RSI 안정화 (spec 6.1)
+    private static final int CANDLE_COUNT = 250;            // SMA 최대 200 + RSI 안정화
     private static final int PREVIOUS_SESSION_SCAN_DAYS = 10; // 직전 개장일 역탐색 상한 (연휴 여유)
     private static final Duration FEAR_GREED_TTL = Duration.ofMinutes(10); // 배치 1회를 덮는 길이 — 10분 안의 재계획(수동 실행 포함)은 같은 값
 
@@ -64,7 +63,7 @@ class DcaPlanInputCollector {
     private final TradingBatchRunPort batchRunPort;         // 마감 리포트 여부 — 리포트 후엔 취소분 체결이 원장에 반영됨
     // (ticker, US 세션) → 검증된 종가 — 세션 이전 확정 봉은 불변이라 배치·전략 간 공유, 실패는 캐시하지 않음
     private final Map<CandleKey, List<BigDecimal>> closeCache = new ConcurrentHashMap<>();
-    // 최신 CNN 지수 단기 메모 — 같은 배치의 전략들이 공유, TTL 경과·실패 시 재조회 (spec 6.2)
+    // 최신 CNN 지수 단기 메모 — 같은 배치의 전략들이 공유, TTL 경과·실패 시 재조회
     private final AtomicReference<FearGreedMemo> fearGreedMemo = new AtomicReference<>();
     InstantSource clock = InstantSource.system(); // TTL 판정용 시계 — 테스트에서 고정 시계로 교체
     // 직전 US 개장일 세션 메모 — 일봉 신선도 검증에서 같은 세션의 전략들이 캘린더 스캔을 공유
@@ -95,9 +94,9 @@ class DcaPlanInputCollector {
             if (dcaExecutionPort.find(strategy.id(), key, tradeDate).isPresent()) continue; // 이미 판정됨
 
             // 주문 저장 후 이력 기록 전 중단된 재개 — 기존 규칙 주문으로 ORDERED 복구 (다른 timing 배치에서도 복구되도록 timing 판정보다 먼저)
-            Optional<Order> existing = existingOrders.stream().filter(o -> rule.orderLeg().equals(o.orderLeg())).findFirst();
-            if (existing.isPresent()) {
-                recoveries.put(key, existing.get());
+            Order existing = existingOrders.stream().filter(o -> rule.orderLeg().equals(o.orderLeg())).findFirst().orElse(null);
+            if (existing != null) {
+                recoveries.put(key, existing);
                 continue;
             }
 
@@ -107,9 +106,9 @@ class DcaPlanInputCollector {
 
             // PLANNED/PLACED 외 상태(FILLED 등)로 넘어간 당일 규칙 주문 — 이력만 누락된 경우 다시 접수하지 않고 복구
             if (todayOrders == null) todayOrders = orderPort.findByStrategyId(strategy.id(), tradeDate, tradeDate);
-            Optional<Order> terminal = todayOrders.stream().filter(o -> rule.orderLeg().equals(o.orderLeg())).findFirst();
-            if (terminal.isPresent()) {
-                recoveries.put(key, terminal.get());
+            Order terminal = todayOrders.stream().filter(o -> rule.orderLeg().equals(o.orderLeg())).findFirst().orElse(null);
+            if (terminal != null) {
+                recoveries.put(key, terminal);
                 continue;
             }
 

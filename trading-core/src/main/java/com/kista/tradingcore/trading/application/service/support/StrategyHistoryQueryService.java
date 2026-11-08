@@ -99,8 +99,7 @@ public class StrategyHistoryQueryService {
     public CycleHistoryPage getByStrategy(UUID strategyId, UUID requesterId,
                                    LocalDate from, LocalDate to,
                                    Instant cursor, int size) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        Strategy strategy = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId).strategy();
         Instant fromInstant = resolveHistoryFrom(from);
         Instant effectiveCursor = cursor != null ? cursor : resolveHistoryTo(to);
         List<CyclePositionHistoryEntry> raw =
@@ -114,8 +113,7 @@ public class StrategyHistoryQueryService {
     // 전략(사이클) 기준 기간 내 주문 내역 조회 — 사용자 전략 상세 화면용
     @Transactional(readOnly = true)
     public List<Order> getOrdersByStrategy(UUID strategyId, UUID requesterId, LocalDate from, LocalDate to) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        Strategy strategy = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId).strategy();
         return orderPort.findByStrategyId(strategyId, from, to);
     }
 

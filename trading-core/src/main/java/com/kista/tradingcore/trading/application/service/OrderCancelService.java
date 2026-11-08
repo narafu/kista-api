@@ -13,6 +13,7 @@ import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
+import com.kista.tradingcore.trading.application.service.support.OwnedStrategy;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
 import com.kista.tradingcore.broker.domain.model.CancelOutcome;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
@@ -49,9 +50,8 @@ class OrderCancelService {
 
     CancelResult cancelByCycle(UUID strategyId, UUID requesterId) {
         // 소유권 검증: 전략 → 계좌 → 요청자 일치 확인
-        var strategy = strategyPort.findByIdOrThrow(strategyId);
-        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        return cancelOpenOrders(strategy.id(), account);
+        OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
+        return cancelOpenOrders(owned.strategy().id(), owned.account());
     }
 
     // 코인 거래소 시장가는 접수 즉시 체결돼 취소할 증권사 주문이 없다 — SUBMITTING·PLACED는 다음 10분 틱의 CryptoOrderSynchronizer가 확정한다.

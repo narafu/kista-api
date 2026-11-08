@@ -111,8 +111,8 @@ class TradingCandidatePlanner {
     // 잔고 로드 — KIS·Toss 모두 cycle_position DB 이력 사용 (전략 공식 기준)
     private AccountBalance loadBalance(Strategy strategy, TradingAccount account) {
         AccountBalance balance = balanceLoader.loadBalanceOrThrow(strategy).balance();
-        log.info("잔고 조회: [{}] {} {}주, 통합주문가능금액 ${}",
-                account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
+        log.info("[accountId={}] 잔고 조회: {} {}주, 통합주문가능금액 ${}",
+                account.id(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
         return balance;
     }
 
@@ -153,28 +153,29 @@ class TradingCandidatePlanner {
             dca.recoveries().forEach((ruleKey, order) -> dcaExecutionRecorder.recordOrdered(ctx, tradeDate, ruleKey, order, null));
         }
         Optional<CycleOrderStrategy.OrderPlan> planOpt = orderComputer.compute(balance, strategy, prevClosePrice, tradeDate,
-                ctx.currentCycle(), privacyBase, account.nickname(), price, dca == null ? null : dca.inputs());
+                ctx.currentCycle(), privacyBase, account.id(), price, dca == null ? null : dca.inputs());
         if (planOpt.isEmpty()) {
-            log.info("[{}] 전략 계산 skip (PRIVACY 기준 미수신 등)", account.nickname());
+            log.info("[accountId={}] 전략 계산 skip (PRIVACY 기준 미수신 등)", account.id());
             if (existingOrders.isEmpty()) return null;
             CycleState existingState = buildCycleStateFromExistingOrders(
                     ctx, balance, priceSnapshot, privacyBase, tradeDate, existingOrders.size(), true);
             return new CyclePlanCandidate(existingState, List.of(), true);
         }
-        if (dca != null) recordDcaSkips(ctx, tradeDate, planOpt.get().skips(), dca.inputs());
+        CycleOrderStrategy.OrderPlan plan = planOpt.get();
+        if (dca != null) recordDcaSkips(ctx, tradeDate, plan.skips(), dca.inputs());
 
         // 예산 배정 전에 전략별 가격 cap을 반영해 최종 BUY 수량과 correction 주문까지 포함한다.
         List<PlannedOrder> preparedOrders = strategyHandler.fixesPricesAtPlan()
-                ? planOpt.get().orders() // 계획 시점 캡가 고정 — 현재가 기준 재캡 없음
+                ? plan.orders() // 계획 시점 캡가 고정 — 현재가 기준 재캡 없음
                 : priceCapper.prepareForAllocation(
-                        planOpt.get().orders(), price, planOpt.get().position(), planOpt.get().vrPosition(), strategy.ticker(),
+                        plan.orders(), price, plan.position(), plan.vrPosition(), strategy.ticker(),
                         strategy.type(), tradeDate);
         validateConcreteOrderLegs(strategy, preparedOrders);
         List<PlannedOrder> creatableOrders = filterCreatableOrders(
                 preparedOrders, existingOrders, creatableTimings);
         PrivacyTradeBase privacyBaseForState = strategy.requiresPrivacyBase() ? privacyBase : null;
-        CycleState state = new CycleState(ctx, balance, planOpt.get().position(), planOpt.get().vrPosition(), price, privacyBaseForState);
-        return new CyclePlanCandidate(state, creatableOrders, !existingOrders.isEmpty(), planOpt.get().referencePrices());
+        CycleState state = new CycleState(ctx, balance, plan.position(), plan.vrPosition(), price, privacyBaseForState);
+        return new CyclePlanCandidate(state, creatableOrders, !existingOrders.isEmpty(), plan.referencePrices());
     }
 
     // 규칙 skip 판정 이력 기록 — 방향은 판정 입력의 규칙에서 찾는다(ruleKey는 버전 내 유일)
@@ -210,12 +211,12 @@ class TradingCandidatePlanner {
         Strategy strategy = ctx.strategy();
         TradingAccount account = ctx.account();
         BigDecimal price = priceSnapshot != null ? priceSnapshot.current() : null;
-        log.info("[{}] 오늘 주문 {}건 존재 — 재계산 skip", account.nickname(), existingCount);
+        log.info("[accountId={}] 오늘 주문 {}건 존재 — 재계산 skip", account.id(), existingCount);
         if (strategy.isInfinite() && recalculateInfinitePosition) {
             // position 재계산: 저장 없이 매수 보정(BuyOrderPriceCapper)용으로만 사용
             BigDecimal prevClosePrice = PriceSnapshot.prevCloseOrNull(priceSnapshot);
             InfinitePosition recalcPos = orderComputer.compute(
-                    balance, strategy, prevClosePrice, today, ctx.currentCycle(), null, account.nickname(), price)
+                    balance, strategy, prevClosePrice, today, ctx.currentCycle(), null, account.id(), price)
                     .map(CycleOrderStrategy.OrderPlan::position).orElse(null);
             return new CycleState(ctx, balance, recalcPos, null, price, null);
         }
@@ -250,7 +251,7 @@ class TradingCandidatePlanner {
                     BatchContext firstContext = accountSlots.getFirst().ctx();
                     UUID accountId = firstContext.account().id();
                     return new TradingParallelRunner.Task<AccountAllocation>(accountId,
-                            () -> budgetLock.call(accountId, () -> allocateAndSave(accountSlots, firstContext, tradeDate, dcaReferencePrices)));
+                            () -> budgetLock.call(accountId, () -> allocateAndSave(accountSlots, tradeDate, dcaReferencePrices)));
                 })
                 .toList();
 
@@ -294,7 +295,7 @@ class TradingCandidatePlanner {
     private record AccountAllocation(List<BatchContext> savedContexts, List<BatchContext> rejectedContexts) {}
 
     // 계좌 예산 락 안에서 실행 — 사이클마다 저장 직전 원장 잔여를 계산하고(이미 저장된 슬롯은 한 번만 차감), 통과분을 저장한다
-    private Optional<AccountAllocation> allocateAndSave(List<Slot> accountSlots, BatchContext firstContext,
+    private Optional<AccountAllocation> allocateAndSave(List<Slot> accountSlots,
                                                         LocalDate tradeDate,
                                                         Map<BatchContext, Map<String, BigDecimal>> dcaReferencePrices)
             throws InterruptedException {

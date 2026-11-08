@@ -2,6 +2,7 @@ package com.kista.tradingcore.trading.application.service;
 
 import java.util.NoSuchElementException;
 import com.kista.shared.kernel.Market;
+import com.kista.tradingcore.trading.application.service.support.OwnedStrategy;
 import com.kista.tradingcore.trading.application.service.support.StrategyHistoryQueryService;
 
 import com.kista.tradingcore.account.application.port.output.AccountPort;
@@ -68,8 +69,9 @@ class StrategyService implements StrategyUseCase {
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 증권사 주문 취소 HTTP 포함 — DB 쓰기는 StrategyStateWriter 짧은 트랜잭션
     public void delete(UUID strategyId, UUID requesterId) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
+        Strategy strategy = owned.strategy();
+        Account account = owned.account();
         // 먼저 PAUSED로 기록해 이후 배치가 이 전략으로 새 주문을 만들지 않게 한 뒤 미체결 주문을 정리한다
         // 일시 장애로 증권사 취소에 실패한 주문이 있으면 삭제하지 않는다(삭제된 전략의 주문이 증권사에 남지 않도록) — 전략은 PAUSED로 남는다
         // 자격증명 오류(키 만료·철회)는 재시도로 풀리지 않아 삭제를 막지 않는다 — 그 주문은 PLACED로 남고 관리자에게 알린다
@@ -87,8 +89,9 @@ class StrategyService implements StrategyUseCase {
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 증권사 주문 취소 HTTP 포함 — DB 쓰기는 StrategyStateWriter 짧은 트랜잭션
     public void pause(UUID strategyId, UUID requesterId) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
+        Strategy strategy = owned.strategy();
+        Account account = owned.account();
         strategy.requireNotArchived(); // 보관 전략은 일시중지도 불가 (소유권 검증 이후 수행)
         // 중복 상태 guard — 이미 일시중지된 전략은 다시 일시중지 불가
         if (strategy.isPaused()) {
@@ -108,8 +111,9 @@ class StrategyService implements StrategyUseCase {
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 증권사 주문 취소 HTTP 포함 — DB 쓰기는 StrategyStateWriter 짧은 트랜잭션
     public void archive(UUID strategyId, UUID requesterId) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
+        Strategy strategy = owned.strategy();
+        Account account = owned.account();
         if (strategy.isArchived()) {
             throw new IllegalStateException("이미 보관된 전략입니다.");
         }
@@ -150,7 +154,7 @@ class StrategyService implements StrategyUseCase {
 
     @Override
     public void resume(UUID strategyId, UUID requesterId) {
-        Strategy strategy = requireOwnedStrategy(strategyId, requesterId);
+        Strategy strategy = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId).strategy();
         strategy.requireNotArchived(); // 보관은 한 방향 — 재개 불가
         // 중복 상태 guard — 이미 활성화된 전략은 재활성화 불가 (소유권 검증 이후 수행)
         if (strategy.isActive()) {
@@ -161,13 +165,6 @@ class StrategyService implements StrategyUseCase {
             throw new IllegalStateException("보관된 전략은 변경할 수 없습니다.");
         }
         log.info("[strategyId={}] 전략 재개", strategyId);
-    }
-
-    // 전략 조회 + 소유권 검증 — delete/pause/resume/getById/update 공용
-    private Strategy requireOwnedStrategy(UUID strategyId, UUID requesterId) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        return strategy;
     }
 
     // cycleSeedType=NONE 전략은 청산 시 자동 rotation 없이 사이클이 종료된 채로 PAUSED된다(CycleRotationService).
@@ -226,15 +223,17 @@ class StrategyService implements StrategyUseCase {
     @Override
     @Transactional(readOnly = true)
     public StrategyDetail getById(UUID strategyId, UUID requesterId) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
+        Strategy strategy = owned.strategy();
+        Account account = owned.account();
         return detailAssembler.toDetail(strategy, account.broker().getMarket());
     }
 
     @Override
     public StrategyDetail update(UUID strategyId, UUID requesterId, UpdateStrategyCommand cmd) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
+        Strategy strategy = owned.strategy();
+        Account account = owned.account();
         strategy.requireNotArchived();
         if (strategy.isVr() && cmd.newSeed() != null) {
             throw new IllegalArgumentException("VR 전략의 시작 예수금은 일반 수정으로 변경할 수 없습니다. VR 재설정을 이용해야 합니다.");

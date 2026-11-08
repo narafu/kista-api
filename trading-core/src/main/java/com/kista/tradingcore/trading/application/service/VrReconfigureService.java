@@ -22,6 +22,7 @@ import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCycleVrPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
+import com.kista.tradingcore.trading.application.service.support.OwnedStrategy;
 import com.kista.tradingcore.trading.application.port.output.StrategyVrDetailPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import lombok.RequiredArgsConstructor;
@@ -60,8 +61,9 @@ class VrReconfigureService implements VrReconfigureUseCase {
 
     @Override
     public void reconfigure(UUID strategyId, UUID requesterId, ReconfigureVrCommand cmd) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
+        Strategy strategy = owned.strategy();
+        Account account = owned.account();
         strategy.requireNotArchived();
         if (!strategy.isVr()) {
             throw new IllegalArgumentException("VR 전략만 재설정할 수 있습니다.");

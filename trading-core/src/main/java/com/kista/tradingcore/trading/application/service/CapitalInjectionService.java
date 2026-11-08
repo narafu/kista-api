@@ -2,7 +2,6 @@ package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
-import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.trading.application.port.output.CycleCapitalEventPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
@@ -10,6 +9,7 @@ import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
+import com.kista.tradingcore.trading.application.service.support.OwnedStrategy;
 import com.kista.tradingcore.trading.application.usecase.InjectCapitalUseCase;
 import com.kista.tradingcore.trading.application.usecase.WithdrawCapitalUseCase;
 import com.kista.tradingcore.trading.domain.model.CycleCapitalEvent;
@@ -56,9 +56,6 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
     // 잠금 후 재조회한 진행 중 사이클과 그 최신 포지션
     private record LockedCycle(StrategyCycle cycle, CyclePosition latest) {}
 
-    // 소유권 검증된 전략과 계좌 통화(원장 예수금 단위 — 주식 USD, 코인 견적 통화)·코인 여부
-    private record OwnedStrategy(Strategy strategy, Currency currency, boolean crypto) {}
-
     private final StrategyPort strategyPort;
     private final AccountPort accountPort;
     private final StrategyCyclePort strategyCyclePort;
@@ -72,7 +69,7 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
 
     @Override
     public void inject(UUID strategyId, UUID requesterId, InjectCapitalCommand cmd) {
-        OwnedStrategy owned = ownedStrategy(strategyId, requesterId);
+        OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
         Strategy strategy = owned.strategy();
 
         BigDecimal deposit = cmd.depositAmount() != null ? cmd.depositAmount() : BigDecimal.ZERO;
@@ -122,7 +119,7 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
 
     @Override
     public void withdraw(UUID strategyId, UUID requesterId, WithdrawCapitalCommand cmd) {
-        OwnedStrategy owned = ownedStrategy(strategyId, requesterId);
+        OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
         Strategy strategy = owned.strategy();
         BigDecimal amount = cmd.amount();
         if (amount == null || amount.signum() <= 0) {
@@ -188,13 +185,6 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
                 strategyId, amount, newBalance.usdDeposit(), newStartAmount);
     }
 
-    // 전략 조회 + 소유권 검증
-    private OwnedStrategy ownedStrategy(UUID strategyId, UUID requesterId) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        return new OwnedStrategy(strategy, account.broker().getCurrency(), account.broker().getMarket().isCrypto());
-    }
-
     private void requireSupportedType(Strategy strategy, String message) {
         if (!strategy.isPrivacy() && !strategy.isInfinite() && !strategy.isDca()) {
             throw new IllegalArgumentException(message);
@@ -238,7 +228,7 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
     // 그 사이 커밋된 in-place 변경(예수금)은 덮어써지고 startAmount 변경만 남는다. postClose 이전 변경은 리포트가 재조회하므로 안전하다.
     // 리포트가 실패해 마커가 안 찍히면 그날은 계속 거절된다(다음 날 해제). 리포트 대상이 아닌 전략(주문 없음, 정지 전략의 미접수 주문)은 제외(CloseReportScope)
     private void requireOutsideReportWindow(Strategy strategy, String message) {
-        if (DstInfo.calculate(ZonedDateTime.now(clock)).waitUntilPostClose(clock.instant()).isPositive()) {
+        if (DstInfo.calculate(ZonedDateTime.now(clock)).waitUntilPostClose(Instant.now(clock)).isPositive()) {
             return;
         }
         LocalDate today = LocalDate.now(clock);

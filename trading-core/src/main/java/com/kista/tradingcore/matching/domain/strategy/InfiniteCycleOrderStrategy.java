@@ -115,8 +115,8 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
         int divisionCount = inputs.divisionCount() != null ? inputs.divisionCount() : StrategyDefaults.DEFAULT_DIVISION_COUNT;
         InfinitePosition position = new InfinitePosition(ctx.balance(), ctx.ticker(), inputs.prevClosePrice(), divisionCount);
         List<PlannedOrder> orders = infiniteStrategy.buildOrders(position, ctx.tradeDate());
-        log.info("[{}] 전략 계산(일반모드): priceOffsetRate={}, currentRound={}, unitAmount={}, orders={}",
-                ctx.label(), position.priceOffsetRate(), position.currentRound(),
+        log.info("[accountId={}] 전략 계산(일반모드): priceOffsetRate={}, currentRound={}, unitAmount={}, orders={}",
+                ctx.accountId(), position.priceOffsetRate(), position.currentRound(),
                 position.unitAmount(), orders.size());
         return Optional.of(new OrderPlan(position, null, orders));
     }
@@ -137,8 +137,8 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
                 ? reverseStrategy.buildFirstDayOrders(position, ctx.tradeDate())
                 : reverseStrategy.buildOrders(position, ctx.tradeDate());
 
-        log.info("[{}] 전략 계산(리버스모드): isFirstDay={}, holdings={}, starPointPrice={}, orders={}",
-                ctx.label(), position.isFirstDay(), position.holdings(), position.starPointPrice(), orders.size());
+        log.info("[accountId={}] 전략 계산(리버스모드): isFirstDay={}, holdings={}, starPointPrice={}, orders={}",
+                ctx.accountId(), position.isFirstDay(), position.holdings(), position.starPointPrice(), orders.size());
         // 리버스모드 position은 가격 캡 재산정(쿼터 예산 = 원장 예수금/4) 전용 — reverseMode=true라 미리보기 화면에는 내보내지 않는다
         InfinitePosition capPosition = new InfinitePosition(ctx.balance(), ctx.ticker(), inputs.prevClosePrice(), position.divisionCount());
         return Optional.of(new OrderPlan(capPosition, null, orders, List.of(), Map.of(), true));

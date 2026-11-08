@@ -504,7 +504,7 @@ class DcaPlanInputCollectorTest {
     // 수집 → 실제 커널 plan() — 기존 DcaRoundPlanner.plan과 같은 입력·결과(주문 목록)를 재현
     private List<PlannedOrder> plan(java.util.Set<OrderTiming> timings, List<Order> existing, BigDecimal currentPrice, AccountBalance ledger) {
         collected = collector.collect(ctx, TRADE_DATE, timings, existing, currentPrice, ledger);
-        last = kernel.plan(new CycleOrderStrategy.PlanContext(ledger, ctx.strategy().ticker(), TRADE_DATE, "test",
+        last = kernel.plan(new CycleOrderStrategy.PlanContext(ledger, ctx.strategy().ticker(), TRADE_DATE, null,
                 null, null, null, collected.inputs())).orElseThrow();
         return last.orders();
     }

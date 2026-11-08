@@ -57,14 +57,14 @@ class TradingReporter {
 
         // today는 KST — KIS는 어댑터에서 toUtc 변환, Toss는 KST 날짜 그대로 전달
         List<Execution> executions = executionPort.getExecutions(today, today, strategy.ticker(), account.brokerRef());
-        // 원장 = 우리 매매 원칙의 기록, 외부 매매는 수동 보정으로만 반영 (spec 3장 원장 원칙) — 자기 주문(externalOrderId) 체결만 사용
+        // 원장 = 우리 매매 원칙의 기록, 외부 매매는 수동 보정으로만 반영 — 자기 주문(externalOrderId) 체결만 사용
         // 당일 취소된 주문(CANCELLED)도 부분 체결분이 있을 수 있어 자기 주문에 포함 — 수동 체결 보정 FILLED 행(UNKNOWN_LEG)은 포지션을 직접 기록했으므로 제외
         // 외부 주문번호가 없는 체결은 우리 것이 아닌 것으로 본다 (ownIds에 null이 없어 걸러짐)
         List<Order> cancelledOrders = orderPort.findCancelledByCycleAndDate(ctx.currentCycle().id(), today);
         Set<String> ownIds = Stream.concat(mainOrders.stream(), cancelledOrders.stream())
                 .map(Order::externalOrderId).filter(Objects::nonNull).collect(Collectors.toSet());
         executions = executions.stream().filter(e -> ownIds.contains(e.externalOrderId())).toList();
-        log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
+        log.info("[accountId={}] 체결 내역 {}건 조회", account.id(), executions.size());
 
         // 체결 결과로 매매 후 잔고 계산 (체결 없으면 pre-trade 그대로)
         List<AccountBalance.Fill> fills = executions.stream()
@@ -84,7 +84,7 @@ class TradingReporter {
                 .map(e -> new TradeLegSummary(e.direction(), e.ticker(), e.quantity(), e.price(), e.amountUsd()))
                 .toList();
         eventPublisher.publishEvent(new TradingReportReadyEvent(userProfile.userId(), account.id(), strategy.id(), account.nickname(), report, legs, reportEnabled));
-        log.info("[{}] 매매 리포트 이벤트 발행 완료 (executions={}건)", account.nickname(), executions.size());
+        log.info("[accountId={}] 매매 리포트 이벤트 발행 완료 (executions={}건)", account.id(), executions.size());
     }
 
     // 체결 조회 전 잔여 PLACED 주문을 증권사에 취소 요청 — 전 증권사 공통.
@@ -169,7 +169,7 @@ class TradingReporter {
         List<UUID> leftoverIds = orderPort.findSubmittingByCycleAndDate(ctx.currentCycle().id(), today).stream()
                 .map(s -> s.order().id()).toList();
         if (leftoverIds.isEmpty()) return;
-        log.error("[{}] 리포트 시점 SUBMITTING 잔류 — 리포트 제외: {}", ctx.account().nickname(), leftoverIds);
+        log.error("[accountId={}] 리포트 시점 SUBMITTING 잔류 — 리포트 제외: {}", ctx.account().id(), leftoverIds);
         eventPublisher.publishEvent(new TradingErrorEvent(null,
                 "[접수 결과 불명 — 리포트 제외] %s %s 거래일 %s orderId=%s — 증권사 확인 후 런북 정정, 체결분은 수동 체결 보정"
                         .formatted(ctx.account().nickname(), ctx.strategy().ticker(), today, leftoverIds)));

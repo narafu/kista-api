@@ -6,7 +6,6 @@ import com.kista.tradingcore.trading.domain.model.CyclePositionHistoryEntry;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;

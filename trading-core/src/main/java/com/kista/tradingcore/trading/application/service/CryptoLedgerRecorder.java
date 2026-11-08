@@ -50,6 +50,7 @@ class CryptoLedgerRecorder {
         AccountBalance base = latest == null ? new AccountBalance(BigDecimal.ZERO, null, BigDecimal.ZERO) : latest.toBalance();
         // 원장 예수금은 견적 통화 실지출·실수령으로 증감 — 순수량 × 평균가와 수수료만큼 다르다, 누적 금액을 이번 증분 비율로 배분
         // ponytail: 비율 배분 — 동기화기는 종결(DONE·CANCEL) 주문만 넘겨 누적값이 최종값 1회라 정확, 부분 체결을 여러 번 반영하면 체결가 차이만큼 어긋난다(그때는 반영한 견적 금액을 주문에 저장해 차액 반영)
+        // 증분은 scale 8 중간값 — 최종 예수금은 DB numeric(20,2)가 한 번만 반올림한다(증분을 먼저 2자리로 자르면 경계에서 0.01 어긋남)
         BigDecimal cashDelta = quoteAmount.multiply(delta).divide(volume, 8, RoundingMode.HALF_UP);
         BigDecimal deposit = current.direction() == OrderDirection.BUY
                 ? base.usdDeposit().subtract(cashDelta) : base.usdDeposit().add(cashDelta);

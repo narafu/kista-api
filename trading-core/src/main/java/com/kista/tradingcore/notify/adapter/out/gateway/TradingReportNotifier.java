@@ -38,9 +38,9 @@ class TradingReportNotifier {
         // TRADING_ALERT 알림 활성 여부에 따라 리포트 발송 여부 결정 (기본값 true)
         if (event.reportEnabled()) {
             userNotificationPort.notifyTradingReport(profile, event.accountNickname(), event.report());
-            log.info("[{}] 리포트 발송 완료", event.accountNickname());
+            log.info("[accountId={}] 리포트 발송 완료", event.accountId());
         } else {
-            log.info("[{}] TRADING_ALERT 비활성 — 리포트 발송 생략", event.accountNickname());
+            log.info("[accountId={}] TRADING_ALERT 비활성 — 리포트 발송 생략", event.accountId());
         }
 
         // 체결 건별 SSE 실시간 알림 — 알림 설정과 무관하게 항상 발송
@@ -52,6 +52,6 @@ class TradingReportNotifier {
                             event.accountNickname(), event.accountId(), event.strategyId(), Currency.USD, Instant.now(clock)); // 주식 체결 리포트 — US_STOCK 견적 통화
             realtimeNotificationPort.notifyTrade(profile.userId(), tradeEvent);
         }
-        log.info("[{}] SSE 매매 알림 {}건 발송 완료", event.accountNickname(), event.executions().size());
+        log.info("[accountId={}] SSE 매매 알림 {}건 발송 완료", event.accountId(), event.executions().size());
     }
 }

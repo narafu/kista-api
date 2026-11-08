@@ -42,7 +42,7 @@ import java.util.UUID;
 // 코인 DCA 회차 실행 — 한 계좌의 이번 틱 대상 전략×규칙을 decideRule 판정·시장가 주문·이력 기록까지 처리
 // 원장 = 최신 cycle_position(체결 동기화가 갱신) — 매수 가용 = 원장 예수금 − 미체결 BUY − 같은 틱 앞 규칙 매수분,
 // 매도 가용 = 원장 보유 − 미체결 SELL − 같은 틱 앞 규칙 매도분 (거래소 잔고는 보지 않는다)
-// HTTP를 포함하므로 @Transactional 없음 — 상태 변경은 OrderPort·recorder의 개별 트랜잭션. 계좌 단위 예외는 호출부(Task 8)가 격리
+// HTTP를 포함하므로 @Transactional 없음 — 상태 변경은 OrderPort·recorder의 개별 트랜잭션. 계좌 단위 예외는 호출부(CryptoDcaRunner)가 격리
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -147,9 +147,9 @@ class CryptoDcaRoundExecutor {
                 if (todayOrders == null) todayOrders = orderPort.findByStrategyId(strategyId, today, today);
                 List<Order> sameLeg = todayOrders.stream().filter(o -> rule.orderLeg().equals(o.orderLeg())).toList();
                 if (sameLeg.stream().anyMatch(o -> UNSETTLED.contains(o.status()))) continue;
-                Optional<Order> confirmed = sameLeg.stream().filter(o -> CONFIRMED.contains(o.status())).findFirst();
-                if (confirmed.isPresent()) {
-                    recorder.recordOrdered(ctx, today, rule.ruleKey(), confirmed.get(), confirmed.get().price());
+                Order confirmed = sameLeg.stream().filter(o -> CONFIRMED.contains(o.status())).findFirst().orElse(null);
+                if (confirmed != null) {
+                    recorder.recordOrdered(ctx, today, rule.ruleKey(), confirmed, confirmed.price());
                     continue;
                 }
                 result.add(new Target(ctx, rule));

@@ -101,12 +101,12 @@ class BuyOrderPriceCapper {
         if (AccountBalance.buyTotal(corrected).compareTo(budget) <= 0) return corrected;
         List<PlannedOrder> fitted = strategy.fitBuysToBudget(corrected, budget);
         if (!fitted.isEmpty() && AccountBalance.buyTotal(fitted).compareTo(budget) <= 0) {
-            log.info("[{}] BUY 재캡 원장 예산 내 축소: budget={}, orders {}->{}건",
-                    account.nickname(), budget, corrected.size(), fitted.size());
+            log.info("[accountId={}] BUY 재캡 원장 예산 내 축소: budget={}, orders {}->{}건",
+                    account.id(), budget, corrected.size(), fitted.size());
             return fitted;
         }
-        log.warn("[{}] BUY 재캡이 원장 예산 초과 — 재캡 생략, 기존 PLANNED 유지: budget={}, required={}",
-                account.nickname(), budget, AccountBalance.buyTotal(corrected));
+        log.warn("[accountId={}] BUY 재캡이 원장 예산 초과 — 재캡 생략, 기존 PLANNED 유지: budget={}, required={}",
+                account.id(), budget, AccountBalance.buyTotal(corrected));
         return null;
     }
 
@@ -127,19 +127,19 @@ class BuyOrderPriceCapper {
             }
         }
         if (changed.isEmpty()) return;
-        log.info("[{}] BUY 가격 보정 필요 — cap={}, 개별 보정 주문: {}", account.nickname(), cap, describePlannedOrders(changed));
+        log.info("[accountId={}] BUY 가격 보정 필요 — cap={}, 개별 보정 주문: {}", account.id(), cap, describePlannedOrders(changed));
         orderPlanner.savePlannedOrders(changed, account, strategyCycleId);
-        log.info("[{}] BUY 가격 보정 완료(개별)", account.nickname());
+        log.info("[accountId={}] BUY 가격 보정 완료(개별)", account.id());
     }
 
     // INFINITE/VR 전용 — 사다리 전체를 취소하고 재산정 결과 전체를 재저장(개별 행 대응이 무의미)
     private void applyBatchCap(TradingAccount account, UUID strategyCycleId, List<Order> buyOrders,
                                List<PlannedOrder> plannedBuyOrders, List<PlannedOrder> corrected) {
         if (plannedBuyOrders.equals(corrected)) return; // 예: VR bootstrap — 캡 재산정 대상 아님
-        log.info("[{}] BUY 가격 보정 필요 — 원래 주문: {}", account.nickname(), describePlannedOrders(plannedBuyOrders));
+        log.info("[accountId={}] BUY 가격 보정 필요 — 원래 주문: {}", account.id(), describePlannedOrders(plannedBuyOrders));
         buyOrders.forEach(o -> orderPort.cancelPlanned(o.id())); // 하나라도 그 사이 취소됐으면 경합 예외로 재캡 전체 롤백
         if (corrected.isEmpty()) {
-            log.warn("[{}] 보정 후 BUY 주문 없음 — 매수 제외", account.nickname());
+            log.warn("[accountId={}] 보정 후 BUY 주문 없음 — 매수 제외", account.id());
             return;
         }
         // 이미 PLACED/SUBMITTING인 leg(예: 접수 도중 인터럽트 후 재개 시 PLACED된 평단가 매수①)는 재생성분에서 제외 — 이중 매수 방지
@@ -149,7 +149,7 @@ class BuyOrderPriceCapper {
         corrected = TradingOrderSlots.excludeExisting(corrected, alreadyActive);
         if (corrected.isEmpty()) return;
         orderPlanner.savePlannedOrders(corrected, account, strategyCycleId);
-        log.info("[{}] BUY 가격 보정 완료(전체) — 보정 주문: {}", account.nickname(), describePlannedOrders(corrected));
+        log.info("[accountId={}] BUY 가격 보정 완료(전체) — 보정 주문: {}", account.id(), describePlannedOrders(corrected));
     }
 
     // 스코프별 PLANNED BUY 조회 — atOpenOnly=false면 사이클+거래일 전체 PLANNED(AT_CLOSE 접수 경로 기존 계약 유지),

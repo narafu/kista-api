@@ -305,7 +305,8 @@ class HexagonalArchitectureTest {
                 "com.kista.tradingcore.trading.application.service.UserTradingDataEraseService", // 탈퇴 미체결 취소(AccountUseCase.listByUser → AccountOpenOrderCancelPort가 Account를 받음)
                 "com.kista.tradingcore.trading.application.service.DcaConfigService",            // 소유권 검증 + 계좌 브로커 시장 규칙 검증
                 "com.kista.tradingcore.trading.application.service.CapitalInjectionService",     // 소유권 검증 + 계좌 통화(금액 자릿수·문구)·코인 여부
-                "com.kista.tradingcore.trading.application.service.AccountLedgerTotalsService"  // 소유권 검증 + 계좌 통화(반올림)·코인 여부(시세 소스)
+                "com.kista.tradingcore.trading.application.service.AccountLedgerTotalsService",  // 소유권 검증 + 계좌 통화(반올림)·코인 여부(시세 소스)
+                "com.kista.tradingcore.trading.application.service.support.OwnedStrategy"       // 전략+소유 계좌 검증 결과 — 서비스가 계좌 통화·시장·브로커를 읽는 단일 통로
         );
         // 제외 목록 오타·개명 감지 — 이름이 실제 클래스로 존재해야 한다
         Set<String> existing = new java.util.HashSet<>();

@@ -109,7 +109,7 @@ class CycleOrderComputerTest {
         when(vrStrategy.buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), any(), any()))
                 .thenReturn(List.of());
 
-        computer.compute(BALANCE, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, "테스트", CURRENT_PRICE);
+        computer.compute(BALANCE, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, null, CURRENT_PRICE);
 
         // VrInputs 조립 확인: value·bandWidth·poolLimit·poolUsed·currentPrice가 VrPosition에 전달됨
         verify(strategyCycleVrPort).findByCycleId(VR_CYCLE.id());
@@ -139,7 +139,7 @@ class CycleOrderComputerTest {
         when(vrStrategy.buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), any(), any()))
                 .thenReturn(List.of());
 
-        computer.compute(BALANCE, VR_STRATEGY, null, VR_TRADE_DATE, rolloverCycle, null, "테스트", CURRENT_PRICE);
+        computer.compute(BALANCE, VR_STRATEGY, null, VR_TRADE_DATE, rolloverCycle, null, null, CURRENT_PRICE);
 
         var captor = org.mockito.ArgumentCaptor.forClass(VrPosition.class);
         verify(vrStrategy).buildOrders(captor.capture(), eq(StrategyTicker.SOXL), eq(CURRENT_PRICE), eq(VR_TRADE_DATE));
@@ -166,7 +166,7 @@ class CycleOrderComputerTest {
         when(vrStrategy.buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), any(), any()))
                 .thenReturn(List.of());
 
-        computer.compute(BALANCE, VR_STRATEGY, null, VR_TRADE_DATE, rolloverCycle, null, "테스트", CURRENT_PRICE);
+        computer.compute(BALANCE, VR_STRATEGY, null, VR_TRADE_DATE, rolloverCycle, null, null, CURRENT_PRICE);
 
         var captor = org.mockito.ArgumentCaptor.forClass(VrPosition.class);
         verify(vrStrategy).buildOrders(captor.capture(), eq(StrategyTicker.SOXL), eq(CURRENT_PRICE), eq(VR_TRADE_DATE));
@@ -186,7 +186,7 @@ class CycleOrderComputerTest {
         when(cyclePositionPort.findFirstOne(VR_CYCLE.id())).thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
-                computer.compute(BALANCE, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, "테스트", CURRENT_PRICE))
+                computer.compute(BALANCE, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, null, CURRENT_PRICE))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("VR 시작 포지션이 없습니다.");
     }
@@ -197,7 +197,7 @@ class CycleOrderComputerTest {
         when(strategyCycleVrPort.findByCycleId(VR_CYCLE.id())).thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
-                computer.compute(BALANCE, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, "테스트", CURRENT_PRICE))
+                computer.compute(BALANCE, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, null, CURRENT_PRICE))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("VR 사이클 상세가 없습니다.");
     }
@@ -211,7 +211,7 @@ class CycleOrderComputerTest {
         when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
-                computer.compute(BALANCE, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, "테스트", CURRENT_PRICE))
+                computer.compute(BALANCE, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, null, CURRENT_PRICE))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("VR 전략 버전 상세가 없습니다.");
     }
@@ -223,7 +223,7 @@ class CycleOrderComputerTest {
                 .thenReturn(List.of());
 
         computer.compute(BALANCE, INFINITE_STRATEGY, new BigDecimal("20.00"),
-                LocalDate.now(), INFINITE_CYCLE, null, "테스트", CURRENT_PRICE);
+                LocalDate.now(), INFINITE_CYCLE, null, null, CURRENT_PRICE);
 
         // VR 전용 포트 미호출 확인
         verify(strategyCycleVrPort, never()).findByCycleId(any());
@@ -241,7 +241,7 @@ class CycleOrderComputerTest {
         when(cyclePositionPort.findLatestWithInfiniteDetailByCycleId(cycleId, 5)).thenReturn(List.of());
 
         computer.compute(BALANCE, INFINITE_STRATEGY, new BigDecimal("20.00"),
-                LocalDate.now(), INFINITE_CYCLE, null, "테스트", CURRENT_PRICE);
+                LocalDate.now(), INFINITE_CYCLE, null, null, CURRENT_PRICE);
 
         verify(cyclePositionPort).findLatestWithInfiniteDetailByCycleId(cycleId, 5);
         verify(cyclePositionPort, never()).findLatestByCycleId(any(), anyInt());
@@ -278,7 +278,7 @@ class CycleOrderComputerTest {
         when(orderPort.sumFilledBuyAmountByCycleId(VR_CYCLE.id())).thenReturn(BigDecimal.ZERO);
 
         Optional<CycleOrderStrategy.OrderPlan> planOpt = realComputer.compute(
-                balance, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, "캡미적용테스트", currentPrice);
+                balance, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, null, currentPrice);
 
         assertThat(planOpt).isPresent();
         // vrPosition도 함께 실려 있어야 VrCycleOrderStrategy.capBuyOrders()의 접수 전 보정이 가능하다
@@ -308,7 +308,7 @@ class CycleOrderComputerTest {
                 .thenReturn(List.of());
 
         // currentPrice=null (수동 실행·preview 경로)
-        computer.compute(BALANCE, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, "테스트", null);
+        computer.compute(BALANCE, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, null, null);
 
         // buildOrders에 currentPrice=null 전달 확인
         verify(vrStrategy).buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), isNull(), any(LocalDate.class));
@@ -329,7 +329,7 @@ class CycleOrderComputerTest {
         when(vrStrategy.buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), any(), any()))
                 .thenReturn(List.of());
 
-        computer.compute(BALANCE, VR_STRATEGY, prevClosePrice, LocalDate.now(), VR_CYCLE, null, "preview", null);
+        computer.compute(BALANCE, VR_STRATEGY, prevClosePrice, LocalDate.now(), VR_CYCLE, null, null, null);
 
         verify(vrStrategy).buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), eq(prevClosePrice), any(LocalDate.class));
     }
@@ -353,7 +353,7 @@ class CycleOrderComputerTest {
                 strategyCycleVrPort, strategyVrDetailPort, orderPort);
 
         reverseComputer.compute(BALANCE, INFINITE_STRATEGY, new BigDecimal("20.00"),
-                LocalDate.now(), INFINITE_CYCLE, null, "테스트", CURRENT_PRICE);
+                LocalDate.now(), INFINITE_CYCLE, null, null, CURRENT_PRICE);
 
         var captor = org.mockito.ArgumentCaptor.forClass(ReverseModePosition.class);
         verify(reverseStrategy).buildOrders(captor.capture(), any(LocalDate.class));

@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import com.kista.shared.kernel.StrategyCapability;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyTicker;
@@ -97,12 +98,12 @@ public interface CycleOrderStrategy {
 
     // 전략 계산 입력 — execute/preview 공통
     // 공통 4필드 + 전략 전용 입력 묶음(infinite/privacy/vr)으로 그룹핑 — 각 구현체는 자기 묶음만 소비
-    // label: 로그 식별자 (계좌 닉네임 또는 "preview:<accountId>")
+    // accountId: 로그 식별자 (백테스트는 계좌가 없어 null)
     record PlanContext(
             AccountBalance balance,
             StrategyTicker ticker,  // 거래 종목 — Strategy 전체가 아닌 커널이 실제로 쓰는 값만 주입(matching↔trading 순환 방지)
             LocalDate tradeDate,
-            String label,
+            UUID accountId,
             InfiniteInputs infinite,  // INFINITE 전용 입력 (PRIVACY·VR은 무시)
             PrivacyInputs privacy,    // PRIVACY 전용 입력 (INFINITE·VR은 무시)
             VrInputs vr,              // VR 전용 입력 (INFINITE·PRIVACY는 무시)
@@ -110,9 +111,9 @@ public interface CycleOrderStrategy {
     ) {
 
         // DCA 외 전략용 — dca 입력 없음
-        public PlanContext(AccountBalance balance, StrategyTicker ticker, LocalDate tradeDate, String label,
+        public PlanContext(AccountBalance balance, StrategyTicker ticker, LocalDate tradeDate, UUID accountId,
                            InfiniteInputs infinite, PrivacyInputs privacy, VrInputs vr) {
-            this(balance, ticker, tradeDate, label, infinite, privacy, vr, null);
+            this(balance, ticker, tradeDate, accountId, infinite, privacy, vr, null);
         }
 
         // DCA 전략 전용 입력 묶음 — 이번 배치에서 판정할 규칙별 입력(입력 순서 유지, 빈 목록 = 판정할 규칙 없음)

@@ -53,7 +53,7 @@ class OrderSubmissionReconciler {
         List<SubmittingOrder> leftovers = orderPort.findSubmittingByCycleAndDate(strategyCycleId, tradeDate);
         if (leftovers.isEmpty()) return;
 
-        Instant now = clock.instant();
+        Instant now = Instant.now(clock);
         List<UUID> unresolved = new ArrayList<>();
         for (SubmittingOrder leftover : leftovers) {
             Duration age = Duration.between(leftover.submittedAt(), now);
@@ -65,7 +65,7 @@ class OrderSubmissionReconciler {
         }
         unresolved.removeIf(id -> !alerted.add(id)); // 이미 알린 주문은 제외
         if (!unresolved.isEmpty()) {
-            log.error("[{}] 접수 결과 불명 주문 잔류 — 재접수하지 않음: {}", account.nickname(), unresolved);
+            log.error("[accountId={}] 접수 결과 불명 주문 잔류 — 재접수하지 않음: {}", account.id(), unresolved);
             eventPublisher.publishEvent(new TradingErrorEvent(null,
                     "[접수 결과 불명] %s 거래일 %s SUBMITTING 잔류 orderId=%s — 자동 재접수되지 않음, 증권사 확인 후 런북 정정"
                             .formatted(account.nickname(), tradeDate, unresolved)));
@@ -84,14 +84,14 @@ class OrderSubmissionReconciler {
             result = brokerOrderCorrectionPort.place(OrderSubmitter.instructionOf(latest), account.brokerRef());
         } catch (Exception e) {
             if (!BrokerApiException.isRejection(e)) {
-                log.warn("[orderId={}] [{}] SUBMITTING 대사 재요청 결과 불명: {}", order.id(), account.nickname(), e.getMessage());
+                log.warn("[orderId={}] [accountId={}] SUBMITTING 대사 재요청 결과 불명: {}", order.id(), account.id(), e.getMessage());
                 return false;
             }
-            log.warn("[orderId={}] [{}] SUBMITTING 대사 재요청 확정 거절 — FAILED: {}", order.id(), account.nickname(), e.getMessage());
+            log.warn("[orderId={}] [accountId={}] SUBMITTING 대사 재요청 확정 거절 — FAILED: {}", order.id(), account.id(), e.getMessage());
             return markResolved(() -> orderPort.markFailed(order.id()));
         }
-        log.info("[orderId={}] [{}] SUBMITTING 대사 — 원 주문번호 회수로 PLACED (externalOrderId={})",
-                order.id(), account.nickname(), result.externalOrderId());
+        log.info("[orderId={}] [accountId={}] SUBMITTING 대사 — 원 주문번호 회수로 PLACED (externalOrderId={})",
+                order.id(), account.id(), result.externalOrderId());
         return markResolved(() -> orderPort.markPlaced(order.id(), result.externalOrderId()));
     }
 

@@ -169,6 +169,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 위험: 낮음. 로그 문자열만 바뀐다. 운영 대시보드·알림이 로그 문자열을 파싱하는지는 착수 시 `docker-infra.md`에서 확인한다.
 - 가드(`constraints.md` 주석 규칙 옆에 추가할 문장 초안): "로그 문맥은 `[strategyId={}]`·`[accountId={}]`·`[orderId={}]`·`[userId={}]` 접두사로 시작한다. 본문 중간 `key=`로 쓰지 않는다."
 - 상태: done(cc6db1e64). trading-core·api의 userId/accountId/orderId/strategyId 본문 `key=` 로그를 접두사로 통일(`[{}]`는 orderId 등 명확한 경우만 앞에 접두사 추가). 알림·예외 문구 속 `orderId=`와 FinanceAccountService(금융 accountId라 trading accountId와 혼동)는 유지.
+- 후속(2026-11-08): `[{}]`+닉네임 약 35줄을 `[accountId={}]`로 통일(trading `application/service`·matching·`TradingReportNotifier`). matching `PlanContext`의 `String label`은 `UUID accountId`로 교체(backtest는 null). 남긴 로그는 쓸 수 있는 strategyId/accountId/orderId/userId가 없는 경우다: `TradingService:461` lockName, `TradingPriceFetcher:192` ticker, 접두사 없는 `TradingService`·`TradingPriceFetcher`·`TradingPolicyService` 일부, `DcaPlanInputCollector:146` `[DCA]`, `StrategyStartAmountCalculator` `[PRIVACY]`. `BrokerCallGuard`·`SchedulerLockService`는 작업 라벨·잠금 키라 대상이 아니다.
 
 ### CQ-08 `CyclePosition.toBalance()`가 있는데 인라인 생성
 - 주제: 매핑. 유형: 보일러플레이트.
@@ -629,6 +630,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | 원장↔증권사 보유 수량 자동 대사 없음 | `TradingReporter` 마감 리포트 | 사용자가 전략과 별개로 같은 계좌에서 직접 매매할 수 있어 차이가 정상이다(사용자 결정 2026-11-07, CQ-39). 감지는 미리보기 `accountHoldingsCheck` 경고로 충분하다. |
 | 조회 경로 `.orElse(DEFAULT_DIVISION_COUNT)` 폴백 | `CyclePositionPersistor`, `CycleRotationService`, `StrategyDetailAssembler`, `CycleOrderComputer`, `InfiniteCycleOrderStrategy` | null 기본값이 아니라 버전 상세 행 누락 방어다. 예외로 바꾸면 매매가 멈춘다(CQ-12, 2026-11-07). |
 | 시드 미리보기 `divisionCount` `@RequestParam(defaultValue = "20")` | `TradingCycleController` 시드 미리보기 | 등록 resolver로 흐르지 않는 미리보기 전용 쿼리 파라미터다(CQ-12). |
+| `CryptoLedgerRecorder` 증분 `divide(volume, 8, HALF_UP)` | `trading/application/service/` `CryptoLedgerRecorder` (코드 주석 있음) | 증분을 `LEDGER_SCALE`(2)로 먼저 반올림하면 경계에서 최종 예수금이 0.01 어긋난다. DB `numeric(20,2)`가 최종 합을 한 번 반올림하는 현행이 동작 보존이다(2026-11-08). |
 
 ### CQ-39 PRIVACY 전략 원장 변화와 체결 주문 합이 어긋남
 - 주제: 원장 정합성 조사. 유형: 불일치(원인 미확정). 위험: 중간.

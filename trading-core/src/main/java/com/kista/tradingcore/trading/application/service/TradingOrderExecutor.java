@@ -26,7 +26,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.UUID;
 
 // 증권사 접수: 잔류 SUBMITTING 대사 → BUY 가격 보정 → PLANNED 건별 선점·접수(OrderSubmitter) — 결과 불명 주문은 SUBMITTING으로 남아 재접수되지 않는다
 @Component
@@ -54,13 +53,13 @@ class TradingOrderExecutor {
         applyCap(true, tradeDate, account, cycle, currentPrice, position, vrPosition, strategy);
         List<Order> atOpenOrders = orderPort.findAtOpenPlannedByCycleAndDate(cycle.id(), tradeDate);
         if (atOpenOrders.isEmpty()) {
-            log.info("[{}] 개장 선접수할 주문 없음", account.nickname());
+            log.info("[accountId={}] 개장 선접수할 주문 없음", account.id());
             return List.of();
         }
         PlaceResult result = placeEach(atOpenOrders, account);
         reportInsufficient(result, tradeDate, account, strategy);
         List<Order> placed = result.placed();
-        log.info("[{}] 개장 주문 {}건 선접수 (성공/{} 시도)", account.nickname(), placed.size(), atOpenOrders.size());
+        log.info("[accountId={}] 개장 주문 {}건 선접수 (성공/{} 시도)", account.id(), placed.size(), atOpenOrders.size());
         return placed;
     }
 
@@ -74,7 +73,7 @@ class TradingOrderExecutor {
         PlaceResult result = placeEach(planned, account);
         reportInsufficient(result, today, account, strategy);
         List<Order> placed = result.placed();
-        log.info("[{}] 주문 {}건 접수 (성공/{} 시도)", account.nickname(), placed.size(), planned.size());
+        log.info("[accountId={}] 주문 {}건 접수 (성공/{} 시도)", account.id(), placed.size(), planned.size());
         return placed;
     }
 
@@ -87,7 +86,7 @@ class TradingOrderExecutor {
         } catch (OrderStateConflictException | PessimisticLockingFailureException e) {
             // 재캡 대상 BUY가 그 사이 사용자 취소·정리됨(또는 일시중지 일괄 삭제와 행 잠금 데드락) —
             // 재캡 트랜잭션은 통째로 롤백, 남은 PLANNED를 그대로 접수한다
-            log.warn("[{}] BUY 재캡 중 주문 상태 경합 — 재캡 생략: {}", account.nickname(), e.getMessage());
+            log.warn("[accountId={}] BUY 재캡 중 주문 상태 경합 — 재캡 생략: {}", account.id(), e.getMessage());
         }
     }
 
@@ -126,7 +125,7 @@ class TradingOrderExecutor {
             // 주문 간격이 이미 충분히 벌어져(정상적인 왕복 지연) 게이트가 대기 없이 즉시 반환하는 경우
             // 아래 체크만으로는 놓친다 — 매 주문 시도 전에 별도로 확인한다
             if (Thread.currentThread().isInterrupted()) {
-                log.warn("[{}] 인터럽트 감지 — 남은 주문 {}건 접수 중단", account.nickname(), orders.size() - i);
+                log.warn("[accountId={}] 인터럽트 감지 — 남은 주문 {}건 접수 중단", account.id(), orders.size() - i);
                 break;
             }
             Order p = orders.get(i);
@@ -139,7 +138,7 @@ class TradingOrderExecutor {
             // KisHttpClient의 호출 간격 게이트가 대기 중 인터럽트를 감지하면 확정 거절로 전파한다 — 이 주문만
             // FAILED로 남기고 나머지 주문은 중단한다
             if (Thread.currentThread().isInterrupted()) {
-                log.warn("[{}] 인터럽트 감지 — 남은 주문 접수 중단", account.nickname());
+                log.warn("[accountId={}] 인터럽트 감지 — 남은 주문 접수 중단", account.id());
                 break;
             }
         }
@@ -175,7 +174,7 @@ class TradingOrderExecutor {
             }
         } catch (Exception e) {
             // 관리자 이벤트는 이미 억제됐으므로 여기서 실패하면 아무도 모른다 — 관리자에게 알린다
-            log.error("[{}] 잔고 부족 알림 처리 실패", account.nickname(), e);
+            log.error("[accountId={}] 잔고 부족 알림 처리 실패", account.id(), e);
             eventPublisher.publishEvent(new TradingErrorEvent(null, "[잔고 부족 알림 실패] %s %s %s — %s"
                     .formatted(account.nickname(), strategy.ticker(), strategy.type(), e.getMessage())));
         }

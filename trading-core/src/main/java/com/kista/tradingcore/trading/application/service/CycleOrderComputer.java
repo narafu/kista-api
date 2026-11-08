@@ -48,14 +48,14 @@ class CycleOrderComputer {
     // Optional.empty() = 전략 차원 skip (예: PRIVACY 기준매매표 미수신)
     Optional<CycleOrderStrategy.OrderPlan> compute(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
                                                    LocalDate tradeDate, StrategyCycle currentCycle,
-                                                   PrivacyTradeBase privacyBase, String label, BigDecimal currentPrice) {
-        return compute(balance, strategy, prevClosePrice, tradeDate, currentCycle, privacyBase, label, currentPrice, null);
+                                                   PrivacyTradeBase privacyBase, UUID accountId, BigDecimal currentPrice) {
+        return compute(balance, strategy, prevClosePrice, tradeDate, currentCycle, privacyBase, accountId, currentPrice, null);
     }
 
     // dcaInputs: 회차 판정 전략(recordsRounds)의 수집 입력(DcaPlanInputCollector) — 호출부가 수집해 복구 대상을 직접 다룬다, 그 외 null
     Optional<CycleOrderStrategy.OrderPlan> compute(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
                                                    LocalDate tradeDate, StrategyCycle currentCycle,
-                                                   PrivacyTradeBase privacyBase, String label, BigDecimal currentPrice,
+                                                   PrivacyTradeBase privacyBase, UUID accountId, BigDecimal currentPrice,
                                                    CycleOrderStrategy.PlanContext.DcaPlanInputs dcaInputs) {
         BigDecimal initialUsdDeposit = strategy.isPrivacy()
                 ? currentCycle.startAmount()
@@ -105,7 +105,7 @@ class CycleOrderComputer {
 
         CycleOrderStrategy orderStrategy = cycleStrategies.of(strategy.type());
         return orderStrategy.plan(new CycleOrderStrategy.PlanContext(
-                balance, strategy.ticker(), tradeDate, label, infiniteInputs, privacyInputs, vrInputs, dcaInputs));
+                balance, strategy.ticker(), tradeDate, accountId, infiniteInputs, privacyInputs, vrInputs, dcaInputs));
     }
 
     // 별지점 계산 — INFINITE 상세가 있는 최신 STAR_POINT_WINDOW(5)건(리포트·개장 행)의 종가 평균

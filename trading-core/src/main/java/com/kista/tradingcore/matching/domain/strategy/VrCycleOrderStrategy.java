@@ -52,8 +52,8 @@ public class VrCycleOrderStrategy implements CycleOrderStrategy {
         StrategyTicker ticker = ctx.ticker(); // 거래 종목 (strategy에서 결정)
         // referencePrice: bootstrap·캡 판정 공용 기준가(전일종가 대체 허용)
         List<PlannedOrder> orders = vrStrategy.buildOrders(position, ticker, inputs.referencePrice(), ctx.tradeDate());
-        log.info("[{}] VR 전략 계산: holdings={}, value={}, lowerBand={}, upperBand={}, orders={}",
-                ctx.label(), position.holdings(), position.value(),
+        log.info("[accountId={}] VR 전략 계산: holdings={}, value={}, lowerBand={}, upperBand={}, orders={}",
+                ctx.accountId(), position.holdings(), position.value(),
                 position.lowerBand(), position.upperBand(), orders.size());
         // vrPosition을 OrderPlan에 함께 실어 보낸다 — BuyOrderPriceCapper가 접수 전 VR BUY 재산정(capBuyOrders)에 재사용
         return Optional.of(new OrderPlan(null, position, orders));

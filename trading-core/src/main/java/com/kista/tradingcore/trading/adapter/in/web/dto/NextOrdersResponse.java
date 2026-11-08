@@ -11,7 +11,6 @@ import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.matching.domain.model.InfinitePosition;
-import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.shared.kernel.StrategyTicker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -19,7 +18,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
-import com.kista.shared.kernel.StrategyType;
 
 public record NextOrdersResponse(
         @Schema(description = "다음 매매 예정일 (KST 기준)")
