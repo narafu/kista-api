@@ -15,6 +15,7 @@ import com.kista.tradingcore.trading.application.port.output.StrategyVersionPort
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -25,6 +26,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,7 +48,7 @@ class CycleSnapshotCreatorTest {
         StrategyCycle savedCycle = StrategyCycle.start(strategyId, strategyVersionId, new BigDecimal("1600.00"), LocalDate.of(2026, 1, 6));
         AccountBalance postBalance = new AccountBalance(5, new BigDecimal("100.00"), new BigDecimal("1000.00"));
 
-        when(strategyCyclePort.save(org.mockito.ArgumentMatchers.any(StrategyCycle.class))).thenReturn(savedCycle);
+        when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
 
         CycleSnapshotCreator creator = new CycleSnapshotCreator(
                 strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, FIXED);
@@ -70,7 +73,7 @@ class CycleSnapshotCreatorTest {
         StrategyCycle savedCycle = StrategyCycle.start(strategyId, strategyVersionId, new BigDecimal("1600.01"), LocalDate.of(2026, 1, 6));
         AccountBalance postBalance = new AccountBalance(1, new BigDecimal("100.00"), new BigDecimal("1000.00"));
 
-        when(strategyCyclePort.save(org.mockito.ArgumentMatchers.any(StrategyCycle.class))).thenReturn(savedCycle);
+        when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
 
         CycleSnapshotCreator creator = new CycleSnapshotCreator(
                 strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, FIXED);
@@ -144,7 +147,7 @@ class CycleSnapshotCreatorTest {
         verify(strategyCyclePort).updateStrategyVersion(cycleId, newVersionId);
         // 700 + 12 × 120 = 2140.00 (scale 2)
         ArgumentCaptor<BigDecimal> startAmount = ArgumentCaptor.forClass(BigDecimal.class);
-        verify(strategyCyclePort).updateStartAmount(org.mockito.ArgumentMatchers.eq(cycleId), startAmount.capture());
+        verify(strategyCyclePort).updateStartAmount(eq(cycleId), startAmount.capture());
         assertThat(startAmount.getValue()).isEqualTo(new BigDecimal("2140.00"));
         verify(cyclePositionPort).updateBalance(positionId, postBalance);
         ArgumentCaptor<StrategyCycleVrDetail> vr = ArgumentCaptor.forClass(StrategyCycleVrDetail.class);
@@ -154,9 +157,9 @@ class CycleSnapshotCreatorTest {
         assertThat(vr.getValue().gradient()).isEqualTo(newDetail.gradientAt(0));
         assertThat(vr.getValue().poolLimitRate()).isEqualByComparingTo(newDetail.poolLimitRateAt(0));
         // nextVersionNo는 활성 버전 소프트삭제보다 먼저 — 순서 뒤집히면 번호 중복(uq 위반)
-        org.mockito.InOrder order = org.mockito.Mockito.inOrder(strategyVersionPort);
+        InOrder order = inOrder(strategyVersionPort);
         order.verify(strategyVersionPort).nextVersionNo(strategyId);
-        order.verify(strategyVersionPort).softDeleteActiveByStrategyId(org.mockito.ArgumentMatchers.eq(strategyId), any());
+        order.verify(strategyVersionPort).softDeleteActiveByStrategyId(eq(strategyId), any());
     }
 
     private ReconfigureAmounts reconfigure(
@@ -191,8 +194,8 @@ class CycleSnapshotCreatorTest {
 
         ArgumentCaptor<BigDecimal> endAmountCaptor = ArgumentCaptor.forClass(BigDecimal.class);
         ArgumentCaptor<StrategyCycle> cycleCaptor = ArgumentCaptor.forClass(StrategyCycle.class);
-        verify(strategyCyclePort).markEnded(org.mockito.ArgumentMatchers.eq(currentCycleId),
-                endAmountCaptor.capture(), org.mockito.ArgumentMatchers.eq(cycleDate));
+        verify(strategyCyclePort).markEnded(eq(currentCycleId),
+                endAmountCaptor.capture(), eq(cycleDate));
         verify(strategyCyclePort).save(cycleCaptor.capture());
         // 종료일 == 새 시작일 == 2026-01-06 (nextTradeDate=01-07이 아님) — 하루 겹침으로 stats 연속성이 깨지는 회귀 방지
         assertThat(cycleCaptor.getValue().startDate()).isEqualTo(LocalDate.of(2026, 1, 6)).isEqualTo(cycleDate);
