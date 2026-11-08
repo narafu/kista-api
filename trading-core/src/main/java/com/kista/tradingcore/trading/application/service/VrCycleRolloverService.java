@@ -31,7 +31,7 @@ class VrCycleRolloverService {
 
     private final StrategyCycleVrPort strategyCycleVrPort;       // VR 사이클 상세 조회·저장
     private final StrategyVrDetailPort strategyVrDetailPort;     // 전략 버전별 VR 설정 조회
-    private final StrategyCyclePort strategyCyclePort;           // 사이클 종료 기록
+    private final StrategyCyclePort strategyCyclePort;           // 첫 사이클 조회(램프 시계 기준)
     private final CycleSnapshotCreator cycleSnapshotCreator;     // 새 사이클 + 초기 포지션 원자 저장
     private final ApplicationEventPublisher eventPublisher;       // 새 사이클 시작 이벤트 발행 + 관리자·사용자 오류 알림 이벤트
     private final MarketCalendarPort marketCalendarPort;          // due일 직전 거래일 탐색
@@ -144,17 +144,14 @@ class VrCycleRolloverService {
         // ponytail: 평가일 종가 × 실행일 매매 후 잔고 — 롤오버가 지연되면 그 사이 체결이 옛 사이클 평가에 섞인다. 정확히 하려면 평가일 이후 체결을 역산해 평가일 잔고를 재구성
         BigDecimal endAmount = postBalance.usdDeposit().add(evaluation)
                 .setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
-        strategyCyclePort.markEnded(cycle.id(), endAmount, evaluationDate);
-        log.info("[strategyId={}] VR 사이클 종료 완료: cycleId={}", strategy.id(), cycle.id());
-
         // 새 poolLimitRate — 경과 주수 기준 램프 재계산값 (달러 파생은 조회 시점에 개장 pool×rate로 수행)
         BigDecimal newPoolLimitRate = detail.poolLimitRateAt(weeks);
 
-        // 새 사이클 + holdings 승계 스냅샷 원자 생성 — pool은 적립/인출 반영된 실 현금(adjustedPool)으로 개장
+        // 옛 사이클 종료 + 새 사이클 + holdings 승계 스냅샷 단일 트랜잭션 — pool은 적립/인출 반영된 실 현금(adjustedPool)으로 개장
         // 시작일은 evaluationDate(항상 실제 거래일)로 고정 — dueDate(휴장일일 수 있음) 그대로 쓰면 시작일이 비거래일이 되고,
         // 배치 실행일(today)을 쓰면 실행이 며칠 밀릴 때마다 다음 due일도 함께 밀려 N주 스케줄이 누적 drift된다
         AccountBalance newCycleBalance = postBalance.withUsdDeposit(adjustedPool);
-        cycleSnapshotCreator.createVrCycleAndSnapshot(new CycleSnapshotCreator.VrCycleStart(
+        cycleSnapshotCreator.rolloverVrCycle(cycle.id(), endAmount, evaluationDate, new CycleSnapshotCreator.VrCycleStart(
                 strategy.id(),
                 cycle.strategyVersionId(),
                 newCycleBalance,
@@ -164,7 +161,7 @@ class VrCycleRolloverService {
                 newPoolLimitRate,
                 evaluationDate
         ));
-        log.info("[strategyId={}] VR 사이클 롤오버 완료: newValue={}, newPoolLimitRate={}", strategy.id(), newValue, newPoolLimitRate);
+        log.info("[strategyId={}] VR 사이클 종료·롤오버 완료: cycleId={}, newValue={}, newPoolLimitRate={}", strategy.id(), cycle.id(), newValue, newPoolLimitRate);
 
         // 사용자에게 새 사이클 시작 알림 이벤트 발행 (적립/인출 반영된 개장 예수금)
         eventPublisher.publishEvent(new NewCycleStartedEvent(ctx.userProfile().userId(), ctx.account().id(), ctx.account().nickname(),

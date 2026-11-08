@@ -71,6 +71,14 @@ class CycleSnapshotCreator {
         return newCycle;
     }
 
+    // VR 롤오버 전용: 옛 사이클 종료(markEnded)와 새 사이클/스냅샷/VR 상세 생성을 하나의 트랜잭션으로 처리
+    // 두 단계가 별도 트랜잭션이면 새 사이클 생성 실패 시 ACTIVE VR 전략에 종료된 사이클만 남는다(재개로도 복구 불가) — VrCycleRolloverService.rollIfDue에서 호출
+    @Transactional
+    StrategyCycle rolloverVrCycle(UUID endedCycleId, BigDecimal endAmount, LocalDate endDate, VrCycleStart start) {
+        strategyCyclePort.markEnded(endedCycleId, endAmount, endDate);
+        return createVrCycleAndSnapshot(start);
+    }
+
     // VR 운영 중 재설정 전용(시작 후): 활성 버전 소프트삭제 + 신규 버전/VR상세 저장 + 기존 사이클 종료 + 새 사이클/스냅샷 생성을 하나의 트랜잭션으로 처리
     // 중간 실패 시 "활성 버전 없음" 또는 "사이클 종료됐지만 신규 사이클 없음" 등 고아 상태 방지 — VrReconfigureService에서 호출
     @Transactional
