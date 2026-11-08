@@ -119,10 +119,6 @@ class CycleSnapshotCreator {
     // 활성 버전 소프트삭제 후 새 버전 + VR 버전 상세 발급 (두 재설정 경로 공용)
     private StrategyVrDetail issueNewVersion(VrReconfiguration r) {
         UUID strategyId = r.strategyId();
-        // nextVersionNo는 반드시 소프트 삭제보다 먼저 계산한다 — StrategyVersionEntity에 걸린
-        // @SQLRestriction("deleted_at IS NULL")이 커스텀 @Query(findMaxVersionNoByStrategyId)에도
-        // 자동 적용되므로, 활성 버전을 먼저 소프트 삭제하면 MAX(versionNo)가 그 버전을 제외해버려
-        // 방금 삭제한 버전과 동일한 번호를 다시 계산 → uq_strategy_version_strategy_version_no 위반
         int nextVersionNo = strategyVersionPort.nextVersionNo(strategyId);
         // 기존 활성 버전 소프트 삭제 후 새 버전 발급 (버전 이력은 계속 누적)
         strategyVersionPort.softDeleteActiveByStrategyId(strategyId, Instant.now(clock));

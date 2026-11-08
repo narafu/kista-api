@@ -24,11 +24,8 @@ interface StrategyVersionJpaRepository extends JpaRepository<StrategyVersionEnti
             """, nativeQuery = true)
     List<StrategyVersionEntity> findActiveByStrategyIdIn(@Param("strategyIds") Collection<UUID> strategyIds);
 
-    @Query("""
-            SELECT COALESCE(MAX(sv.versionNo), 0)
-            FROM StrategyVersionEntity sv
-            WHERE sv.strategyId = :strategyId
-            """)
+    // native — @SQLRestriction을 우회해 삭제 버전 포함 MAX (uq_strategy_version_strategy_version_no는 삭제 행도 포함)
+    @Query(value = "SELECT COALESCE(MAX(version_no), 0) FROM strategy_version WHERE strategy_id = :strategyId", nativeQuery = true)
     int findMaxVersionNoByStrategyId(@Param("strategyId") UUID strategyId);
 
     @Modifying

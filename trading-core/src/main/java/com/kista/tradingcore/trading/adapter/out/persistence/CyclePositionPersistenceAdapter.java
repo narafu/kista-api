@@ -96,20 +96,6 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     }
 
     @Override
-    public List<CyclePositionHistoryEntry> findByAccountId(UUID accountId, Instant from, Instant to) {
-        return toEntries(positionRepo.findByAccountIdAndDateRange(accountId, from, to));
-    }
-
-    @Override
-    public List<CyclePositionHistoryEntry> findByStrategyIdAndDateRange(UUID strategyId, Instant from, Instant to) {
-        // ticker·type은 strategy에서 한 번만 조회
-        Strategy strategy = strategyPort.findById(strategyId).orElse(null);
-        return positionRepo.findByStrategyIdAndDateRange(strategyId, from, to).stream()
-                .map(e -> toEntry(e, strategy))
-                .toList();
-    }
-
-    @Override
     public List<CyclePositionHistoryEntry> findRecentByUser(UUID userId, int limit) {
         return toEntries(positionRepo.findRecentByUserId(userId, NON_USD_BROKERS, PageRequest.of(0, limit)));
     }

@@ -66,6 +66,15 @@ class TradingPolicySettingsPersistenceAdapterTest {
     }
 
     @Test
+    @DisplayName("brokers·strategies 섹션 자체가 없는 저장 JSON도 기본 섹션으로 채워져 로드된다")
+    void loadBackfillsMissingSection() {
+        when(repository.findById(TradingPolicySettingsPersistenceAdapter.SETTING_KEY)).thenReturn(Optional.of(
+                new TradingPolicySettingsEntity(TradingPolicySettingsPersistenceAdapter.SETTING_KEY, "{}")));
+
+        assertThat(adapter.load()).isEqualTo(TradingPolicySettings.defaults());
+    }
+
+    @Test
     @DisplayName("brokers 맵에 신규 enum 키(MOCK)가 없는 저장된 JSON도 defaults로 보충되어 로드된다")
     void loadBackfillsMissingBrokerEnumKey() throws Exception {
         ObjectNode root = (ObjectNode) objectMapper.valueToTree(TradingPolicySettings.defaults());

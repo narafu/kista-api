@@ -42,7 +42,7 @@ class TradingPolicySettingsPersistenceAdapter implements TradingPolicySettingsPo
         try {
             return objectMapper.writeValueAsString(settings);
         } catch (JacksonException e) {
-            throw new IllegalArgumentException("trading policy serialization failed", e);
+            throw new IllegalArgumentException("거래 정책 직렬화에 실패했습니다.", e);
         }
     }
 
@@ -51,7 +51,7 @@ class TradingPolicySettingsPersistenceAdapter implements TradingPolicySettingsPo
             JsonNode root = backfillMissingEnumKeys(objectMapper.readTree(json));
             return objectMapper.treeToValue(root, TradingPolicySettings.class);
         } catch (JacksonException | IllegalArgumentException e) {
-            throw new IllegalStateException("trading policy deserialization failed", e);
+            throw new IllegalStateException("거래 정책 역직렬화에 실패했습니다.", e);
         }
     }
 
@@ -65,8 +65,12 @@ class TradingPolicySettingsPersistenceAdapter implements TradingPolicySettingsPo
     }
 
     private void backfillSection(ObjectNode root, JsonNode defaultsNode, String section) {
-        ObjectNode sectionNode = (ObjectNode) root.get(section);
         ObjectNode defaultsSection = (ObjectNode) defaultsNode.get(section);
+        // 섹션 자체가 없으면(구버전 행) 기본 섹션을 통째로 채운다
+        if (!(root.get(section) instanceof ObjectNode sectionNode)) {
+            root.set(section, defaultsSection);
+            return;
+        }
         Iterator<Map.Entry<String, JsonNode>> defaultFields = defaultsSection.properties().iterator();
         while (defaultFields.hasNext()) {
             Map.Entry<String, JsonNode> entry = defaultFields.next();

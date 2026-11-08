@@ -17,9 +17,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// nextVersionNo — StrategyVersionEntity의 @SQLRestriction("deleted_at IS NULL")이
-// 커스텀 @Query(findMaxVersionNoByStrategyId)에도 자동 적용되는 것을 검증한다.
-// (CycleSnapshotCreator.reconfigureVrCycle이 "소프트 삭제 전에 nextVersionNo를 먼저 계산해야 하는" 이유)
 @Import(StrategyVersionPersistenceAdapter.class)
 @Execution(ExecutionMode.SAME_THREAD) // @DataJpaTest + parallel execution — 트랜잭션 경합 방지
 class StrategyVersionPersistenceAdapterTest extends DataJpaTestBase {
@@ -74,19 +71,16 @@ class StrategyVersionPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(versionAdapter.nextVersionNo(strategyId)).isEqualTo(2);
     }
 
-    // 회귀 테스트 — 활성 버전을 먼저 소프트 삭제한 뒤 nextVersionNo를 계산하면 @SQLRestriction 때문에
-    // 방금 삭제한 버전이 MAX(version_no) 계산에서 제외되어 동일한 번호가 다시 나온다.
-    // CycleSnapshotCreator.reconfigureVrCycle이 이 순서를 지키지 않으면
-    // uq_strategy_version_strategy_version_no 위반으로 재설정이 실패한다.
+    // 삭제 행 포함 MAX — 활성 버전을 먼저 소프트 삭제해도 번호를 재사용하지 않는다(uq_strategy_version_strategy_version_no 충돌 방지)
     @Test
-    void nextVersionNo_afterSoftDeletingOnlyVersion_incorrectlyRestartsFrom1() {
+    void nextVersionNo_afterSoftDeletingOnlyVersion_returnsMaxPlus1() {
         jdbcTemplate.update(
                 "INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, ?, now())",
                 UUID.randomUUID(), strategyId, 1);
 
         versionAdapter.softDeleteActiveByStrategyId(strategyId, Instant.now());
 
-        assertThat(versionAdapter.nextVersionNo(strategyId)).isEqualTo(1);
+        assertThat(versionAdapter.nextVersionNo(strategyId)).isEqualTo(2);
     }
 
     @Test

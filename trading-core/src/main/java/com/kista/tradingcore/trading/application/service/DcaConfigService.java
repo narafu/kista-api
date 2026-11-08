@@ -43,7 +43,6 @@ class DcaConfigService implements DcaConfigUseCase {
                 .orElseThrow(() -> new NoSuchElementException("DCA 설정이 없습니다: " + strategyId));
         // ruleKey 확정 — 기존 키는 보존(같은 날 재발동 방지), null은 신규 UUID, 현재 버전에 없는 키는 400. 방향 변경도 허용(규칙 단위)
         DcaStrategyConfig config = requested.withAssignedKeys(current.ruleKeys());
-        // nextVersionNo는 soft delete 전에 — @SQLRestriction이 삭제 버전을 가린다 (CycleSnapshotCreator.reconfigureVrCycle과 동일 순서)
         int nextVersionNo = strategyVersionPort.nextVersionNo(strategyId);
         strategyVersionPort.softDeleteActiveByStrategyId(strategyId, Instant.now(clock));
         StrategyVersion version = strategyVersionPort.save(new StrategyVersion(null, strategyId, nextVersionNo, null, null));

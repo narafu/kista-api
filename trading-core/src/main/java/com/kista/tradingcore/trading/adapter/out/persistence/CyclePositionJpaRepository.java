@@ -62,24 +62,6 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
             @Param("from") Instant from,
             @Param("to") Instant to);
 
-    // 계좌 ID 기준 날짜 범위 조회 (strategy_cycle → strategy 경유 JOIN — native)
-    @Query(value = """
-            SELECT cp.* FROM cycle_position cp
-            JOIN strategy_cycle sc ON cp.strategy_cycle_id = sc.id
-            JOIN strategy s ON sc.strategy_id = s.id
-            WHERE s.account_id = :accountId
-              AND cp.created_at >= :from AND cp.created_at < :to
-              AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL AND s.deleted_at IS NULL
-            ORDER BY cp.created_at DESC
-            """, nativeQuery = true)
-    List<CyclePositionEntity> findByAccountIdAndDateRange(
-            @Param("accountId") UUID accountId,
-            @Param("from") Instant from,
-            @Param("to") Instant to);
-
-    // 전체 이력 최근 N건 — 대시보드·텔레그램 현황용 (@SQLRestriction 적용)
-    List<CyclePositionEntity> findAllByOrderByCreatedAtDesc(Pageable pageable);
-
     // 사용자 스코프 최근 N건 (관리자 /status — 본인 데이터만, native, DCA 포함·USD 표시 전제라 excludedBrokers(원화 코인) 계좌 제외)
     @Query(value = """
             SELECT cp.* FROM cycle_position cp
@@ -128,7 +110,7 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
             JOIN accounts a ON s.account_id = a.id
             WHERE s.account_id = :accountId AND a.broker NOT IN (:excludedBrokers)
               AND cp.created_at >= :from AND cp.created_at < :cursor
-              AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL AND s.deleted_at IS NULL
+              AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL AND s.deleted_at IS NULL AND a.deleted_at IS NULL
             ORDER BY cp.created_at DESC
             """, nativeQuery = true)
     List<CyclePositionEntity> findByAccountIdWithCursor(

@@ -45,12 +45,6 @@ public interface CyclePositionPort {
     // 여러 사이클의 최신 포지션 배치 조회 (목록 조회 N+1 방지) — cycleId 기준 최신 1건씩
     Map<UUID, CyclePosition> findLatestByCycleIds(Collection<UUID> cycleIds);
 
-    // 계좌 ID 기준 이력 조회 (ticker 포함, 날짜 범위 필터)
-    List<CyclePositionHistoryEntry> findByAccountId(UUID accountId, Instant from, Instant to);
-
-    // 전략 ID 기준 이력 조회 (날짜 범위 필터)
-    List<CyclePositionHistoryEntry> findByStrategyIdAndDateRange(UUID strategyId, Instant from, Instant to);
-
     // 사용자 스코프 최근 N건 (대시보드 — 본인 데이터만)
     List<CyclePositionHistoryEntry> findRecentByUser(UUID userId, int limit);
 

@@ -155,18 +155,14 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         entityManager.flush();
         entityManager.clear();
         assertThat(fractional.id()).isNotNull();
-        // 이력 조회 경로도 정규화(5.00000000이 아니라 5)
-        assertThat(cyclePositionAdapter.findByStrategyIdAndDateRange(strategy.id(),
-                java.time.Instant.EPOCH, java.time.Instant.now().plusSeconds(60)))
+        // 이력 entry(계좌 커서 경로): holdings 정규화(5.00000000이 아니라 5) + 전략 ticker·type 채움
+        assertThat(cyclePositionAdapter.findByAccountIdWithCursor(accountId,
+                java.time.Instant.EPOCH, java.time.Instant.now().plusSeconds(60), 10))
+                .isNotEmpty()
                 .extracting(CyclePositionHistoryEntry::holdings)
                 .contains(new BigDecimal("5"));
-        // 이력 entry는 전략 ticker·type을 싣는다 — 단건(전략) 경로와 배치(계좌) 경로 모두
-        assertThat(cyclePositionAdapter.findByStrategyIdAndDateRange(strategy.id(),
-                java.time.Instant.EPOCH, java.time.Instant.now().plusSeconds(60)))
-                .allSatisfy(e -> assertThat(e.strategyType()).isEqualTo(StrategyType.INFINITE));
-        assertThat(cyclePositionAdapter.findByAccountId(accountId,
-                java.time.Instant.EPOCH, java.time.Instant.now().plusSeconds(60)))
-                .isNotEmpty()
+        assertThat(cyclePositionAdapter.findByAccountIdWithCursor(accountId,
+                java.time.Instant.EPOCH, java.time.Instant.now().plusSeconds(60), 10))
                 .allSatisfy(e -> {
                     assertThat(e.ticker()).isEqualTo(StrategyTicker.SOXL);
                     assertThat(e.strategyType()).isEqualTo(StrategyType.INFINITE);

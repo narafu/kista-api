@@ -43,6 +43,17 @@ class CyclePositionDcaInclusionDbTest extends DataJpaTestBase {
         assertThat(repo.findByAccountIdWithCursor(upbitAccountId, excluded, from, to, PageRequest.of(0, 10))).isEmpty();
     }
 
+    @Test
+    void accountCursorQuery_excludesSoftDeletedAccount() {
+        UUID accountId = insertAccount(UUID.randomUUID(), "KIS");
+        insertPosition(accountId, "INFINITE");
+        jdbc.update("UPDATE accounts SET deleted_at = now() WHERE id = ?", accountId);
+
+        // 삭제 계좌의 포지션은 커서 조회에 나오지 않는다 (findRecentByUserId 등 같은 JOIN 쿼리와 일관)
+        assertThat(repo.findByAccountIdWithCursor(accountId, List.of("UPBIT"), Instant.EPOCH,
+                Instant.now().plusSeconds(3600), PageRequest.of(0, 10))).isEmpty();
+    }
+
     private UUID insertAccount(UUID userId, String broker) {
         UUID accountId = UUID.randomUUID();
         jdbc.update("INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
