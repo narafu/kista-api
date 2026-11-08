@@ -636,7 +636,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | `StrategyStatusInternalController` ARCHIVED 이중 검사 | `trading/adapter/in/web/StrategyStatusInternalController.java:37,48` | 선검사를 지우면 이미 ARCHIVED인 전략에 ARCHIVED를 요청할 때 no-op 200이 돼 400에서 바뀐다. switch의 `case ARCHIVED`는 default 없는 switch 컴파일 가드라 필요하다(CQ 감사 2026-11-08). |
 | not-found ISE→NoSuchElementException 일괄 교체 | `StrategyCyclePersistenceAdapter`·`OrderPersistenceAdapter`·`CyclePositionPersistenceAdapter` | ISE는 400, NSEE는 404라 상태코드가 바뀐다. 2026-11-08 감사에서 타입은 유지하고 메시지만 한국어 고정 문구로 바꿨다. |
 | `OrderPort` default `findByIdOrThrow` 부재 | `trading/application/port/output/OrderPort.java`, `CryptoLedgerRecorder:39`·`OrderCancelService:162`·`SubmittingOrderAwaiter:50` | 효과가 서비스 3곳 문구 통일뿐이고, default 메서드는 mock이 override해 테스트의 findById stub이 NPE가 된다(testing.md). 유지. |
-| 응답 DTO enum 표현 혼재(String vs enum) | `TradingCycleResponse`·`ExecuteOrdersResponse` vs `DcaResponse`·`NextOrdersResponse` | JSON 결과가 같고 통일하면 OpenAPI 스키마(api-types)만 흔들린다. 유지. |
+| 응답 DTO enum 표현 혼재(String vs enum) | `TradingCycleResponse`·`ExecuteOrdersResponse` vs `DcaResponse`, `NextOrdersResponse`는 파일 안에서 `OrderItem`(enum)과 `TodayOrderItem`(String)이 섞임 | JSON 결과가 같고 통일하면 OpenAPI 스키마(api-types)만 흔들린다. 유지. |
 | `UserEventRepublisher` 동일 본문 메서드 2개 | `trading/adapter/in/redis/UserEventRepublisher.java` | 2곳이라 추출 기준(3곳) 미달. 유지. |
 | `CycleCompletedEvent`/`CycleEndedEvent` 필드 동일 | `trading/application/event/` | 발행 흐름(배치 정상 종료 vs 수동 체결 보정)과 리스너 phase가 달라 병합하지 않는다. 한 흐름에서 동시 발행 없음(발행처 `CycleRotationService:54`, `ManualTradeCorrectionService:111`). |
 
