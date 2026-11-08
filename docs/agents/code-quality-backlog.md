@@ -830,26 +830,29 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 주제: 상태 전이. 위험: 중간.
 - 위치: `OrderPersistenceAdapter.java:253-256,269-276` ✔(`mutate`), 대조 `markFailed` `:258-265` ✔(`lockOrConflict`+`requireStatus`).
 - 근거: 접수 계열은 행 잠금과 상태 검사를 하는데 취소·체결 기록은 last-write-wins다. 증권사 상태를 진실로 보는 의도일 수 있다. 실제 경합 경로는 미확인이다.
-- 결정 필요: 의도라면 주석으로 고정한다. 아니면 최소한 FAILED→FILLED 같은 되살림만 막는다.
-- 상태: open.
+- 결정(사용자, 2026-11-08): 증권사 상태 우선 설계는 유지하고, `markCancelled`가 이미 FILLED·PARTIALLY_FILLED인 행을 덮지 못하게만 막는다. 취소 후 체결 기록은 기존 `markFilled(…, CANCELLED)` 경로를 유지한다. 의도는 주석으로 고정한다.
+- 가드: 어댑터 테스트 "FILLED 행에 markCancelled → 상태 불변".
+- 상태: open(구현 대기).
 
 ### CQ-60 수동 마감 트리거가 창 밖이면 202 뒤에 조용히 거부된다 (정책 판단 필요)
 - 위치: `TradingCloseScheduler.java:63-70` ✔, `TradingSchedulerInternalController.java:44-53` ✔(무조건 202 + 가상 스레드), root `TradingSchedulerCommandHttpAdapter.java:28-30`·`AdminTradingSchedulerController.java:28-30`.
 - 근거: 관리자 알림은 가지만 호출 응답으로는 거부를 알 수 없다. 개장 `runNow`에는 창 판정이 없다.
-- 결정 필요: 창 판정을 동기 구간으로 올려 409를 반환할지(root 어댑터·admin UI 영향), 현행 유지+주석일지.
-- 상태: open.
+- 결정(사용자, 2026-11-08): 현행 유지(202 + 관리자 알림). 비대칭 이유를 `TradingSchedulerInternalController`·`TradingCloseScheduler.runNow`에 주석으로 남긴다. 응답 코드 불변이라 kista-ui 영향 없음.
+- 상태: open(주석 대기).
 
 ### CQ-61 코인 부분체결 후 취소 주문이 FILLED가 된다 (정책 판단 필요)
 - 위치: `CryptoLedgerRecorder.java:60`(`markFilled(…, FILLED)`), `CryptoOrderSynchronizer.java:115,130`. 주식은 CANCELLED를 유지하고 체결량만 기록한다(`CancelledOrderFillRecorder`, `OrderCancelStateWriter`).
-- 결정 필요: 코인 시장가 BUY 수량 추정 때문에 의도된 것인지. 의도면 주석, 아니면 CANCELLED 유지로 맞춘다.
-- 상태: open.
+- 결정(사용자, 2026-11-08): 의도로 유지한다. 업비트 시장가 매수(금액 지정)는 다 체결돼도 자투리 때문에 `cancel`로 끝나는 일이 흔하다. 이유를 `CryptoOrderSynchronizer.settle` 주석과 유지 목록에 남긴다.
+- 상태: open(주석 대기).
 
 ### CQ-62 미리보기 계좌 현금·보유 경고가 정지 전략 주문까지 합산한다 (정책 판단 필요)
 - 위치: `TradingPreviewService.java:106`(`!isArchived()`만 거름), `:202-` `attachAccountCashCheck`·`attachAccountHoldingsCheck`.
-- 결정 필요: 경고 합산을 `isActive()` 전략으로 좁힐지(카드 표시는 유지).
-- 상태: open.
+- 결정(사용자, 2026-11-08): 경고 합산만 ACTIVE 전략으로 좁히고 카드 표시는 유지한다. 응답 형식 불변.
+- 가드: 정지 전략 주문이 경고 합산에서 빠지는 단위 테스트.
+- 상태: open(구현 대기).
 
 ### CQ-63 시드 수정·인출 뒤 INFINITE 최소 시드를 다시 확인하지 않는다 (정책 판단 필요)
 - 위치: `StrategyService.updateSeed`, `CapitalInjectionService.java:169`(`signum() > 0`만). `minRequiredDeposit` 호출은 등록(`StrategyCreationService:160`)과 `CycleRotationService:92`뿐이다.
-- 결정 필요: 수정·인출 경로에도 0회차 교착 시드 검사를 둘지. 허용이면 유지 목록에 근거를 남긴다(fail-open 전환 제안 아님).
-- 상태: open.
+- 결정(사용자, 2026-11-08): `updateSeed`·인출에도 등록과 같은 fail-open 최소 시드 검사를 넣는다(시세 조회 실패 시 건너뜀, 미달이면 400). 검사는 등록과 한 곳을 공유한다.
+- 가드: 시드 수정·인출 미달 거부 테스트.
+- 상태: open(구현 대기).
