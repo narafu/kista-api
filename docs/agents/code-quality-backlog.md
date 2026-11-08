@@ -169,7 +169,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 위험: 낮음. 로그 문자열만 바뀐다. 운영 대시보드·알림이 로그 문자열을 파싱하는지는 착수 시 `docker-infra.md`에서 확인한다.
 - 가드(`constraints.md` 주석 규칙 옆에 추가할 문장 초안): "로그 문맥은 `[strategyId={}]`·`[accountId={}]`·`[orderId={}]`·`[userId={}]` 접두사로 시작한다. 본문 중간 `key=`로 쓰지 않는다."
 - 상태: done(cc6db1e64). trading-core·api의 userId/accountId/orderId/strategyId 본문 `key=` 로그를 접두사로 통일(`[{}]`는 orderId 등 명확한 경우만 앞에 접두사 추가). 알림·예외 문구 속 `orderId=`와 FinanceAccountService(금융 accountId라 trading accountId와 혼동)는 유지.
-- 후속(2026-11-08): `[{}]`+닉네임 약 35줄을 `[accountId={}]`로 통일(trading `application/service`·matching·`TradingReportNotifier`). matching `PlanContext`의 `String label`은 `UUID accountId`로 교체(backtest는 null). 남긴 로그는 쓸 수 있는 strategyId/accountId/orderId/userId가 없는 경우다: `TradingService:461` lockName, `TradingPriceFetcher:192` ticker, 접두사 없는 `TradingService`·`TradingPriceFetcher`·`TradingPolicyService` 일부, `DcaPlanInputCollector:146` `[DCA]`, `StrategyStartAmountCalculator` `[PRIVACY]`. `BrokerCallGuard`·`SchedulerLockService`는 작업 라벨·잠금 키라 대상이 아니다.
+- 후속(2026-11-08): `[{}]`+닉네임 약 35줄을 `[accountId={}]`로 통일(trading `application/service`·matching·`TradingReportNotifier`). matching `PlanContext`의 `String label`은 `UUID accountId`로 교체(backtest는 null). 남긴 로그는 쓸 수 있는 strategyId/accountId/orderId/userId가 없는 경우다: `TradingService:461` lockName, `TradingPriceFetcher:192` ticker, 접두사 없는 `TradingService`·`TradingPriceFetcher`·`TradingPolicyService` 일부, `DcaPlanInputCollector:146` `[DCA]`, `StrategyStartAmountCalculator` `[PRIVACY]`. `BrokerCallGuard`·`SchedulerLockService`는 작업 라벨·잠금 키라 대상이 아니다. 예외 확정(2026-11-08): 접두사는 엔티티 id가 범위에 있을 때만 적용하고, 잠금·종목·정책 단위 로그는 그 키나 범주 태그(`[DCA]`·`[PRIVACY]`)를 그대로 쓴다. 로그 때문에 시그니처를 넓히지 않으며 `[ticker={}]` 같은 새 형식도 만들지 않는다.
 
 ### CQ-08 `CyclePosition.toBalance()`가 있는데 인라인 생성
 - 주제: 매핑. 유형: 보일러플레이트.
@@ -631,6 +631,8 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | 조회 경로 `.orElse(DEFAULT_DIVISION_COUNT)` 폴백 | `CyclePositionPersistor`, `CycleRotationService`, `StrategyDetailAssembler`, `CycleOrderComputer`, `InfiniteCycleOrderStrategy` | null 기본값이 아니라 버전 상세 행 누락 방어다. 예외로 바꾸면 매매가 멈춘다(CQ-12, 2026-11-07). |
 | 시드 미리보기 `divisionCount` `@RequestParam(defaultValue = "20")` | `TradingCycleController` 시드 미리보기 | 등록 resolver로 흐르지 않는 미리보기 전용 쿼리 파라미터다(CQ-12). |
 | `CryptoLedgerRecorder` 증분 `divide(volume, 8, HALF_UP)` | `trading/application/service/` `CryptoLedgerRecorder` (코드 주석 있음) | 증분을 `LEDGER_SCALE`(2)로 먼저 반올림하면 경계에서 최종 예수금이 0.01 어긋난다. DB `numeric(20,2)`가 최종 합을 한 번 반올림하는 현행이 동작 보존이다(2026-11-08). |
+| 잠금·종목·정책 단위 로그의 비표준 접두사 | `TradingService:461` lockName, `TradingPriceFetcher:192` ticker, `DcaPlanInputCollector:145` `[DCA]`(전략 간 공유 일봉 캐시 안), `StrategyStartAmountCalculator:43` `[PRIVACY]`, `TradingPolicyService` | 쓸 수 있는 strategyId·accountId·orderId·userId가 범위에 없다. 잠금 하나가 전략 여러 개를 덮어 id 하나를 넘기면 오해를 부른다(CQ-07, 2026-11-08). |
+| 미사용 import 빌드 가드 | 빌드 설정(Checkstyle·Spotless·Error Prone 없음) | import는 바이트코드에 남지 않아 ArchUnit·`-Xlint`로 못 잡고, 가드는 신규 플러그인이 필요하다. 약 1,100개 파일 중 21개이고 타입 이동 뒤 남은 잔재라 재발 근거가 없다. 재검토 트리거는 이관과 무관한 재발이 감사에서 확인될 때(CQ-42, 2026-11-08). |
 
 ### CQ-39 PRIVACY 전략 원장 변화와 체결 주문 합이 어긋남
 - 주제: 원장 정합성 조사. 유형: 불일치(원인 미확정). 위험: 중간.
@@ -657,3 +659,15 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 수정 방향: 계좌 시장의 `amountScale()`로 바꾼다. KRW에서는 값이 바뀌므로 경계 테스트를 먼저 넣는다. 원장 `numeric(20,2)` 저장값과의 관계(원장은 통화 무관 2자리)를 함께 정한다.
 - 출처: CQ-20 작업 중 제외 site(2026-11-07).
 - 상태: done(1566604d4). 조건 목표가·가격·금액 표시는 계좌 `Market.amountScale()`(KRW 정수), RSI·공포탐욕지수 표시는 2자리 유지, start_amount는 `AccountBalance.LEDGER_SCALE`(값 불변).
+
+
+### CQ-41 전략 소유권 검증 2줄 반복
+- 주제: 소유권 검증. 유형: 중복.
+- 위치: `trading/application/service`의 `StrategyService`(6곳)·`DcaConfigService`·`ManualTradingService`·`CapitalInjectionService`·`OrderCancelService`·`DcaExecutionQueryService`·`VrReconfigureService`·`TradingPreviewService`·`StrategyHistoryQueryService`(2곳) 16곳.
+- 근거: `findByIdOrThrow` 뒤 `requireOwnedAccount(strategy.accountId(), requesterId)` 2줄이 반복됐고 `StrategyService.requireOwnedStrategy`는 1곳만 썼다. Account를 쓰는 곳 10곳, 버리는 곳 4곳.
+- 상태: done(7f4d9be11). `support/OwnedStrategy`(record strategy·account, `load()`) 하나로 통일. `stats` `InvestmentPointsQueryService:49-50` 1건은 모듈 경계상 별도(추출 기준 3곳 미달).
+
+### CQ-42 미사용 import·파라미터 잔재
+- 주제: 불필요한 코드. 유형: 죽은 코드.
+- 위치: trading-core `trading`·`stats`의 미사용 import 21개(대부분 `Strategy`가 `shared.kernel`로 옮겨진 뒤 남은 import), `TradingPreviewService.buildPreview`의 `account`·`TradingCandidatePlanner.allocateAndSave`의 `firstContext` 파라미터.
+- 상태: done(7f4d9be11). 가드는 두지 않는다(유지 목록 "미사용 import 빌드 가드").
