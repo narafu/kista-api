@@ -146,7 +146,7 @@ class TradingPreviewService {
                         new StrategyOrderPlanBuilder.PlanResult(null, NextOrdersPreview.SkipReason.CYCLE_ENDED));
                 continue;
             }
-            if (!today.isAfter(cycle.startDate())) {
+            if (!cycle.hasStartedBy(today)) {
                 // skip 결과를 캐시에 명시적으로 채워둔다 — 비워두면 아래 최종 루프가 캐시 미스로 오인해 재계산한다
                 planResultsByStrategyId.put(strategy.id(),
                         new StrategyOrderPlanBuilder.PlanResult(null, NextOrdersPreview.SkipReason.SCHEDULED_START_NOT_REACHED));

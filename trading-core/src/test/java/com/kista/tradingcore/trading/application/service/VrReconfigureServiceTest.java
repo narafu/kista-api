@@ -6,7 +6,9 @@ import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.domain.model.CancelResult;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.trading.application.event.NewCycleStartedEvent;
+import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
 import com.kista.tradingcore.trading.domain.model.ReconfigureVrCommand;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.shared.kernel.StrategyTicker;
@@ -32,6 +34,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
@@ -134,7 +137,7 @@ class VrReconfigureServiceTest {
 
     // cycleSnapshotCreator.reconfigureVrCycle(...) 호출 인자 전체를 캡처해 검증하기 위한 홀더
     private record CapturedCall(
-            UUID strategyId, UUID currentCycleId, LocalDate today,
+            UUID strategyId, UUID currentCycleId,
             Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount,
             Integer initialGradient, Integer gGraceWeeks, Integer gStepWeeks, Integer gMax,
             BigDecimal initialPoolLimitRate, Integer pGraceWeeks, Integer pStepWeeks, BigDecimal poolLimitFloor,
@@ -148,7 +151,7 @@ class VrReconfigureServiceTest {
         CycleSnapshotCreator.VrReconfiguration r = captor.getValue();
         var ramp = r.ramp();
         return new CapturedCall(
-                r.strategyId(), r.currentCycleId(), r.today(),
+                r.strategyId(), r.currentCycleId(),
                 r.intervalWeeks(), r.bandWidth(), r.recurringAmount(),
                 ramp.initialGradient(), ramp.gGraceWeeks(), ramp.gStepWeeks(), ramp.gMax(),
                 ramp.initialPoolLimitRate(), ramp.pGraceWeeks(), ramp.pStepWeeks(), ramp.poolLimitFloor(),
@@ -196,7 +199,7 @@ class VrReconfigureServiceTest {
         assertThat(captured.newValue()).isEqualByComparingTo(currentCycleVr.value());
 
         verify(orderCancelService).cancelByCycle(strategyId, requesterId);
-        verify(eventPublisher).publishEvent(new com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent(requesterId));
+        verify(eventPublisher).publishEvent(new StrategyCapitalChangedEvent(requesterId));
     }
 
     // --- 2) 수량 주입 ---
@@ -398,6 +401,72 @@ class VrReconfigureServiceTest {
         assertThat(captured.weeks()).isEqualTo(ChronoUnit.WEEKS.between(today.minusWeeks(60), today));
         // 램프값 자체는 cmd 재지정이 정상 반영됨 (weeks 계산과는 독립적으로 갱신)
         assertThat(captured.initialGradient()).isEqualTo(12);
+    }
+
+    // --- 6-b) 시작 전 재설정 — 첫 사이클 in-place 갱신 ---
+
+    @Test
+    @DisplayName("시작예정일이 미래면 reconfigureVrCycleBeforeStart 호출 — weeks=0, 새 사이클 알림 없음, 캐시 무효화 이벤트는 발행")
+    void reconfigure_beforeStart_updatesInPlace() {
+        stubHappyPathChain(LocalDate.now(FIXED).plusDays(5)); // 최초 사이클도 미래 시작 → 경과 주수 음수, 0으로 보정
+        currentCycle = new StrategyCycle(cycleId, strategyId, strategyVersionId,
+                BigDecimal.valueOf(1000), null, LocalDate.now(FIXED).plusDays(5), null, null, null);
+        when(strategyCyclePort.requireLatestByStrategyId(strategyId)).thenReturn(currentCycle);
+
+        service.reconfigure(strategyId, requesterId, reconfigureVr().bandWidth("20.00").build());
+
+        ArgumentCaptor<CycleSnapshotCreator.VrReconfiguration> captor =
+                ArgumentCaptor.forClass(CycleSnapshotCreator.VrReconfiguration.class);
+        verify(cycleSnapshotCreator).reconfigureVrCycleBeforeStart(captor.capture());
+        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(any(CycleSnapshotCreator.VrReconfiguration.class));
+        assertThat(captor.getValue().weeks()).isZero(); // 최초 사이클도 미래 시작 → 음수 보정 0
+        verify(orderCancelService).cancelByCycle(strategyId, requesterId);
+        verify(eventPublisher).publishEvent(new StrategyCapitalChangedEvent(requesterId));
+        verify(eventPublisher, never()).publishEvent(any(NewCycleStartedEvent.class));
+    }
+
+    @Test
+    @DisplayName("시작 전 경로여도 램프 weeks는 최초 사이클 기준 — 당일 사이클이 최초가 아니면 리셋하지 않는다")
+    void reconfigure_beforeStart_keepsRampClockFromFirstCycle() {
+        stubHappyPathChain(today.minusWeeks(10));
+        currentCycle = new StrategyCycle(cycleId, strategyId, strategyVersionId,
+                BigDecimal.valueOf(1000), null, today, null, null, null); // startDate == nextTradeDate → 시작 전
+        when(strategyCyclePort.requireLatestByStrategyId(strategyId)).thenReturn(currentCycle);
+
+        service.reconfigure(strategyId, requesterId, reconfigureVr().bandWidth("20.00").build());
+
+        ArgumentCaptor<CycleSnapshotCreator.VrReconfiguration> captor =
+                ArgumentCaptor.forClass(CycleSnapshotCreator.VrReconfiguration.class);
+        verify(cycleSnapshotCreator).reconfigureVrCycleBeforeStart(captor.capture());
+        assertThat(captor.getValue().weeks()).isEqualTo(10L);
+    }
+
+    // 시작예정일 당일 04:30 KST(DstInfo.nextTradeDate 경계) 전후 — 04:29는 다음 거래일=당일이라 시작 전, 04:31은 다음 거래일=내일이라 시작 후
+    @Test
+    @DisplayName("경계: 시작예정일 당일 04:29 KST는 시작 전 경로, 04:31 KST는 시작 후 경로")
+    void reconfigure_boundaryAtStartDate_switchesPathAround0430Kst() {
+        stubHappyPathChain();
+        LocalDate startDate = LocalDate.of(2026, 1, 6); // 화요일
+        currentCycle = new StrategyCycle(cycleId, strategyId, strategyVersionId,
+                BigDecimal.valueOf(1000), null, startDate, null, null, null);
+        when(strategyCyclePort.requireLatestByStrategyId(strategyId)).thenReturn(currentCycle);
+
+        for (boolean before : new boolean[]{true, false}) {
+            Clock clock = Clock.fixed(
+                    startDate.atTime(4, before ? 29 : 31).atZone(TimeZones.KST).toInstant(), TimeZones.KST);
+            VrReconfigureService boundaryService = new VrReconfigureService(strategyPort, accountPort, strategyCyclePort,
+                    strategyVrDetailPort, strategyCycleVrPort, cyclePositionPort, pricePort, cycleSnapshotCreator,
+                    orderCancelService, eventPublisher, clock);
+
+            boundaryService.reconfigure(strategyId, requesterId, reconfigureVr().bandWidth("20.00").build());
+
+            if (before) {
+                verify(cycleSnapshotCreator).reconfigureVrCycleBeforeStart(any(CycleSnapshotCreator.VrReconfiguration.class));
+                verify(cycleSnapshotCreator, never()).reconfigureVrCycle(any(CycleSnapshotCreator.VrReconfiguration.class));
+            } else {
+                verify(cycleSnapshotCreator).reconfigureVrCycle(any(CycleSnapshotCreator.VrReconfiguration.class));
+            }
+        }
     }
 
     // --- 7) 램프 검증 실패 ---

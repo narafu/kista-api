@@ -125,4 +125,20 @@ class StrategyCyclePersistenceAdapterTest extends DataJpaTestBase {
     void findLatestByStrategyIds_emptyCollection_returnsEmptyMap() {
         assertThat(cycleAdapter.findLatestByStrategyIds(List.of())).isEmpty();
     }
+
+    @Test
+    void updateStrategyVersion_replacesVersionOfCycle() {
+        UUID strategyId = insertStrategy();
+        UUID cycleId = UUID.randomUUID();
+        insertCycle(cycleId, strategyId, Instant.now().truncatedTo(ChronoUnit.MILLIS), false);
+        UUID newVersionId = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, ?, now())",
+                newVersionId, strategyId, 2);
+
+        cycleAdapter.updateStrategyVersion(cycleId, newVersionId);
+
+        assertThat(cycleAdapter.findByStrategyIds(List.of(strategyId)))
+                .singleElement().extracting(StrategyCycle::strategyVersionId).isEqualTo(newVersionId);
+    }
 }

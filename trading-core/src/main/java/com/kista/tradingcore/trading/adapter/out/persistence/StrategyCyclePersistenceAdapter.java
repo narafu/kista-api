@@ -60,6 +60,15 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
     }
 
     @Override
+    public void updateStrategyVersion(UUID cycleId, UUID strategyVersionId) {
+        // load-set-save 패턴 (updateStartAmount와 동일)
+        StrategyCycleEntity e = jpaRepository.findById(cycleId)
+                .orElseThrow(() -> new IllegalStateException("사이클을 찾을 수 없습니다."));
+        e.setStrategyVersionId(strategyVersionId);
+        jpaRepository.save(e);
+    }
+
+    @Override
     public void updateStartAmount(UUID cycleId, BigDecimal startAmount) {
         // 시드 수정: load-set-save 패턴 (markEnded와 동일)
         StrategyCycleEntity e = jpaRepository.findById(cycleId)

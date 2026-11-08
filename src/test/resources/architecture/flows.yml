@@ -920,7 +920,7 @@ flows:
         desc: >-
           이미 ACTIVE면 거부한다. VR이 아닌 전략은 사이클이 청산으로 끝나 일시정지된 경우(연속 정책 NONE 등) 최신 사이클에 종료일이 남아 있는데,
           상태만 ACTIVE로 되돌리면 배치가 "종료된 사이클"로 판단해 계속 건너뛴다. 그래서 재개할 때 새 사이클과 초기 포지션을 열고 상태를 ACTIVE로 바꾼다. 시드는 종료된 사이클의 최종 금액이고, 연속 정책 MAINTAIN이면 rotation과 같이 min(시작 시드, 최종 금액)이다(정지 중 청산된 사이클 포함).
-          VR 전략은 이 재오픈에서 제외한다(VR은 청산으로 사이클이 끝나지 않고 롤오버·재설정이 새 사이클을 항상 만든다).
+          VR 전략은 이 재오픈에서 제외한다(VR은 청산으로 사이클이 끝나지 않고 롤오버와 시작 후 재설정이 새 사이클을 만든다 — 시작 전 재설정은 첫 사이클을 in-place 갱신한다).
         code: [StrategyService#resume, StrategyService#reopenCycleIfEnded, CycleSnapshotCreator#createCycleAndSnapshot]
         cond: 최신 사이클에 종료일이 있을 때(VR 제외)
         state: "strategy → ACTIVE · 종료 사이클이면 strategy_cycle +1 · cycle_position +1"

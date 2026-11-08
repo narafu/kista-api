@@ -65,13 +65,13 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
   - `poolLimitRateAt(weeks)`: `weeks < pGraceWeeks` → `initialPoolLimitRate`; 이후 `pStepWeeks`마다 `-5%p`(고정, `StrategyVrDetail.POOL_LIMIT_STEP`), `poolLimitFloor` 하한(scale=2 HALF_UP)
     - `pStepWeeks=0`은 poolLimitRate 램프 자체를 비활성화(항상 `initialPoolLimitRate` 유지) — 이때 `poolLimitFloor`·`pGraceWeeks`는 무관해지므로 검증 없이 0 허용(등록·재설정 양쪽 `pStepWeeks > 0`일 때만 `0 < poolLimitFloor <= initialPoolLimitRate` 강제)
   - G·poolLimitRate 두 램프의 유예·단계주기는 서로 독립
-  - weeks 재계산 시점: 사이클 롤오버(`VrCycleRolloverService`) 및 운영 중 재설정(`VrReconfigureService`) — 둘 다 `ChronoUnit.WEEKS.between(전략 최초 사이클.startDate, today)`. 사이클 진행 중엔 `strategy_cycle_vr` 스냅샷(gradient·poolLimitRate) 고정
+  - weeks 재계산 시점: 사이클 롤오버(`VrCycleRolloverService`) 및 운영 중 재설정(`VrReconfigureService`) — 둘 다 `ChronoUnit.WEEKS.between(전략 최초 사이클.startDate, today)`(재설정은 음수면 0으로 보정 — 시작 전 재설정). 사이클 진행 중엔 `strategy_cycle_vr` 스냅샷(gradient·poolLimitRate) 고정
 - 등록 검증: `initialValue`, `initialUsdDeposit`, `recurringAmount` null은 0으로 취급
 - 적립식(`recurringAmount > 0`): 초기 V와 초기 시드가 모두 0이어도 등록 가능
 - 거치식/인출식(`recurringAmount <= 0`): `initialValue + initialUsdDeposit > 0` 필수
 - 인출식(`recurringAmount < 0`): `initialValue + initialUsdDeposit >= abs(recurringAmount) × 100 × (4 / intervalWeeks)` 필수 — 운영 중 재설정으로 `recurringAmount`를 인출식으로 바꾸는 경우도 `VrReconfigureService`가 동일 규칙 재검증
 - **개장 금액 계약**: `initialUsdDeposit` = 사이클 개장 USD pool(개장 `CyclePosition.usdDeposit`), `startAmount` = 개장 예수금 + 개장 보유분 시장가(PRIVACY 중간부터 시작만 예외 — 아래 "PRIVACY 중간부터 시작 시작금액"), `poolLimit` = 개장 pool × `poolLimitRate` (scale=2 HALF_UP). 보유분 시장가를 pool에 포함하지 않는다.
-- **종료 금액 계약**: VR 롤오버 `endAmount` = 마감 예수금 + 보유분 종가 평가액(scale=2 HALF_UP). 재설정은 이전 사이클을 자본 조정 전 포지션의 총자산으로 종료하고 새 사이클을 자본 조정 후 총자산으로 시작해 주입/인출을 이전 사이클 손익에 포함하지 않는다.
+- **종료 금액 계약**: VR 롤오버 `endAmount` = 마감 예수금 + 보유분 종가 평가액(scale=2 HALF_UP). 시작 후 재설정(강제 롤오버)은 이전 사이클을 자본 조정 전 포지션의 총자산으로 종료하고 새 사이클을 자본 조정 후 총자산으로 시작해 주입/인출을 이전 사이클 손익에 포함하지 않는다.
 - **PRIVACY 중간부터 시작 시작금액** (`StrategyStartAmountCalculator.privacyBootstrapStartAmount`): PRIVACY 매매표 배수는 `startAmount ÷ currentCycleStart`라 보유분을 시장가로 평가하면 FIDA 보유 비율과 어긋난다. 등록 시 FIDA 기준표(`findSeedPreviewBase`)로 배수 = (예수금 + 보유×FIDA 평단) ÷ (FIDA `current_cycle_start` + `current_cycle_realized_pnl`)을 소수 2자리 FLOOR로 구하고, `startAmount` = 배수 × `current_cycle_start`(scale=2 CEILING — 매매 시 FLOOR 역산이 같은 배수로 돌아오도록). 기준표·FIDA 평단이 없거나 FIDA 원가 자산 ≤ 0이거나 배수가 0이면 등록 거부(400). 개장 포지션(예수금·보유·평단·종가)은 그대로 저장한다
 - **통계 원금**: Stats는 VR 포함 모든 전략에서 저장된 `startAmount`를 개장 원금으로 쓴다. 레거시 VR 개장 포지션 복원 호환 경로는 운영 VR 사이클 전건이 `startAmount == 개장 포지션 총자산`임을 확인한 뒤(2026-10-12) 제거했다.
 - **`strategy_cycle_vr.pool_limit_rate`**(비율, 달러 아님)를 스냅샷 저장. poolLimit(달러)은 저장하지 않고 조회 시점에 개장 `CyclePosition.usdDeposit × poolLimitRate`로 파생 — 첫 사이클은 `poolLimitRateAt(0)`, 롤오버·재설정 사이클은 `poolLimitRateAt(weeks)`를 저장
@@ -84,6 +84,7 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 - rollover due 조건: `cycle.startDate() + intervalWeeks ≤ today` (당일 포함)
 - V′ ≤ 0이면 롤오버 보류 — 사이클 유지, 관리자·사용자 알림. V=0·holdings=0인 채로 롤오버가 진행되는 경우도 `nextValue()` 결과를 그대로 쓴다(예전 존재했던 "V 강제 0 유지" 가드는 폐기됨) — `pool/G+recurringAmount` 항으로 다음 사이클 V가 자연 성장하고, 실제 매수는 항상 pool/poolLimit 실측 잔고 한도 내에서만 이뤄지므로 과다지출 위험이 없다
 - **운영 중 재설정** (`PUT /api/trading-cycles/{id}/vr-config`, `VrReconfigureUseCase`/`VrReconfigureService`): 밴드폭·주기·적립금·램프 파라미터 수정 + 선택적 투자금 추가/인출(수량/예수금)을 "새 `strategy_vr_version` 발급 + 강제 롤오버(현재 사이클 종료→새 사이클 즉시 생성)" 단일 메커니즘으로 처리. VR 전용, 소유권 검증 필수
+  - 시작 전 재설정(`!currentCycle.hasStartedBy(nextTradeDate)`, `StrategyCycle.hasStartedBy` — 배치·미리보기와 같은 술어)은 새 사이클을 만들지 않고 첫 사이클을 in-place 갱신한다(`CycleSnapshotCreator.reconfigureVrCycleBeforeStart` — 버전 교체·`startAmount`·최신 포지션(`updateBalance`)·사이클 VR 상세, startDate 유지, 램프 weeks는 최초 사이클 기준(음수면 0), 새 사이클 시작 알림 없음). 시작 후 재설정은 강제 롤오버이며 옛 사이클 종료일 = 새 사이클 시작일 = 오늘(KST, nextTradeDate 아님 — 하루 겹침이 stats 연속성 판정을 깬다)
   - 램프 시계(경과주수)는 재설정해도 리셋하지 않음 — 항상 전략 최초 사이클 startDate 기준
   - 순수 파라미터 수정: V·holdings·usdDeposit 이월. 수량 주입 +N주(단가 Pc): `holdings+=N`, `avgPrice` 가중평균, `V+=N×현재가`. 수량 인출 -N주: holdings·V 감소, 잔여 평단가 유지. 예수금 주입/인출은 usdDeposit만 증감하고 V는 불변
   - 검증 순서: 램프 파라미터·투자금 추가 형태(수량 음수 금지 등)·인출식 최소자산 재검증까지 모두 통과한 뒤에만 브로커 미체결 주문 취소(`OrderCancelService`, 별도 트랜잭션이라 이후 실패해도 롤백 불가)를 호출 — 검증 실패 시 브로커에 실주문 취소가 나가지 않도록 순서 고정

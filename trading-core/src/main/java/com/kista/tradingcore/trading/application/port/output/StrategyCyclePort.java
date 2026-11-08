@@ -41,6 +41,9 @@ public interface StrategyCyclePort {
     // 시드 수정 — 사이클 시작금액(startAmount) 갱신
     void updateStartAmount(UUID cycleId, BigDecimal startAmount);
 
+    // 시작 전 VR 재설정 — 사이클의 전략 버전 교체(새 버전 FK)
+    void updateStrategyVersion(UUID cycleId, UUID strategyVersionId);
+
     // 전략 삭제 시 사이클 일괄 소프트 삭제
     void deleteByStrategyId(UUID strategyId);
 

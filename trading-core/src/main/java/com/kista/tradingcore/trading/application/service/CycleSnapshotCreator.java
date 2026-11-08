@@ -50,7 +50,7 @@ class CycleSnapshotCreator {
                         BigDecimal newValue, int gradient, BigDecimal poolLimitRate, LocalDate startDate) {}
 
     // VR 재설정 입력 — 상속·검증을 마친 새 버전 값(interval/band/recurring/ramp)과 자본 조정 후 잔고
-    record VrReconfiguration(UUID strategyId, UUID currentCycleId, LocalDate today,
+    record VrReconfiguration(UUID strategyId, UUID currentCycleId,
                              Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount, VrRampParams ramp,
                              AccountBalance postBalance, BigDecimal closingPrice, BigDecimal newValue, long weeks) {}
 
@@ -71,10 +71,45 @@ class CycleSnapshotCreator {
         return newCycle;
     }
 
-    // VR 운영 중 재설정 전용: 활성 버전 소프트삭제 + 신규 버전/VR상세 저장 + 기존 사이클 종료 + 새 사이클/스냅샷 생성을 하나의 트랜잭션으로 처리
+    // VR 운영 중 재설정 전용(시작 후): 활성 버전 소프트삭제 + 신규 버전/VR상세 저장 + 기존 사이클 종료 + 새 사이클/스냅샷 생성을 하나의 트랜잭션으로 처리
     // 중간 실패 시 "활성 버전 없음" 또는 "사이클 종료됐지만 신규 사이클 없음" 등 고아 상태 방지 — VrReconfigureService에서 호출
     @Transactional
     StrategyCycle reconfigureVrCycle(VrReconfiguration r) {
+        StrategyVrDetail newDetail = issueNewVersion(r);
+        // 현재 사이클은 자본 조정 전 포지션을 종가로 평가해 종료한다.
+        AccountBalance preAdjustmentBalance = cyclePositionPort.findLatestOne(r.currentCycleId())
+                .orElseThrow(() -> new IllegalStateException("VR 재설정 전 포지션이 없습니다."))
+                .toBalance();
+        // 옛 사이클 종료일 = 새 사이클 시작일 = 오늘(KST) — 다음 거래일(nextTradeDate)을 쓰면 04:30 이후 하루 겹쳐 stats 연속성 판정이 깨진다.
+        // 새 시작일을 nextTradeDate로 두면 배치 hasStartedBy가 그날 밤 매매를 건너뛰므로 오늘로 통일한다
+        LocalDate cycleDate = LocalDate.now(clock);
+        strategyCyclePort.markEnded(r.currentCycleId(), totalAssets(preAdjustmentBalance, r.closingPrice()), cycleDate);
+        // 새 사이클 + holdings 승계 스냅샷 원자 생성 — 램프 시계(weeks) 기준 gradient/poolLimitRate 재계산 스냅샷
+        return createVrCycleAndSnapshot(new VrCycleStart(r.strategyId(), newDetail.strategyVersionId(), r.postBalance(), r.closingPrice(),
+                r.newValue(), newDetail.gradientAt(r.weeks()), newDetail.poolLimitRateAt(r.weeks()), cycleDate));
+    }
+
+    // VR 시작 전 재설정 전용: 현재 사이클이 아직 시작 전이라 새 사이클 없이 in-place 갱신(버전 교체·startAmount·포지션·사이클 VR 상세, startDate 유지)
+    // 현재 사이클이 최초 사이클이라는 보장은 없다 — 램프 weeks는 호출부가 최초 사이클 기준으로 계산해 넘긴다
+    @Transactional
+    void reconfigureVrCycleBeforeStart(VrReconfiguration r) {
+        StrategyVrDetail newDetail = issueNewVersion(r);
+        UUID cycleId = r.currentCycleId();
+        strategyCyclePort.updateStrategyVersion(cycleId, newDetail.strategyVersionId());
+        // 개장 금액 계약 — 개장 예수금 + 개장 보유분 시장가
+        strategyCyclePort.updateStartAmount(cycleId, totalAssets(r.postBalance(), r.closingPrice()));
+        // holdings·평단도 바뀌므로 updateCycleStartSnapshot이 아닌 updateBalance — CapitalInjectionService와 같은 in-place 방식
+        CyclePosition latest = cyclePositionPort.findLatestOne(cycleId)
+                .orElseThrow(() -> new IllegalStateException("VR 재설정 전 포지션이 없습니다."));
+        // 포지션의 closingPrice는 의도적으로 그대로 둔다(CapitalInjectionService와 동일) — 현재가 평가는 startAmount가 담는다
+        cyclePositionPort.updateBalance(latest.id(), r.postBalance());
+        // 사이클 VR 상세는 PK=cycleId upsert
+        strategyCycleVrPort.save(new StrategyCycleVrDetail(cycleId, r.newValue(),
+                newDetail.gradientAt(r.weeks()), newDetail.poolLimitRateAt(r.weeks())));
+    }
+
+    // 활성 버전 소프트삭제 후 새 버전 + VR 버전 상세 발급 (두 재설정 경로 공용)
+    private StrategyVrDetail issueNewVersion(VrReconfiguration r) {
         UUID strategyId = r.strategyId();
         // nextVersionNo는 반드시 소프트 삭제보다 먼저 계산한다 — StrategyVersionEntity에 걸린
         // @SQLRestriction("deleted_at IS NULL")이 커스텀 @Query(findMaxVersionNoByStrategyId)에도
@@ -86,17 +121,8 @@ class CycleSnapshotCreator {
         StrategyVersion newVersion = strategyVersionPort.save(
                 new StrategyVersion(null, strategyId, nextVersionNo, null, null));
         // 새 램프 파라미터로 VR 버전 상세 저장
-        StrategyVrDetail newDetail = vrStrategyDetailService.saveVersionDetail(
+        return vrStrategyDetailService.saveVersionDetail(
                 newVersion.id(), r.intervalWeeks(), r.bandWidth(), r.recurringAmount(), r.ramp());
-        // 현재 사이클은 자본 조정 전 포지션을 종가로 평가해 종료한다.
-        AccountBalance preAdjustmentBalance = cyclePositionPort.findLatestOne(r.currentCycleId())
-                .orElseThrow(() -> new IllegalStateException("VR 재설정 전 포지션이 없습니다."))
-                .toBalance();
-        strategyCyclePort.markEnded(r.currentCycleId(), totalAssets(preAdjustmentBalance, r.closingPrice()), r.today());
-        // 새 사이클 + holdings 승계 스냅샷 원자 생성 — 램프 시계(weeks) 기준 gradient/poolLimitRate 재계산 스냅샷
-        // 시작일은 오늘(KST) — "지금 당장" 실행되는 액션이라 r.today()(다음 거래일)와 다르다
-        return createVrCycleAndSnapshot(new VrCycleStart(strategyId, newVersion.id(), r.postBalance(), r.closingPrice(),
-                r.newValue(), newDetail.gradientAt(r.weeks()), newDetail.poolLimitRateAt(r.weeks()), LocalDate.now(clock)));
     }
 
     private static BigDecimal totalAssets(AccountBalance balance, BigDecimal closingPrice) {

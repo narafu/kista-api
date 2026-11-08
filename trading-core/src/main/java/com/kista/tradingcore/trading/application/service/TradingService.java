@@ -476,7 +476,7 @@ class TradingService {
     // 시작예정일 미도래 사이클 제외 — tradeDate가 startDate 이후일 때만 집행 (tradeDate > startDate)
     private List<BatchContext> filterScheduledStart(List<BatchContext> contexts, LocalDate tradeDate) {
         return contexts.stream().filter(ctx -> {
-            boolean started = tradeDate.isAfter(ctx.currentCycle().startDate());
+            boolean started = ctx.currentCycle().hasStartedBy(tradeDate);
             if (!started) log.info("[strategyId={}] 시작예정일 미도래 skip (startDate={}, tradeDate={})",
                     ctx.strategy().id(), ctx.currentCycle().startDate(), tradeDate);
             return started;

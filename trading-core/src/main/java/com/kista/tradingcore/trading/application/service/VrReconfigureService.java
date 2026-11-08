@@ -71,6 +71,9 @@ class VrReconfigureService implements VrReconfigureUseCase {
 
         // 현재 사이클·버전 상세·사이클 상세·최신 포지션 조회 (모두 조회 전용 — 검증을 외부 호출보다 먼저 끝내기 위해 앞으로 이동)
         StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategyId);
+        // 다음 거래일 기준 매매 시작 여부 — 시작 전이면 새 사이클 없이 첫 사이클을 in-place 갱신한다
+        LocalDate today = DstInfo.nextTradeDate(ZonedDateTime.now(clock));
+        boolean beforeStart = !currentCycle.hasStartedBy(today);
         StrategyVrDetail currentDetail = strategyVrDetailPort.findByStrategyVersionId(currentCycle.strategyVersionId())
                 .orElseThrow(() -> new NoSuchElementException("VR 전략 버전 상세 없음: strategyId=" + strategyId));
         StrategyCycleVrDetail currentCycleVr = strategyCycleVrPort.findByCycleId(currentCycle.id())
@@ -102,22 +105,32 @@ class VrReconfigureService implements VrReconfigureUseCase {
         VrRampValidator.validateWithdrawalSufficiency(recurringAmount, intervalWeeks, totalAssets, totalAssets);
 
         // 램프 시계 — 전략 최초 사이클 startDate 기준 경과 주수 (재설정해도 리셋하지 않음)
+        // 최초 사이클이 시작 전이면 음수가 되므로 0으로 보정 — 시작 전 현재 사이클이 최초 사이클이 아닐 수도 있어(시작 후 재설정이 만든 당일 사이클) 시작 전 경로도 같은 계산을 쓴다
         LocalDate firstStart = strategyCyclePort.findFirstByStrategyId(strategyId)
                 .orElseThrow(() -> new NoSuchElementException("VR 최초 사이클 없음: strategyId=" + strategyId))
                 .startDate();
-        LocalDate today = DstInfo.nextTradeDate(ZonedDateTime.now(clock));
-        long weeks = ChronoUnit.WEEKS.between(firstStart, today);
+        long weeks = Math.max(0, ChronoUnit.WEEKS.between(firstStart, today));
 
         // 미체결 주문 전체 취소(best-effort) — 위 검증을 모두 통과한 뒤에만 호출 (독립 트랜잭션이라 이후 실패해도 롤백 불가하므로 최대한 뒤로 미룸)
         orderCancelService.cancelByCycle(strategyId, requesterId);
 
-        // 새 버전 발급 + 강제 롤오버(사이클 종료 → 새 사이클) 원자 처리
-        cycleSnapshotCreator.reconfigureVrCycle(new CycleSnapshotCreator.VrReconfiguration(
-                strategyId, currentCycle.id(), today, intervalWeeks, bandWidth, recurringAmount, ramp,
-                postBalance, currentPrice, newValue, weeks));
+        // 새 버전 발급 + (시작 전) 현재 사이클 in-place 갱신 / (시작 후) 강제 롤오버(사이클 종료 → 새 사이클) 원자 처리
+        var reconfiguration = new CycleSnapshotCreator.VrReconfiguration(
+                strategyId, currentCycle.id(), intervalWeeks, bandWidth, recurringAmount, ramp,
+                postBalance, currentPrice, newValue, weeks);
+        if (beforeStart) {
+            cycleSnapshotCreator.reconfigureVrCycleBeforeStart(reconfiguration);
+        } else {
+            cycleSnapshotCreator.reconfigureVrCycle(reconfiguration);
+        }
 
         // stats 캐시 무효화 — @EventListener라 동기 실행되며, 트랜잭션 동기화가 활성이면 afterCommit에 아니면 즉시 비운다
         eventPublisher.publishEvent(new StrategyCapitalChangedEvent(requesterId));
+
+        // 시작 전 재설정은 새 사이클이 없으므로 새 사이클 시작 알림을 보내지 않는다
+        if (beforeStart) {
+            return;
+        }
 
         // 사용자 알림 이벤트 발행 — 실패해도 재설정 자체는 이미 완료된 상태이므로 로그만 남기고 무시
         // 이 클래스/메서드가 비-트랜잭션이라 publishEvent가 리스너를 즉시 동기 실행하므로 try/catch가 유효함

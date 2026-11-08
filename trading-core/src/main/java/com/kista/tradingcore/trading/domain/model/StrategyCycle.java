@@ -33,6 +33,11 @@ public record StrategyCycle(
         this(id, strategyId, null, startAmount, endAmount, startDate, endDate, createdAt, deletedAt);
     }
 
+    // 거래일 tradeDate 기준 매매 시작 여부 — 시작예정일 당일 거래일은 아직 시작 전(배치·미리보기·VR 재설정 공용)
+    public boolean hasStartedBy(LocalDate tradeDate) {
+        return tradeDate.isAfter(startDate);
+    }
+
     // 시작예정일 지정 — 시작일은 호출부가 주입한다 (오늘 시작이면 Clock 기준 오늘)
     public static StrategyCycle start(UUID strategyId, UUID strategyVersionId, BigDecimal startAmount, LocalDate startDate) {
         return new StrategyCycle(null, strategyId, strategyVersionId,
