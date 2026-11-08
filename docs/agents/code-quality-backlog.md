@@ -639,6 +639,9 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | 응답 DTO enum 표현 혼재(String vs enum) | `TradingCycleResponse`·`ExecuteOrdersResponse` vs `DcaResponse`, `NextOrdersResponse`는 파일 안에서 `OrderItem`(enum)과 `TodayOrderItem`(String)이 섞임 | JSON 결과가 같고 통일하면 OpenAPI 스키마(api-types)만 흔들린다. 유지. |
 | `UserEventRepublisher` 동일 본문 메서드 2개 | `trading/adapter/in/redis/UserEventRepublisher.java` | 2곳이라 추출 기준(3곳) 미달. 유지. |
 | 코인 부분체결 후 취소 주문의 FILLED 확정 | `CryptoOrderSynchronizer.settle`, `CryptoLedgerRecorder:60` | 업비트 시장가 매수(금액 지정)는 다 체결돼도 자투리 때문에 `cancel`로 끝나는 일이 흔하다. 주식(CANCELLED 유지)과 달라도 의도다(CQ-61, 2026-11-08). |
+| `CancelledOrderFillRecorder` 바깥 try/catch | `CancelledOrderFillRecorder.java:36-41` | 도달 불가가 아니다. `tryGet`은 조회 예외만 흡수하고 `ifPresent` 람다의 `OrderFill` 생성(null 금액 NPE 등)은 던질 수 있다. 지우면 한 그룹 실패가 다른 그룹까지 중단시켜 동작이 바뀐다(CQ-56, 2026-11-08). |
+| `findPlannedOrPlaced*` 포트 이름(SUBMITTING도 포함) | `OrderPort`·`OrderPersistenceAdapter` | 포트·호출처 전반의 개명인데 주석으로 이미 정정했다. 이름 변경 이득이 비용보다 작다(CQ-56, 2026-11-08). |
+| 테스트 FQCN 전수 import 전환 | trading-core test 약 269개 파일 | 기능 이득이 없다. 파일을 건드릴 때만 고친다(CQ-56, 2026-11-08). |
 | `CycleCompletedEvent`/`CycleEndedEvent` 필드 동일 | `trading/application/event/` | 발행 흐름(배치 정상 종료 vs 수동 체결 보정)과 리스너 phase가 달라 병합하지 않는다. 한 흐름에서 동시 발행 없음(발행처 `CycleRotationService:54`, `ManualTradeCorrectionService:111`). |
 | stats 2곳 중복(기록만) | `PlainDecimalSerializer`(shared contract·stats dto), `Instant.parse(cursor)`(`DashboardController`·`TradingCycleController`), `CryptoMarketIndicators.Premium`/`DailyIndicator` 동형, `EquityPoint`/`BacktestPoint`, `BacktestEngine` initialHoldings null 폴백, `InvestmentIndexCalculator` `laterPosition` 병합 | 2곳(추출 기준 미달). `BacktestPoint`는 프론트 차트 재사용이 주석에 명시돼 있다(stats 감사 2026-11-08). |
 | stats 평가액 계산 2종 | `TradingStatsService`(종가 없으면 평단 대체) vs `InvestmentIndexCalculator`(종가 없으면 제외) | 곡선·요약은 연속성이, 투자지수(TWR)는 실평가가 필요해 용도가 다르다(stats 감사 2026-11-08). |
