@@ -17,6 +17,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OrderTest {
 
     @Test
+    void unknownLegConstantMatchesPlannedOrder() {
+        // 두 모델의 미지정 레그 sentinel이 어긋나면 fromPlanned/toPlanned 변환이 깨진다
+        assertThat(Order.UNKNOWN_LEG).isEqualTo(PlannedOrder.UNKNOWN_LEG);
+    }
+
+    @Test
     void fromPlanned_mapsAllFields_thenToPlanned_roundTrips() {
         PlannedOrder p = PlannedOrder.of(LocalDate.of(2026, 9, 9), StrategyTicker.SOXL,
                 OrderType.LOC, OrderDirection.BUY, 3, new BigDecimal("10.00"),
