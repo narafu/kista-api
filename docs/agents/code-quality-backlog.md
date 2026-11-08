@@ -560,7 +560,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 위치: `StrategyEntity.java:22`(`@SQLRestriction`), `StrategyPersistenceAdapter.java:80`(`findAllByAccountIdIn`), `StrategyStatus`(ACTIVE·PAUSED만 있음).
 - 근거: 소프트 삭제된 전략의 사이클·스냅샷이 실현손익·승률·곡선에서 빠진다. 사용자는 "보고 싶어서 남길 것"과 "치우려고 지운 것"을 구분하고 싶어 한다.
 - 수정 방향(사용자 추천안 동의): `StrategyStatus.ARCHIVED`(보관)를 신설한다. 보관하면 매매를 멈추고 목록에서 숨기되 통계는 유지하고, 삭제는 지금처럼 통계에서도 뺀다. 스케쥴러·상태 판정의 `!= PAUSED` 형태를 전수 점검한다(보관 전략이 매매되면 안 된다). kista-ui에 보관 버튼·보관함 목록·삭제 확인 문구를 추가한다.
-- 상태: done(2026-11-07, 8795996a0). UI 후속(kista-ui 세션: 보관 버튼·통계 화면 보관 섹션·삭제 문구·`includeArchived`)은 별도 작업.
+- 상태: done(2026-11-07, 8795996a0). UI 후속(보관 버튼·통계 화면 보관 섹션·`includeArchived`)도 done(kista-ui ad7a49bc·0fa94063).
 
 ### CQ-38 마커 커밋 뒤 `rotate` 실패 시 ACTIVE 전략이 영구 skip됨
 - 주제: 배치 복구. 유형: 버그(CQ-29 계열). 위험: 중간(발생 시 매매 정지, 자동 복구 없음).
