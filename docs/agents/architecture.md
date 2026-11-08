@@ -66,7 +66,7 @@ com.kista.tradingcore.web/           :trading-core · CLOSED · (NamedInterface 
 ### JPA Auditing
 - `BaseAuditEntity`(`createdAt`+`updatedAt`) 또는 `BaseCreatedAtEntity`(`createdAt`만)를 상속한다(`com.kista.shared.platform.persistence`) — `updated_at` 컬럼 없는 엔티티에 `BaseAuditEntity` 금지(`ddl-auto: validate` 실패)
 - 서비스에서 domain record 생성 시 `updatedAt=null`(`@LastModifiedDate`가 처리), `createdAt`은 update 시 기존 값 보존 / register 시 `null`(`@CreatedDate`가 처리)
-- `toEntity()`에서 `setCreatedAt()`/`setUpdatedAt()`을 호출하지 않는다 — `BaseAuditEntity`의 setter는 package-private라 각 모듈 persistence 패키지에서 접근도 안 된다
+- `toEntity()`에서 `setCreatedAt()`/`setUpdatedAt()`을 호출하지 않는다 — `BaseAuditEntity`·`BaseCreatedAtEntity`에는 setter가 없다(Spring Data Auditing이 필드에 직접 쓴다)
 
 ### 텔레그램 알림 (사용자 봇)
 사용자 봇만 사용, 계좌별 설정 없음. 발송 규칙 → `modules/tradingcore/notify.md`
