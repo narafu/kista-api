@@ -710,7 +710,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 근거: 새 사이클 생성이 실패하면 ACTIVE VR 전략에 종료된 사이클만 남는다. `StrategyService.reopenCycleIfEnded`(`:175-178`) ✔는 "VR은 rollover/재설정이 원자적으로 대체 사이클을 만든다"는 전제로 VR을 제외해서 재개로도 풀리지 않는다. 그런데 그 전제가 롤오버에서는 성립하지 않는다. 같은 작업인 `CycleSnapshotCreator.reconfigureVrCycle`(`:76`)은 한 트랜잭션이다. CQ-29(INFINITE·PRIVACY의 `markEnded`)와 같은 유형이다.
 - 수정안: `CycleSnapshotCreator`에 `markEnded`까지 포함한 `@Transactional` 롤오버 메서드를 두고 `rollIfDue`가 그것을 호출한다.
 - 가드: DB 테스트로 "새 사이클 생성 실패 시 `markEnded`도 롤백"을 잠근다(`CyclePositionPersistorDbTest` CQ-29 패턴).
-- 상태: open.
+- 상태: done(9554a1607).
 
 ### CQ-46 같은 계좌·종목 중복 등록이 check-then-act라 경합에 뚫린다
 - 주제: 상태 가드. 유형: 누락 가드. 위험: 중간(마이그레이션).
@@ -718,7 +718,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 근거: 더블클릭이나 재시도로 두 요청이 동시에 검증을 통과하면 같은 종목 전략이 두 개 생긴다. 운영 중복은 0건이다.
 - 수정안: trading 마이그레이션에 `UNIQUE (account_id, ticker) WHERE deleted_at IS NULL AND status <> 'ARCHIVED'` 부분 인덱스를 추가하고, `DataIntegrityViolationException`을 `DuplicateStrategyTickerException`(409)으로 변환한다.
 - 가드: 인덱스 자체와 저장 경합 IT.
-- 상태: open.
+- 상태: done(e2fe66ed8, 테스트 픽스처 028a1cdd0). 배포 전 운영 중복 0건 재확인 필요(2026-11-08 0건).
 
 ### CQ-47 개장 후 바로주문의 AT_OPEN 접수 시세 조회가 raw 호출이다
 - 주제: 브로커 실패 처리. 유형: 비일관·조용한 실패. 위험: 낮음.
@@ -726,7 +726,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 근거: `:160`은 PLANNED 저장 뒤에 실행된다. 시세 조회가 실패하면 사용자는 503을 받는데 주문은 PLANNED로 남는다. 같은 서비스의 다른 조회는 실패 시 캡 미적용(null)으로 진행한다.
 - 수정안: `fetchStartPriceOrNull`을 재사용한다(null이면 캡 없이 원본 접수 — 기존 계약).
 - 가드: 시세 조회 실패 시 접수가 진행되는지 확인하는 단위 테스트.
-- 상태: open.
+- 상태: done(a0877d62e).
 
 ### CQ-48 오래된 스냅샷 `strategyPort.save`가 상태를 덮어쓴다
 - 주제: 상태 전이. 유형: 비일관. 위험: 낮음~중간.
@@ -734,7 +734,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 근거: `StrategyPort`가 "오래된 스냅샷 save가 보관을 덮어쓰는 경합" 때문에 조건부 갱신을 만들었는데 두 곳이 남았다. 동시에 보관하면 ARCHIVED가 PAUSED나 ACTIVE로 되돌아갈 수 있다(재현 미확인).
 - 수정안: `CycleCloser`는 `strategyPort.pause(id)`를 호출하고 `withStatus(PAUSED)`를 반환한다. `update`는 `cycleSeedType`만 쓰는 조건부 메서드를 추가한다.
 - 가드: 어댑터 테스트로 ARCHIVED 행이 되돌아가지 않음을 잠근다.
-- 상태: open.
+- 상태: done(a0877d62e).
 
 ### CQ-49 계좌 삭제 cascade 실패의 재시도 경로가 재기동뿐이다
 - 주제: 이벤트. 유형: 비일관. 위험: 낮음.
@@ -742,7 +742,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 근거: 사용자 탈퇴 cascade는 첫 실패 시 알림과 10분 재발행이 있다. 계좌 삭제 cascade는 kista-trading 재기동 재발행에만 기대므로 그 사이 삭제 계좌의 전략·사이클이 남는다. 리스너가 멱등인지는 미확인이다.
 - 수정안: 필터에 `AccountDeletedEvent`를 추가하고 메서드·주석 이름을 "cascade·사용자 동기화 이벤트"로 넓힌다. 리스너 멱등은 먼저 확인한다.
 - 가드: `UserEventResubmitSchedulerTest`에 `AccountDeletedEvent` 케이스를 추가한다.
-- 상태: open.
+- 상태: done(517989e81).
 
 ### CQ-50 "증권사에 접수된 전략 주문" 술어 4곳 반복
 - 주제: 중복. 유형: 중복. 위험: 낮음.
@@ -824,7 +824,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 근거: INFINITE·PRIVACY·VR 등록에 음수나 소수 3자리 예수금이 들어갈 수 있다. INFINITE는 `validateInfiniteMinSeed`가 fail-open(유지 목록)이라 시세 조회 실패 시 통과한다.
 - 수정안: `requireAmountScale`을 공용 검증 하나로 올려 등록 전 타입·시드 수정·투자금 추가가 같이 쓴다.
 - 가드: 타입별 음수·자릿수 등록 거부 테스트.
-- 상태: open.
+- 상태: done(8ece9ebdf). DCA 자릿수 문구가 "예수금은…"에서 "금액은…"으로 통일됐다.
 
 ### CQ-59 `markCancelled`·`markFilled`가 잠금·상태 검사 없이 덮어쓴다 (정책 판단 필요)
 - 주제: 상태 전이. 위험: 중간.
@@ -832,7 +832,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 근거: 접수 계열은 행 잠금과 상태 검사를 하는데 취소·체결 기록은 last-write-wins다. 증권사 상태를 진실로 보는 의도일 수 있다. 실제 경합 경로는 미확인이다.
 - 결정(사용자, 2026-11-08): 증권사 상태 우선 설계는 유지하고, `markCancelled`가 이미 FILLED·PARTIALLY_FILLED인 행을 덮지 못하게만 막는다. 취소 후 체결 기록은 기존 `markFilled(…, CANCELLED)` 경로를 유지한다. 의도는 주석으로 고정한다.
 - 가드: 어댑터 테스트 "FILLED 행에 markCancelled → 상태 불변".
-- 상태: open(구현 대기).
+- 상태: done(a0877d62e). 행 잠금은 넣지 않았다(결정 범위 밖, 조회→검사→저장 사이 경합 창 잔존).
 
 ### CQ-60 수동 마감 트리거가 창 밖이면 202 뒤에 조용히 거부된다 (정책 판단 필요)
 - 위치: `TradingCloseScheduler.java:63-70` ✔, `TradingSchedulerInternalController.java:44-53` ✔(무조건 202 + 가상 스레드), root `TradingSchedulerCommandHttpAdapter.java:28-30`·`AdminTradingSchedulerController.java:28-30`.
@@ -849,10 +849,10 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 위치: `TradingPreviewService.java:106`(`!isArchived()`만 거름), `:202-` `attachAccountCashCheck`·`attachAccountHoldingsCheck`.
 - 결정(사용자, 2026-11-08): 경고 합산만 ACTIVE 전략으로 좁히고 카드 표시는 유지한다. 응답 형식 불변.
 - 가드: 정지 전략 주문이 경고 합산에서 빠지는 단위 테스트.
-- 상태: open(구현 대기).
+- 상태: done(517989e81).
 
 ### CQ-63 시드 수정·인출 뒤 INFINITE 최소 시드를 다시 확인하지 않는다 (정책 판단 필요)
 - 위치: `StrategyService.updateSeed`, `CapitalInjectionService.java:169`(`signum() > 0`만). `minRequiredDeposit` 호출은 등록(`StrategyCreationService:160`)과 `CycleRotationService:92`뿐이다.
 - 결정(사용자, 2026-11-08): `updateSeed`·인출에도 등록과 같은 fail-open 최소 시드 검사를 넣는다(시세 조회 실패 시 건너뜀, 미달이면 400). 검사는 등록과 한 곳을 공유한다.
 - 가드: 시드 수정·인출 미달 거부 테스트.
-- 상태: open(구현 대기).
+- 상태: done(8ece9ebdf). 전일종가 조회는 `NOT_SUPPORTED` 진입점(`StrategyService.update`·`CapitalWithdrawalService`), 쓰기는 `StrategyUpdateWriter`·`CapitalInjectionService` 트랜잭션.
