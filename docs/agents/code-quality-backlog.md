@@ -638,6 +638,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | `OrderPort` default `findByIdOrThrow` 부재 | `trading/application/port/output/OrderPort.java`, `CryptoLedgerRecorder:39`·`OrderCancelService:162`·`SubmittingOrderAwaiter:50` | 효과가 서비스 3곳 문구 통일뿐이고, default 메서드는 mock이 override해 테스트의 findById stub이 NPE가 된다(testing.md). 유지. |
 | 응답 DTO enum 표현 혼재(String vs enum) | `TradingCycleResponse`·`ExecuteOrdersResponse` vs `DcaResponse`, `NextOrdersResponse`는 파일 안에서 `OrderItem`(enum)과 `TodayOrderItem`(String)이 섞임 | JSON 결과가 같고 통일하면 OpenAPI 스키마(api-types)만 흔들린다. 유지. |
 | `UserEventRepublisher` 동일 본문 메서드 2개 | `trading/adapter/in/redis/UserEventRepublisher.java` | 2곳이라 추출 기준(3곳) 미달. 유지. |
+| 코인 부분체결 후 취소 주문의 FILLED 확정 | `CryptoOrderSynchronizer.settle`, `CryptoLedgerRecorder:60` | 업비트 시장가 매수(금액 지정)는 다 체결돼도 자투리 때문에 `cancel`로 끝나는 일이 흔하다. 주식(CANCELLED 유지)과 달라도 의도다(CQ-61, 2026-11-08). |
 | `CycleCompletedEvent`/`CycleEndedEvent` 필드 동일 | `trading/application/event/` | 발행 흐름(배치 정상 종료 vs 수동 체결 보정)과 리스너 phase가 달라 병합하지 않는다. 한 흐름에서 동시 발행 없음(발행처 `CycleRotationService:54`, `ManualTradeCorrectionService:111`). |
 | stats 2곳 중복(기록만) | `PlainDecimalSerializer`(shared contract·stats dto), `Instant.parse(cursor)`(`DashboardController`·`TradingCycleController`), `CryptoMarketIndicators.Premium`/`DailyIndicator` 동형, `EquityPoint`/`BacktestPoint`, `BacktestEngine` initialHoldings null 폴백, `InvestmentIndexCalculator` `laterPosition` 병합 | 2곳(추출 기준 미달). `BacktestPoint`는 프론트 차트 재사용이 주석에 명시돼 있다(stats 감사 2026-11-08). |
 | stats 평가액 계산 2종 | `TradingStatsService`(종가 없으면 평단 대체) vs `InvestmentIndexCalculator`(종가 없으면 제외) | 곡선·요약은 연속성이, 투자지수(TWR)는 실평가가 필요해 용도가 다르다(stats 감사 2026-11-08). |
@@ -750,14 +751,14 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 근거: `externalOrderId != null && !UNKNOWN_LEG.equals(orderLeg)`가 4곳에 있고, 수동 보정 행 판정이 바뀌면 함께 바뀐다(CLAUDE.md 추출 기준 충족).
 - 수정안: `Order.isBrokerSubmitted()`(이름은 착수 시 정함)를 추가하고 4곳을 교체한다.
 - 가드: 없음(도메인 메서드 단위 테스트만).
-- 상태: open.
+- 상태: done(b0147f672).
 
 ### CQ-51 DCA 주문 leg 접두사 `"DCA_"` 4곳
 - 주제: 중복. 유형: 비일관. 위험: 낮음.
 - 위치: 생성 `matching/domain/model/DcaRule.java:90` ✔, 역변환·판별 `CryptoOrderSynchronizer.java:110` ✔(리터럴), `TradingCandidatePlanner.java:278,285,288` ✔·`TradingOrderExecutor.java:151,159,161` ✔(각자 private 상수).
 - 수정안: `DcaRule`에 `isDcaLeg(leg)`·`ruleKeyOf(leg)` 정적 메서드를 두고 3곳을 교체한다.
 - 가드: 없음.
-- 상태: open.
+- 상태: done(b0147f672).
 
 ### CQ-52 배치 락 이름·보유시간 리터럴 7곳
 - 주제: 중복. 유형: SSOT 우회. 위험: 낮음.
@@ -765,7 +766,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 근거: 락 이름과 체크포인트 키가 다르면 재개 판정이 어긋난다.
 - 수정안: `TradingBatchJob.OPEN.lockName()`과 클래스 상수 `LOCK_TTL`로 바꾼다.
 - 가드: 없음.
-- 상태: open.
+- 상태: done(b0147f672).
 
 ### CQ-53 포지션 포트·쿼리의 죽은 메서드와 커서 쿼리 soft-delete 필터 누락
 - 주제: 불필요한 코드·영속성 일관성. 유형: 죽은 코드·비일관. 위험: 낮음.
@@ -774,7 +775,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - 필터 누락: `CyclePositionJpaRepository.java` `findByAccountIdWithCursor`에 `a.deleted_at IS NULL`이 없다 ✔. 같은 JOIN을 쓰는 `findRecentByUserId`·`findByUserIdAndRange`에는 있다 ✔. 호출 전 계좌 소유 검증이 삭제 계좌를 막으므로 실제 영향은 없다.
 - 수정안: 죽은 메서드 4개와 해당 어댑터 테스트를 지우고 필터를 추가한다.
 - 가드: 없음.
-- 상태: open.
+- 상태: done(b53504f24).
 
 ### CQ-54 `nextVersionNo`가 soft delete 순서에 의존한다
 - 주제: 영속성. 유형: 잠재 함정. 위험: 낮음.
@@ -782,7 +783,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 근거: 호출 순서가 바뀌면 삭제된 버전 번호를 재사용해 `uq_strategy_version_strategy_version_no`(V1:544)와 충돌한다. 현재 순서는 안전하다.
 - 수정안: 삭제 행을 포함하는 native `MAX(version_no)`로 바꾸고 호출부의 순서 주석을 지운다.
 - 가드: 어댑터 테스트 "삭제된 버전이 있어도 다음 번호는 최대+1".
-- 상태: open.
+- 상태: done(b53504f24).
 
 ### CQ-55 거래일 후보 쌍·마감 리포트 창 판정의 중복
 - 주제: 중복. 유형: 중복. 위험: 낮음.
@@ -791,7 +792,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - 리포트 창 거절: `CapitalInjectionService.java:230-239`·`ManualTradeCorrectionService.java:127-136`(본문 동일, 주석이 서로 참조). `TradingService.java:229-232`는 모양이 다르다.
 - 수정안: 후보 쌍은 `DstInfo`(또는 거래일 헬퍼)에 하나로 둔다. 리포트 창은 `CloseReportScope`에 위임 메서드를 둔다.
 - 가드: 없음.
-- 상태: open(착수 시 줄 재확인).
+- 상태: done(d9f9c3743).
 
 ### CQ-56 trading 잔손질 묶음 (동작 불변)
 - 주제: 일관성·불필요한 코드. 유형: 보일러플레이트·죽은 코드·stale 주석.
@@ -809,14 +810,14 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - stale 주석: `TradingExecutionUseCase.executeManually`("INFINITE 전용", 실제는 DCA만 거부), `StrategyCreationRequest`(변환 주체).
   - 문서: 스트림 컨슈머 복구 `@Scheduled`가 `adapter/in/redis`에 있다(`UserEventStreamConsumer:63`, root 2곳 동형, `RedisStreamSubscriber` 설계). `constraints.md`에 예외를 한 줄 추가한다.
 - 가드: 없음.
-- 상태: open.
+- 상태: done(d6e89b7fa). 미처리: `CancelledOrderFillRecorder` 바깥 try/catch(람다 안 `OrderFill` 생성이 던질 수 있어 도달 불가 아님, 지우면 동작 변경)·`getStrategyOrders` 기간 기본값 서비스 이동·size 상한 100/200 통일·`findPlannedOrPlaced*` 포트 이름(주석만 정정).
 
 ### CQ-57 정책 설정 JSON 섹션 누락 시 NPE
 - 주제: 누락 가드. 위험: 낮음.
 - 위치: `adapter/out/persistence/policy/TradingPolicySettingsPersistenceAdapter.java:62-68`(`(ObjectNode) root.get(section)`), catch `:53`은 Jackson·IAE만 잡는다. 예외 문구가 영어다.
 - 수정안: 섹션이 없으면 기본 섹션을 채우고 문구를 한국어로 바꾼다.
 - 가드: 섹션 없는 JSON 단위 테스트.
-- 상태: open.
+- 상태: done(b53504f24).
 
 ### CQ-58 등록 예수금 부호·자릿수 검증이 DCA에만 있다
 - 주제: 입력 검증. 유형: 비일관·누락 가드. 위험: 낮음~중간.
@@ -838,12 +839,12 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 위치: `TradingCloseScheduler.java:63-70` ✔, `TradingSchedulerInternalController.java:44-53` ✔(무조건 202 + 가상 스레드), root `TradingSchedulerCommandHttpAdapter.java:28-30`·`AdminTradingSchedulerController.java:28-30`.
 - 근거: 관리자 알림은 가지만 호출 응답으로는 거부를 알 수 없다. 개장 `runNow`에는 창 판정이 없다.
 - 결정(사용자, 2026-11-08): 현행 유지(202 + 관리자 알림). 비대칭 이유를 `TradingSchedulerInternalController`·`TradingCloseScheduler.runNow`에 주석으로 남긴다. 응답 코드 불변이라 kista-ui 영향 없음.
-- 상태: open(주석 대기).
+- 상태: done(주석, 이 세션 마지막 커밋). 현행 유지(202 + 관리자 알림), 비대칭 이유를 `TradingSchedulerInternalController`·`TradingCloseScheduler.runNow`에 주석으로 남김.
 
 ### CQ-61 코인 부분체결 후 취소 주문이 FILLED가 된다 (정책 판단 필요)
 - 위치: `CryptoLedgerRecorder.java:60`(`markFilled(…, FILLED)`), `CryptoOrderSynchronizer.java:115,130`. 주식은 CANCELLED를 유지하고 체결량만 기록한다(`CancelledOrderFillRecorder`, `OrderCancelStateWriter`).
 - 결정(사용자, 2026-11-08): 의도로 유지한다. 업비트 시장가 매수(금액 지정)는 다 체결돼도 자투리 때문에 `cancel`로 끝나는 일이 흔하다. 이유를 `CryptoOrderSynchronizer.settle` 주석과 유지 목록에 남긴다.
-- 상태: open(주석 대기).
+- 상태: done(주석, 이 세션 마지막 커밋). 의도 유지, 이유를 `CryptoOrderSynchronizer.settle` 주석과 유지 목록에 남김.
 
 ### CQ-62 미리보기 계좌 현금·보유 경고가 정지 전략 주문까지 합산한다 (정책 판단 필요)
 - 위치: `TradingPreviewService.java:106`(`!isArchived()`만 거름), `:202-` `attachAccountCashCheck`·`attachAccountHoldingsCheck`.
