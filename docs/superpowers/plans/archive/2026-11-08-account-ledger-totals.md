@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4, JUnit5, Mockito, `@WebMvcTest`
 
-**Spec:** `docs/superpowers/specs/2026-11-08-account-ledger-totals-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-11-08-account-ledger-totals-design.md`
 
 ## Global Constraints
 
