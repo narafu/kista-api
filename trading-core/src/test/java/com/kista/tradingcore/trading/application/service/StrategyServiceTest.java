@@ -42,6 +42,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
+import com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy;
+import com.kista.tradingcore.matching.domain.strategy.PrivacyCycleOrderStrategy;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -131,6 +134,10 @@ class StrategyServiceTest {
         StrategyDetailAssembler detailAssembler = new StrategyDetailAssembler(
                 strategyVersionPort, strategyInfiniteDetailPort, vrStrategyDetailService, strategyCyclePort,
                 cyclePositionPort, cyclePositionInfiniteDetailPort, dcaDetailPort, dcaExecutionPort, dcaSummaryAssembler, FIXED);
+        InfiniteMinSeedGuard minSeedGuard = new InfiniteMinSeedGuard(brokerPricePort,
+                new CycleOrderStrategies(List.of(
+                        new InfiniteCycleOrderStrategy(null, null))),
+                strategyInfiniteDetailPort);
         StrategyCreationService creationService = new StrategyCreationService(
                 strategyPort,
                 accountPort,
@@ -143,12 +150,11 @@ class StrategyServiceTest {
                         vrStrategyDetailService, strategyCyclePort, cyclePositionPort, cyclePositionInfiniteDetailPort,
                         dcaDetailPort),
                 new StrategyStartAmountCalculator(privacyTradePort),
-                new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies(List.of(
-                        new com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy(null, null))),
+                minSeedGuard,
                 detailAssembler, FIXED);
-        var historyStrategies = new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies(List.of(
-                new com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy(null, null),
-                new com.kista.tradingcore.matching.domain.strategy.PrivacyCycleOrderStrategy(null)));
+        var historyStrategies = new CycleOrderStrategies(List.of(
+                new InfiniteCycleOrderStrategy(null, null),
+                new PrivacyCycleOrderStrategy(null)));
         StrategyHistoryQueryService historyQueryService = new StrategyHistoryQueryService(
                 accountPort, strategyPort, cyclePositionPort, orderPort, historyStrategies,
                 privacyTradePort, brokerPricePort,
@@ -166,9 +172,11 @@ class StrategyServiceTest {
                         strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, FIXED),
                 orderCancelService,
                 eventPublisher,
-                cycleCapitalEventPort,
                 new StrategyStateWriter(strategyPort, strategyCyclePort, cyclePositionPort),
-                orderPort, batchRunPort, FIXED);
+                orderPort, batchRunPort, minSeedGuard,
+                new StrategyUpdateWriter(strategyPort, accountPort, strategyCyclePort, cyclePositionPort, cycleCapitalEventPort,
+                        detailAssembler, eventPublisher),
+                FIXED);
         lenient().when(orderCancelService.cancelOpenOrders(any(), any())).thenReturn(new CancelResult(0, 0));
         for (StrategyType type : StrategyType.values()) {
             lenient().when(strategyCreationPolicyPort.find(type)).thenReturn(Optional.of(defaultTradingSettings(type)));
@@ -390,7 +398,7 @@ class StrategyServiceTest {
         inOrder.verify(cyclePositionPort).deleteByStrategyId(STRATEGY_ID);
         inOrder.verify(strategyCyclePort).deleteByStrategyId(STRATEGY_ID);
         inOrder.verify(strategyPort).delete(STRATEGY_ID);
-        verify(eventPublisher).publishEvent(new com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent(USER_ID)); // stats 캐시 무효화
+        verify(eventPublisher).publishEvent(new StrategyCapitalChangedEvent(USER_ID)); // stats 캐시 무효화
     }
 
     @Test
@@ -752,7 +760,7 @@ class StrategyServiceTest {
         verify(cyclePositionPort).save(argThat(p ->
                 p.usdDeposit().compareTo(new BigDecimal("874.50")) == 0 && p.holdings().signum() == 0));
         verify(strategyPort).updateStatusUnlessArchived(STRATEGY_ID, StrategyStatus.ACTIVE);
-        verify(eventPublisher).publishEvent(new com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent(USER_ID)); // 새 사이클 생성 → stats 캐시 무효화
+        verify(eventPublisher).publishEvent(new StrategyCapitalChangedEvent(USER_ID)); // 새 사이클 생성 → stats 캐시 무효화
     }
 
     @ParameterizedTest
@@ -987,7 +995,7 @@ class StrategyServiceTest {
 
         verify(strategyCyclePort).updateStartAmount(CYCLE_ID, new BigDecimal("3000"));
         verify(cyclePositionPort).updateCycleStartSnapshot(STRATEGY_ID, new BigDecimal("3000"));
-        verify(eventPublisher).publishEvent(new com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent(USER_ID));
+        verify(eventPublisher).publishEvent(new StrategyCapitalChangedEvent(USER_ID));
     }
 
     @Test
@@ -2503,6 +2511,83 @@ class StrategyServiceTest {
         strategyService.register(USER_ID, ACCOUNT_ID, infiniteSeedCommand("100"));
 
         verify(strategyPort).save(any());
+    }
+
+    // --- register() 예수금 부호·자릿수 (전 전략 타입 공통, CQ-58) ---
+
+    @Test
+    @DisplayName("INFINITE·PRIVACY·VR register() 음수 예수금은 거부하고 저장하지 않는다")
+    void register_nonDca_rejectsNegativeDeposit() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
+        for (StrategyType type : List.of(StrategyType.INFINITE, StrategyType.PRIVACY, StrategyType.VR)) {
+            assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                    register(type).deposit("-1").build()))
+                    .as(type.name()).isInstanceOf(IllegalArgumentException.class).hasMessage("예수금은 0 이상이어야 합니다.");
+        }
+        verify(strategyPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("INFINITE·PRIVACY·VR register() 계좌 통화(USD) 자릿수를 넘는 예수금은 거부하고 저장하지 않는다")
+    void register_nonDca_rejectsDepositBeyondCurrencyScale() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
+        for (StrategyType type : List.of(StrategyType.INFINITE, StrategyType.PRIVACY, StrategyType.VR)) {
+            assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                    register(type).deposit("100.123").build()))
+                    .as(type.name()).isInstanceOf(IllegalArgumentException.class).hasMessage("금액은 소수 2자리까지 입력할 수 있습니다.");
+        }
+        verify(strategyPort, never()).save(any());
+    }
+
+    // --- update() newSeed 검증 (CQ-58 자릿수, CQ-63 INFINITE 최소 시드) ---
+
+    private void stubInfiniteSeedUpdate() {
+        CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
+                new BigDecimal("1000"), new BigDecimal("110"), null, BigDecimal.ZERO, null, null);
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyInfiniteDetailPort.findActiveByStrategyId(STRATEGY_ID))
+                .thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 20)));
+        lenient().when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(CYCLE);
+        lenient().when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(latest));
+    }
+
+    @Test
+    @DisplayName("update() INFINITE 시드가 최소 시드(전일종가×분할×2) 미만이면 거부하고 저장하지 않는다")
+    void update_infinite_seedBelowMin_rejected() {
+        stubInfiniteSeedUpdate();
+        when(brokerPricePort.getPrevClose(eq(StrategyTicker.SOXL), any())).thenReturn(new BigDecimal("60")); // 최소 2,400
+
+        assertThatThrownBy(() -> strategyService.update(STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, new BigDecimal("2399.99"))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("최소 투자금 $2,400.00 이상이 필요합니다.");
+        verify(strategyCyclePort, never()).updateStartAmount(any(), any());
+    }
+
+    @Test
+    @DisplayName("update() INFINITE 전일종가 조회가 실패하면 최소 시드 검사만 건너뛰고 수정된다")
+    void update_infinite_priceFetchFails_skipsMinCheck() {
+        stubInfiniteSeedUpdate();
+        when(brokerPricePort.getPrevClose(eq(StrategyTicker.SOXL), any())).thenThrow(new RuntimeException("시세 장애"));
+
+        strategyService.update(STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, new BigDecimal("100")));
+
+        verify(strategyCyclePort).updateStartAmount(CYCLE_ID, new BigDecimal("100"));
+    }
+
+    @Test
+    @DisplayName("update() 시드가 계좌 통화 자릿수를 넘으면 거부한다")
+    void update_seed_beyondCurrencyScale_rejected() {
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        lenient().when(brokerPricePort.getPrevClose(any(), any())).thenReturn(new BigDecimal("1"));
+        lenient().when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(CYCLE);
+
+        assertThatThrownBy(() -> strategyService.update(STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, new BigDecimal("5000.123"))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("금액은 소수 2자리까지 입력할 수 있습니다.");
+        verify(strategyCyclePort, never()).updateStartAmount(any(), any());
+        verifyNoInteractions(brokerPricePort); // 싼 검증이 외부 시세 호출보다 먼저
     }
 
     @Test

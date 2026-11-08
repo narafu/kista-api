@@ -11,7 +11,6 @@ import com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.service.support.OwnedStrategy;
 import com.kista.tradingcore.trading.application.usecase.InjectCapitalUseCase;
-import com.kista.tradingcore.trading.application.usecase.WithdrawCapitalUseCase;
 import com.kista.tradingcore.trading.domain.model.CycleCapitalEvent;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
@@ -25,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
+import com.kista.tradingcore.trading.domain.model.DepositAmounts;
 
 import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
 import java.math.BigDecimal;
@@ -46,7 +46,7 @@ import java.util.stream.Stream;
 @Service
 @RequiredArgsConstructor
 @Transactional
-class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUseCase {
+class CapitalInjectionService implements InjectCapitalUseCase {
 
     private static final String NO_ACTIVE_CYCLE = "진행 중인 사이클이 없어 투자금을 추가할 수 없습니다.";
     private static final String NO_ACTIVE_CYCLE_WITHDRAW = "진행 중인 사이클이 없어 투자금을 인출할 수 없습니다.";
@@ -88,7 +88,7 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
         if (strategy.isDca() && cmd.shares() != null) {
             throw new IllegalArgumentException("DCA 전략은 예수금만 추가할 수 있습니다.");
         }
-        requireAmountScale(deposit, owned.currency());
+        DepositAmounts.requireScale(deposit, owned.currency());
         LockedCycle locked = lockActiveCycle(owned, NO_ACTIVE_CYCLE, REPORT_WINDOW);
         StrategyCycle cycle = locked.cycle();
         CyclePosition latest = locked.latest();
@@ -117,16 +117,12 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
                 strategyId, deposit, shares, cmd.sharePrice(), newBalance.holdings(), newBalance.usdDeposit());
     }
 
-    @Override
-    public void withdraw(UUID strategyId, UUID requesterId, WithdrawCapitalCommand cmd) {
+    // 인출 DB 변경 본문 — CapitalWithdrawalService(트랜잭션 밖)가 전일종가 HTTP 뒤에 호출한다. 메서드는 public이어야 클래스 레벨 @Transactional 프록시가 적용된다
+    public void withdraw(UUID strategyId, UUID requesterId, WithdrawCapitalCommand cmd, BigDecimal minSeed) {
         OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
         Strategy strategy = owned.strategy();
         BigDecimal amount = cmd.amount();
-        if (amount == null || amount.signum() <= 0) {
-            throw new IllegalArgumentException("투자금 인출 금액은 0보다 커야 합니다.");
-        }
-        requireSupportedType(strategy, "투자금 인출은 PRIVACY·INFINITE·DCA 전략만 지원합니다.");
-        requireAmountScale(amount, owned.currency());
+        requireValidWithdrawal(strategy, amount, owned.currency());
         LockedCycle locked = lockActiveCycle(owned, NO_ACTIVE_CYCLE_WITHDRAW, REPORT_WINDOW_WITHDRAW);
         StrategyCycle cycle = locked.cycle();
         CyclePosition latest = locked.latest();
@@ -170,6 +166,7 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
             // PRIVACY 배수 = startAmount ÷ currentCycleStart가 깨진다
             throw new IllegalArgumentException("투자금 인출 후 시작 금액이 0 이하가 되어 인출할 수 없습니다.");
         }
+        InfiniteMinSeedGuard.requireAtLeast(minSeed, newStartAmount); // INFINITE는 인출 후에도 0회차 교착 시드 미만이 되면 거부
 
         AccountBalance old = latest.toBalance();
         AccountBalance newBalance = new AccountBalance(old.holdings(), old.avgPrice(), old.usdDeposit().subtract(amount));
@@ -185,17 +182,18 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
                 strategyId, amount, newBalance.usdDeposit(), newStartAmount);
     }
 
-    private void requireSupportedType(Strategy strategy, String message) {
-        if (!strategy.isPrivacy() && !strategy.isInfinite() && !strategy.isDca()) {
-            throw new IllegalArgumentException(message);
+    // 인출 입력 검증(금액 부호·지원 전략·자릿수) — HTTP 전 선검증과 트랜잭션 본문이 함께 쓴다
+    static void requireValidWithdrawal(Strategy strategy, BigDecimal amount, Currency currency) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new IllegalArgumentException("투자금 인출 금액은 0보다 커야 합니다.");
         }
+        requireSupportedType(strategy, "투자금 인출은 PRIVACY·INFINITE·DCA 전략만 지원합니다.");
+        DepositAmounts.requireScale(amount, currency);
     }
 
-    // 금액 자릿수 — 계좌 통화 소수 자릿수 이하(KRW 정수·USD/USDT 소수 2자리)
-    private static void requireAmountScale(BigDecimal amount, Currency currency) {
-        if (amount.stripTrailingZeros().scale() > currency.amountScale()) {
-            throw new IllegalArgumentException(currency.amountScale() == 0 ? "금액은 정수로 입력해야 합니다."
-                    : "금액은 소수 %d자리까지 입력할 수 있습니다.".formatted(currency.amountScale()));
+    private static void requireSupportedType(Strategy strategy, String message) {
+        if (!strategy.isPrivacy() && !strategy.isInfinite() && !strategy.isDca()) {
+            throw new IllegalArgumentException(message);
         }
     }
 

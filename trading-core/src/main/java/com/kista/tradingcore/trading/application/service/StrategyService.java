@@ -52,10 +52,11 @@ class StrategyService implements StrategyUseCase {
     private final CycleSnapshotCreator cycleSnapshotCreator;       // 재개 시 종료된 사이클 재오픈 전용
     private final OrderCancelService orderCancelService;           // 일시중지·삭제 전 미체결 주문 정리
     private final ApplicationEventPublisher eventPublisher;       // stats 캐시 무효화 이벤트 발행
-    private final CycleCapitalEventPort cycleCapitalEventPort;     // 투자금 추가·인출 이력 존재 확인(시드 수정 거절용)
     private final StrategyStateWriter stateWriter;                 // 일시중지·삭제·보관 DB 쓰기 (취소 HTTP를 트랜잭션 밖에 두기 위해 분리)
     private final OrderPort orderPort;                             // 보관 전 당일 접수 주문 확인
     private final TradingBatchRunPort batchRunPort;                // 보관 전 당일 마감 리포트 반영 여부
+    private final InfiniteMinSeedGuard minSeedGuard;               // 시드 수정 시 INFINITE 최소 시드 검사
+    private final StrategyUpdateWriter updateWriter;               // update DB 쓰기 (전일종가 HTTP를 트랜잭션 밖에 두기 위해 분리)
     private final Clock clock;                                     // 당일(KST) 기준
 
     @Override
@@ -230,60 +231,18 @@ class StrategyService implements StrategyUseCase {
     }
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED) // INFINITE 최소 시드 검사의 전일종가 HTTP는 트랜잭션 밖 — 소유권·잠금·쓰기는 StrategyUpdateWriter 트랜잭션
     public StrategyDetail update(UUID strategyId, UUID requesterId, UpdateStrategyCommand cmd) {
-        OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
-        Strategy strategy = owned.strategy();
-        Account account = owned.account();
-        strategy.requireNotArchived();
-        if (strategy.isVr() && cmd.newSeed() != null) {
-            throw new IllegalArgumentException("VR 전략의 시작 예수금은 일반 수정으로 변경할 수 없습니다. VR 재설정을 이용해야 합니다.");
-        }
-        if (strategy.isDca() && cmd.newSeed() != null) {
-            throw new IllegalArgumentException("DCA 전략의 예수금은 일반 수정으로 변경할 수 없습니다. 투자금 추가·인출을 이용해야 합니다.");
-        }
-        // 연속 사이클 정책 미지원 전략(VR·DCA)은 NONE으로 고정된다
-        if (!strategy.supportsCycleSeed() && cmd.cycleSeedType() != null && cmd.cycleSeedType() != StrategyCycleSeedType.NONE) {
-            throw new IllegalArgumentException(strategy.type().getDescription() + " 전략의 연속 사이클 정책은 변경할 수 없습니다.");
-        }
-
-        StrategyCycleSeedType seedType = cmd.cycleSeedType() != null
-                ? cmd.cycleSeedType()
-                : strategy.cycleSeedType();
-        Strategy updated = strategy.withCycleSeedType(seedType);
-        // cycleSeedType 컬럼만 조건부 갱신 — save()는 status까지 덮어써 동시 보관(ARCHIVED)을 되돌릴 수 있다
-        if (!strategyPort.updateCycleSeedTypeUnlessArchived(strategyId, seedType)) {
-            throw new IllegalStateException("보관된 전략은 변경할 수 없습니다."); // 사전 검사 이후 동시 보관된 경합
-        }
-
+        BigDecimal minSeed = null;
         if (cmd.newSeed() != null) {
-            updateSeed(strategyId, cmd.newSeed());
-            eventPublisher.publishEvent(new StrategyCapitalChangedEvent(requesterId));
+            OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
+            if (owned.strategy().isInfinite()) {
+                // HTTP 전에 싼 입력 검증부터 — 무효 시드로 시세 조회를 낭비하지 않는다
+                StrategyUpdateWriter.requireValidSeed(cmd.newSeed(), owned.currency());
+                minSeed = minSeedGuard.minSeed(owned.strategy(), owned.account().toBrokerRef()); // 조회 실패는 null(검사 건너뜀)
+            }
         }
-
-        log.info("[strategyId={}] 전략 수정: cycleSeedType={}", strategyId, seedType);
-        return detailAssembler.toDetail(updated, account.broker().getMarket());
-    }
-
-    // 시드 수정: holdings=0 시작점에서만 허용 — strategy_cycle + 최신 cycle_position 함께 보정
-    private void updateSeed(UUID strategyId, BigDecimal newSeed) {
-        if (newSeed.signum() <= 0) {
-            throw new IllegalArgumentException("예수금은 0보다 커야 합니다.");
-        }
-        StrategyCycle cycle = strategyCyclePort.requireLatestByStrategyId(strategyId);
-        CyclePosition latest = cyclePositionPort.findLatestOneByStrategyId(strategyId)
-                .orElseThrow(() -> new NoSuchElementException("포지션 이력 없음: " + strategyId));
-
-        if (latest.holdings().signum() != 0) {
-            throw new IllegalArgumentException("보유 수량이 있는 사이클은 예수금을 수정할 수 없습니다.");
-        }
-        // 이력 합계(원금)와 어긋나므로 투자금 추가·인출 이력이 있으면 일반 시드 수정 불가
-        if (cycleCapitalEventPort.existsByCycleId(cycle.id())) {
-            throw new IllegalArgumentException("투자금 추가·인출 이력이 있는 사이클은 예수금을 수정할 수 없습니다. 투자금 추가·인출을 이용해야 합니다.");
-        }
-
-        strategyCyclePort.updateStartAmount(cycle.id(), newSeed);
-        cyclePositionPort.updateCycleStartSnapshot(strategyId, newSeed);
-        log.info("[strategyId={}] 시드 수정: newSeed={}, holdings={}", strategyId, newSeed, latest.holdings());
+        return updateWriter.update(strategyId, requesterId, cmd, minSeed);
     }
 
     // ── 조회 전용 (stats에서 이관 — 전략 소유 read) ─────────────────────────────

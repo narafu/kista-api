@@ -42,6 +42,11 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
+import com.kista.tradingcore.trading.application.port.output.StrategyInfiniteDetailPort;
+import com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy;
+import com.kista.tradingcore.trading.domain.model.StrategyInfiniteDetail;
+import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -53,6 +58,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -68,8 +74,12 @@ class CapitalInjectionServiceTest {
     @Mock TradingBatchRunPort batchRunPort;
     @Mock CycleOrderStrategies cycleOrderStrategies;
     @Mock CycleCapitalEventPort cycleCapitalEventPort;
+    @Mock BrokerPricePort brokerPricePort;
+    @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
+    final CycleOrderStrategies minSeedStrategies = new CycleOrderStrategies(List.of(new InfiniteCycleOrderStrategy(null, null)));
 
     CapitalInjectionService service;
+    CapitalWithdrawalService withdrawal; // 인출 진입점(전일종가 선조회 후 service.withdraw 호출)
 
     private final UUID strategyId = UUID.randomUUID();
     private final UUID userId = UUID.randomUUID();
@@ -80,6 +90,8 @@ class CapitalInjectionServiceTest {
     @BeforeEach
     void setUp() {
         service = newService(FixedClockTestConfig.FIXED);
+        withdrawal = new CapitalWithdrawalService(strategyPort, accountPort,
+                new InfiniteMinSeedGuard(brokerPricePort, minSeedStrategies, strategyInfiniteDetailPort), service);
         stubAccount(TradingFixtures.kisAccount(accountId, userId)); // 기본: 주식(USD) 계좌
     }
 
@@ -124,7 +136,7 @@ class CapitalInjectionServiceTest {
         assertThat(p.holdings()).isEqualByComparingTo("10");
         assertThat(p.avgPrice()).isEqualByComparingTo("20.0000");
         verify(strategyCyclePort).updateStartAmount(cycleId, new BigDecimal("1300.00"));
-        verify(eventPublisher).publishEvent(new com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent(userId));
+        verify(eventPublisher).publishEvent(new StrategyCapitalChangedEvent(userId));
     }
 
     private CycleCapitalEvent savedEvent() {
@@ -178,7 +190,7 @@ class CapitalInjectionServiceTest {
     void withdraw_recordsNegativeDeltas() {
         stub(StrategyType.PRIVACY, BigDecimal.TEN, new BigDecimal("100.0000"), null);
 
-        service.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("300.00")));
+        withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("300.00")));
 
         assertEvent(savedEvent(), CycleCapitalEvent.Kind.WITHDRAW, "-300", "0", "-300");
     }
@@ -412,7 +424,7 @@ class CapitalInjectionServiceTest {
     }
 
     private void withdrawRejected(String amount, Class<? extends RuntimeException> type, String message) {
-        assertThatThrownBy(() -> service.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal(amount))))
+        assertThatThrownBy(() -> withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal(amount))))
                 .isInstanceOf(type).hasMessage(message);
         verify(cyclePositionPort, never()).updateBalance(any(), any());
         verify(strategyCyclePort, never()).updateStartAmount(any(), any());
@@ -422,31 +434,79 @@ class CapitalInjectionServiceTest {
     void withdraw_success_reducesDepositAndStartAmount_keepsHoldingsAndAvg() {
         stub(StrategyType.PRIVACY, BigDecimal.TEN, new BigDecimal("20.0000"), null);
 
-        service.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("200.00")));
+        withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("200.00")));
 
         AccountBalance p = updatedBalance();
         assertThat(p.usdDeposit()).isEqualByComparingTo("300.00");
         assertThat(p.holdings()).isEqualByComparingTo("10");
         assertThat(p.avgPrice()).isEqualByComparingTo("20.0000");
         verify(strategyCyclePort).updateStartAmount(cycleId, new BigDecimal("800.00"));
-        verify(eventPublisher).publishEvent(new com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent(userId));
+        verify(eventPublisher).publishEvent(new StrategyCapitalChangedEvent(userId));
     }
 
     @Test
     void withdraw_infinite_exactlyAvailable_succeeds() {
         stub(StrategyType.INFINITE, BigDecimal.TEN, new BigDecimal("20.0000"), null);
 
-        service.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("500.00")));
+        withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("500.00")));
 
         assertThat(updatedBalance().usdDeposit()).isEqualByComparingTo("0.00");
         verify(strategyCyclePort).updateStartAmount(cycleId, new BigDecimal("500.00"));
+    }
+
+    // 인출 후 INFINITE 최소 시드(CQ-63): 전일종가 60, 분할 20 → 최소 2,400. 시작금액 3,000에서 인출
+    private void stubInfiniteWithdrawal() {
+        stub(StrategyType.INFINITE, BigDecimal.ZERO, null, null);
+        when(strategyCyclePort.requireLatestByStrategyId(strategyId)).thenReturn(new StrategyCycle(cycleId, strategyId,
+                UUID.randomUUID(), new BigDecimal("3000.00"), null, LocalDate.of(2026, 1, 1), null, null, null));
+        when(cyclePositionPort.findLatestOne(cycleId)).thenReturn(Optional.of(new CyclePosition(latestId, cycleId,
+                new BigDecimal("3000.00"), new BigDecimal("30.00"), null, BigDecimal.ZERO, null, null)));
+        when(strategyInfiniteDetailPort.findActiveByStrategyId(strategyId))
+                .thenReturn(Optional.of(new StrategyInfiniteDetail(UUID.randomUUID(), 20)));
+    }
+
+    @Test
+    void withdraw_infinite_belowMinSeed_rejected() {
+        stubInfiniteWithdrawal();
+        when(brokerPricePort.getPrevClose(eq(StrategyTicker.SOXL), any())).thenReturn(new BigDecimal("60"));
+
+        withdrawRejected("600.01", IllegalArgumentException.class, "최소 투자금 $2,400.00 이상이 필요합니다.");
+    }
+
+    @Test
+    void withdraw_infinite_atMinSeed_succeeds() {
+        stubInfiniteWithdrawal();
+        when(brokerPricePort.getPrevClose(eq(StrategyTicker.SOXL), any())).thenReturn(new BigDecimal("60"));
+
+        withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("600.00")));
+
+        verify(strategyCyclePort).updateStartAmount(cycleId, new BigDecimal("2400.00"));
+    }
+
+    @Test
+    void withdraw_infinite_priceFetchFails_skipsMinCheck() {
+        stubInfiniteWithdrawal();
+        when(brokerPricePort.getPrevClose(eq(StrategyTicker.SOXL), any())).thenThrow(new RuntimeException("시세 장애"));
+
+        withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("1000.00")));
+
+        verify(strategyCyclePort).updateStartAmount(cycleId, new BigDecimal("2000.00"));
+    }
+
+    @Test
+    void withdraw_infinite_invalidAmount_rejectedBeforePriceFetch() {
+        stub(StrategyType.INFINITE, BigDecimal.ZERO, null, null);
+
+        assertThatThrownBy(() -> withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("1.234"))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("금액은 소수 2자리까지 입력할 수 있습니다.");
+        verifyNoInteractions(brokerPricePort); // 싼 검증이 외부 시세 호출보다 먼저
     }
 
     @Test
     void withdraw_rejects_nonPositiveAmount() {
         stub(StrategyType.PRIVACY, BigDecimal.TEN, new BigDecimal("20.0000"), null);
         withdrawRejected("0", IllegalArgumentException.class, "투자금 인출 금액은 0보다 커야 합니다.");
-        assertThatThrownBy(() -> service.withdraw(strategyId, userId, new WithdrawCapitalCommand(null)))
+        assertThatThrownBy(() -> withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(null)))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("투자금 인출 금액은 0보다 커야 합니다.");
     }
 
@@ -493,7 +553,7 @@ class CapitalInjectionServiceTest {
         // 가용 = 500 − 100 − 100 = 300
         withdrawRejected("300.01", IllegalArgumentException.class,
                 "투자금 인출 금액이 인출 가능액 $300.00를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소 전에 체결된 매수 금액을 뺀 만큼 인출할 수 있습니다.");
-        service.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("300.00")));
+        withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("300.00")));
         assertThat(updatedBalance().usdDeposit()).isEqualByComparingTo("200.00");
     }
 
@@ -521,7 +581,7 @@ class CapitalInjectionServiceTest {
     void withdraw_locksCycleBeforeSaving() {
         stub(StrategyType.PRIVACY, BigDecimal.TEN, new BigDecimal("20.0000"), null);
 
-        service.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("100.00")));
+        withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("100.00")));
 
         InOrder order = inOrder(strategyCyclePort, cyclePositionPort);
         order.verify(strategyCyclePort).lockForUpdate(cycleId);
@@ -554,7 +614,7 @@ class CapitalInjectionServiceTest {
 
         assertThatThrownBy(() -> service.inject(strategyId, userId, new InjectCapitalCommand(BigDecimal.ONE, null, null)))
                 .isInstanceOf(IllegalStateException.class).hasMessage(WINDOW_ADD);
-        assertThatThrownBy(() -> service.withdraw(strategyId, userId, new WithdrawCapitalCommand(BigDecimal.ONE)))
+        assertThatThrownBy(() -> withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(BigDecimal.ONE)))
                 .isInstanceOf(IllegalStateException.class).hasMessage(WINDOW_WITHDRAW);
         verify(cyclePositionPort, never()).updateBalance(any(), any());
         verify(strategyCyclePort, never()).updateStartAmount(any(), any());
@@ -574,7 +634,7 @@ class CapitalInjectionServiceTest {
         stub(StrategyType.PRIVACY, BigDecimal.TEN, new BigDecimal("20.0000"), null);
         stubTodayOrder(Order.UNKNOWN_LEG);
 
-        service.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("100.00")));
+        withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("100.00")));
         verify(cyclePositionPort).updateBalance(eq(latestId), any());
     }
 
@@ -634,7 +694,7 @@ class CapitalInjectionServiceTest {
         lenient(orderPort.findCancelledByCycleAndDate(cycleId, TODAY)).thenReturn(List.of(
                 cancelled(TODAY, OrderDirection.BUY, "10.00", "10", "E1", "LOC_BUY")));
 
-        service.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("500.00")));
+        withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("500.00")));
 
         verify(orderPort, never()).findCancelledByCycleAndDate(cycleId, TODAY);
         assertThat(updatedBalance().usdDeposit()).isEqualByComparingTo("0.00");
@@ -648,7 +708,7 @@ class CapitalInjectionServiceTest {
                 cancelled(TODAY, OrderDirection.SELL, "10.00", "10", "E1", "LOC_SELL"),          // SELL
                 cancelled(TODAY, OrderDirection.BUY, "10.00", "10", "E2", Order.UNKNOWN_LEG)));  // 수동 보정 행
 
-        service.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("500.00")));
+        withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("500.00")));
 
         assertThat(updatedBalance().usdDeposit()).isEqualByComparingTo("0.00");
     }

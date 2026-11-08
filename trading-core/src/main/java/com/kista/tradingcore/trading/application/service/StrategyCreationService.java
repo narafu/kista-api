@@ -9,7 +9,6 @@ import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.matching.domain.model.BootstrapPosition;
 import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
-import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.shared.kernel.StrategyCreationSettings;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyTicker;
@@ -21,6 +20,7 @@ import com.kista.tradingcore.trading.domain.model.DuplicateStrategyTickerExcepti
 import com.kista.tradingcore.trading.domain.model.RegisterStrategyCommand;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyDetail;
+import com.kista.tradingcore.trading.domain.model.DepositAmounts;
 import com.kista.tradingcore.trading.domain.creation.StrategyCreationRequest;
 import com.kista.tradingcore.trading.domain.creation.StrategyCreationResolver.ResolvedCreation;
 import com.kista.tradingcore.trading.domain.creation.StrategyCreationResolvers;
@@ -36,7 +36,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
-import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.UUID;
@@ -66,7 +65,7 @@ class StrategyCreationService {
     private final StrategyCreationResolvers creationResolvers;
     private final StrategyCreationPersister creationPersister; // 저장 5단계 트랜잭션 경계 (self-invocation 회피용 별도 빈)
     private final StrategyStartAmountCalculator startAmountCalculator; // 시작금액 산출(PRIVACY 중간부터 시작 환산 포함)
-    private final CycleOrderStrategies cycleStrategies;         // INFINITE 최소 시드 산출(minRequiredDeposit)
+    private final InfiniteMinSeedGuard minSeedGuard;            // INFINITE 최소 시드 검사(등록·시드 수정·인출 공유)
     private final StrategyDetailAssembler detailAssembler;      // 응답 조립(조회 경로와 동일 SSOT)
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
@@ -100,9 +99,8 @@ class StrategyCreationService {
         // 사용자 복제본이 없으면 배치가 이 전략을 돌릴 수 없다 — 등록 단계에서 거부
         tradingUserProfilePort.findByUserId(userId)
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
-        // 예수금 — 생략(null)은 0으로 여기서 한 번만 정규화, DCA는 계좌 통화(주식 USD·코인 견적 통화) 자릿수 검증 포함
-        BigDecimal initialUsdDeposit = dca ? dcaDeposit(cmd.initialUsdDeposit(), account.broker().getMarket())
-                : cmd.initialUsdDeposit() != null ? cmd.initialUsdDeposit() : BigDecimal.ZERO;
+        // 예수금 — 생략(null)은 0으로 여기서 한 번만 정규화, 전 전략 공통으로 음수 거부·계좌 통화(주식 USD·코인 견적 통화) 자릿수 검증
+        BigDecimal initialUsdDeposit = DepositAmounts.normalizeForRegistration(cmd.initialUsdDeposit(), account.broker().getCurrency());
 
         // 중간부터 시작 시 시장가(전일종가) 1회 조회 — holdings=0이면 조회 자체를 건너뛰어 기존 동작 보존
         // DCA는 시장가를 조회하지 않고 초기 투입 원가(보유 × 평단)를 start_amount로 둔다 — 코인은 BrokerPricePort 경로가 없다
@@ -123,7 +121,8 @@ class StrategyCreationService {
 
         // INFINITE 최소 시드 검증 — 폼이 먼저 막지만 API 직접 호출도 0회차 교착 시드를 만들지 못하게 서버에서도 막는다
         if (cmd.type() == StrategyType.INFINITE) {
-            validateInfiniteMinSeed(account, resolvedTicker, marketPrice, resolved.divisionCount(), startAmount);
+            InfiniteMinSeedGuard.requireAtLeast(
+                    minSeedGuard.minSeed(account.toBrokerRef(), resolvedTicker, resolved.divisionCount(), marketPrice), startAmount);
         }
 
         // 저장 5단계(strategy·version·detail·cycle·position)는 별도 빈의 한 트랜잭션 — 중간 실패 시 부분 저장 없이 롤백
@@ -161,20 +160,6 @@ class StrategyCreationService {
                 () -> brokerPricePort.getPrevClose(ticker, account.toBrokerRef()));
     }
 
-    // INFINITE 최소 시드(전일종가×분할×2) 미만이면 거부 — 전일종가 조회 실패는 검증만 건너뛴다(fail-open, 503 변환 불필요)
-    private void validateInfiniteMinSeed(Account account, StrategyTicker ticker, BigDecimal marketPrice,
-                                         int divisionCount, BigDecimal startAmount) {
-        BigDecimal price = marketPrice != null ? marketPrice
-                : BrokerCallGuard.tryGet("최소 시드 검증용 전일종가 조회: ticker=" + ticker,
-                        () -> brokerPricePort.getPrevClose(ticker, account.toBrokerRef())).orElse(null);
-        if (price == null) return; // 조회 실패 — 검증 건너뜀
-        BigDecimal min = cycleStrategies.of(StrategyType.INFINITE).minRequiredDeposit(price, null, divisionCount);
-        if (min != null && startAmount.compareTo(min) < 0) {
-            // 금액 표기는 kista-ui fmtUsd와 같은 #,##0.00 (JVM 로케일 무관)
-            throw new IllegalArgumentException("최소 투자금 $%s 이상이 필요합니다.".formatted(String.format(Locale.US, "%,.2f", min)));
-        }
-    }
-
     // 등록 시점에만 런타임 생성 정책을 적용해 기존 전략 흐름과 설정 조회를 분리한다.
     // 전략 타입별 필드 해석은 CycleOrderStrategy와 동일한 capability 패턴(StrategyCreationResolvers)에 위임한다.
     private ResolvedCreation resolveCreationSettings(RegisterStrategyCommand cmd) {
@@ -189,24 +174,13 @@ class StrategyCreationService {
         return creationResolvers.of(cmd.type()).resolve(request, settings);
     }
 
-    // 같은 계좌 내 종목 중복 방지 — 종목별 합산 잔고 ↔ 전략 일대일 보장 (DCA도 예외 없음 — 매수·매도는 한 전략의 규칙으로)
-    // DCA 시작 원장 예수금 검증 — 0 이상, 계좌 통화 금액 자릿수 이하(KRW 정수·USD/USDT 소수 2자리)
-    private static BigDecimal dcaDeposit(BigDecimal deposit, Market market) {
-        if (deposit == null) return BigDecimal.ZERO;
-        if (deposit.signum() < 0) throw new IllegalArgumentException("예수금은 0 이상이어야 합니다.");
-        if (deposit.stripTrailingZeros().scale() > market.amountScale()) {
-            throw new IllegalArgumentException(market.amountScale() == 0 ? "예수금은 정수로 입력해야 합니다."
-                    : "예수금은 소수 %d자리까지 입력할 수 있습니다.".formatted(market.amountScale()));
-        }
-        return deposit;
-    }
-
     // PostgreSQL 위반 메시지에 인덱스 이름이 들어 있다
     private static boolean isActiveTickerIndexViolation(DataIntegrityViolationException e) {
         String msg = e.getMostSpecificCause().getMessage();
         return msg != null && msg.contains(ACTIVE_TICKER_INDEX);
     }
 
+    // 같은 계좌 내 종목 중복 방지 — 종목별 합산 잔고 ↔ 전략 일대일 보장 (DCA도 예외 없음 — 매수·매도는 한 전략의 규칙으로)
     private void validateUniqueTicker(UUID accountId, StrategyTicker ticker) {
         // 보관 전략은 같은 종목 재등록을 막지 않는다
         if (strategyPort.findByAccountIdAndTicker(accountId, ticker).stream().anyMatch(s -> !s.isArchived())) {
