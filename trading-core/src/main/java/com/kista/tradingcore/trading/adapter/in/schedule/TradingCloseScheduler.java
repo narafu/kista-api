@@ -63,6 +63,8 @@ public class TradingCloseScheduler {
 
     // package-private: 시각 주입으로 접수 창 판정 테스트
     void runNow(ZonedDateTime nowKst) throws InterruptedException {
+        // 개장 runNow는 창 판정이 없고 마감만 창 밖을 거부한다
+        // 컨트롤러는 202를 먼저 돌려주므로 거부는 호출 응답이 아닌 관리자 알림으로만 알린다(CQ-60 현행 유지 결정)
         // 당일 마감 접수 창(04:30~장마감 10분 전) 밖이면 거부 — LOC가 다음 세션으로 넘어가 거래일(KST 당일)·리포트가 어긋난다
         if (nowKst.toLocalTime().isBefore(CRON_TIME) || !beforePlacementCutoff(nowKst)) {
             String message = "[수동 마감 거부] 마감 접수 창(04:30~장마감 10분 전 KST) 밖 — 요청 시각 " + nowKst.toLocalTime().withNano(0);

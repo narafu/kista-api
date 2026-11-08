@@ -28,6 +28,7 @@ public class TradingSchedulerInternalController {
         void run() throws InterruptedException;
     }
 
+    // 마감은 접수 창 밖이면 실행 단계에서 조용히 거부하고 관리자 알림만 보낸다(개장 runNow는 창 판정 없음) — 응답은 항상 202(CQ-60 현행 유지)
     // 백그라운드 가상 스레드 실행 + 인터럽트/예외 처리 — 202 반환 후 처리
     private void triggerAsync(String label, InterruptibleAction action) {
         Thread.ofVirtual().start(() -> {

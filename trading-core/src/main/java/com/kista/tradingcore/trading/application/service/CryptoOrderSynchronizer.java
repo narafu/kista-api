@@ -112,6 +112,7 @@ class CryptoOrderSynchronizer {
 
     // 체결 수량이 있으면 원장 반영·FILLED 확정(새 증분일 때만 이벤트), 무체결 취소면 CANCELLED, 그 외(WAIT/WATCH)는 유지
     private void settle(BatchContext ctx, Order order, CryptoOrderResult r) {
+        // 업비트 시장가 매수(금액 지정)는 전량 체결돼도 자투리 때문에 CANCEL로 끝나는 일이 흔해, 체결량이 있으면 CANCEL이어도 FILLED로 확정한다(주식과 다름, CQ-61 의도 유지)
         boolean closed = r.state() == CryptoOrderResult.State.DONE || r.state() == CryptoOrderResult.State.CANCEL;
         if (!closed) return;
         BigDecimal volume = r.executedVolume() == null ? BigDecimal.ZERO : r.executedVolume();
