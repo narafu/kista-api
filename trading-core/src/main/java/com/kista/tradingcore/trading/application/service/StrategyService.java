@@ -146,7 +146,7 @@ class StrategyService implements StrategyUseCase {
         ZonedDateTime now = ZonedDateTime.now(clock);
         for (LocalDate date : Stream.of(now.toLocalDate(), DstInfo.nextTradeDate(now)).distinct().toList()) {
             boolean hasPlaced = orderPort.findByStrategyId(strategyId, date, date).stream()
-                    .anyMatch(o -> o.externalOrderId() != null && !Order.UNKNOWN_LEG.equals(o.orderLeg()));
+                    .anyMatch(Order::isBrokerSubmitted);
             if (hasPlaced && !batchRunPort.isReported(date, strategyId)) {
                 throw new IllegalStateException("오늘 접수된 주문이 마감 반영된 뒤 보관할 수 있습니다.");
             }

@@ -196,8 +196,7 @@ class TradingService {
     // 당일 접수된 적 있는 주문(externalOrderId 보유) — 수동 체결 보정 행(UNKNOWN_LEG)은 포지션을 직접 기록했으므로 제외
     private List<Order> reportableOrders(UUID strategyId, LocalDate today) {
         return orderPort.findByStrategyId(strategyId, today, today).stream()
-                .filter(order -> order.externalOrderId() != null)
-                .filter(order -> !Order.UNKNOWN_LEG.equals(order.orderLeg()))
+                .filter(Order::isBrokerSubmitted)
                 .toList();
     }
 

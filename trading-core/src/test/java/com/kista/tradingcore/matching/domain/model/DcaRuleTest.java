@@ -86,4 +86,13 @@ class DcaRuleTest {
         assertThatIllegalArgumentException().isThrownBy(() -> rule("a", OrderDirection.BUY, OrderType.MARKET, 9, amount("4999")).requireCompatible(Market.CRYPTO_KRW))
                 .withMessage("코인 DCA 금액은 5,000원 이상이어야 합니다.");
     }
+
+    @Test
+    void leg_접두사_왕복과_비DCA_leg_판별() {
+        DcaRule r = rule("weekly-1", OrderDirection.BUY, OrderType.MOC, null, amount("100"));
+        assertThat(DcaRule.isDcaLeg(r.orderLeg())).isTrue();
+        assertThat(DcaRule.ruleKeyOf(r.orderLeg())).isEqualTo("weekly-1");
+        assertThat(DcaRule.isDcaLeg(PlannedOrder.UNKNOWN_LEG)).isFalse();
+        assertThat(DcaRule.isDcaLeg("INFINITE_BUY_01")).isFalse();
+    }
 }

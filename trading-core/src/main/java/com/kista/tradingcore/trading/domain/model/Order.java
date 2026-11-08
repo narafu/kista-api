@@ -45,6 +45,11 @@ public record Order(
         filledQuantity = Quantities.normalize(filledQuantity);
     }
 
+    // 증권사에 접수된 전략 주문 — 접수번호 보유 + 수동 보정 행(UNKNOWN_LEG) 제외
+    public boolean isBrokerSubmitted() {
+        return externalOrderId != null && !UNKNOWN_LEG.equals(orderLeg);
+    }
+
     // 커널 계획 주문(PlannedOrder) → 특정 계좌·사이클 PLANNED Order 승격 — 유일한 승격 지점(TradingOrderPlanner.savePlannedOrders)
     public static Order fromPlanned(PlannedOrder p, UUID accountId, UUID strategyCycleId) {
         return new Order(null, accountId, strategyCycleId, p.tradeDate(), p.ticker(), p.orderType(),

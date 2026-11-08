@@ -275,17 +275,11 @@ class TradingCandidatePlanner {
     private void recordDcaOrdered(BatchContext ctx, LocalDate tradeDate, Map<String, BigDecimal> referencePrices) throws InterruptedException {
         batchGuard.runSafely("DCA 회차 이력 기록", ctx, () -> {
             orderPort.findPlannedOrPlacedByCycleAndDate(ctx.currentCycle().id(), tradeDate).stream()
-                    .filter(order -> order.orderLeg().startsWith(DCA_LEG_PREFIX))
-                    .forEach(order -> dcaExecutionRecorder.recordOrdered(ctx, tradeDate, dcaRuleKey(order.orderLeg()), order,
+                    .filter(order -> DcaRule.isDcaLeg(order.orderLeg()))
+                    .forEach(order -> dcaExecutionRecorder.recordOrdered(ctx, tradeDate, DcaRule.ruleKeyOf(order.orderLeg()), order,
                             referencePrices.get(order.orderLeg())));
             return ctx;
         });
-    }
-
-    private static final String DCA_LEG_PREFIX = "DCA_"; // DCA 주문 leg = "DCA_" + ruleKey
-
-    private static String dcaRuleKey(String orderLeg) {
-        return orderLeg.substring(DCA_LEG_PREFIX.length());
     }
 
     // 원장 판정 대상 슬롯 — 사이클(ctx)과 신규 생성 가능한 주문

@@ -85,9 +85,21 @@ public record DcaRule(
         return orderType == OrderType.MOO ? OrderTiming.AT_OPEN : OrderTiming.AT_CLOSE;
     }
 
+    private static final String DCA_LEG_PREFIX = "DCA_"; // DCA 주문 leg = "DCA_" + ruleKey
+
     // 규칙별 concrete leg — 슬롯 중복 방지 키
     public String orderLeg() {
-        return "DCA_" + ruleKey;
+        return DCA_LEG_PREFIX + ruleKey;
+    }
+
+    // DCA 주문 leg 여부 — 비DCA leg(전략 주문·UNKNOWN)는 false
+    public static boolean isDcaLeg(String orderLeg) {
+        return orderLeg.startsWith(DCA_LEG_PREFIX);
+    }
+
+    // DCA 주문 leg → ruleKey (orderLeg()의 역변환)
+    public static String ruleKeyOf(String orderLeg) {
+        return orderLeg.substring(DCA_LEG_PREFIX.length());
     }
 
     public DcaRule withRuleKey(String key) {

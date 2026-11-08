@@ -55,4 +55,20 @@ class OrderTest {
         assertThat(o.id()).isNull();
         assertThat(o.externalOrderId()).isNull();
     }
+
+    @Test
+    void isBrokerSubmitted_접수번호와_전략_leg가_모두_있을때만_true() {
+        Order base = Order.filledManual(UUID.randomUUID(), UUID.randomUUID(), LocalDate.of(2026, 9, 9), StrategyTicker.SOXL,
+                OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.ONE, BigDecimal.TEN, "ODNO1");
+        // 수동 보정 행(UNKNOWN_LEG)은 접수번호가 있어도 제외
+        assertThat(base.isBrokerSubmitted()).isFalse();
+        // 접수번호 없음
+        assertThat(new Order(null, base.accountId(), base.strategyCycleId(), base.tradeDate(), base.ticker(), base.orderType(),
+                base.timing(), base.direction(), "INFINITE_BUY_01", base.quantity(), base.price(), OrderStatus.PLANNED, null, null, null)
+                .isBrokerSubmitted()).isFalse();
+        // 정상
+        assertThat(new Order(null, base.accountId(), base.strategyCycleId(), base.tradeDate(), base.ticker(), base.orderType(),
+                base.timing(), base.direction(), "INFINITE_BUY_01", base.quantity(), base.price(), OrderStatus.PLACED, "ODNO1", null, null)
+                .isBrokerSubmitted()).isTrue();
+    }
 }

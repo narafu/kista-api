@@ -8,6 +8,7 @@ import com.kista.tradingcore.trading.application.port.output.HeartbeatPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
+import com.kista.tradingcore.trading.domain.model.TradingBatchJob;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +43,7 @@ public class TradingCloseScheduler {
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     static final LocalTime CRON_TIME = LocalTime.of(4, 30);                // cron 발화 시각 — 당일 마감 접수 창 시작
+    private static final Duration LOCK_TTL = Duration.ofHours(3); // 마감 배치 락 보유시간
     static final Duration PLACEMENT_MARGIN = Duration.ofMinutes(10);       // 장마감 10분 전까지만 마감 접수
 
     // 장마감 10분 전 이전인지 — 수동 트리거·재기동 재개 공용 접수 마감 판정
@@ -51,7 +53,7 @@ public class TradingCloseScheduler {
 
     @Scheduled(cron = "0 30 4 * * TUE-SAT", zone = TimeZones.KST_ID) // 화~토 04:30 KST (DST 장마감 30분 전, 비DST는 waitUntilOrderTime 60분 대기)
     public void run() throws InterruptedException {
-        schedulerLockService.tryRun("trading-close", Duration.ofHours(3), this::runLocked);
+        schedulerLockService.tryRun(TradingBatchJob.CLOSE.lockName(), LOCK_TTL, this::runLocked);
     }
 
     // 수동 트리거 — 주문 대기 없이 즉시 접수, 리포트는 장마감 후
@@ -68,7 +70,7 @@ public class TradingCloseScheduler {
             errorReportPort.reportError(new IllegalStateException(message));
             return;
         }
-        schedulerLockService.tryRun("trading-close", Duration.ofHours(3), () ->
+        schedulerLockService.tryRun(TradingBatchJob.CLOSE.lockName(), LOCK_TTL, () ->
                 jobRunner.run("마감 매매 스케쥴러 수동",
                         () -> contextFactory.buildAll(closeBatchStrategies()),
                         useCase::executeBatchNow));
@@ -76,12 +78,12 @@ public class TradingCloseScheduler {
 
     // 재기동 재개 — 이전 프로세스 락을 인수해 마감 배치 전체 재실행 (slot 멱등 재계획, 남은 시간만 대기)
     public void resume() throws InterruptedException {
-        schedulerLockService.takeOver("trading-close", Duration.ofHours(3), this::runLocked);
+        schedulerLockService.takeOver(TradingBatchJob.CLOSE.lockName(), LOCK_TTL, this::runLocked);
     }
 
     // 재기동 재개 — 접수 완료(PLACED) 이후 중단분: 리포트 미완료 전략만 리포트
     public void resumeReport() throws InterruptedException {
-        schedulerLockService.takeOver("trading-close", Duration.ofHours(3), () -> {
+        schedulerLockService.takeOver(TradingBatchJob.CLOSE.lockName(), LOCK_TTL, () -> {
             boolean completed = jobRunner.run("마감 리포트 재개",
                     () -> contextFactory.buildAll(closeBatchStrategies()),
                     useCase::resumeCloseReport);

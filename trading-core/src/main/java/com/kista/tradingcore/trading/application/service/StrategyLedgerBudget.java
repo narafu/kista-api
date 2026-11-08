@@ -56,7 +56,7 @@ class StrategyLedgerBudget {
     List<Order> unreportedCancelledBuys(StrategyCycle cycle, LocalDate tradeDate) {
         if (batchRunPort.isReported(tradeDate, cycle.strategyId())) return List.of();
         return orderPort.findCancelledByCycleAndDate(cycle.id(), tradeDate).stream()
-                .filter(o -> o.direction() == OrderDirection.BUY && o.externalOrderId() != null && !Order.UNKNOWN_LEG.equals(o.orderLeg()))
+                .filter(o -> o.direction() == OrderDirection.BUY && o.isBrokerSubmitted())
                 .toList();
     }
 

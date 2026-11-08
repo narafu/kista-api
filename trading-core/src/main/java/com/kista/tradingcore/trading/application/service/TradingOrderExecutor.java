@@ -7,6 +7,7 @@ import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
+import com.kista.tradingcore.matching.domain.model.DcaRule;
 import com.kista.tradingcore.matching.domain.model.InfinitePosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.matching.domain.model.VrPosition;
@@ -148,17 +149,15 @@ class TradingOrderExecutor {
     // 접수 결과 — placed: 접수 성공, insufficient: 증권사 잔고·수량 부족으로 거절된 주문(BUY·SELL 혼재 가능)
     private record PlaceResult(List<Order> placed, List<Order> insufficient) {}
 
-    private static final String DCA_LEG_PREFIX = "DCA_"; // DCA 주문 leg = "DCA_" + ruleKey
-
     // 잔고·수량 부족 거절을 사용자 알림으로 전달 — 전략·방향당 1건(DCA는 회차 skip 기록), 알림 실패가 접수 결과를 막지 않게 격리
     private void reportInsufficient(PlaceResult result, LocalDate tradeDate, TradingAccount account, Strategy strategy) {
         if (result.insufficient().isEmpty()) return;
         try {
             if (cycleOrderStrategies.of(strategy.type()).recordsRounds()) {
                 for (Order order : result.insufficient()) {
-                    if (!order.orderLeg().startsWith(DCA_LEG_PREFIX)) continue;
+                    if (!DcaRule.isDcaLeg(order.orderLeg())) continue;
                     boolean sell = order.direction() == OrderDirection.SELL;
-                    dcaRecorder.recordOrderRejected(strategy, account, tradeDate, order.orderLeg().substring(DCA_LEG_PREFIX.length()),
+                    dcaRecorder.recordOrderRejected(strategy, account, tradeDate, DcaRule.ruleKeyOf(order.orderLeg()),
                             order, sell ? DcaSkipReason.INSUFFICIENT_HOLDINGS : DcaSkipReason.INSUFFICIENT_BALANCE,
                             sell ? "증권사 판매 가능 수량 부족" : "증권사 주문 가능 금액 부족");
                 }

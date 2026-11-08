@@ -105,9 +105,9 @@ class CryptoOrderSynchronizer {
         return order.direction() == OrderDirection.BUY ? gross.add(quoteFee) : gross.subtract(quoteFee);
     }
 
-    // 주문 leg "DCA_" + ruleKey → ruleKey
+    // 주문 leg → DCA ruleKey
     private static String ruleKeyOf(Order order) {
-        return order.orderLeg().substring("DCA_".length());
+        return DcaRule.ruleKeyOf(order.orderLeg());
     }
 
     // 체결 수량이 있으면 원장 반영·FILLED 확정(새 증분일 때만 이벤트), 무체결 취소면 CANCELLED, 그 외(WAIT/WATCH)는 유지

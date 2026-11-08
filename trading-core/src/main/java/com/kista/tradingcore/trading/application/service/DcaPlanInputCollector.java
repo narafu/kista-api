@@ -182,8 +182,7 @@ class DcaPlanInputCollector {
     private BigDecimal cancelledPlacedSell(List<Order> todayOrders, UUID strategyId, LocalDate tradeDate) {
         if (batchRunPort.isReported(tradeDate, strategyId)) return BigDecimal.ZERO;
         return todayOrders.stream()
-                .filter(o -> o.direction() == OrderDirection.SELL && o.status() == OrderStatus.CANCELLED && o.externalOrderId() != null
-                        && !Order.UNKNOWN_LEG.equals(o.orderLeg()))
+                .filter(o -> o.direction() == OrderDirection.SELL && o.status() == OrderStatus.CANCELLED && o.isBrokerSubmitted())
                 .map(o -> o.filledQuantity() == null ? o.quantity() : o.filledQuantity())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
