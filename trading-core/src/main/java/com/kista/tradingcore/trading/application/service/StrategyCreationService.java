@@ -27,6 +27,7 @@ import com.kista.tradingcore.trading.domain.creation.StrategyCreationResolvers;
 import com.kista.tradingcore.trading.domain.creation.VrRegistration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,6 +46,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 class StrategyCreationService {
+
+    private static final String ACTIVE_TICKER_INDEX = "uq_strategy_account_ticker_active"; // V16 부분 유니크 인덱스
 
     // 계좌 시장에서 종목 거래 가능 + DCA 규칙의 시장별 규칙(주문유형·금액·요일)
     private void validateMarket(Account account, DcaStrategyConfig dca, StrategyTicker ticker) {
@@ -125,9 +128,17 @@ class StrategyCreationService {
 
         // 저장 5단계(strategy·version·detail·cycle·position)는 별도 빈의 한 트랜잭션 — 중간 실패 시 부분 저장 없이 롤백
         // (증권사 호출은 위에서 이미 끝났으므로 트랜잭션이 HTTP 대기를 물지 않는다)
-        Strategy strategy = creationPersister.persist(new StrategyCreationPersister.Draft(
-                accountId, cmd.type(), seedType, resolved, vr != null ? vr.ramp() : null, initialUsdDeposit, initialHoldings,
-                cmd.initialAvgPrice(), marketPrice, startAmount, vr != null ? vr.vrValue() : null, scheduledStart, dcaConfig));
+        Strategy strategy;
+        try {
+            strategy = creationPersister.persist(new StrategyCreationPersister.Draft(
+                    accountId, cmd.type(), seedType, resolved, vr != null ? vr.ramp() : null, initialUsdDeposit, initialHoldings,
+                    cmd.initialAvgPrice(), marketPrice, startAmount, vr != null ? vr.vrValue() : null, scheduledStart, dcaConfig));
+        } catch (DataIntegrityViolationException e) {
+            // 선검사(validateUniqueTicker)를 동시에 통과한 경합 — 유니크 인덱스 위반만 409로 바꾸고 다른 제약 위반은 그대로 던진다
+            // 커밋 시점 flush 예외도 persist 프록시 밖(여기)에서 잡힌다
+            if (isActiveTickerIndexViolation(e)) throw new DuplicateStrategyTickerException();
+            throw e;
+        }
 
         log.info("[strategyId={}] [accountId={}] 전략 등록: type={}", strategy.id(), accountId, strategy.type());
         return detailAssembler.toDetail(strategy, account.broker().getMarket());
@@ -188,6 +199,12 @@ class StrategyCreationService {
                     : "예수금은 소수 %d자리까지 입력할 수 있습니다.".formatted(market.amountScale()));
         }
         return deposit;
+    }
+
+    // PostgreSQL 위반 메시지에 인덱스 이름이 들어 있다
+    private static boolean isActiveTickerIndexViolation(DataIntegrityViolationException e) {
+        String msg = e.getMostSpecificCause().getMessage();
+        return msg != null && msg.contains(ACTIVE_TICKER_INDEX);
     }
 
     private void validateUniqueTicker(UUID accountId, StrategyTicker ticker) {

@@ -35,6 +35,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -1254,6 +1255,30 @@ class StrategyServiceTest {
                 infinite().deposit("1000").divisionCount(0).build()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("허용되지 않는 값");
+    }
+
+    @Test
+    @DisplayName("register()는 활성 종목 유니크 인덱스 위반을 DuplicateStrategyTickerException으로 변환한다")
+    void register_activeTickerIndexViolation_translatesToDuplicate() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
+        when(strategyPort.save(any())).thenThrow(new DataIntegrityViolationException("저장 실패",
+                new RuntimeException("duplicate key value violates unique constraint \"uq_strategy_account_ticker_active\"")));
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, infinite().build()))
+                .isInstanceOf(DuplicateStrategyTickerException.class);
+    }
+
+    @Test
+    @DisplayName("register()는 다른 제약 위반은 변환하지 않고 그대로 던진다")
+    void register_otherConstraintViolation_isNotTranslated() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
+        when(strategyPort.save(any())).thenThrow(new DataIntegrityViolationException("저장 실패",
+                new RuntimeException("duplicate key value violates unique constraint \"other_key\"")));
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, infinite().build()))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test

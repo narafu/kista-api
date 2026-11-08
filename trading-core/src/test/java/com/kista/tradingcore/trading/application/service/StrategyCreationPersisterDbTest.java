@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.ComponentScan;
@@ -105,6 +106,27 @@ class StrategyCreationPersisterDbTest extends DataJpaTestBase {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM cycle_position cp JOIN strategy_cycle sc ON sc.id = cp.strategy_cycle_id JOIN strategy s ON s.id = sc.strategy_id WHERE s.account_id = ?",
                 Integer.class, accountId)).isEqualTo(1);
+    }
+
+    @Test
+    void persist_secondActiveStrategySameTicker_violatesUniqueIndex() {
+        persistInfinite();
+
+        assertThatThrownBy(this::persistInfinite)
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("uq_strategy_account_ticker_active");
+        assertThat(countStrategyRows()).isEqualTo(1); // 두 번째 저장은 통째로 롤백
+    }
+
+    @Test
+    void persist_sameTickerAllowed_whenExistingIsArchivedOrDeleted() {
+        persistInfinite();
+        jdbcTemplate.update("UPDATE strategy SET status = 'ARCHIVED' WHERE account_id = ?", accountId);
+        persistInfinite(); // 보관 전략은 인덱스 밖
+        jdbcTemplate.update("UPDATE strategy SET deleted_at = now() WHERE account_id = ? AND status = 'ACTIVE'", accountId);
+        persistInfinite(); // 삭제 전략도 인덱스 밖
+
+        assertThat(countStrategyRows()).isEqualTo(3);
     }
 
     private void persistInfinite() {
