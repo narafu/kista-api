@@ -157,7 +157,8 @@ class ManualTradingService {
             // AT_OPEN 주문이 없으면(PRIVACY는 항상, INFINITE도 흔함) 불필요한 라이브 시세 조회를 건너뛴다
             if (orderPort.findAtOpenPlannedByCycleAndDate(cycle.id(), today).isEmpty()) return;
             // BUY cap 판단용 최신 현재가 재조회 — 단일 전략 수동 실행이라 ticker 1개(배치 불필요)
-            BigDecimal currentPrice = priceFetcher.fetchPrices(List.of(strategy.ticker()), account.brokerRef()).get(strategy.ticker());
+            // 조회 실패해도 PLANNED는 이미 저장됐으므로 예외 대신 캡 미적용(null)으로 접수한다
+            BigDecimal currentPrice = fetchStartPriceOrNull(strategy, account);
             log.info("[accountId={}] 개장 후 수동 실행 — AT_OPEN 주문 접수", account.id());
             orderExecutor.placeAtOpenOrders(today, account, cycle, currentPrice, position, vrPosition, strategy);
         }

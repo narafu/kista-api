@@ -8,7 +8,6 @@ import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -17,6 +16,8 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -55,16 +56,15 @@ class CycleCloserTest {
         AccountBalance balance = new AccountBalance(0, null, BigDecimal.valueOf(500));
         LocalDate tradeDate = LocalDate.of(2026, 7, 17);
         Strategy pausedStrategy = strategy.withStatus(StrategyStatus.PAUSED);
-        when(strategyPort.save(strategy.withStatus(StrategyStatus.PAUSED))).thenReturn(pausedStrategy);
 
         CycleCloser.CycleEndResult result = CycleCloser.closeIfExhausted(
                 strategyCyclePort, strategyPort, strategy, cycle, balance, tradeDate);
 
         // 사이클 종료 기록 — 종료금액=usdDeposit, 종료일자=tradeDate
         verify(strategyCyclePort).markEnded(cycle.id(), balance.usdDeposit(), tradeDate);
-        ArgumentCaptor<Strategy> savedCaptor = ArgumentCaptor.forClass(Strategy.class);
-        verify(strategyPort).save(savedCaptor.capture());
-        assertThat(savedCaptor.getValue().status()).isEqualTo(StrategyStatus.PAUSED);
+        // 조건부 pause — 전체 save는 동시 보관(ARCHIVED)을 덮어쓸 수 있다
+        verify(strategyPort).pause(strategyId);
+        verify(strategyPort, never()).save(any());
         assertThat(result.strategy()).isEqualTo(pausedStrategy);
         assertThat(result.ended()).isTrue();
         assertThat(result.endDate()).isEqualTo(tradeDate);
@@ -94,7 +94,6 @@ class CycleCloserTest {
         StrategyCycle cycle = currentCycle();
         AccountBalance balance = new AccountBalance(new BigDecimal("0.00000000"), null, BigDecimal.valueOf(500));
         LocalDate tradeDate = LocalDate.of(2026, 7, 17);
-        when(strategyPort.save(strategy.withStatus(StrategyStatus.PAUSED))).thenReturn(strategy.withStatus(StrategyStatus.PAUSED));
 
         CycleCloser.CycleEndResult result = CycleCloser.closeIfExhausted(
                 strategyCyclePort, strategyPort, strategy, cycle, balance, tradeDate);

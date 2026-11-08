@@ -125,6 +125,7 @@ class StrategyServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(strategyPort.archiveIfPaused(any())).thenReturn(true); // 보관 확정 기본 성공
+        lenient().when(strategyPort.updateCycleSeedTypeUnlessArchived(any(), any())).thenReturn(true); // 정책 조건부 갱신 기본 성공
         lenient().when(strategyPort.updateStatusUnlessArchived(any(), any())).thenReturn(true); // 조건부 상태 갱신 기본 성공(보관 경합 테스트에서 재스텁)
         DcaSummaryAssembler dcaSummaryAssembler = new DcaSummaryAssembler(marketCalendarPort);
         StrategyDetailAssembler detailAssembler = new StrategyDetailAssembler(
@@ -903,7 +904,7 @@ class StrategyServiceTest {
         Strategy maintained = ACTIVE_STRATEGY.withCycleSeedType(StrategyCycleSeedType.MAINTAIN);
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        when(strategyPort.save(any(Strategy.class))).thenReturn(maintained);
+        when(strategyPort.updateCycleSeedTypeUnlessArchived(STRATEGY_ID, StrategyCycleSeedType.MAINTAIN)).thenReturn(true);
         when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
 
         StrategyDetail result = strategyService.update(STRATEGY_ID, USER_ID,
@@ -911,9 +912,25 @@ class StrategyServiceTest {
 
         assertThat(result.strategy().cycleSeedType()).isEqualTo(StrategyCycleSeedType.MAINTAIN);
         assertThat(result.initialUsdDeposit()).isEqualTo(new BigDecimal("1000"));
+        // 전체 save가 아니라 정책 컬럼만 조건부 갱신한다(오래된 스냅샷이 status를 덮지 않게)
+        verify(strategyPort, never()).save(any());
         verify(strategyCyclePort, never()).updateStartAmount(any(), any());
         verify(cyclePositionPort, never()).updateCycleStartSnapshot(any(), any());
         verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("update() 사전 검사 뒤 동시에 보관되면(조건부 갱신 0건) 변경 불가 예외를 던진다")
+    void update_concurrentlyArchived_throws() {
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyPort.updateCycleSeedTypeUnlessArchived(STRATEGY_ID, StrategyCycleSeedType.MAINTAIN)).thenReturn(false);
+
+        assertThatThrownBy(() -> strategyService.update(STRATEGY_ID, USER_ID,
+                new UpdateStrategyCommand(StrategyCycleSeedType.MAINTAIN, null)))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(strategyPort, never()).save(any());
     }
 
     @Test
@@ -924,7 +941,6 @@ class StrategyServiceTest {
 
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        when(strategyPort.save(any(Strategy.class))).thenReturn(ACTIVE_STRATEGY);
         when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(CYCLE);
         when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(latest));
 
@@ -944,7 +960,6 @@ class StrategyServiceTest {
 
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        when(strategyPort.save(any(Strategy.class))).thenReturn(ACTIVE_STRATEGY);
         when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(CYCLE);
         when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(latest));
         when(cycleCapitalEventPort.existsByCycleId(CYCLE.id())).thenReturn(true);
@@ -965,7 +980,6 @@ class StrategyServiceTest {
 
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        when(strategyPort.save(any(Strategy.class))).thenReturn(ACTIVE_STRATEGY);
         when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(CYCLE);
         when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(latest));
 
@@ -981,7 +995,6 @@ class StrategyServiceTest {
     void update_seed_zero_or_negative_throws() {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        when(strategyPort.save(any(Strategy.class))).thenReturn(ACTIVE_STRATEGY);
 
         assertThatThrownBy(() -> strategyService.update(STRATEGY_ID, USER_ID,
                 new UpdateStrategyCommand(null, BigDecimal.ZERO)))
@@ -1002,7 +1015,6 @@ class StrategyServiceTest {
                 null, null, BigDecimal.valueOf(0), null, null);
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(vrStrategy);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        lenient().when(strategyPort.save(any(Strategy.class))).thenReturn(vrStrategy);
         lenient().when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
         lenient().when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(opening));
 
@@ -1400,7 +1412,6 @@ class StrategyServiceTest {
     void update_doesNotLoadCreationSettings() {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        when(strategyPort.save(any(Strategy.class))).thenReturn(ACTIVE_STRATEGY);
         when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
 
         strategyService.update(STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, null));

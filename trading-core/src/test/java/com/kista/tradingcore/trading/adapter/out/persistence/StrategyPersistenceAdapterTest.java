@@ -264,6 +264,27 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
+    void updateCycleSeedTypeUnlessArchived_changesOnlySeedTypeAndKeepsArchived() {
+        Strategy archived = strategyAdapter.save(new Strategy(null, accountId, StrategyType.INFINITE,
+                StrategyStatus.ARCHIVED, StrategyTicker.SOXL, StrategyCycleSeedType.NONE));
+        Strategy paused = strategyAdapter.save(new Strategy(null, accountId, StrategyType.INFINITE,
+                StrategyStatus.PAUSED, StrategyTicker.UPRO, StrategyCycleSeedType.NONE));
+        entityManager.flush();
+
+        assertThat(strategyAdapter.updateCycleSeedTypeUnlessArchived(archived.id(), StrategyCycleSeedType.MAINTAIN)).isFalse();
+        assertThat(strategyAdapter.updateCycleSeedTypeUnlessArchived(paused.id(), StrategyCycleSeedType.MAINTAIN)).isTrue();
+        entityManager.clear();
+
+        // ARCHIVED 행은 정책·상태 모두 불변, 그 외 행은 정책만 바뀌고 status는 그대로
+        Strategy archivedAfter = strategyAdapter.findByIdOrThrow(archived.id());
+        assertThat(archivedAfter.status()).isEqualTo(StrategyStatus.ARCHIVED);
+        assertThat(archivedAfter.cycleSeedType()).isEqualTo(StrategyCycleSeedType.NONE);
+        Strategy pausedAfter = strategyAdapter.findByIdOrThrow(paused.id());
+        assertThat(pausedAfter.status()).isEqualTo(StrategyStatus.PAUSED);
+        assertThat(pausedAfter.cycleSeedType()).isEqualTo(StrategyCycleSeedType.MAINTAIN);
+    }
+
+    @Test
     void updateStatusUnlessArchived_keepsArchivedAndUpdatesOthers() {
         Strategy archived = strategyAdapter.save(new Strategy(null, accountId, StrategyType.INFINITE,
                 StrategyStatus.ARCHIVED, StrategyTicker.SOXL, StrategyCycleSeedType.NONE));

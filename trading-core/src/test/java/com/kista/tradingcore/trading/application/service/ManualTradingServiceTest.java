@@ -550,6 +550,25 @@ class ManualTradingServiceTest {
     }
 
     @Test
+    void execute_vrStrategy_marketOpen_priceFetchFails_placesAtOpenOrdersWithNullPrice() {
+        // PLANNED가 이미 저장된 뒤 시세 조회가 실패해도 예외로 끝내지 않고 캡 미적용(null 가격)으로 접수한다
+        VrFixture fx = setUpVrManualExecution();
+        when(orderPort.findAtOpenPlannedByCycleAndDate(eq(fx.vrCycle().id()), any()))
+                .thenReturn(List.of(fx.vrBuyPlanned(), fx.vrSellPlanned()));
+        when(kisPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
+                .thenThrow(new RuntimeException("시세 오류"));
+        // TradingPriceFetcher가 포트 실패를 삼키고 발행하는 알림마저 실패해 fetchPrices가 던지는 경로
+        doThrow(new RuntimeException("알림 발행 실패")).when(eventPublisher).publishEvent(any(Object.class));
+
+        List<Order> result = service.execute(fx.vrStrat().id(), REQUESTER_ID, DstInfo.immediateOpen(ZonedDateTime.now(FIXED)));
+
+        assertThat(result).hasSize(2);
+        verify(orderExecutor).placeAtOpenOrders(
+                any(LocalDate.class), eq(TradingAccount.from(ACCOUNT)), eq(fx.vrCycle()),
+                isNull(), isNull(), any(VrPosition.class), eq(fx.vrStrat()));
+    }
+
+    @Test
     void execute_vrStrategy_marketClosed_doesNotPlaceAtOpenOrders() {
         // 개장 전 수동 실행 — marketOpen을 미래로 설정해 개장 분기를 결정론적으로 회피한다
         VrFixture fx = setUpVrManualExecution();

@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 
@@ -68,6 +69,11 @@ interface StrategyJpaRepository extends JpaRepository<StrategyEntity, UUID> {
     @Modifying
     @Query("UPDATE StrategyEntity s SET s.status = :status, s.updatedAt = :now WHERE s.id = :id AND s.status <> com.kista.shared.kernel.StrategyStatus.ARCHIVED")
     int updateStatusUnlessArchived(@Param("id") UUID id, @Param("status") StrategyStatus status, @Param("now") Instant now);
+
+    // 연속 사이클 정책만 조건부 갱신 — 보관(ARCHIVED) 행은 건드리지 않는다(벌크 UPDATE라 updatedAt 직접 설정)
+    @Modifying
+    @Query("UPDATE StrategyEntity s SET s.cycleSeedType = :cycleSeedType, s.updatedAt = :now WHERE s.id = :id AND s.status <> com.kista.shared.kernel.StrategyStatus.ARCHIVED")
+    int updateCycleSeedTypeUnlessArchived(@Param("id") UUID id, @Param("cycleSeedType") StrategyCycleSeedType cycleSeedType, @Param("now") Instant now);
 
     // 보관 확정 — PAUSED일 때만 ARCHIVED로(마지막 확인 뒤 재개된 전략을 덮어쓰지 않는다)
     @Modifying

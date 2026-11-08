@@ -20,8 +20,9 @@ public final class CycleCloser {
                                            AccountBalance balance, LocalDate tradeDate) {
         if (!balance.hasHoldings()) {
             strategyCyclePort.markEnded(currentCycle.id(), balance.usdDeposit(), tradeDate);
-            Strategy updated = strategyPort.save(strategy.withStatus(StrategyStatus.PAUSED));
-            return new CycleEndResult(updated, true, tradeDate);
+            // 조건부 갱신 — 오래된 스냅샷 save가 동시에 보관된 ARCHIVED를 PAUSED로 되돌리지 않게 한다
+            strategyPort.pause(strategy.id());
+            return new CycleEndResult(strategy.withStatus(StrategyStatus.PAUSED), true, tradeDate);
         }
         return new CycleEndResult(strategy, false, null);
     }

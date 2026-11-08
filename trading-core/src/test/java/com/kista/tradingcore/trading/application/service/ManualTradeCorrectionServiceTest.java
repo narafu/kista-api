@@ -95,7 +95,6 @@ class ManualTradeCorrectionServiceTest {
 
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(strategy);
-        when(strategyPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(cycle);
         when(cyclePositionPort.findLatestOne(CYCLE_ID)).thenReturn(Optional.of(latest));
 
@@ -106,7 +105,7 @@ class ManualTradeCorrectionServiceTest {
         assertThat(result.strategyStatus()).isEqualTo(StrategyStatus.PAUSED);
         verify(orderPort).saveAll(any());
         verify(strategyCyclePort).markEnded(CYCLE_ID, new BigDecimal("7200.05"), LocalDate.of(2026, 7, 1));
-        verify(strategyPort).save(argThat(s -> s.id().equals(STRATEGY_ID) && s.status() == StrategyStatus.PAUSED));
+        verify(strategyPort).pause(STRATEGY_ID);
         // 청산 발생 → 사이클 종료 이벤트 발행
         verify(eventPublisher).publishEvent(any(CycleEndedEvent.class));
         verify(eventPublisher).publishEvent(any(com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent.class)); // stats 캐시 무효화
@@ -359,7 +358,6 @@ class ManualTradeCorrectionServiceTest {
         ManualTradeCorrectionCommand.Fill day1 = sell(1, "ODNO-1");
         ManualTradeCorrectionCommand.Fill day2 = new ManualTradeCorrectionCommand.Fill(LocalDate.of(2026, 7, 2),
                 OrderDirection.SELL, BigDecimal.ONE, new BigDecimal("267.37"), "ODNO-1", null);
-        when(strategyPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ManualTradeCorrectionResult result = service.correctManualFills(command(day1, day2));
 

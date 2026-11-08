@@ -12,6 +12,7 @@ import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.LockModeType;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +26,7 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE) // OrderJpaRepository가 package-private
 public class OrderPersistenceAdapter implements OrderPort {
@@ -251,8 +253,16 @@ public class OrderPersistenceAdapter implements OrderPort {
 
     @Override
     public void markCancelled(UUID orderId) {
-        // 명시적 save로 CANCELLED 상태 기록
-        mutate(orderId, e -> e.setStatus(OrderStatus.CANCELLED));
+        // 증권사 상태 우선 설계(취소 후 체결은 markFilled(…, CANCELLED)로 기록)는 유지하되,
+        // 이미 체결(FILLED·PARTIALLY_FILLED)로 기록된 행을 늦게 도착한 취소 판정이 덮어쓰지 못하게 막는다
+        OrderEntity e = repository.findById(orderId)
+                .orElseThrow(() -> new IllegalStateException("주문을 찾을 수 없습니다."));
+        if (e.getStatus() == OrderStatus.FILLED || e.getStatus() == OrderStatus.PARTIALLY_FILLED) {
+            log.warn("[orderId={}] 이미 체결된 주문이라 CANCELLED로 바꾸지 않습니다: status={}", orderId, e.getStatus());
+            return;
+        }
+        e.setStatus(OrderStatus.CANCELLED);
+        repository.save(e); // 명시적 save로 CANCELLED 상태 기록
     }
 
     @Override

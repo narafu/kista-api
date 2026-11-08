@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
+import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 
@@ -36,6 +37,8 @@ public interface StrategyPort {
 
     // 상태만 조건부 갱신 — 보관(ARCHIVED) 행은 건드리지 않는다. 오래된 스냅샷 save가 보관을 덮어쓰는 경합 방지. 갱신됐으면 true
     boolean updateStatusUnlessArchived(UUID id, StrategyStatus status);
+    // 연속 사이클 정책만 갱신 — 오래된 스냅샷 save가 status 등 다른 컬럼을 덮어쓰지 않게 한다(보관 행은 건드리지 않는다). 갱신됐으면 true
+    boolean updateCycleSeedTypeUnlessArchived(UUID id, StrategyCycleSeedType cycleSeedType);
     void delete(UUID id);
     void deleteByAccountId(UUID accountId); // 계좌 삭제 시 전략 일괄 소프트 삭제
     void deleteByUserId(UUID userId);       // 사용자 탈퇴 시 전략 일괄 소프트 삭제

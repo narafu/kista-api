@@ -368,6 +368,28 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
     }
 
     @Test
+    void markCancelled_placed_becomesCancelled() {
+        UUID placed = insertWithId("BUY", "PLACED");
+
+        adapter.markCancelled(placed);
+
+        assertThat(statusOf(placed)).isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void markCancelled_filledOrPartiallyFilled_keepsStatus() {
+        UUID filled = insertWithId("BUY", "FILLED");
+        UUID partial = insertWithId("BUY", "PARTIALLY_FILLED");
+
+        adapter.markCancelled(filled);
+        adapter.markCancelled(partial);
+
+        // 체결 기록을 늦게 도착한 취소 판정이 덮지 못한다
+        assertThat(statusOf(filled)).isEqualTo(OrderStatus.FILLED);
+        assertThat(statusOf(partial)).isEqualTo(OrderStatus.PARTIALLY_FILLED);
+    }
+
+    @Test
     void markFailed_requiresSubmitting() {
         UUID planned = insertWithId("BUY", "PLANNED");
         assertThatThrownBy(() -> adapter.markFailed(planned)).isInstanceOf(OrderStateConflictException.class);

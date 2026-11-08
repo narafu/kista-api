@@ -250,7 +250,10 @@ class StrategyService implements StrategyUseCase {
                 ? cmd.cycleSeedType()
                 : strategy.cycleSeedType();
         Strategy updated = strategy.withCycleSeedType(seedType);
-        Strategy saved = strategyPort.save(updated);
+        // cycleSeedType 컬럼만 조건부 갱신 — save()는 status까지 덮어써 동시 보관(ARCHIVED)을 되돌릴 수 있다
+        if (!strategyPort.updateCycleSeedTypeUnlessArchived(strategyId, seedType)) {
+            throw new IllegalStateException("보관된 전략은 변경할 수 없습니다."); // 사전 검사 이후 동시 보관된 경합
+        }
 
         if (cmd.newSeed() != null) {
             updateSeed(strategyId, cmd.newSeed());
@@ -258,7 +261,7 @@ class StrategyService implements StrategyUseCase {
         }
 
         log.info("[strategyId={}] 전략 수정: cycleSeedType={}", strategyId, seedType);
-        return detailAssembler.toDetail(saved, account.broker().getMarket());
+        return detailAssembler.toDetail(updated, account.broker().getMarket());
     }
 
     // 시드 수정: holdings=0 시작점에서만 허용 — strategy_cycle + 최신 cycle_position 함께 보정
