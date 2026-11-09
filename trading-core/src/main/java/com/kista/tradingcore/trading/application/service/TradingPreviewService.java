@@ -76,7 +76,7 @@ class TradingPreviewService {
         Strategy strategy = owned.strategy();
         Account account = owned.account();
         // 코인 DCA는 실행 루프(CryptoDcaRoundExecutor) 전용이라 미리보기 경로가 없다 — 주식 DCA는 plan() 정규 경로로 미리보기
-        if (account.broker().isCryptoExchange()) throw new DcaManualExecutionUnsupportedException();
+        if (TradingAccount.from(account).brokerRef().broker().isCryptoExchange()) throw new DcaManualExecutionUnsupportedException(); // Account 직접 접근 금지 가드(trading_batch_path_must_not_carry_account_aggregate) — TradingAccount 투영 경유
         // 계산 실패로 생략된 전략은 404(사이클 없음)로 오인되지 않도록 원래 예외를 그대로 전파
         Map<UUID, RuntimeException> failures = new HashMap<>();
         NextOrdersPreview preview = previewBatch(strategy.accountId(), requesterId, failures).get(strategyId);
