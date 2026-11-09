@@ -136,6 +136,7 @@ class CapitalLedgerServiceTest {
         assertThat(p.holdings()).isEqualByComparingTo("10");
         assertThat(p.avgPrice()).isEqualByComparingTo("20.0000");
         verify(strategyCyclePort).updateStartAmount(cycleId, new BigDecimal("1300.00"));
+        verify(strategyCyclePort, never()).resetStartAndOpenAmount(any(), any()); // 개장 평가(openAmount)는 투자금 증감과 무관
         verify(eventPublisher).publishEvent(new StrategyCapitalChangedEvent(userId));
     }
 
@@ -441,6 +442,7 @@ class CapitalLedgerServiceTest {
         assertThat(p.holdings()).isEqualByComparingTo("10");
         assertThat(p.avgPrice()).isEqualByComparingTo("20.0000");
         verify(strategyCyclePort).updateStartAmount(cycleId, new BigDecimal("800.00"));
+        verify(strategyCyclePort, never()).resetStartAndOpenAmount(any(), any()); // 개장 평가(openAmount)는 투자금 증감과 무관
         verify(eventPublisher).publishEvent(new StrategyCapitalChangedEvent(userId));
     }
 

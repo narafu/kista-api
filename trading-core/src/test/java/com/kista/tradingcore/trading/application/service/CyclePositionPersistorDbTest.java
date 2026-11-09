@@ -87,7 +87,7 @@ class CyclePositionPersistorDbTest extends DataJpaTestBase {
         jdbcTemplate.update("INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, ?, now())",
                 versionId, strategyId, 1);
         jdbcTemplate.update(
-                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, start_date, created_at) VALUES (?, ?, ?, ?, ?, now())",
+                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, start_date, created_at) VALUES (?, ?, ?, ?, 0, ?, now())",
                 cycleId, strategyId, versionId, new BigDecimal("1000.00"), TODAY);
     }
 

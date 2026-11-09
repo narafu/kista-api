@@ -98,7 +98,7 @@ class StrategyUpdateWriter {
         }
         InfiniteMinSeedGuard.requireAtLeast(minSeed, newSeed); // INFINITE는 등록과 같은 최소 시드 미만 거부(기존 거절 사유 뒤)
 
-        strategyCyclePort.updateStartAmount(cycle.id(), newSeed);
+        strategyCyclePort.resetStartAndOpenAmount(cycle.id(), newSeed); // 보유 0이라 개장 평가도 새 시드
         cyclePositionPort.updateCycleStartSnapshot(strategyId, newSeed);
         log.info("[strategyId={}] 시드 수정: newSeed={}, holdings={}", strategyId, newSeed, latest.holdings());
     }

@@ -45,7 +45,7 @@ class CycleSnapshotCreatorTest {
     void createVrCycleAndSnapshot_usesTotalOpeningAssetsForCycleStartAmount() {
         UUID strategyId = UUID.randomUUID();
         UUID strategyVersionId = UUID.randomUUID();
-        StrategyCycle savedCycle = StrategyCycle.start(strategyId, strategyVersionId, new BigDecimal("1600.00"), LocalDate.of(2026, 1, 6));
+        StrategyCycle savedCycle = StrategyCycle.start(strategyId, strategyVersionId, new BigDecimal("1600.00"), new BigDecimal("1600.00"), LocalDate.of(2026, 1, 6));
         AccountBalance postBalance = new AccountBalance(5, new BigDecimal("100.00"), new BigDecimal("1000.00"));
 
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
@@ -62,6 +62,7 @@ class CycleSnapshotCreatorTest {
 
         assertThat(cycleCaptor.getValue().startAmount()).isEqualByComparingTo("1600.00");
         assertThat(cycleCaptor.getValue().startAmount().scale()).isEqualTo(2);
+        assertThat(cycleCaptor.getValue().openAmount()).isEqualByComparingTo(cycleCaptor.getValue().startAmount()); // 개장 평가 = 종가 평가 시작 금액
         assertThat(positionCaptor.getValue().usdDeposit()).isEqualByComparingTo("1000.00");
         assertThat(positionCaptor.getValue().holdings()).isEqualTo(new BigDecimal("5"));
     }
@@ -70,7 +71,7 @@ class CycleSnapshotCreatorTest {
     void createVrCycleAndSnapshot_roundsFractionalCentStartAmountHalfUp() {
         UUID strategyId = UUID.randomUUID();
         UUID strategyVersionId = UUID.randomUUID();
-        StrategyCycle savedCycle = StrategyCycle.start(strategyId, strategyVersionId, new BigDecimal("1600.01"), LocalDate.of(2026, 1, 6));
+        StrategyCycle savedCycle = StrategyCycle.start(strategyId, strategyVersionId, new BigDecimal("1600.01"), new BigDecimal("1600.01"), LocalDate.of(2026, 1, 6));
         AccountBalance postBalance = new AccountBalance(1, new BigDecimal("100.00"), new BigDecimal("1000.00"));
 
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
@@ -85,6 +86,22 @@ class CycleSnapshotCreatorTest {
 
         assertThat(cycleCaptor.getValue().startAmount()).isEqualByComparingTo("1600.01");
         assertThat(cycleCaptor.getValue().startAmount().scale()).isEqualTo(2);
+    }
+
+    @Test
+    void createCycleAndSnapshot_opensCycleWithOpenAmountEqualToSeed() {
+        UUID strategyId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        when(strategyCyclePort.save(any(StrategyCycle.class))).thenAnswer(i -> i.getArgument(0));
+
+        CycleSnapshotCreator creator = new CycleSnapshotCreator(
+                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, FIXED);
+        creator.createCycleAndSnapshot(strategyId, versionId, new BigDecimal("1000.00"), new BigDecimal("50.00"));
+
+        ArgumentCaptor<StrategyCycle> cycleCaptor = ArgumentCaptor.forClass(StrategyCycle.class);
+        verify(strategyCyclePort).save(cycleCaptor.capture());
+        assertThat(cycleCaptor.getValue().startAmount()).isEqualByComparingTo("1000.00");
+        assertThat(cycleCaptor.getValue().openAmount()).isEqualByComparingTo("1000.00");
     }
 
     @Test
@@ -147,8 +164,9 @@ class CycleSnapshotCreatorTest {
         verify(strategyCyclePort).updateStrategyVersion(cycleId, newVersionId);
         // 700 + 12 × 120 = 2140.00 (scale 2)
         ArgumentCaptor<BigDecimal> startAmount = ArgumentCaptor.forClass(BigDecimal.class);
-        verify(strategyCyclePort).updateStartAmount(eq(cycleId), startAmount.capture());
+        verify(strategyCyclePort).resetStartAndOpenAmount(eq(cycleId), startAmount.capture());
         assertThat(startAmount.getValue()).isEqualTo(new BigDecimal("2140.00"));
+        verify(strategyCyclePort, never()).updateStartAmount(any(), any());
         verify(cyclePositionPort).updateBalance(positionId, postBalance);
         ArgumentCaptor<StrategyCycleVrDetail> vr = ArgumentCaptor.forClass(StrategyCycleVrDetail.class);
         verify(strategyCycleVrPort).save(vr.capture());

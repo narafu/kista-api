@@ -1001,7 +1001,8 @@ class StrategyServiceTest {
 
         strategyService.update(STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, new BigDecimal("3000")));
 
-        verify(strategyCyclePort).updateStartAmount(CYCLE_ID, new BigDecimal("3000"));
+        verify(strategyCyclePort).resetStartAndOpenAmount(CYCLE_ID, new BigDecimal("3000"));
+        verify(strategyCyclePort, never()).updateStartAmount(any(), any());
         verify(cyclePositionPort).updateCycleStartSnapshot(STRATEGY_ID, new BigDecimal("3000"));
         verify(eventPublisher).publishEvent(new StrategyCapitalChangedEvent(USER_ID));
     }
@@ -2303,7 +2304,8 @@ class StrategyServiceTest {
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
         // startAmount = 현금 1500 + 시장가 50.00×10 = 2000.00 (최소 시드 50×20×2 = 2000 충족)
-        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("2000.00")) == 0));
+        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("2000.00")) == 0
+                && c.openAmount().compareTo(new BigDecimal("2000.00")) == 0)); // 비PRIVACY는 개장 평가 == 시작 금액
         verify(cyclePositionPort).save(argThat(p ->
                 p.holdings().compareTo(BigDecimal.valueOf(10)) == 0
                         && p.avgPrice().compareTo(new BigDecimal("45.50")) == 0
@@ -2347,6 +2349,8 @@ class StrategyServiceTest {
                         && p.closingPrice().compareTo(new BigDecimal("100.00")) == 0));
         // 시작금액은 시장가 평가(200 + 20×100 = 2,200)가 아니라 FIDA 기준 배수 환산값
         verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("2100.07")) == 0));
+        // 개장 평가(통계 원금)는 배수 환산이 아니라 시장가 평가 = 200 + 20×100
+        verify(strategyCyclePort).save(argThat(c -> c.openAmount().compareTo(new BigDecimal("2200.00")) == 0));
         verify(cyclePositionInfiniteDetailPort, never()).save(any());
         assertThat(result.currentHoldings()).isEqualTo(20);
         assertThat(result.divisionCount()).isNull(); // 조회 경로와 동일 — PRIVACY는 분할 수를 싣지 않는다
@@ -2398,7 +2402,8 @@ class StrategyServiceTest {
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
         // startAmount = USD pool 1000 + 시장가 120 × 보유수량 5 = 1600.00, V = 600.00
-        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("1600.00")) == 0));
+        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("1600.00")) == 0
+                && c.openAmount().compareTo(new BigDecimal("1600.00")) == 0));
         verify(strategyCycleVrPort).save(argThat(cv -> cv.value().compareTo(new BigDecimal("600.00")) == 0));
         assertThat(result.initialUsdDeposit()).isEqualByComparingTo("1000.00");
         assertThat(result.vr().value()).isEqualByComparingTo("600.00");
@@ -2581,7 +2586,8 @@ class StrategyServiceTest {
 
         strategyService.update(STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, new BigDecimal("100")));
 
-        verify(strategyCyclePort).updateStartAmount(CYCLE_ID, new BigDecimal("100"));
+        verify(strategyCyclePort).resetStartAndOpenAmount(CYCLE_ID, new BigDecimal("100"));
+        verify(strategyCyclePort, never()).updateStartAmount(any(), any());
     }
 
     @Test

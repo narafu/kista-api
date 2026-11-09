@@ -61,8 +61,8 @@ class StrategyCyclePersistenceAdapterTest extends DataJpaTestBase {
 
     private void insertCycle(UUID cycleId, UUID strategyId, Instant createdAt, boolean deleted) {
         jdbcTemplate.update(
-                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, start_date, created_at, deleted_at) "
-                        + "VALUES (?, ?, (SELECT id FROM strategy_version WHERE strategy_id = ?), ?, ?, ?, ?)",
+                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, start_date, created_at, deleted_at) "
+                        + "VALUES (?, ?, (SELECT id FROM strategy_version WHERE strategy_id = ?), ?, 0, ?, ?, ?)",
                 cycleId, strategyId, strategyId, new BigDecimal("1000.00"), LocalDate.now(),
                 Timestamp.from(createdAt), deleted ? Timestamp.from(createdAt) : null);
     }
@@ -92,6 +92,33 @@ class StrategyCyclePersistenceAdapterTest extends DataJpaTestBase {
         assertThat(result).extracting(StrategyCycle::id)
                 .containsExactly(cycleA1, cycleB1, cycleA2);
         assertThat(result).extracting(StrategyCycle::deletedAt).allMatch(Objects::isNull);
+    }
+
+    @Test
+    void save_roundTripsOpenAmountSeparatelyFromStartAmount_andResetSetsBoth() {
+        UUID strategyId = insertStrategy();
+        UUID versionId = jdbcTemplate.queryForObject(
+                "SELECT id FROM strategy_version WHERE strategy_id = ?", UUID.class, strategyId);
+
+        // 시작 금액(FIDA 환산)과 개장 평가가 다른 사이클
+        StrategyCycle saved = cycleAdapter.save(StrategyCycle.start(strategyId, versionId,
+                new BigDecimal("2100.07"), new BigDecimal("2200.00"), LocalDate.now()));
+        StrategyCycle loaded = cycleAdapter.findLatestByStrategyId(strategyId).orElseThrow();
+        assertThat(loaded.id()).isEqualTo(saved.id());
+        assertThat(loaded.startAmount()).isEqualByComparingTo("2100.07");
+        assertThat(loaded.openAmount()).isEqualByComparingTo("2200.00");
+
+        // 투자금 증감은 start_amount만 바꾼다
+        cycleAdapter.updateStartAmount(saved.id(), new BigDecimal("2300.07"));
+        StrategyCycle injected = cycleAdapter.findLatestByStrategyId(strategyId).orElseThrow();
+        assertThat(injected.startAmount()).isEqualByComparingTo("2300.07");
+        assertThat(injected.openAmount()).isEqualByComparingTo("2200.00");
+
+        // 시드 수정·VR 시작 전 재설정은 둘 다 같은 값으로
+        cycleAdapter.resetStartAndOpenAmount(saved.id(), new BigDecimal("3000.00"));
+        StrategyCycle reset = cycleAdapter.findLatestByStrategyId(strategyId).orElseThrow();
+        assertThat(reset.startAmount()).isEqualByComparingTo("3000.00");
+        assertThat(reset.openAmount()).isEqualByComparingTo("3000.00");
     }
 
     @Test

@@ -47,4 +47,8 @@ class StrategyCycleEntity extends BaseCreatedAtEntity {
 
     @Column(name = "deleted_at")
     private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨
+
+    // ADD COLUMN이 맨 뒤에 붙으므로 DB 컬럼 순서에 맞춰 마지막에 둔다
+    @Column(name = "open_amount", nullable = false, precision = 20, scale = 2)
+    private BigDecimal openAmount; // 사이클 개장 시가 평가금 (USD, 통계 원금·실현 기준)
 }

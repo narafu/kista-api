@@ -40,7 +40,8 @@ class CycleSnapshotCreator {
     // 새 StrategyCycle + 시작 스냅샷을 하나의 트랜잭션으로 저장 — 중간 실패 시 고아 사이클 방지
     @Transactional
     StrategyCycle createCycleAndSnapshot(UUID strategyId, UUID versionId, BigDecimal seed, BigDecimal price) {
-        StrategyCycle newCycle = strategyCyclePort.save(StrategyCycle.start(strategyId, versionId, seed, LocalDate.now(clock)));
+        // 보유 0으로 여는 사이클이라 개장 평가 = 시드
+        StrategyCycle newCycle = strategyCyclePort.save(StrategyCycle.start(strategyId, versionId, seed, seed, LocalDate.now(clock)));
         cyclePositionPort.save(CyclePosition.cycleStartSnapshot(newCycle.id(), seed, price));
         return newCycle;
     }
@@ -63,7 +64,7 @@ class CycleSnapshotCreator {
         // 새 사이클 생성 — 시드(startAmount)는 롤오버 후 예수금과 보유 주식 평가액의 합계
         BigDecimal startAmount = totalAssets(start.postBalance(), start.closingPrice());
         StrategyCycle newCycle = strategyCyclePort.save(
-                StrategyCycle.start(start.strategyId(), start.strategyVersionId(), startAmount, start.startDate()));
+                StrategyCycle.start(start.strategyId(), start.strategyVersionId(), startAmount, startAmount, start.startDate())); // 개장 평가 = 시작 금액(종가 평가)
         // holdings 승계 스냅샷: 이전 사이클 보유량·평단가·예수금·종가 그대로 기록
         cyclePositionPort.save(CyclePosition.tradeSnapshot(newCycle.id(), start.postBalance(), start.closingPrice()));
         // VR 사이클 상세 저장 — V′·gradient·poolLimitRate 스냅샷
@@ -104,8 +105,8 @@ class CycleSnapshotCreator {
         StrategyVrDetail newDetail = issueNewVersion(r);
         UUID cycleId = r.currentCycleId();
         strategyCyclePort.updateStrategyVersion(cycleId, newDetail.strategyVersionId());
-        // 개장 금액 계약 — 개장 예수금 + 개장 보유분 시장가
-        strategyCyclePort.updateStartAmount(cycleId, totalAssets(r.postBalance(), r.closingPrice()));
+        // 개장 금액 계약 — 개장 예수금 + 개장 보유분 시장가, 개장 평가도 같은 값(첫 행 종가는 갱신하지 않으므로 r.closingPrice 기준)
+        strategyCyclePort.resetStartAndOpenAmount(cycleId, totalAssets(r.postBalance(), r.closingPrice()));
         // holdings·평단도 바뀌므로 updateCycleStartSnapshot이 아닌 updateBalance — CapitalLedgerService와 같은 in-place 방식
         CyclePosition latest = cyclePositionPort.findLatestOne(cycleId)
                 .orElseThrow(() -> new IllegalStateException("VR 재설정 전 포지션이 없습니다."));

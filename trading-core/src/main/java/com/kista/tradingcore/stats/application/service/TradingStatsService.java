@@ -78,24 +78,19 @@ class TradingStatsService implements TradingStatsUseCase {
     // getEquityCurve 캐시 키 — 파라미터 조합별로 분리
     private record EquityCurveKey(UUID userId, StrategyType type, LocalDate from, LocalDate to) {}
 
-    // 사이클 + 소속 전략 조인 뷰 — 원금 = 사이클 시작 금액(추가·인출 반영), 자산 = 예수금 + 보유 평가액(시드 점유 전략 공통)
+    // 사이클 + 소속 전략 조인 뷰 — 원금 = 개장 시가 평가 + 추가·인출 합계(매매 계약 startAmount는 쓰지 않음), 자산 = 예수금 + 보유 평가액(시드 점유 전략 공통)
     private record CycleView(StrategyCycle cycle, Strategy strategy, List<CycleCapitalEvent> events) {
         boolean closed() {
             return cycle.endAmount() != null && cycle.isEnded();
         }
 
         BigDecimal principal() {
-            return cycle.startAmount();
+            return cycle.openAmount().add(CapitalLedgerTimeline.principalDeltaTotal(events));
         }
 
-        // date(KST) 시점의 원금 — 그 뒤 추가·인출분을 현재 시작 금액에서 되돌린다
+        // date(KST) 시점의 원금 — 그 뒤 추가·인출분을 현재 원금에서 되돌린다
         BigDecimal principalOn(LocalDate date) {
-            return cycle.startAmount().subtract(CapitalLedgerTimeline.principalDeltaAfter(events, date));
-        }
-
-        // 사이클이 열린 시점의 시작 금액 — 이후 추가·인출 전체를 되돌린다
-        BigDecimal startAmountAtOpen() {
-            return cycle.startAmount().subtract(CapitalLedgerTimeline.principalDeltaTotal(events));
+            return principal().subtract(CapitalLedgerTimeline.principalDeltaAfter(events, date));
         }
 
         // 구간 손익(종료 − 시작) — 승률·평균 수익률·성과 목록·체인 보정 기준
@@ -150,13 +145,15 @@ class TradingStatsService implements TradingStatsUseCase {
                 .collect(Collectors.groupingBy(v -> v.strategy().type(),
                         () -> new EnumMap<>(StrategyType.class), Collectors.toList()));
 
-        // 종료 사이클의 장부가 실현손익 계산용 첫·마지막 스냅샷 — 종료 사이클이 없으면 조회 생략
+        // 종료 사이클의 개장 시가 기준 실현손익 계산용 전체 포지션 행 — 종료 사이클이 없으면 조회 생략
         Set<UUID> closedIds = cycles.stream().filter(CycleView::closed).map(v -> v.cycle().id()).collect(Collectors.toSet());
-        Map<UUID, CyclePosition> firstPositions = closedIds.isEmpty() ? Map.of() : cyclePositionPort.findFirstByCycleIds(closedIds);
-        Map<UUID, CyclePosition> lastPositions = closedIds.isEmpty() ? Map.of() : cyclePositionPort.findLatestByCycleIds(closedIds);
+        Map<UUID, List<CyclePosition>> closedPositions = closedIds.isEmpty() ? Map.of()
+                : cyclePositionPort.findByCycleIdsAndRange(closedIds, Instant.EPOCH, KstDays.endExclusive(LocalDate.now(clock))).stream()
+                        .sorted(Comparator.comparing(CyclePosition::createdAt).thenComparing(CyclePosition::id)) // 동시각은 UUIDv7 id로 고정 — V17 백필의 첫 행 선택과 같은 순서
+                        .collect(Collectors.groupingBy(CyclePosition::strategyCycleId));
 
         List<StrategyTypeStats> typeStats = byType.entrySet().stream()
-                .map(e -> toTypeStats(e.getKey(), e.getValue(), unrealizedByCycle, firstPositions, lastPositions))
+                .map(e -> toTypeStats(e.getKey(), e.getValue(), unrealizedByCycle, closedPositions))
                 .toList();
 
         BigDecimal totalRealized = sum(typeStats.stream().map(StrategyTypeStats::realizedPnl));
@@ -264,15 +261,14 @@ class TradingStatsService implements TradingStatsUseCase {
 
     private StrategyTypeStats toTypeStats(StrategyType type, List<CycleView> views,
                                           Map<UUID, BigDecimal> unrealizedByCycle,
-                                          Map<UUID, CyclePosition> firstPositions,
-                                          Map<UUID, CyclePosition> lastPositions) {
+                                          Map<UUID, List<CyclePosition>> closedPositions) {
         List<CycleView> closed = views.stream().filter(CycleView::closed).toList();
         List<CycleView> active = views.stream().filter(v -> !v.closed()).toList();
 
         // 총 손익 = 종료 구간 손익 + 진행 중 미실현 — 실현(매도 확정분)만 장부가로 갈라내고 나머지는 미실현으로 둬 합을 보존한다
         BigDecimal totalPnl = sum(closed.stream().map(CycleView::realizedPnl))
                 .add(sum(active.stream().map(v -> unrealizedByCycle.getOrDefault(v.cycle().id(), BigDecimal.ZERO))));
-        BigDecimal realizedPnl = sum(closed.stream().map(v -> settledPnl(v, firstPositions, lastPositions)));
+        BigDecimal realizedPnl = sum(closed.stream().map(v -> settledPnl(v, closedPositions.getOrDefault(v.cycle().id(), List.of()))));
         BigDecimal unrealizedPnl = totalPnl.subtract(realizedPnl).setScale(AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP);
 
         BigDecimal winRate = null;
@@ -306,13 +302,10 @@ class TradingStatsService implements TradingStatsUseCase {
                 winRate, avgReturnRate, avgDurationDays, realizedPnl, unrealizedPnl);
     }
 
-    // 종료 사이클의 실현손익 — 보유 0으로 끝났으면 종료 − 시작, 보유가 남았으면(VR 롤오버·재설정) 장부가 기준 매도 확정분
-    private static BigDecimal settledPnl(CycleView v, Map<UUID, CyclePosition> firstPositions,
-                                         Map<UUID, CyclePosition> lastPositions) {
-        CyclePosition first = firstPositions.get(v.cycle().id());
-        CyclePosition last = lastPositions.get(v.cycle().id());
-        if (first == null || last == null || last.holdings().signum() == 0) return v.realizedPnl();
-        return CapitalLedgerTimeline.bookRealized(first, last, v.events());
+    // 종료 사이클의 실현손익 — 보유 0으로 끝났으면 종료 − 원금, 보유가 남았으면(VR 롤오버·재설정) 개장 시가 기준 장부가 실현분
+    private static BigDecimal settledPnl(CycleView v, List<CyclePosition> rows) {
+        if (rows.isEmpty() || rows.getLast().holdings().signum() == 0) return v.realizedPnl();
+        return CapitalLedgerTimeline.openBasisRealized(v.cycle().openAmount(), rows, v.events());
     }
 
     // 날짜(KST)별 사이클 최신 스냅샷 carry-forward 합산.
@@ -380,7 +373,7 @@ class TradingStatsService implements TradingStatsUseCase {
         return points;
     }
 
-    // 체인 보정 합계 — 마지막 사이클 앞의 종료 사이클 i마다 realized_i = end-start, surplus_i = max(0, end_i - start_{i+1})
+    // 체인 보정 합계 — 마지막 사이클 앞의 종료 사이클 i마다 realized_i = end-start, surplus_i = max(0, end_i - open_{i+1})
     private record ChainAdjustment(BigDecimal realized, BigDecimal surplus) {}
 
     private static ChainAdjustment chainAdjustment(TreeSet<StrategyCycle> chain, Map<UUID, CycleView> cycleById) {
@@ -391,7 +384,7 @@ class TradingStatsService implements TradingStatsUseCase {
             CycleView prev = cycleById.get(cs[i].id());
             if (!prev.closed()) continue;
             realized = realized.add(prev.realizedPnl());
-            surplus = surplus.add(prev.cycle().endAmount().subtract(cycleById.get(cs[i + 1].id()).startAmountAtOpen()).max(BigDecimal.ZERO));
+            surplus = surplus.add(prev.cycle().endAmount().subtract(cycleById.get(cs[i + 1].id()).cycle().openAmount()).max(BigDecimal.ZERO));
         }
         return new ChainAdjustment(realized, surplus);
     }

@@ -74,7 +74,7 @@ class UserCascadeEndToEndIT {
         jdbcTemplate.update("INSERT INTO strategy (id, account_id, type, ticker, status, cycle_seed_type, created_at, updated_at) VALUES (?, ?, 'VR', 'SOXL', 'ACTIVE', 'NONE', now(), now())",
                 strategyId, accountId);
         jdbcTemplate.update("INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, 1, now())", versionId, strategyId);
-        jdbcTemplate.update("INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, start_date, created_at) VALUES (?, ?, ?, ?, ?, now())",
+        jdbcTemplate.update("INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, start_date, created_at) VALUES (?, ?, ?, ?, 0, ?, now())",
                 cycleId, strategyId, versionId, new BigDecimal("1000.00"), LocalDate.now(TimeZones.KST));
         jdbcTemplate.update("INSERT INTO orders (account_id, strategy_cycle_id, trade_date, ticker, order_type, timing, direction, order_leg, price, quantity, status, created_at, updated_at) "
                         + "VALUES (?, ?, ?, 'SOXL', 'LOC', 'AT_CLOSE', 'BUY', 'UNKNOWN', 22.00, 5, 'PLANNED', now(), now())",

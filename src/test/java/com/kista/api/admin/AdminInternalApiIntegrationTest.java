@@ -91,9 +91,9 @@ class AdminInternalApiIntegrationTest {
                 "INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, 1, now())",
                 versionId, strategyId);
         jdbcTemplate.update(
-                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, start_date, created_at) "
-                        + "VALUES (?, ?, ?, ?, ?, now())",
-                cycleId, strategyId, versionId, new BigDecimal("1000.00"), today);
+                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, start_date, created_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, now())",
+                cycleId, strategyId, versionId, new BigDecimal("1000.00"), new BigDecimal("1000.00"), today);
         // 개장 포지션 스냅샷: holdings=2, avgPrice=100.00, usdDeposit=1000.00
         jdbcTemplate.update(
                 "INSERT INTO cycle_position (id, strategy_cycle_id, usd_deposit, avg_price, holdings, created_at) "

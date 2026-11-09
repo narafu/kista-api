@@ -5,6 +5,7 @@ import com.kista.tradingcore.trading.domain.model.CycleCapitalEvent;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -66,14 +67,29 @@ final class CapitalLedgerTimeline {
         return p.usdDeposit().add(p.holdings().multiply(avg));
     }
 
-    // 장부가 실현손익 = 마지막 장부가 − (첫 행 장부가 − 첫 행에 걸린 원금 증감) − 전체 원금 증감
-    static BigDecimal bookRealized(CyclePosition first, CyclePosition last, List<CycleCapitalEvent> cycleEvents) {
+    // 개장 시가 기준 장부 실현손익 — 개장 프리미엄 D(= 개장 평가 − 개장 장부가, 승계 보유분의 시가−평단 차)를 매도 비율만큼 줄이며 스냅샷을 재생한다.
+    // 실현 = 마지막 장부가 + 남은 D − 개장 평가 − 전체 원금 증감
+    static BigDecimal openBasisRealized(BigDecimal openAmount, List<CyclePosition> rawRows, List<CycleCapitalEvent> cycleEvents) {
+        CyclePosition firstRaw = rawRows.getFirst();
         BigDecimal firstRowPrincipal = cycleEvents.stream()
-                .filter(e -> e.cyclePositionId().equals(first.id()))
+                .filter(e -> e.cyclePositionId().equals(firstRaw.id()))
                 .map(CycleCapitalEvent::principalDelta)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return bookValue(last)
-                .subtract(bookValue(first).subtract(firstRowPrincipal))
+        BigDecimal premium = openAmount.subtract(bookValue(firstRaw).subtract(firstRowPrincipal));
+        List<CyclePosition> timeline = restore(rawRows, cycleEvents);
+        BigDecimal prevHoldings = timeline.getFirst().holdings();
+        // ponytail: 스냅샷 순증감만 본다 — 같은 날 매수·매도가 함께 체결되면 순증감으로 근사. 개선 = orders의 일별 SELL 체결 재생
+        for (CyclePosition p : timeline.subList(1, timeline.size())) {
+            BigDecimal holdings = p.holdings();
+            if (holdings.signum() == 0 || prevHoldings.signum() == 0) {
+                premium = BigDecimal.ZERO; // 전량 매도·무보유에서 재진입 — 승계 프리미엄 소멸
+            } else if (holdings.compareTo(prevHoldings) < 0) {
+                premium = premium.multiply(holdings).divide(prevHoldings, 10, RoundingMode.HALF_UP); // 평균원가법 — 매도분만큼 프리미엄 실현
+            }
+            prevHoldings = holdings;
+        }
+        return bookValue(rawRows.getLast()).add(premium)
+                .subtract(openAmount)
                 .subtract(principalDeltaTotal(cycleEvents));
     }
 

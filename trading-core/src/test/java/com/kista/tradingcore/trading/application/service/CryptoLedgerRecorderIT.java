@@ -77,7 +77,7 @@ class CryptoLedgerRecorderIT extends DataJpaTestBase {
                 strategyId, accountId, "DCA", "BTC", "ACTIVE", "NONE");
         jdbc.update("INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, ?, now())",
                 versionId, strategyId, 1);
-        jdbc.update("INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, start_date, created_at) VALUES (?, ?, ?, ?, ?, now())",
+        jdbc.update("INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, start_date, created_at) VALUES (?, ?, ?, ?, 0, ?, now())",
                 cycleId, strategyId, versionId, BigDecimal.ZERO, LocalDate.now());
         TradingAccount account = TradingFixtures.tradingAccount(accountId, userId);
         Strategy strategy = new Strategy(strategyId, accountId, StrategyType.DCA, StrategyStatus.ACTIVE, StrategyTicker.BTC, StrategyCycleSeedType.NONE);

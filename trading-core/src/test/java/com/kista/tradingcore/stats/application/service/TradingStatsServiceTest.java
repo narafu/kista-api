@@ -163,16 +163,13 @@ class TradingStatsServiceTest {
     }
 
     @Test
-    void VR_사이클도_저장된_startAmount를_원금으로_쓰고_개장_포지션을_조회하지_않는다() {
+    void VR_사이클도_개장_평가를_원금으로_쓰고_진행_중_목록은_포지션을_조회하지_않는다() {
         UUID vrStrategyId = UUID.randomUUID();
         Strategy vrStrategy = new Strategy(
                 vrStrategyId, ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
                 StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
-        StrategyCycle cycle = new StrategyCycle(
-                UUID.randomUUID(), vrStrategyId, null,
-                new BigDecimal("1600.00"), new BigDecimal("1800.00"),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31),
-                Instant.parse("2026-01-01T00:00:00Z"), null);
+        // 시작 금액(매매 계약)과 개장 평가를 다르게 둬 원금이 개장 평가에서 나오는지 가른다
+        StrategyCycle cycle = cycleWithOpen(vrStrategyId, "1700.00", "1600.00", "1800.00");
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(vrStrategy)));
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
@@ -184,7 +181,7 @@ class TradingStatsServiceTest {
         assertThat(performance.startAmount()).isEqualByComparingTo("1600.00");
         assertThat(performance.pnl()).isEqualByComparingTo("200.00");
         assertThat(performance.returnRate()).isEqualByComparingTo("0.1250");
-        verify(cyclePositionPort, never()).findFirstByCycleIds(any());
+        verify(cyclePositionPort, never()).findByCycleIdsAndRange(any(), any(), any());
     }
 
     @Test
@@ -868,7 +865,7 @@ class TradingStatsServiceTest {
     @Test
     void equityCurve_capitalInjection_keepsPastPrincipalAndAsset() {
         stubUserWith(PRIVACY_STRATEGY);
-        StrategyCycle active = activeCycle(PRIVACY_STRATEGY_ID, "15000.00", "2026-06-01");
+        StrategyCycle active = cycleWithOpen(PRIVACY_STRATEGY_ID, "15000.00", "10000.00", null); // 개장 평가 10,000 + 이후 추가 5,000
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(active));
         UUID p2 = UUID.randomUUID();
         when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
@@ -894,7 +891,8 @@ class TradingStatsServiceTest {
     void equityCurve_chainSurplus_usesStartAmountAtRotation() {
         stubUserWithStrategy();
         StrategyCycle c1 = closedCycle("10000.00", "12000.00", "2026-06-01", "2026-06-10");
-        StrategyCycle c2 = activeCycle("13000.00", "2026-06-10"); // 현재 13,000 = 회전 시점 11,000 + 이후 추가 2,000
+        StrategyCycle c2 = new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, null, new BigDecimal("13000.00"), new BigDecimal("11000.00"),
+                null, LocalDate.parse("2026-06-10"), null, Instant.parse("2026-06-10T00:00:00Z"), null); // 현재 13,000 = 개장 11,000 + 이후 추가 2,000
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(c1, c2));
         UUID row = UUID.randomUUID();
         when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
@@ -913,10 +911,101 @@ class TradingStatsServiceTest {
         assertThat(points.get(2).principal()).isEqualByComparingTo("12000");
     }
 
-    // 종료 사이클의 첫·마지막 스냅샷 스텁 (Set.of(id) 조회)
-    private void stubClosedSnapshots(StrategyCycle closed, CyclePosition first, CyclePosition last) {
-        when(cyclePositionPort.findFirstByCycleIds(Set.of(closed.id()))).thenReturn(Map.of(closed.id(), first));
-        when(cyclePositionPort.findLatestByCycleIds(Set.of(closed.id()))).thenReturn(Map.of(closed.id(), last));
+    // 종료 사이클의 전체 포지션 행 스텁 (Set.of(id) 조회)
+    private void stubClosedSnapshots(StrategyCycle closed, CyclePosition... rows) {
+        when(cyclePositionPort.findByCycleIdsAndRange(eq(Set.of(closed.id())), any(), any())).thenReturn(List.of(rows));
+    }
+
+    // 개장 시가 평가(openAmount)가 시작 금액과 다른 사이클
+    private static StrategyCycle cycleWithOpen(UUID strategyId, String start, String open, String end) {
+        return new StrategyCycle(UUID.randomUUID(), strategyId, null, new BigDecimal(start), new BigDecimal(open),
+                end == null ? null : new BigDecimal(end), LocalDate.parse("2026-01-01"),
+                end == null ? null : LocalDate.parse("2026-02-01"), Instant.parse("2026-01-01T00:00:00Z"), null);
+    }
+
+    private static CyclePosition pos(UUID cycleId, String deposit, String closing, String avg, int holdings, String createdAt) {
+        return position(UUID.randomUUID(), cycleId, deposit, closing, avg, holdings, createdAt);
+    }
+
+    @Test
+    void summary_privacyMidStart_principalIsOpenAmount() {
+        stubUserWith(PRIVACY_STRATEGY);
+        StrategyCycle c = cycleWithOpen(PRIVACY_STRATEGY_ID, "66156.02", "38289.77", null);
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(c));
+        when(cyclePositionPort.findLatestByCycleIds(Set.of(c.id()))).thenReturn(Map.of(c.id(),
+                new CyclePosition(UUID.randomUUID(), c.id(), new BigDecimal("27869.33"), null, null,
+                        BigDecimal.ZERO, Instant.parse("2026-02-01T03:00:00Z"), null)));
+
+        StatsSummary summary = statsService.getSummary(USER_ID);
+        CyclePerformance perf = statsService.getCyclePerformances(USER_ID, null, null, null, null, 0, 10).items().getFirst();
+
+        assertThat(summary.totalUnrealizedPnl()).isEqualByComparingTo("-10420.44");
+        assertThat(summary.activePrincipal()).isEqualByComparingTo("38289.77");
+        assertThat(summary.totalRealizedPnl().add(summary.totalUnrealizedPnl())).isEqualByComparingTo("-10420.44");
+        assertThat(perf.startAmount()).isEqualByComparingTo("38289.77");
+        assertThat(perf.returnRate().doubleValue()).isCloseTo(-0.2721, org.assertj.core.data.Offset.offset(0.0001));
+    }
+
+    @Test
+    void equityCurve_privacyMidStart_principalIsOpenAmount() {
+        stubUserWith(PRIVACY_STRATEGY);
+        StrategyCycle c = cycleWithOpen(PRIVACY_STRATEGY_ID, "66156.02", "38289.77", null);
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(c));
+        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
+                pos(c.id(), "27869.33", null, null, 0, "2026-02-01T03:00:00Z")));
+
+        EquityPoint p = statsService.getEquityCurve(USER_ID, null, null, LocalDate.parse("2026-02-28")).points().getLast();
+
+        assertThat(p.principal()).isEqualByComparingTo("38289.77");
+        assertThat(p.totalAsset()).isEqualByComparingTo("27869.33");
+    }
+
+    @Test
+    void summary_carriedHoldingsFullySold_realizedIsMarketOpenBasis() {
+        stubUserWith(VR_STRATEGY);
+        // 개장: 예수금 100 + 10주(평단 50, 종가 62) = 720 → 전량 70에 매도해 800
+        StrategyCycle c = cycleWithOpen(VR_STRATEGY.id(), "720", "720", "800");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(c));
+        stubClosedSnapshots(c,
+                pos(c.id(), "100", "62", "50", 10, "2026-01-01T03:00:00Z"),
+                pos(c.id(), "450", "70", "50", 5, "2026-01-10T03:00:00Z"),
+                pos(c.id(), "800", "70", null, 0, "2026-02-01T03:00:00Z"));
+
+        StrategyTypeStats vr = statsService.getSummary(USER_ID).byType().getFirst();
+
+        assertThat(vr.realizedPnl()).isEqualByComparingTo("80.00"); // 장부(평단) 기준 280이 아니다
+        assertThat(vr.unrealizedPnl()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void summary_registeredAvgDiffersFromMarket_noTrade_realizedZero() {
+        stubUserWith(VR_STRATEGY);
+        StrategyCycle c = cycleWithOpen(VR_STRATEGY.id(), "720", "720", "750");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(c));
+        stubClosedSnapshots(c,
+                pos(c.id(), "100", "62", "50", 10, "2026-01-01T03:00:00Z"),
+                pos(c.id(), "100", "65", "50", 10, "2026-02-01T03:00:00Z"));
+
+        StrategyTypeStats vr = statsService.getSummary(USER_ID).byType().getFirst();
+
+        assertThat(vr.realizedPnl()).isEqualByComparingTo("0.00");
+        assertThat(vr.unrealizedPnl()).isEqualByComparingTo("30.00");
+    }
+
+    @Test
+    void summary_registeredAvgDiffersFromMarket_partialSell_releasesPremiumProportionally() {
+        stubUserWith(VR_STRATEGY);
+        StrategyCycle c = cycleWithOpen(VR_STRATEGY.id(), "720", "720", "780");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(c));
+        stubClosedSnapshots(c,
+                pos(c.id(), "100", "62", "50", 10, "2026-01-01T03:00:00Z"),
+                pos(c.id(), "450", "66", "50", 5, "2026-02-01T03:00:00Z")); // 5주를 70에 매도
+
+        StrategyTypeStats vr = statsService.getSummary(USER_ID).byType().getFirst();
+
+        assertThat(vr.realizedPnl()).isEqualByComparingTo("40.00"); // 5 x (70 - 62)
+        assertThat(vr.unrealizedPnl()).isEqualByComparingTo("20.00");
+        assertThat(vr.realizedPnl().add(vr.unrealizedPnl())).isEqualByComparingTo("60.00");
     }
 
     @Test

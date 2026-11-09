@@ -116,8 +116,9 @@ class StrategyCreationService {
                 ? StrategyCycleSeedType.NONE  // capability.supportsCycleSeed=false는 NONE 강제
                 : (cmd.cycleSeedType() != null ? cmd.cycleSeedType() : StrategyCycleSeedType.NONE);
 
-        // 시작금액 산출
+        // 시작금액 산출 — 개장 평가(통계 원금)는 예수금 + 보유 평가(DCA는 원가)로, PRIVACY 중간 시작의 배수 환산과 분리한다
         BigDecimal startAmount = startAmountCalculator.calculate(cmd.type(), initialUsdDeposit, initialHoldings, initialStockValue);
+        BigDecimal openAmount = initialUsdDeposit.add(initialStockValue);
 
         // INFINITE 최소 시드 검증 — 폼이 먼저 막지만 API 직접 호출도 0회차 교착 시드를 만들지 못하게 서버에서도 막는다
         if (cmd.type() == StrategyType.INFINITE) {
@@ -131,7 +132,7 @@ class StrategyCreationService {
         try {
             strategy = creationPersister.persist(new StrategyCreationPersister.Draft(
                     accountId, cmd.type(), seedType, resolved, vr != null ? vr.ramp() : null, initialUsdDeposit, initialHoldings,
-                    cmd.initialAvgPrice(), marketPrice, startAmount, vr != null ? vr.vrValue() : null, scheduledStart, dcaConfig));
+                    cmd.initialAvgPrice(), marketPrice, startAmount, openAmount, vr != null ? vr.vrValue() : null, scheduledStart, dcaConfig));
         } catch (DataIntegrityViolationException e) {
             // 선검사(validateUniqueTicker)를 동시에 통과한 경합 — 유니크 인덱스 위반만 409로 바꾸고 다른 제약 위반은 그대로 던진다
             // 커밋 시점 flush 예외도 persist 프록시 밖(여기)에서 잡힌다
