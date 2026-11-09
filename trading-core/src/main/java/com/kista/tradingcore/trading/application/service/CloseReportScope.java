@@ -34,7 +34,7 @@ final class CloseReportScope {
     static boolean awaitsCloseReport(Strategy strategy, List<Order> todayOrders) {
         boolean paused = !strategy.isActive();
         return todayOrders.stream()
-                .filter(o -> !Order.UNKNOWN_LEG.equals(o.orderLeg()))
+                .filter(Order::isStrategyOrder)
                 .anyMatch(o -> !paused || o.externalOrderId() != null);
     }
 }

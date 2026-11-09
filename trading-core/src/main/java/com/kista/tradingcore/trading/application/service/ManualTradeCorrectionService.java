@@ -73,7 +73,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
         rejectUnidentifiedFillsBeforeReport(command, account, strategy);
         CyclePosition latest = cyclePositionPort.findLatestOne(currentCycle.id())
                 .orElseThrow(() -> new NoSuchElementException("최신 포지션 이력이 없습니다: cycleId=" + currentCycle.id()));
-        if (currentCycle.endDate() != null) {
+        if (currentCycle.isEnded()) {
             throw new IllegalStateException("이미 종료된 사이클은 수동 체결 보정을 지원하지 않습니다.");
         }
 
@@ -165,7 +165,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
             if (batchRunPort.isReported(date, strategy.id())) continue;
             // 수동 보정 행(UNKNOWN_LEG)은 전략 주문이 아니므로 제외
             boolean hasStrategyOrder = orderPort.findByStrategyId(strategy.id(), date, date).stream()
-                    .anyMatch(o -> !Order.UNKNOWN_LEG.equals(o.orderLeg()));
+                    .anyMatch(Order::isStrategyOrder);
             if (hasStrategyOrder) {
                 throw new IllegalArgumentException("마감 리포트 전인 거래일의 체결은 증권사 주문번호를 함께 입력해야 합니다.");
             }

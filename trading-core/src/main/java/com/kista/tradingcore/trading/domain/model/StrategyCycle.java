@@ -38,6 +38,11 @@ public record StrategyCycle(
         return tradeDate.isAfter(startDate);
     }
 
+    // 사이클 종료 여부 — 종료일이 기록되면 종료(진행 중이면 null)
+    public boolean isEnded() {
+        return endDate != null;
+    }
+
     // 시작예정일 지정 — 시작일은 호출부가 주입한다 (오늘 시작이면 Clock 기준 오늘)
     public static StrategyCycle start(UUID strategyId, UUID strategyVersionId, BigDecimal startAmount, LocalDate startDate) {
         return new StrategyCycle(null, strategyId, strategyVersionId,

@@ -176,7 +176,7 @@ class StrategyService implements StrategyUseCase {
         // 만들어버리는 사고를 막기 위해 명시적으로 제외한다
         if (strategy.isVr()) return;
         StrategyCycle latestCycle = strategyCyclePort.findLatestByStrategyId(strategy.id()).orElse(null);
-        if (latestCycle == null || latestCycle.endDate() == null) return;
+        if (latestCycle == null || !latestCycle.isEnded()) return;
         StrategyVersion activeVersion = strategyVersionPort.findActiveByStrategyId(strategy.id())
                 .orElseThrow(() -> new NoSuchElementException("활성 전략 버전이 없습니다: " + strategy.id()));
         BigDecimal closingPrice = cyclePositionPort.findLatestOneByStrategyId(strategy.id())

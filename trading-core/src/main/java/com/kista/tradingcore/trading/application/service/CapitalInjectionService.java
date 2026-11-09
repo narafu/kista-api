@@ -200,7 +200,7 @@ class CapitalInjectionService implements InjectCapitalUseCase {
         UUID strategyId = strategy.id();
         strategy.requireNotArchived(); // 보관 전략은 투자금 추가·인출 불가
         StrategyCycle first = strategyCyclePort.requireLatestByStrategyId(strategyId);
-        if (first.endDate() != null) {
+        if (first.isEnded()) {
             throw new IllegalStateException(noActiveMessage);
         }
 
@@ -208,7 +208,7 @@ class CapitalInjectionService implements InjectCapitalUseCase {
         strategyCyclePort.lockForUpdate(first.id());
         // 마감 리포트의 markEnded는 마커와 한 트랜잭션이라 위 잠금과 FK 락으로 직렬화됨
         StrategyCycle cycle = strategyCyclePort.requireLatestByStrategyId(strategyId);
-        if (cycle.endDate() != null || !cycle.id().equals(first.id())) {
+        if (cycle.isEnded() || !cycle.id().equals(first.id())) {
             throw new IllegalStateException(noActiveMessage);
         }
         // 코인 계좌는 마감 리포트가 없다 — 체결 기록(CryptoLedgerRecorder)이 같은 사이클 잠금으로 직렬화된다

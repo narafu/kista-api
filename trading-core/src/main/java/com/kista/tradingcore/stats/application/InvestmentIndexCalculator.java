@@ -152,7 +152,7 @@ public final class InvestmentIndexCalculator {
 
     private static void addExitFlow(Map<LocalDate, BigDecimal> flows, StrategyCycle cycle,
                                     NavigableMap<LocalDate, BigDecimal> values) {
-        if (cycle.endDate() == null) {
+        if (!cycle.isEnded()) {
             return;
         }
         BigDecimal value = lastCompleteValue(values, cycle.endDate());
@@ -247,7 +247,7 @@ public final class InvestmentIndexCalculator {
             return null;
         }
 
-        if (candidate.endDate() == null) {
+        if (!candidate.isEnded()) {
             return candidate;
         }
         boolean contiguousReplacement = candidateIndex + 1 < ordered.size()
@@ -259,7 +259,7 @@ public final class InvestmentIndexCalculator {
     }
 
     private static boolean isContiguousTransition(StrategyCycle previous, StrategyCycle next) {
-        return previous.endDate() != null && previous.endDate().equals(next.startDate());
+        return previous.isEnded() && previous.endDate().equals(next.startDate());
     }
 
     // 진입 흐름 = 시작일 평가가 실제로 쓰는 값(시작일 이하 최근 완전평가) — 없으면 시작 후 첫 완전평가

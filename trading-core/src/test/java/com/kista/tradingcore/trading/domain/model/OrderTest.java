@@ -71,4 +71,16 @@ class OrderTest {
                 base.timing(), base.direction(), "INFINITE_BUY_01", base.quantity(), base.price(), OrderStatus.PLACED, "ODNO1", null, null)
                 .isBrokerSubmitted()).isTrue();
     }
+
+    @Test
+    void isStrategyOrder_수동_보정_행만_false() {
+        Order manual = Order.filledManual(UUID.randomUUID(), UUID.randomUUID(), LocalDate.of(2026, 9, 9), StrategyTicker.SOXL,
+                OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.ONE, BigDecimal.TEN, "ODNO1");
+        // 수동 보정 행(UNKNOWN_LEG)
+        assertThat(manual.isStrategyOrder()).isFalse();
+        // 접수번호 유무와 무관하게 전략 leg면 true
+        assertThat(new Order(null, manual.accountId(), manual.strategyCycleId(), manual.tradeDate(), manual.ticker(), manual.orderType(),
+                manual.timing(), manual.direction(), "INFINITE_BUY_01", manual.quantity(), manual.price(), OrderStatus.PLANNED, null, null, null)
+                .isStrategyOrder()).isTrue();
+    }
 }

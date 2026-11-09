@@ -95,7 +95,7 @@ class CryptoPortfolioService implements CryptoPortfolioUseCase {
                 .collect(Collectors.toMap(Strategy::id, Strategy::ticker));
         if (tickerByStrategy.isEmpty()) return Map.of();
         Map<UUID, StrategyTicker> tickerByCycle = strategyCyclePort.findLatestByStrategyIds(tickerByStrategy.keySet()).values().stream()
-                .filter(c -> c.endDate() == null)
+                .filter(c -> !c.isEnded())
                 .collect(Collectors.toMap(StrategyCycle::id, c -> tickerByStrategy.get(c.strategyId())));
         if (tickerByCycle.isEmpty()) return Map.of();
         Map<StrategyTicker, BigDecimal> result = new EnumMap<>(StrategyTicker.class);

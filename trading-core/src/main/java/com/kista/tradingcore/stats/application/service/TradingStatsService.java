@@ -81,7 +81,7 @@ class TradingStatsService implements TradingStatsUseCase {
     // 사이클 + 소속 전략 조인 뷰 — 원금 = 사이클 시작 금액(추가·인출 반영), 자산 = 예수금 + 보유 평가액(시드 점유 전략 공통)
     private record CycleView(StrategyCycle cycle, Strategy strategy, List<CycleCapitalEvent> events) {
         boolean closed() {
-            return cycle.endAmount() != null && cycle.endDate() != null;
+            return cycle.endAmount() != null && cycle.isEnded();
         }
 
         BigDecimal principal() {
