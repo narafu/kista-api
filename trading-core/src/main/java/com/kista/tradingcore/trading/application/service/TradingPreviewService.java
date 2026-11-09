@@ -13,10 +13,10 @@ import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.trading.domain.model.LedgerCheckPreview;
 import com.kista.tradingcore.trading.domain.model.NextOrdersPreview;
 import com.kista.tradingcore.trading.domain.model.Order;
+import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderStatus;
-import com.kista.shared.kernel.StrategyStatus;
 import com.kista.tradingcore.matching.domain.strategy.InfiniteStrategy;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
 import com.kista.tradingcore.trading.domain.model.DcaManualExecutionUnsupportedException;
@@ -76,7 +76,7 @@ class TradingPreviewService {
         Strategy strategy = owned.strategy();
         Account account = owned.account();
         // 코인 DCA는 실행 루프(CryptoDcaRoundExecutor) 전용이라 미리보기 경로가 없다 — 주식 DCA는 plan() 정규 경로로 미리보기
-        if (TradingAccount.from(account).brokerRef().broker().isCryptoExchange()) throw new DcaManualExecutionUnsupportedException();
+        if (TradingAccount.from(account).brokerRef().broker().isCryptoExchange()) throw new DcaManualExecutionUnsupportedException(); // Account 직접 접근 금지 가드(trading_batch_path_must_not_carry_account_aggregate) — TradingAccount 투영 경유
         // 계산 실패로 생략된 전략은 404(사이클 없음)로 오인되지 않도록 원래 예외를 그대로 전파
         Map<UUID, RuntimeException> failures = new HashMap<>();
         NextOrdersPreview preview = previewBatch(strategy.accountId(), requesterId, failures).get(strategyId);
@@ -139,7 +139,7 @@ class TradingPreviewService {
         for (Strategy strategy : strategies) {
             StrategyCycle cycle = cyclesByStrategyId.get(strategy.id());
             if (cycle == null) continue;
-            if (cycle.endDate() != null) {
+            if (cycle.isEnded()) {
                 // findLatestByStrategyId는 종료 여부 무관 최신 1건 — 청산 후 재등록 실패로 종료된 사이클이
                 // "현재 사이클"로 남아있으면 여기서 걸러야 다음 주문이 잘못 계산되지 않는다.
                 // startDate==endDate==오늘(당일 등록·당일 청산)인 경우와 겹칠 수 있어 시작예정일 체크보다 먼저 판정한다
@@ -294,11 +294,8 @@ class TradingPreviewService {
             buyCandidates = fit.orders(); // 거절이면 BUY 없음, 축소면 축소 후 금액
         }
         // 계좌 경고 합산은 ACTIVE 전략만 — 정지 전략 카드는 보이되 그 가상 주문은 실행되지 않으므로 필요 현금·수량에 넣지 않는다
-        if (strategy.status() == StrategyStatus.ACTIVE) {
-            freshBuyByStrategyId.put(strategy.id(), buyCandidates.stream()
-                    .filter(o -> o.direction() == OrderDirection.BUY)
-                    .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add));
+        if (strategy.isActive()) {
+            freshBuyByStrategyId.put(strategy.id(), AccountBalance.buyTotal(buyCandidates));
             freshCorrectionByStrategyId.put(strategy.id(), buyCandidates.stream()
                     .filter(o -> o.direction() == OrderDirection.BUY && InfiniteStrategy.isCorrectionLeg(o.orderLeg()))
                     .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))

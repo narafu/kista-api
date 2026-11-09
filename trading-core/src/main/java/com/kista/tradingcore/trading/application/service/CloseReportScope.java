@@ -17,7 +17,7 @@ final class CloseReportScope {
 
     private CloseReportScope() {}
 
-    // 마감 리포트 창(오늘 postClose 이후 ~ 리포트 마커 전)에 이 전략이 리포트 대기 중인지 — 창 거절 로직(CapitalInjectionService·ManualTradeCorrectionService)의 공통 판정
+    // 마감 리포트 창(오늘 postClose 이후 ~ 리포트 마커 전)에 이 전략이 리포트 대기 중인지 — 창 거절 로직(CapitalLedgerService·ManualTradeCorrectionService)의 공통 판정
     // postClose 이전이면 리포트가 최신 상태를 재조회하므로 안전. 리포트 마커가 이미 찍혔거나 리포트 대상 주문이 없으면 창 밖
     static boolean inReportWindow(Strategy strategy, Clock clock, TradingBatchRunPort batchRunPort, OrderPort orderPort) {
         if (DstInfo.calculate(ZonedDateTime.now(clock)).waitUntilPostClose(Instant.now(clock)).isPositive()) {
@@ -34,7 +34,7 @@ final class CloseReportScope {
     static boolean awaitsCloseReport(Strategy strategy, List<Order> todayOrders) {
         boolean paused = !strategy.isActive();
         return todayOrders.stream()
-                .filter(o -> !Order.UNKNOWN_LEG.equals(o.orderLeg()))
+                .filter(Order::isStrategyOrder)
                 .anyMatch(o -> !paused || o.externalOrderId() != null);
     }
 }

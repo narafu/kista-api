@@ -14,10 +14,21 @@ class StrategyCycleTest {
     @Test
     void hasStartedBy_isTrueOnlyAfterStartDate() {
         LocalDate startDate = LocalDate.of(2026, 1, 6);
-        StrategyCycle cycle = StrategyCycle.start(UUID.randomUUID(), UUID.randomUUID(), BigDecimal.TEN, startDate);
+        StrategyCycle cycle = StrategyCycle.start(UUID.randomUUID(), UUID.randomUUID(), BigDecimal.TEN, BigDecimal.TEN, startDate);
 
         assertThat(cycle.hasStartedBy(startDate.minusDays(1))).isFalse();
         assertThat(cycle.hasStartedBy(startDate)).isFalse();
         assertThat(cycle.hasStartedBy(startDate.plusDays(1))).isTrue();
+    }
+
+    // 종료일이 기록돼야 종료 — 진행 중 사이클은 endDate null
+    @Test
+    void isEnded_isTrueOnlyWhenEndDateRecorded() {
+        StrategyCycle open = StrategyCycle.start(UUID.randomUUID(), UUID.randomUUID(), BigDecimal.TEN, BigDecimal.TEN, LocalDate.of(2026, 1, 6));
+        StrategyCycle ended = new StrategyCycle(null, open.strategyId(), open.strategyVersionId(), BigDecimal.TEN,
+                BigDecimal.ONE, open.startDate(), LocalDate.of(2026, 2, 6), null, null);
+
+        assertThat(open.isEnded()).isFalse();
+        assertThat(ended.isEnded()).isTrue();
     }
 }

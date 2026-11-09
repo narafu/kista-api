@@ -3,9 +3,14 @@ package com.kista.api.benchmark.adapter.in.web.dto;
 import com.kista.api.benchmark.domain.model.BenchmarkAssetType;
 import com.kista.api.benchmark.domain.model.BenchmarkScope;
 import com.kista.api.benchmark.domain.model.BenchmarkComparison;
+import com.kista.api.benchmark.domain.model.StrategyRef;
+import com.kista.shared.kernel.Currency;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -58,5 +63,59 @@ class BenchmarkComparisonResponseTest {
         assertThat(response.quality().benchmarkCurrency()).isEqualTo("USD");
         assertThat(response.benchmark().assetType()).isEqualTo("ETF");
         assertThat(response.benchmark().symbol()).isEqualTo("SPY");
+        assertThat(response.quality().investmentCurrency()).isEqualTo("USD");
+    }
+
+    @Test
+    void USDT_전략_ETF_비교는_투자_통화를_USDT로_표기한다() {
+        BenchmarkComparisonResponse response = BenchmarkComparisonResponse.from(
+                strategyComparison(Currency.USDT, BenchmarkAssetType.ETF));
+
+        assertThat(response.quality().investmentCurrency()).isEqualTo("USDT");
+        assertThat(response.quality().benchmarkCurrency()).isEqualTo("USD");
+        assertThat(response.quality().notice()).contains("투자 성과는 USDT");
+    }
+
+    @Test
+    void USDT_전략_아파트_비교는_투자_통화를_USDT로_표기한다() {
+        BenchmarkComparisonResponse response = BenchmarkComparisonResponse.from(
+                strategyComparison(Currency.USDT, BenchmarkAssetType.HOUSING));
+
+        assertThat(response.quality().investmentCurrency()).isEqualTo("USDT");
+        assertThat(response.quality().notice()).contains("투자 성과는 USDT, 아파트 매매가격지수는 KRW");
+    }
+
+    @Test
+    void KRW_전략_아파트_비교는_같은_통화임을_안내한다() {
+        BenchmarkComparisonResponse response = BenchmarkComparisonResponse.from(
+                strategyComparison(Currency.KRW, BenchmarkAssetType.HOUSING));
+
+        assertThat(response.quality().investmentCurrency()).isEqualTo("KRW");
+        assertThat(response.quality().notice()).contains("모두 KRW 기준");
+    }
+
+    @Test
+    void USD_전략은_기존_ETF_notice를_유지한다() {
+        BenchmarkComparisonResponse response = BenchmarkComparisonResponse.from(
+                strategyComparison(Currency.USD, BenchmarkAssetType.ETF));
+
+        assertThat(response.quality().investmentCurrency()).isEqualTo("USD");
+        assertThat(response.quality().notice()).isEqualTo(ETF_NOTICE);
+    }
+
+    // 데이터 없는(emptyReason) STRATEGY 비교 — 빈 결과에서도 전략 통화가 표기돼야 한다
+    private static BenchmarkComparison strategyComparison(Currency currency, BenchmarkAssetType assetType) {
+        boolean etf = assetType == BenchmarkAssetType.ETF;
+        return new BenchmarkComparison(
+                BenchmarkScope.STRATEGY,
+                new StrategyRef(UUID.randomUUID(), StrategyType.DCA, StrategyTicker.ETH, currency),
+                new BenchmarkComparison.Benchmark(
+                        assetType, etf ? null : "1100000000", etf ? null : "서울",
+                        etf ? "SPY" : null, "label", null),
+                new BenchmarkComparison.Period(null, null, 0),
+                null,
+                List.of(),
+                null,
+                "NO_INVESTMENT_DATA");
     }
 }

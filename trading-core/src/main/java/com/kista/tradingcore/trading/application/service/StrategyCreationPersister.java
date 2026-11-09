@@ -38,7 +38,7 @@ class StrategyCreationPersister {
     // vrValue: VR V값(override 반영) — 비VR은 null, dca: DCA 등록일 때만 non-null
     record Draft(UUID accountId, StrategyType type, StrategyCycleSeedType seedType, ResolvedCreation resolved,
                  VrRampParams ramp, BigDecimal initialUsdDeposit, BigDecimal initialHoldings, BigDecimal initialAvgPrice,
-                 BigDecimal marketPrice, BigDecimal startAmount, BigDecimal vrValue, LocalDate scheduledStart,
+                 BigDecimal marketPrice, BigDecimal startAmount, BigDecimal openAmount, BigDecimal vrValue, LocalDate scheduledStart,
                  DcaStrategyConfig dca) {}
 
     @Transactional
@@ -66,7 +66,7 @@ class StrategyCreationPersister {
 
         // strategy_cycles → cycle_positions → 전략 타입별 cycle_detail 순 저장
         // startAmount 산출 규칙은 호출부(StrategyCreationService) 소유
-        StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), version.id(), d.startAmount(), d.scheduledStart()));
+        StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), version.id(), d.startAmount(), d.openAmount(), d.scheduledStart()));
 
         // DCA는 marketPrice 없음(closingPrice null) — 시작 원장 = 초기 보유·평단, 예수금 0
         CyclePosition initialPosition = d.initialHoldings().signum() > 0

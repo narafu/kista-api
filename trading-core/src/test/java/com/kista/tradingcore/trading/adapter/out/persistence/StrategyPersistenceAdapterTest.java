@@ -211,7 +211,7 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
                 strategyId, acct, strategyStatus);
         jdbcTemplate.update("INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, 1, now())", versionId, strategyId);
         jdbcTemplate.update(
-                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, start_date, created_at) VALUES (?, ?, ?, ?, ?, now())",
+                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, start_date, created_at) VALUES (?, ?, ?, ?, 0, ?, now())",
                 cycleId, strategyId, versionId, new BigDecimal("1000.00"), TRADE_DATE.minusDays(5));
         jdbcTemplate.update(
                 "INSERT INTO orders (account_id, strategy_cycle_id, trade_date, ticker, order_type, timing, direction, order_leg, price, quantity, status, external_order_id, created_at, updated_at) "

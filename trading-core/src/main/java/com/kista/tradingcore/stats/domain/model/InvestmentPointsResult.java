@@ -1,5 +1,6 @@
 package com.kista.tradingcore.stats.domain.model;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 
 import java.time.LocalDate;
@@ -12,5 +13,6 @@ public record InvestmentPointsResult(
         List<InvestmentPoint> points,
         LocalDate effectiveFrom,
         LocalDate effectiveTo,
-        Strategy selectedStrategy
+        Strategy selectedStrategy,
+        Currency strategyCurrency    // 선택 전략 계좌 통화(Broker.getCurrency) — PORTFOLIO면 null
 ) {}

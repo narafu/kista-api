@@ -101,7 +101,7 @@ class StrategyCreationPersisterDbTest extends DataJpaTestBase {
 
         persister.persist(new StrategyCreationPersister.Draft(accountId, StrategyType.DCA, StrategyCycleSeedType.NONE,
                 new ResolvedCreation(StrategyTicker.UPRO, 20, null, null, null), null,
-                BigDecimal.ZERO, BigDecimal.ZERO, null, null, BigDecimal.ZERO, null, LocalDate.now(), config));
+                BigDecimal.ZERO, BigDecimal.ZERO, null, null, BigDecimal.ZERO, BigDecimal.ZERO, null, LocalDate.now(), config));
 
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM strategy_dca_rule dv JOIN strategy_version sv ON sv.id = dv.strategy_version_id JOIN strategy s ON s.id = sv.strategy_id WHERE s.account_id = ?",
@@ -135,7 +135,7 @@ class StrategyCreationPersisterDbTest extends DataJpaTestBase {
     private void persistInfinite() {
         persister.persist(new StrategyCreationPersister.Draft(accountId, StrategyType.INFINITE, StrategyCycleSeedType.NONE,
                 new ResolvedCreation(StrategyTicker.SOXL, 20, null, null, null), null,
-                new BigDecimal("1000"), BigDecimal.ZERO, null, null, new BigDecimal("1000"), null, LocalDate.now(), null));
+                new BigDecimal("1000"), BigDecimal.ZERO, null, null, new BigDecimal("1000"), new BigDecimal("1000"), null, LocalDate.now(), null));
     }
 
     private Integer countStrategyRows() {

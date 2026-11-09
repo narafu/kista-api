@@ -98,18 +98,37 @@ class CapitalLedgerTimelineTest {
     }
 
     @Test
-    void bookRealized_vrRollover_onlySoldPart() {
+    void openBasisRealized_vrRollover_onlySoldPart() {
         var first = pos(UUID.randomUUID(), "2026-06-10T00:00:00Z", 5000, 50, 100L);
         var last = pos(UUID.randomUUID(), "2026-06-20T00:00:00Z", 6200, 40, 100L);
-        assertThat(CapitalLedgerTimeline.bookRealized(first, last, List.of())).isEqualByComparingTo("200");
+        assertThat(CapitalLedgerTimeline.openBasisRealized(bd(10000), List.of(first, last), List.of())).isEqualByComparingTo("200");
     }
 
     @Test
-    void bookRealized_firstRowMutated_noDoubleCount() {
+    void openBasisRealized_sellAllThenRebuy_premiumNotCarried() {
+        // 개장: 예수금 100 + 10주(평단 50, 시가 62) = 720, D = 120 → 전량 70 매도 후 3주 70 재매수
+        var open = pos(UUID.randomUUID(), "2026-06-10T00:00:00Z", 100, 10, 50L);
+        var soldOut = pos(UUID.randomUUID(), "2026-06-11T00:00:00Z", 800, 0, null);
+        var rebought = pos(UUID.randomUUID(), "2026-06-12T00:00:00Z", 590, 3, 70L);
+        // 실현 = 10 × (70 − 62) = 80, 재매수분 원가는 체결가 그대로
+        assertThat(CapitalLedgerTimeline.openBasisRealized(bd(720), List.of(open, soldOut, rebought), List.of())).isEqualByComparingTo("80");
+    }
+
+    @Test
+    void openBasisRealized_noHoldingsAtOpen_premiumDropped() {
+        // 보유 0 개장인데 개장 평가(1,000)와 첫 행 예수금(900)이 어긋난 경우 — 차이는 승계 보유분 프리미엄이 아니므로 매수 후 이어지지 않는다
+        var open = pos(UUID.randomUUID(), "2026-06-10T00:00:00Z", 900, 0, null);
+        var bought = pos(UUID.randomUUID(), "2026-06-11T00:00:00Z", 600, 3, 100L);
+        assertThat(CapitalLedgerTimeline.openBasisRealized(bd(1000), List.of(open, bought), List.of())).isEqualByComparingTo("-100");
+    }
+
+    @Test
+    void openBasisRealized_firstRowMutated_noDoubleCount() {
         UUID f = UUID.randomUUID();
         var first = pos(f, "2026-06-10T00:00:00Z", 15000, 0, null);
         var last = pos(UUID.randomUUID(), "2026-06-20T00:00:00Z", 12600, 30, 100L);
         var events = List.of(ev(f, "2026-06-10T01:00:00Z", 5000, 0, 5000));
-        assertThat(CapitalLedgerTimeline.bookRealized(first, last, events)).isEqualByComparingTo("600");
+        // 개장 평가 10,000(원본 행 장부 10,000) — 이력 5,000 제외
+        assertThat(CapitalLedgerTimeline.openBasisRealized(bd(10000), List.of(first, last), events)).isEqualByComparingTo("600");
     }
 }

@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -26,14 +27,14 @@ public class TradingParallelRunner {
     }
 
     // groupKey: 동시 상한을 공유하는 단위(계좌 id) / action: runSafely로 감싼 사이클 작업 — 예외는 action 내부에서 격리되는 것이 계약
-    public record Task<T>(Object groupKey, Callable<Optional<T>> action) {}
+    public record Task<T>(UUID groupKey, Callable<Optional<T>> action) {}
 
     // 제출 순서대로 결과를 수집한다(Optional.empty 제외) — 기존 순차 for 루프의 결과 순서 계약 유지
     public <T> List<T> runAll(List<Task<T>> tasks) throws InterruptedException {
         if (tasks.isEmpty()) return List.of();
         if (maxConcurrentPerGroup <= 0) return runSequentially(tasks);
 
-        Map<Object, Semaphore> gates = new ConcurrentHashMap<>();
+        Map<UUID, Semaphore> gates = new ConcurrentHashMap<>();
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             List<Callable<Optional<T>>> callables = tasks.stream()
                     .map(task -> (Callable<Optional<T>>) () -> {

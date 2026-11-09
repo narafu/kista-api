@@ -90,7 +90,7 @@ class OrderCancelService {
             // 실제 삭제 건수로 집계 — 그 사이 배치가 선점(SUBMITTING)·접수(PLACED)한 행은 삭제되지 않는다
             int plannedCount = stateWriter.deletePlanned(currentCycle.id(), tradeDate);
             if (plannedCount > 0) {
-                log.info("PLANNED 주문 {}건 삭제 — cycleId={}, tradeDate={}", plannedCount, currentCycle.id(), tradeDate);
+                log.info("[strategyId={}] PLANNED 주문 {}건 삭제 — tradeDate={}", strategyId, plannedCount, tradeDate);
                 cancelledCount += plannedCount;
             }
             // 코인 거래소는 증권사 취소 대상이 없다 — 체결 확인 중 주문은 위에서 이미 거부했으므로 PLANNED 삭제만 하고 넘어간다

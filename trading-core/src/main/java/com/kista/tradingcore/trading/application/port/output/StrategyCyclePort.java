@@ -38,7 +38,7 @@ public interface StrategyCyclePort {
     // 사이클 종료 기록 — holdings=0 청산 시 종료금액·종료일자 저장
     void markEnded(UUID cycleId, BigDecimal endAmount, LocalDate endDate);
 
-    // 시드 수정 — 사이클 시작금액(startAmount) 갱신
+    // 투자금 추가·인출 — 사이클 시작금액(startAmount)만 갱신, 개장 평가는 이력 합계로 통계가 더한다
     void updateStartAmount(UUID cycleId, BigDecimal startAmount);
 
     // 시작 전 VR 재설정 — 사이클의 전략 버전 교체(새 버전 FK)

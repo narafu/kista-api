@@ -2,6 +2,7 @@ package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.support.DataJpaTestBase;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
+import com.kista.tradingcore.trading.application.port.output.CycleCapitalEventPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCycleVrPort;
@@ -55,6 +56,7 @@ class CycleSnapshotCreatorDbTest extends DataJpaTestBase {
     @MockitoBean StrategyCycleVrPort strategyCycleVrPort;
     @MockitoBean StrategyVersionPort strategyVersionPort;
     @MockitoBean VrStrategyDetailService vrStrategyDetailService;
+    @MockitoBean CycleCapitalEventPort cycleCapitalEventPort; // VR 재설정 이력 포트(이 테스트 대상 아님)
 
     private UUID accountId;
     private UUID strategyId;
@@ -76,7 +78,7 @@ class CycleSnapshotCreatorDbTest extends DataJpaTestBase {
         jdbcTemplate.update("INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, ?, now())",
                 versionId, strategyId, 1);
         jdbcTemplate.update(
-                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, start_date, created_at) VALUES (?, ?, ?, ?, ?, now())",
+                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, start_date, created_at) VALUES (?, ?, ?, ?, 0, ?, now())",
                 cycleId, strategyId, versionId, new BigDecimal("1000.00"), TODAY.minusWeeks(2));
     }
 

@@ -25,7 +25,7 @@ class VrStrategyDetailService {
     private final StrategyVrDetailPort strategyVrDetailPort;
     private final StrategyCycleVrPort strategyCycleVrPort;
 
-    public StrategyVrDetail saveVersionDetail(UUID strategyVersionId, Integer intervalWeeks,
+    StrategyVrDetail saveVersionDetail(UUID strategyVersionId, Integer intervalWeeks,
                                        BigDecimal bandWidth, Integer recurringAmount, VrRampParams ramp) {
         int normalizedRecurringAmount = recurringAmount != null ? recurringAmount : 0;
         return strategyVrDetailPort.save(
@@ -34,39 +34,35 @@ class VrStrategyDetailService {
                         ramp.initialPoolLimitRate(), ramp.pGraceWeeks(), ramp.pStepWeeks(), ramp.poolLimitFloor()));
     }
 
-    public StrategyCycleVrDetail saveInitialCycleDetail(UUID cycleId, BigDecimal initialValue, StrategyVrDetail vrDetail) {
+    StrategyCycleVrDetail saveInitialCycleDetail(UUID cycleId, BigDecimal initialValue, StrategyVrDetail vrDetail) {
         BigDecimal initialV = initialValue != null ? initialValue : BigDecimal.ZERO;
         return strategyCycleVrPort.save(
                 new StrategyCycleVrDetail(cycleId, initialV, vrDetail.gradientAt(0), vrDetail.poolLimitRateAt(0)));
     }
 
-    public Optional<VrSummary> findSummary(UUID strategyId, Optional<StrategyCycle> latestCycle,
+    Optional<VrSummary> findSummary(UUID strategyId, Optional<StrategyCycle> latestCycle,
                                                     Optional<CyclePosition> openingPosition,
                                                     Optional<CyclePosition> latestPosition) {
         return strategyVrDetailPort.findActiveByStrategyId(strategyId)
                 .flatMap(vrDetail -> latestCycle
                         .flatMap(cycle -> strategyCycleVrPort.findByCycleId(cycle.id())
                                 .map(cycleVr -> {
-                                    BigDecimal openingPool = openingPosition
-                                            .map(CyclePosition::usdDeposit)
-                                            .orElseThrow(() -> new IllegalStateException(
-                                                    "VR 시작 포지션이 없습니다."));
+                                    BigDecimal openingPool = openingPosition.map(CyclePosition::usdDeposit).orElse(null);
                                     BigDecimal currentPool = latestPosition.map(CyclePosition::usdDeposit).orElse(null);
                                     return buildSummary(vrDetail, cycleVr, openingPool, currentPool);
                                 })));
     }
 
-    public Map<UUID, StrategyVrDetail> findVrDetailsByVersionIds(Collection<UUID> strategyVersionIds) {
+    Map<UUID, StrategyVrDetail> findVrDetailsByVersionIds(Collection<UUID> strategyVersionIds) {
         return strategyVrDetailPort.findByStrategyVersionIds(strategyVersionIds);
     }
 
-    public Map<UUID, StrategyCycleVrDetail> findCycleVrDetailsByCycleIds(Collection<UUID> cycleIds) {
+    Map<UUID, StrategyCycleVrDetail> findCycleVrDetailsByCycleIds(Collection<UUID> cycleIds) {
         return strategyCycleVrPort.findByCycleIds(cycleIds);
     }
 
-    public VrSummary buildSummary(StrategyVrDetail vrDetail, StrategyCycleVrDetail cycleVr,
+    VrSummary buildSummary(StrategyVrDetail vrDetail, StrategyCycleVrDetail cycleVr,
                                           BigDecimal openingPool, BigDecimal currentPool) {
-        if (vrDetail == null || cycleVr == null) return null;
         if (openingPool == null) {
             throw new IllegalStateException("VR 시작 포지션이 없습니다.");
         }

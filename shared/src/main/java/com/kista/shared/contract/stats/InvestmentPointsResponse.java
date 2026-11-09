@@ -1,5 +1,6 @@
 package com.kista.shared.contract.stats;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 
@@ -18,7 +19,7 @@ public record InvestmentPointsResponse(
     // 투자 누적지수 시점(월별·주별·일별)과 해당 구간의 현금흐름 조정 수익률
     public record InvestmentPointDto(
             LocalDate baseDate,             // 시점의 기준일
-            BigDecimal investmentIndexUsd,  // 시점의 USD 누적 투자지수
+            BigDecimal investmentIndex,  // 시점의 누적 투자지수(통화 중립 — 전략 계좌 통화 기준 수익률)
             BigDecimal periodReturn         // 외부 현금흐름을 제외한 구간 수익률
     ) {}
 
@@ -26,6 +27,7 @@ public record InvestmentPointsResponse(
     public record StrategyRefDto(
             UUID id,                // 전략 ID
             StrategyType type,      // 전략 종류
-            StrategyTicker ticker   // 거래 종목
+            StrategyTicker ticker,  // 거래 종목
+            Currency currency       // 전략 계좌 통화(Broker.getCurrency)
     ) {}
 }

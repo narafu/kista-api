@@ -4,14 +4,17 @@ import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
+import com.kista.tradingcore.trading.application.port.output.CycleCapitalEventPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import org.junit.jupiter.api.BeforeEach;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
+import com.kista.tradingcore.trading.domain.model.CycleCapitalEvent;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
@@ -50,11 +53,12 @@ class InvestmentPointsQueryServiceTest {
     @Mock StrategyPort strategyPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CyclePositionPort cyclePositionPort;
+    @Mock CycleCapitalEventPort cycleCapitalEventPort;
     InvestmentPointsQueryService service;
 
     @BeforeEach
     void setUp() {
-        service = new InvestmentPointsQueryService(accountPort, strategyPort, strategyCyclePort, cyclePositionPort, FixedClockTestConfig.FIXED);
+        service = new InvestmentPointsQueryService(accountPort, strategyPort, strategyCyclePort, cyclePositionPort, cycleCapitalEventPort, FixedClockTestConfig.FIXED);
     }
 
     private static final UUID USER_ID = UUID.randomUUID();
@@ -96,9 +100,24 @@ class InvestmentPointsQueryServiceTest {
                 STRATEGY_ID, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(result.selectedStrategy()).isEqualTo(STRATEGY);
+        assertThat(result.strategyCurrency()).isEqualTo(Currency.USD);
         assertThat(result.points()).isNotEmpty();
         verify(cyclePositionPort).findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any());
         verify(cyclePositionPort, never()).findByUserAndRange(any(), any(), any());
+    }
+
+    @Test
+    void STRATEGY_scope는_전략_계좌_통화를_싣는다() {
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
+        Account binance = new Account(ACCOUNT_ID, USER_ID, "바이낸스", "n", "k", "s", null, Broker.BINANCE, null, null);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(binance);
+        when(strategyCyclePort.findByStrategyIds(Set.of(STRATEGY_ID))).thenReturn(List.of());
+        when(cyclePositionPort.findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any())).thenReturn(List.of());
+
+        InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsQuery.Scope.STRATEGY,
+                STRATEGY_ID, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
+
+        assertThat(result.strategyCurrency()).isEqualTo(Currency.USDT);
     }
 
     @Test
@@ -136,7 +155,8 @@ class InvestmentPointsQueryServiceTest {
                 null, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(result.selectedStrategy()).isNull();
-        assertThat(result.points().getFirst().investmentIndexUsd()).isEqualByComparingTo("100.0");
+        assertThat(result.strategyCurrency()).isNull();
+        assertThat(result.points().getFirst().investmentIndex()).isEqualByComparingTo("100.0");
         assertThat(strategyIdsCaptor.getValue()).containsExactly(STRATEGY_ID);
         verify(strategyPort, never()).findByAccountIds(argThat(ids -> ids.contains(mockAccountId)));
     }
@@ -204,5 +224,58 @@ class InvestmentPointsQueryServiceTest {
 
         assertThat(result.effectiveFrom()).isEqualTo(LocalDate.of(2026, 1, 15));
         assertThat(result.points().getFirst().baseDate()).isEqualTo(LocalDate.of(2026, 1, 15));
+    }
+
+    @Test
+    void 투자금_추가와_인출이_있는_날의_수익률은_0이다() {
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(testAccount(USER_ID));
+        StrategyCycle cycle = activeCycle("0", "2026-10-30");
+        when(strategyCyclePort.findByStrategyIds(Set.of(STRATEGY_ID))).thenReturn(List.of(cycle));
+        // 현재값(제자리 갱신된 행) — 11-07 행에 +100/-350 이력이 걸려 있다
+        CyclePosition nov6 = new CyclePosition(UUID.randomUUID(), cycle.id(), new BigDecimal("700.00"),
+                new BigDecimal("2238.59"), new BigDecimal("2268.34"), new BigDecimal("0.26291013"),
+                Instant.parse("2026-11-06T00:10:02.630968Z"), null);
+        CyclePosition nov7 = new CyclePosition(UUID.randomUUID(), cycle.id(), new BigDecimal("350.40"),
+                new BigDecimal("2238.67"), new BigDecimal("2264.05"), new BigDecimal("0.30736563"),
+                Instant.parse("2026-11-07T00:10:03.127918Z"), null);
+        when(cyclePositionPort.findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any()))
+                .thenReturn(List.of(nov6, nov7));
+        when(cycleCapitalEventPort.findByCycleIds(any())).thenReturn(List.of(
+                new CycleCapitalEvent(UUID.randomUUID(), cycle.id(), nov7.id(), CycleCapitalEvent.Kind.INJECT,
+                        new BigDecimal("100"), BigDecimal.ZERO, new BigDecimal("100"),
+                        Instant.parse("2026-11-07T02:46:37.851115Z")),
+                new CycleCapitalEvent(UUID.randomUUID(), cycle.id(), nov7.id(), CycleCapitalEvent.Kind.WITHDRAW,
+                        new BigDecimal("-350"), BigDecimal.ZERO, new BigDecimal("-350"),
+                        Instant.parse("2026-11-07T02:47:14.286694Z"))));
+
+        InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsQuery.Scope.STRATEGY,
+                STRATEGY_ID, LocalDate.of(2026, 11, 6), LocalDate.of(2026, 11, 7));
+
+        // 수정 전에는 11-07 수익률이 약 -19.4%(1,288.55 -> 1,038.49)로 보였다
+        assertThat(result.points().getLast().periodReturn().abs()).isLessThan(new BigDecimal("0.0001"));
+    }
+
+    @Test
+    void 이력이_이후_날짜에_발생해도_걸린_행의_과거_평가는_원본으로_복원한다() {
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(testAccount(USER_ID));
+        StrategyCycle cycle = activeCycle("0", "2026-11-05");
+        when(strategyCyclePort.findByStrategyIds(Set.of(STRATEGY_ID))).thenReturn(List.of(cycle));
+        CyclePosition nov5 = depositSnapshot(cycle.id(), "1000.00", "2026-11-05T01:00:00Z");
+        CyclePosition nov6 = depositSnapshot(cycle.id(), "1100.00", "2026-11-06T01:00:00Z"); // 11-08 추가 후 현재값
+        when(cyclePositionPort.findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any()))
+                .thenReturn(List.of(nov5, nov6));
+        when(cycleCapitalEventPort.findByCycleIds(any())).thenReturn(List.of(
+                new CycleCapitalEvent(UUID.randomUUID(), cycle.id(), nov6.id(), CycleCapitalEvent.Kind.INJECT,
+                        new BigDecimal("100"), BigDecimal.ZERO, new BigDecimal("100"),
+                        Instant.parse("2026-11-08T02:00:00Z"))));
+
+        InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsQuery.Scope.STRATEGY,
+                STRATEGY_ID, LocalDate.of(2026, 11, 5), LocalDate.of(2026, 11, 8));
+
+        // 복원 없이는 11-06에 +10%, 11-08에 -9%로 보인다
+        assertThat(result.points()).allSatisfy(point ->
+                assertThat(point.periodReturn().abs()).isLessThan(new BigDecimal("0.0001")));
     }
 }

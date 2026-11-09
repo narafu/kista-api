@@ -1,7 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.OrderStatus;
-import com.kista.tradingcore.trading.domain.model.TradingReport;
 import com.kista.tradingcore.trading.application.event.TradingReportReadyEvent;
 import com.kista.shared.kernel.TradeLegSummary;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;

@@ -37,6 +37,8 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 // 관리자 수동 체결 보정 — fills 순서대로 orders/cycle_position/cycle 종료를 원자적으로 반영
 @Slf4j
@@ -71,7 +73,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
         rejectUnidentifiedFillsBeforeReport(command, account, strategy);
         CyclePosition latest = cyclePositionPort.findLatestOne(currentCycle.id())
                 .orElseThrow(() -> new NoSuchElementException("최신 포지션 이력이 없습니다: cycleId=" + currentCycle.id()));
-        if (currentCycle.endDate() != null) {
+        if (currentCycle.isEnded()) {
             throw new IllegalStateException("이미 종료된 사이클은 수동 체결 보정을 지원하지 않습니다.");
         }
 
@@ -120,7 +122,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
     }
 
     // 마감 리포트 창(오늘 postClose 이후 ~ 리포트 마커 전) 거절 — 리포트는 postClose 이후 읽은 최신 포지션 잔고에 브로커 호출(수 초) 뒤 체결을 반영해 새 행을 append하므로,
-    // 그 사이 append한 보정 스냅샷은 무시된다. 같은 기준: CapitalInjectionService#requireOutsideReportWindow
+    // 그 사이 append한 보정 스냅샷은 무시된다. 같은 기준: CapitalLedgerService#requireOutsideReportWindow
     private void rejectDuringReportWindow(Account account, Strategy strategy) {
         // 코인 계좌는 마감 리포트가 없어 제외 (rejectUnidentifiedFillsBeforeReport와 같은 이유)
         if (account.broker().getMarket().isCrypto()) return;
@@ -154,17 +156,16 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
         // 코인 계좌는 마감 리포트를 거치지 않아(markReported 없음) isReported가 항상 false이므로 가드 제외
         if (account.broker().getMarket().isCrypto()) return;
         LocalDate reportableFrom = LocalDate.now(clock);
-        Set<LocalDate> dates = new java.util.TreeSet<>();
-        command.fills().stream()
+        Set<LocalDate> dates = command.fills().stream()
                 .filter(f -> f.externalOrderId() == null || f.externalOrderId().isBlank())
                 .map(ManualTradeCorrectionCommand.Fill::tradeDate)
                 .filter(d -> !d.isBefore(reportableFrom))
-                .forEach(dates::add);
+                .collect(Collectors.toCollection(TreeSet::new));
         for (LocalDate date : dates) {
             if (batchRunPort.isReported(date, strategy.id())) continue;
             // 수동 보정 행(UNKNOWN_LEG)은 전략 주문이 아니므로 제외
             boolean hasStrategyOrder = orderPort.findByStrategyId(strategy.id(), date, date).stream()
-                    .anyMatch(o -> !Order.UNKNOWN_LEG.equals(o.orderLeg()));
+                    .anyMatch(Order::isStrategyOrder);
             if (hasStrategyOrder) {
                 throw new IllegalArgumentException("마감 리포트 전인 거래일의 체결은 증권사 주문번호를 함께 입력해야 합니다.");
             }

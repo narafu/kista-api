@@ -45,7 +45,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-class CapitalInjectionService implements InjectCapitalUseCase {
+class CapitalLedgerService implements InjectCapitalUseCase {
 
     private static final String NO_ACTIVE_CYCLE = "진행 중인 사이클이 없어 투자금을 추가할 수 없습니다.";
     private static final String NO_ACTIVE_CYCLE_WITHDRAW = "진행 중인 사이클이 없어 투자금을 인출할 수 없습니다.";
@@ -71,18 +71,9 @@ class CapitalInjectionService implements InjectCapitalUseCase {
         OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
         Strategy strategy = owned.strategy();
 
-        BigDecimal deposit = cmd.depositAmount() != null ? cmd.depositAmount() : BigDecimal.ZERO;
-        int shares = cmd.shares() != null ? cmd.shares() : 0;
-        if (cmd.depositAmount() == null && cmd.shares() == null) {
-            throw new IllegalArgumentException("추가할 예수금 또는 주식을 입력해야 합니다.");
-        }
-        if ((cmd.shares() == null) != (cmd.sharePrice() == null)) {
-            throw new IllegalArgumentException("주식을 추가하려면 수량과 매수단가를 함께 입력해야 합니다.");
-        }
-        if ((cmd.depositAmount() != null && deposit.signum() <= 0) || (cmd.shares() != null && shares <= 0)
-                || (cmd.sharePrice() != null && cmd.sharePrice().signum() <= 0)) {
-            throw new IllegalArgumentException("추가 금액과 수량은 0보다 커야 합니다.");
-        }
+        cmd.validate();
+        BigDecimal deposit = cmd.depositOrZero();
+        int shares = cmd.sharesOrZero();
         requireSupportedType(strategy, "투자금 추가는 PRIVACY·INFINITE·DCA 전략만 지원합니다.");
         if (strategy.isDca() && cmd.shares() != null) {
             throw new IllegalArgumentException("DCA 전략은 예수금만 추가할 수 있습니다.");
@@ -166,7 +157,7 @@ class CapitalInjectionService implements InjectCapitalUseCase {
         InfiniteMinSeedGuard.requireAtLeast(minSeed, newStartAmount); // INFINITE는 인출 후에도 0회차 교착 시드 미만이 되면 거부
 
         AccountBalance old = latest.toBalance();
-        AccountBalance newBalance = new AccountBalance(old.holdings(), old.avgPrice(), old.usdDeposit().subtract(amount));
+        AccountBalance newBalance = old.withUsdDeposit(old.usdDeposit().subtract(amount));
         // 최신 행 in-place 갱신 — append하면 리버스 판정·별점가·이력이 왜곡되고 detail은 같은 행에 유지된다
         cyclePositionPort.updateBalance(latest.id(), newBalance);
         strategyCyclePort.updateStartAmount(cycle.id(), newStartAmount);
@@ -200,7 +191,7 @@ class CapitalInjectionService implements InjectCapitalUseCase {
         UUID strategyId = strategy.id();
         strategy.requireNotArchived(); // 보관 전략은 투자금 추가·인출 불가
         StrategyCycle first = strategyCyclePort.requireLatestByStrategyId(strategyId);
-        if (first.endDate() != null) {
+        if (first.isEnded()) {
             throw new IllegalStateException(noActiveMessage);
         }
 
@@ -208,7 +199,7 @@ class CapitalInjectionService implements InjectCapitalUseCase {
         strategyCyclePort.lockForUpdate(first.id());
         // 마감 리포트의 markEnded는 마커와 한 트랜잭션이라 위 잠금과 FK 락으로 직렬화됨
         StrategyCycle cycle = strategyCyclePort.requireLatestByStrategyId(strategyId);
-        if (cycle.endDate() != null || !cycle.id().equals(first.id())) {
+        if (cycle.isEnded() || !cycle.id().equals(first.id())) {
             throw new IllegalStateException(noActiveMessage);
         }
         // 코인 계좌는 마감 리포트가 없다 — 체결 기록(CryptoLedgerRecorder)이 같은 사이클 잠금으로 직렬화된다

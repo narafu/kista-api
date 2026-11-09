@@ -89,8 +89,8 @@ SELECT v.id, 20
 FROM trading.strategy_version v WHERE v.id = md5('dev-seed:kis:version')::uuid
 ON CONFLICT DO NOTHING;
 
-INSERT INTO trading.strategy_cycle (id, strategy_id, strategy_version_id, start_amount, start_date, created_at)
-SELECT md5('dev-seed:kis:cycle')::uuid, v.strategy_id, v.id, 6000, d.start_date, d.start_date::timestamp AT TIME ZONE 'Asia/Seoul'
+INSERT INTO trading.strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, start_date, created_at)
+SELECT md5('dev-seed:kis:cycle')::uuid, v.strategy_id, v.id, 6000, 6000, d.start_date, d.start_date::timestamp AT TIME ZONE 'Asia/Seoul'
 FROM trading.strategy_version v
 CROSS JOIN LATERAL (SELECT (now() AT TIME ZONE 'Asia/Seoul')::date - 60 AS start_date) d
 WHERE v.id = md5('dev-seed:kis:version')::uuid
@@ -189,8 +189,9 @@ JOIN trading.strategy_version v ON v.id = md5('dev-seed:cycles:version:' || t.ti
 ON CONFLICT DO NOTHING;
 
 -- i = 1..closed_n은 3주 간격 종료 사이클(손익 -8%~+12%), i = closed_n+1은 2주 전 시작한 진행 중 사이클
-INSERT INTO trading.strategy_cycle (id, strategy_id, strategy_version_id, start_amount, end_amount, start_date, end_date, created_at)
+INSERT INTO trading.strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, end_amount, start_date, end_date, created_at)
 SELECT md5('dev-seed:cycles:cycle:' || t.ticker || ':' || g.i)::uuid, v.strategy_id, v.id,
+       CASE WHEN g.i > t.closed_n THEN 6000 ELSE 5000 + g.i * 120 END,
        CASE WHEN g.i > t.closed_n THEN 6000 ELSE 5000 + g.i * 120 END,
        CASE WHEN g.i > t.closed_n THEN NULL ELSE round((5000 + g.i * 120) * (1 + ((g.i * 37) % 21 - 8) / 100.0), 2) END,
        d.start_date,

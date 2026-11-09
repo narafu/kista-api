@@ -156,6 +156,7 @@ class ManualTradeCorrectionServiceTest {
     private static Order orderWithLeg(String leg) {
         Order o = org.mockito.Mockito.mock(Order.class);
         lenient().when(o.orderLeg()).thenReturn(leg);
+        lenient().when(o.isStrategyOrder()).thenReturn(!Order.UNKNOWN_LEG.equals(leg)); // mock이라 술어도 leg에 맞춰 stub
         return o;
     }
 

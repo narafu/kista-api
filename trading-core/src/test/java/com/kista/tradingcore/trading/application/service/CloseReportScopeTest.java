@@ -30,7 +30,7 @@ class CloseReportScopeTest {
 
     private static Order order(String leg, String externalOrderId) {
         Order o = mock(Order.class);
-        when(o.orderLeg()).thenReturn(leg);
+        when(o.isStrategyOrder()).thenReturn(!Order.UNKNOWN_LEG.equals(leg)); // 서비스는 orderLeg 대신 술어로 판정
         when(o.externalOrderId()).thenReturn(externalOrderId);
         return o;
     }

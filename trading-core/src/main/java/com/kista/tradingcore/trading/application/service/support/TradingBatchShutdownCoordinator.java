@@ -13,7 +13,7 @@ import java.time.Duration;
 // stop()은 동기 블로킹이라 timeout-per-shutdown-phase 영향 없음 — 상한(150s) + 웹 graceful(30s)이 compose stop_grace_period(200s) 안
 @Slf4j
 @Component
-public class TradingBatchShutdownCoordinator implements SmartLifecycle {
+class TradingBatchShutdownCoordinator implements SmartLifecycle {
 
     private final TradingBatchRunState runState;
     private final ApplicationEventPublisher eventPublisher; // 상한 초과 관리자 알림

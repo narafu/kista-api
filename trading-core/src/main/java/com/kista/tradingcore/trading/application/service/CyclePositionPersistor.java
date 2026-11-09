@@ -5,6 +5,7 @@ import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.trading.domain.model.*;
 import com.kista.tradingcore.matching.domain.model.*;
 import com.kista.tradingcore.trading.application.port.output.*;
+import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,27 +38,25 @@ class CyclePositionPersistor {
         Strategy strategy = ctx.strategy();
         StrategyCycle currentCycle = ctx.currentCycle();
         // INFINITE 전략: cycle_position 최신 행을 기반으로 상태 머신으로 새 모드 결정
-        boolean newReverseMode = false;
-        if (cycleOrderStrategies.of(strategy.type()).tracksReverseMode()) {
-            newReverseMode = computeNewReverseMode(currentCycle, strategy, balance, price);
-        }
+        CycleOrderStrategy orderStrategy = cycleOrderStrategies.of(strategy.type());
+        boolean reverseMode = orderStrategy.tracksReverseMode()
+                && computeNewReverseMode(currentCycle, strategy, balance, price);
 
         // 저장 전 이전 포지션 확인 — 0회차 매수 실패(holdings=0)와 진짜 청산(이전 holdings>0→현재 0) 구분
         List<CyclePosition> prevPositions = cyclePositionPort.findLatestByCycleId(currentCycle.id(), 1);
         boolean prevHadHoldings = !prevPositions.isEmpty() && prevPositions.getFirst().toBalance().hasHoldings();
 
         CyclePosition position = CyclePosition.tradeSnapshot(currentCycle.id(), balance, price);
-        // 포지션·상세·리포트 마커를 한 트랜잭션으로 — 사이에서 중단되면 재개가 체결을 이중 반영한다
-        // 리포트 완료 마커는 rotation이 새 사이클을 만들어도 재개 판정이 유지되도록 전략 키 (저장 직후·rotation 전)
-        final boolean reverseMode = newReverseMode;
         // holdings==0이면서 이전에 보유 이력이 있을 때만 사이클 종료 처리
         // (0회차 매수 실패 케이스: startSnapshot→tradeSnapshot 모두 holdings=0이므로 여기서 걸림)
         // endsCycleOnLiquidation()=false인 전략(VR)은 holdings=0에 사이클 종료 미발동
         boolean cycleEnds = !balance.hasHoldings() && prevHadHoldings
-                && cycleOrderStrategies.of(strategy.type()).endsCycleOnLiquidation();
+                && orderStrategy.endsCycleOnLiquidation();
+        // 포지션·상세·리포트 마커를 한 트랜잭션으로 — 사이에서 중단되면 재개가 체결을 이중 반영한다
+        // 리포트 완료 마커는 rotation이 새 사이클을 만들어도 재개 판정이 유지되도록 전략 키 (저장 직후·rotation 전)
         transactionOperations.executeWithoutResult(status -> {
             CyclePosition savedPosition = cyclePositionPort.save(position);
-            if (cycleOrderStrategies.of(strategy.type()).tracksReverseMode()) {
+            if (orderStrategy.tracksReverseMode()) {
                 cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(savedPosition.id(), reverseMode));
             }
             // 사이클 종료 기록(DB 쓰기만) — 마커와 같은 트랜잭션: 마커만 커밋되고 종료가 빠지면 재개가 건너뛰어 사이클이 영영 안 닫힌다
@@ -67,7 +66,7 @@ class CyclePositionPersistor {
             }
             batchRunPort.markReported(today, strategy.id());
         });
-        log.info("[strategyId={}] 사이클 포지션 저장 완료 (isReverseMode={})", strategy.id(), newReverseMode);
+        log.info("[strategyId={}] 사이클 포지션 저장 완료 (isReverseMode={})", strategy.id(), reverseMode);
 
         boolean paused = !strategy.isActive();
 
@@ -83,7 +82,7 @@ class CyclePositionPersistor {
         }
 
         // 포지션 저장 직후 N주 롤오버 판정 (매일 1회 — due 미도래면 내부에서 no-op). 정지 전략은 건너뛴다 — rollIfDue가 재개 후 따라잡는다
-        if (!paused && cycleOrderStrategies.of(strategy.type()).requiresRolloverCheck()) {
+        if (!paused && orderStrategy.requiresRolloverCheck()) {
             vrCycleRolloverService.rollIfDue(ctx, balance, price, today);
         }
     }

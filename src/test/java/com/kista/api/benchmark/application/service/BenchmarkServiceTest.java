@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.StrategyTicker;
 
 // Task 5 이후: BenchmarkService는 accountPort/strategyPort/strategyCyclePort/cyclePositionPort를 직접
@@ -49,7 +50,7 @@ class BenchmarkServiceTest {
     private static final LocalDate TO = LocalDate.of(2026, 2, 28);
 
     private static final StrategyRef STRATEGY = new StrategyRef(
-            STRATEGY_ID, StrategyType.INFINITE, StrategyTicker.SOXL);
+            STRATEGY_ID, StrategyType.INFINITE, StrategyTicker.SOXL, Currency.USD);
 
     private static InvestmentPoint point(String date, String index) {
         return new InvestmentPoint(LocalDate.parse(date), new BigDecimal(index), null);
@@ -128,9 +129,9 @@ class BenchmarkServiceTest {
         assertThat(result.benchmark().regionName()).isEqualTo("서울");
         assertThat(result.benchmark().label()).isEqualTo("서울 아파트 매매가격지수");
         assertThat(result.points()).hasSize(2);
-        assertThat(result.points().getFirst().investmentIndexUsd()).isEqualByComparingTo("100.0");
+        assertThat(result.points().getFirst().investmentIndex()).isEqualByComparingTo("100.0");
         assertThat(result.points().getFirst().benchmarkIndex()).isEqualByComparingTo("100.0");
-        assertThat(result.points().getLast().investmentIndexUsd()).isEqualByComparingTo("184.2");
+        assertThat(result.points().getLast().investmentIndex()).isEqualByComparingTo("184.2");
         assertThat(result.points().getLast().benchmarkIndex()).isEqualByComparingTo("400.0");
         assertThat(result.summary().investmentCumulativeReturn()).isEqualByComparingTo("0.842");
         assertThat(result.summary().benchmarkCumulativeReturn()).isEqualByComparingTo("3.0");
@@ -220,9 +221,9 @@ class BenchmarkServiceTest {
         assertThat(result.points()).extracting(BenchmarkPoint::baseDate)
                 .containsExactly(LocalDate.of(2026, 1, 9), LocalDate.of(2026, 1, 12), LocalDate.of(2026, 1, 13));
         // 01-12는 아직 01-13 스냅샷(110)이 오지 않았으므로 직전 01-09 값(100)을 그대로 이어받는다
-        assertThat(result.points().get(1).investmentIndexUsd()).isEqualByComparingTo("100.0");
+        assertThat(result.points().get(1).investmentIndex()).isEqualByComparingTo("100.0");
         // 01-13에서야 비로소 값이 갱신된다
-        assertThat(result.points().getLast().investmentIndexUsd()).isEqualByComparingTo("110.0");
+        assertThat(result.points().getLast().investmentIndex()).isEqualByComparingTo("110.0");
     }
 
     @Test
@@ -599,15 +600,15 @@ class BenchmarkServiceTest {
         // 다운샘플링 없이 IndexPrice가 존재하는 3개 거래일이 +1일 보정된 KST 날짜로 그대로 포인트가 생긴다.
         assertThat(result.points()).extracting(BenchmarkPoint::baseDate)
                 .containsExactly(LocalDate.of(2026, 1, 6), LocalDate.of(2026, 1, 7), LocalDate.of(2026, 2, 28));
-        assertThat(result.points().getFirst().investmentIndexUsd()).isEqualByComparingTo("100.0");
+        assertThat(result.points().getFirst().investmentIndex()).isEqualByComparingTo("100.0");
         assertThat(result.points().getFirst().benchmarkIndex()).isEqualByComparingTo("100.0");
-        assertThat(result.points().get(1).investmentIndexUsd()).isEqualByComparingTo("102.0");
+        assertThat(result.points().get(1).investmentIndex()).isEqualByComparingTo("102.0");
         assertThat(result.points().get(1).benchmarkIndex()).isEqualByComparingTo(
                 new BigDecimal("404.00").divide(new BigDecimal("400.00"), 10, java.math.RoundingMode.HALF_UP)
                         .multiply(new BigDecimal("100")));
         // 캘린더 인접 여부와 무관하게(1/7 -> 2/28) 항상 직전 공통일 대비 수익률을 계산한다.
         assertThat(result.points().get(1).investmentPeriodReturn()).isEqualByComparingTo("0.02");
-        assertThat(result.points().getLast().investmentIndexUsd()).isEqualByComparingTo("184.2");
+        assertThat(result.points().getLast().investmentIndex()).isEqualByComparingTo("184.2");
         assertThat(result.points().getLast().benchmarkIndex()).isEqualByComparingTo(
                 new BigDecimal("440.00").divide(new BigDecimal("400.00"), 10, java.math.RoundingMode.HALF_UP)
                         .multiply(new BigDecimal("100")));

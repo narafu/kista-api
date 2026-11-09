@@ -35,6 +35,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import com.kista.tradingcore.trading.domain.model.CycleCapitalEvent;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.Mock;
@@ -177,13 +178,13 @@ class StrategyServiceTest {
                 detailAssembler,
                 historyQueryService,
                 new CycleSnapshotCreator(
-                        strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, FIXED),
+                        strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, cycleCapitalEventPort, FIXED),
                 orderCancelService,
                 eventPublisher,
                 new StrategyStateWriter(strategyPort, strategyCyclePort, cyclePositionPort),
                 orderPort, batchRunPort, minSeedGuard,
                 new StrategyUpdateWriter(strategyPort, accountPort, strategyCyclePort, cyclePositionPort, cycleCapitalEventPort,
-                        detailAssembler, eventPublisher),
+                        detailAssembler, eventPublisher, FIXED, batchRunPort, orderPort),
                 FIXED);
         lenient().when(orderCancelService.cancelOpenOrders(any(), any())).thenReturn(new CancelResult(0, 0));
         for (StrategyType type : StrategyType.values()) {
@@ -931,7 +932,7 @@ class StrategyServiceTest {
         // 전체 save가 아니라 정책 컬럼만 조건부 갱신한다(오래된 스냅샷이 status를 덮지 않게)
         verify(strategyPort, never()).save(any());
         verify(strategyCyclePort, never()).updateStartAmount(any(), any());
-        verify(cyclePositionPort, never()).updateCycleStartSnapshot(any(), any());
+        verify(cyclePositionPort, never()).updateBalance(any(), any());
         verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
@@ -958,52 +959,103 @@ class StrategyServiceTest {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(CYCLE);
-        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(latest));
+        when(cyclePositionPort.findLatestOne(CYCLE_ID)).thenReturn(Optional.of(latest));
 
         assertThatThrownBy(() -> strategyService.update(STRATEGY_ID, USER_ID,
                 new UpdateStrategyCommand(null, new BigDecimal("5000"))))
                 .isInstanceOf(IllegalArgumentException.class);
 
         verify(strategyCyclePort, never()).updateStartAmount(any(), any());
-        verify(cyclePositionPort, never()).updateCycleStartSnapshot(any(), any());
+        verify(cyclePositionPort, never()).updateBalance(any(), any());
     }
 
-    @Test
-    @DisplayName("update() 투자금 추가·인출 이력이 있는 사이클은 시드 수정을 거절한다")
-    void update_newSeed_rejectedWhenCapitalEventsExist() {
+    // 시드 수정 공통 스텁 — holdings 0·예수금 1000 최신 포지션
+    private CyclePosition stubSeedUpdate(StrategyCycle cycle) {
         CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
                 new BigDecimal("1000"), new BigDecimal("110"), null, BigDecimal.ZERO, null, null);
-
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(CYCLE);
-        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(latest));
-        when(cycleCapitalEventPort.existsByCycleId(CYCLE.id())).thenReturn(true);
-
-        assertThatThrownBy(() -> strategyService.update(STRATEGY_ID, USER_ID,
-                new UpdateStrategyCommand(null, new BigDecimal("5000"))))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("투자금 추가·인출 이력이 있는 사이클은 예수금을 수정할 수 없습니다. 투자금 추가·인출을 이용해야 합니다.");
-
-        verify(strategyCyclePort, never()).updateStartAmount(any(), any());
+        lenient().when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(cycle);
+        lenient().when(cyclePositionPort.findLatestOne(CYCLE_ID)).thenReturn(Optional.of(latest));
+        return latest;
     }
 
     @Test
-    @DisplayName("update() holdings가 0이면 strategy_cycle과 cycle_position 시작점을 함께 갱신한다")
-    void update_seed_change_with_no_holdings() {
-        CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
-                new BigDecimal("1000"), new BigDecimal("110"), null, BigDecimal.valueOf(0), null, null);
-
-        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(CYCLE);
-        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(latest));
+    @DisplayName("update() 시드 수정은 openAmount를 건드리지 않고 최신 행 예수금을 바꾸며 차액을 RESET 이력으로 남긴다")
+    void update_seed_change_recordsResetEvent() {
+        CyclePosition latest = stubSeedUpdate(CYCLE);
 
         strategyService.update(STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, new BigDecimal("3000")));
 
+        verify(strategyCyclePort).lockForUpdate(CYCLE_ID);
         verify(strategyCyclePort).updateStartAmount(CYCLE_ID, new BigDecimal("3000"));
-        verify(cyclePositionPort).updateCycleStartSnapshot(STRATEGY_ID, new BigDecimal("3000"));
+        verify(cyclePositionPort).updateBalance(latest.id(), latest.toBalance().withUsdDeposit(new BigDecimal("3000")));
+        ArgumentCaptor<CycleCapitalEvent> event = ArgumentCaptor.forClass(CycleCapitalEvent.class);
+        verify(cycleCapitalEventPort).save(event.capture());
+        assertThat(event.getValue().kind()).isEqualTo(CycleCapitalEvent.Kind.RESET);
+        assertThat(event.getValue().cyclePositionId()).isEqualTo(latest.id());
+        assertThat(event.getValue().strategyCycleId()).isEqualTo(CYCLE_ID);
+        assertThat(event.getValue().depositDelta()).isEqualByComparingTo("2000");
+        assertThat(event.getValue().holdingsDelta()).isEqualByComparingTo("0");
+        assertThat(event.getValue().principalDelta()).isEqualByComparingTo("2000");
         verify(eventPublisher).publishEvent(new StrategyCapitalChangedEvent(USER_ID));
+    }
+
+    @Test
+    @DisplayName("update() 투자금 추가·인출 이력이 있어도 시드 수정이 허용된다(RESET 이력으로 원금 유지)")
+    void update_seed_allowedWithPriorCapitalHistory() {
+        stubSeedUpdate(CYCLE);
+
+        strategyService.update(STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, new BigDecimal("500")));
+
+        verify(strategyCyclePort).updateStartAmount(CYCLE_ID, new BigDecimal("500"));
+        ArgumentCaptor<CycleCapitalEvent> event = ArgumentCaptor.forClass(CycleCapitalEvent.class);
+        verify(cycleCapitalEventPort).save(event.capture());
+        assertThat(event.getValue().principalDelta()).isEqualByComparingTo("-500");
+    }
+
+    @Test
+    @DisplayName("update() 종료된 사이클의 시드 수정은 거절하고 아무것도 쓰지 않는다")
+    void update_seed_endedCycle_rejected() {
+        StrategyCycle ended = new StrategyCycle(CYCLE_ID, STRATEGY_ID, STRATEGY_VERSION_ID, new BigDecimal("1000"),
+                new BigDecimal("1100"), LocalDate.now(FIXED), LocalDate.now(FIXED), null, null);
+        stubSeedUpdate(ended);
+
+        assertThatThrownBy(() -> strategyService.update(STRATEGY_ID, USER_ID,
+                new UpdateStrategyCommand(null, new BigDecimal("3000"))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("종료된 사이클은 예수금을 수정할 수 없습니다. 재개한 뒤 수정해야 합니다.");
+
+        verify(strategyCyclePort, never()).updateStartAmount(any(), any());
+        verify(cyclePositionPort, never()).updateBalance(any(), any());
+        verify(cycleCapitalEventPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update() 마감 리포트 창에는 시드 수정을 거절한다")
+    void update_seed_reportWindow_rejected() {
+        stubSeedUpdate(CYCLE);
+        LocalDate today = LocalDate.now(FIXED);
+        when(orderPort.findByStrategyId(STRATEGY_ID, today, today)).thenReturn(List.of(todayOrder("ODNO1", "LOC_BUY")));
+        when(batchRunPort.isReported(today, STRATEGY_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> strategyService.update(STRATEGY_ID, USER_ID,
+                new UpdateStrategyCommand(null, new BigDecimal("3000"))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("오늘 마감 리포트가 끝나기 전에는 예수금을 수정할 수 없습니다.");
+
+        verify(strategyCyclePort, never()).updateStartAmount(any(), any());
+        verify(cycleCapitalEventPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update() 시드가 현재 예수금과 같으면 이력을 남기지 않는다")
+    void update_seed_same_noEvent() {
+        stubSeedUpdate(CYCLE);
+
+        strategyService.update(STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, new BigDecimal("1000")));
+
+        verify(cycleCapitalEventPort, never()).save(any());
     }
 
     @Test
@@ -1041,7 +1093,7 @@ class StrategyServiceTest {
 
         verify(strategyPort, never()).save(any());
         verify(strategyCyclePort, never()).updateStartAmount(any(), any());
-        verify(cyclePositionPort, never()).updateCycleStartSnapshot(any(), any());
+        verify(cyclePositionPort, never()).updateBalance(any(), any());
     }
 
     @Test
@@ -2303,7 +2355,8 @@ class StrategyServiceTest {
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
         // startAmount = 현금 1500 + 시장가 50.00×10 = 2000.00 (최소 시드 50×20×2 = 2000 충족)
-        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("2000.00")) == 0));
+        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("2000.00")) == 0
+                && c.openAmount().compareTo(new BigDecimal("2000.00")) == 0)); // 비PRIVACY는 개장 평가 == 시작 금액
         verify(cyclePositionPort).save(argThat(p ->
                 p.holdings().compareTo(BigDecimal.valueOf(10)) == 0
                         && p.avgPrice().compareTo(new BigDecimal("45.50")) == 0
@@ -2347,6 +2400,8 @@ class StrategyServiceTest {
                         && p.closingPrice().compareTo(new BigDecimal("100.00")) == 0));
         // 시작금액은 시장가 평가(200 + 20×100 = 2,200)가 아니라 FIDA 기준 배수 환산값
         verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("2100.07")) == 0));
+        // 개장 평가(통계 원금)는 배수 환산이 아니라 시장가 평가 = 200 + 20×100
+        verify(strategyCyclePort).save(argThat(c -> c.openAmount().compareTo(new BigDecimal("2200.00")) == 0));
         verify(cyclePositionInfiniteDetailPort, never()).save(any());
         assertThat(result.currentHoldings()).isEqualTo(20);
         assertThat(result.divisionCount()).isNull(); // 조회 경로와 동일 — PRIVACY는 분할 수를 싣지 않는다
@@ -2398,7 +2453,8 @@ class StrategyServiceTest {
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
         // startAmount = USD pool 1000 + 시장가 120 × 보유수량 5 = 1600.00, V = 600.00
-        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("1600.00")) == 0));
+        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("1600.00")) == 0
+                && c.openAmount().compareTo(new BigDecimal("1600.00")) == 0));
         verify(strategyCycleVrPort).save(argThat(cv -> cv.value().compareTo(new BigDecimal("600.00")) == 0));
         assertThat(result.initialUsdDeposit()).isEqualByComparingTo("1000.00");
         assertThat(result.vr().value()).isEqualByComparingTo("600.00");
@@ -2559,7 +2615,7 @@ class StrategyServiceTest {
         when(strategyInfiniteDetailPort.findActiveByStrategyId(STRATEGY_ID))
                 .thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 20)));
         lenient().when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(CYCLE);
-        lenient().when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(latest));
+        lenient().when(cyclePositionPort.findLatestOne(CYCLE_ID)).thenReturn(Optional.of(latest));
     }
 
     @Test

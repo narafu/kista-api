@@ -51,7 +51,7 @@ class BenchmarkControllerTest {
                 .andExpect(jsonPath("$.scope").value("PORTFOLIO"))
                 .andExpect(jsonPath("$.benchmark.regionCode").value("1100000000"))
                 .andExpect(jsonPath("$.period.pointCount").value(2))
-                .andExpect(jsonPath("$.points[0].investmentIndexUsd").value(100.0))
+                .andExpect(jsonPath("$.points[0].investmentIndex").value(100.0))
                 .andExpect(jsonPath("$.points[1].benchmarkIndex").value(110.0))
                 .andExpect(jsonPath("$.points[1].investmentPeriodReturn").value(0.1))
                 .andExpect(jsonPath("$.summary.investmentCumulativeReturn").value(0.1))
@@ -76,7 +76,7 @@ class BenchmarkControllerTest {
 
         mockMvc.perform(get("/api/stats/housing-benchmark").with(authentication(auth())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.points[0].investmentIndexUsd").value(100.0))
+                .andExpect(jsonPath("$.points[0].investmentIndex").value(100.0))
                 .andExpect(jsonPath("$.currentExchangeRate").value(org.hamcrest.Matchers.nullValue()));
     }
 

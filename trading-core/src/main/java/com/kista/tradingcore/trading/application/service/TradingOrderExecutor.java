@@ -167,8 +167,8 @@ class TradingOrderExecutor {
             for (OrderDirection direction : OrderDirection.values()) {
                 int failed = (int) result.insufficient().stream().filter(o -> o.direction() == direction).count();
                 if (failed == 0) continue;
-                eventPublisher.publishEvent(new InsufficientBalanceEvent(account.userId(), account.id(), account.nickname(),
-                        0, null, strategy.ticker(), strategy.type(), failed,
+                eventPublisher.publishEvent(InsufficientBalanceEvent.brokerRejected(account.userId(), account.id(), account.nickname(),
+                        strategy.ticker(), strategy.type(), failed,
                         result.placed().stream().anyMatch(o -> o.direction() == direction), direction));
             }
         } catch (Exception e) {

@@ -28,11 +28,6 @@ class CycleCapitalEventPersistenceAdapter implements CycleCapitalEventPort {
                 .map(this::toDomain).toList();
     }
 
-    @Override
-    public boolean existsByCycleId(UUID cycleId) {
-        return jpaRepository.existsByStrategyCycleId(cycleId);
-    }
-
     private CycleCapitalEventEntity toEntity(CycleCapitalEvent e) {
         CycleCapitalEventEntity entity = new CycleCapitalEventEntity();
         entity.setId(e.id());

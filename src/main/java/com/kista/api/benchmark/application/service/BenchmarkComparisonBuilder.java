@@ -54,7 +54,7 @@ final class BenchmarkComparisonBuilder {
         }
 
         LocalDate firstDate = commonDates.getFirst();
-        BigDecimal firstInvestmentIndex = investmentByDate.get(firstDate).investmentIndexUsd();
+        BigDecimal firstInvestmentIndex = investmentByDate.get(firstDate).investmentIndex();
         BigDecimal firstBenchmarkPrice = benchmarkPrices.get(firstDate);
         if (firstInvestmentIndex == null || firstInvestmentIndex.signum() <= 0) {
             return empty(scope, strategy, benchmark, "INSUFFICIENT_COMMON_MONTHS");
@@ -66,7 +66,7 @@ final class BenchmarkComparisonBuilder {
         BigDecimal previousBenchmarkIndex = null;
         for (LocalDate date : commonDates) {
             BigDecimal investmentIndex = normalize(
-                    investmentByDate.get(date).investmentIndexUsd(), firstInvestmentIndex);
+                    investmentByDate.get(date).investmentIndex(), firstInvestmentIndex);
             BigDecimal benchmarkIndex = normalize(benchmarkPrices.get(date), firstBenchmarkPrice);
             // commonDates 자체가 실제 관측 포인트 교집합이라 인접 검사 없이 직전 포인트 대비로 계산한다
             boolean computeReturn = previousDate != null;
@@ -81,7 +81,7 @@ final class BenchmarkComparisonBuilder {
             previousBenchmarkIndex = benchmarkIndex;
         }
 
-        BigDecimal lastInvestmentIndex = points.getLast().investmentIndexUsd();
+        BigDecimal lastInvestmentIndex = points.getLast().investmentIndex();
         BigDecimal lastBenchmarkIndex = points.getLast().benchmarkIndex();
         BigDecimal investmentCumulativeReturn = cumulativeReturn(lastInvestmentIndex);
         BigDecimal benchmarkCumulativeReturn = cumulativeReturn(lastBenchmarkIndex);
@@ -95,7 +95,7 @@ final class BenchmarkComparisonBuilder {
                 investmentCumulativeReturn.subtract(benchmarkCumulativeReturn).setScale(SCALE, HALF_UP),
                 suppressAnnualized ? null : annualizedReturn(lastInvestmentIndex, periodsPerYear),
                 suppressAnnualized ? null : annualizedReturn(lastBenchmarkIndex, periodsPerYear),
-                maxDrawdown(points.stream().map(BenchmarkPoint::investmentIndexUsd).toList()),
+                maxDrawdown(points.stream().map(BenchmarkPoint::investmentIndex).toList()),
                 maxDrawdown(points.stream().map(BenchmarkPoint::benchmarkIndex).toList()));
 
         return new BenchmarkComparison(

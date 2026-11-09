@@ -7,7 +7,7 @@ import java.time.LocalDate;
 // InvestmentPointsHttpAdapter가 이 타입으로 명시 매핑한다
 public record InvestmentPoint(
         LocalDate baseDate,
-        BigDecimal investmentIndexUsd,
+        BigDecimal investmentIndex,
         BigDecimal periodReturn
 ) {
 }

@@ -52,7 +52,12 @@ public record Order(
 
     // 증권사에 접수된 전략 주문 — 접수번호 보유 + 수동 보정 행(UNKNOWN_LEG) 제외
     public boolean isBrokerSubmitted() {
-        return externalOrderId != null && !UNKNOWN_LEG.equals(orderLeg);
+        return externalOrderId != null && isStrategyOrder();
+    }
+
+    // 전략이 만든 주문 — 수동 보정 행(UNKNOWN_LEG) 제외
+    public boolean isStrategyOrder() {
+        return !UNKNOWN_LEG.equals(orderLeg);
     }
 
     // 커널 계획 주문(PlannedOrder) → 특정 계좌·사이클 PLANNED Order 승격 — 유일한 승격 지점(TradingOrderPlanner.savePlannedOrders)

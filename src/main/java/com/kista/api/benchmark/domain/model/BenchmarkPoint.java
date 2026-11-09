@@ -5,7 +5,7 @@ import java.time.LocalDate;
 
 public record BenchmarkPoint(
         LocalDate baseDate,
-        BigDecimal investmentIndexUsd,
+        BigDecimal investmentIndex,
         BigDecimal benchmarkIndex,
         BigDecimal investmentPeriodReturn,
         BigDecimal benchmarkPeriodReturn

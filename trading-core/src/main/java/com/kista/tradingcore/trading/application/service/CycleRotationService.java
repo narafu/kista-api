@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
 
-import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.trading.application.event.CycleCompletedEvent;
 import com.kista.tradingcore.trading.application.event.CycleRotationFailedEvent;
 import com.kista.tradingcore.trading.application.event.NewCycleStartedEvent;
@@ -75,8 +74,7 @@ class CycleRotationService {
                 strategyPort.pause(strategy.id());
                 pausedByPolicy = true;
                 log.warn("[strategyId={}] 원장 1주 미만({} < {}) — 새 사이클 없이 PAUSED", strategy.id(), targetSeed, price);
-                eventPublisher.publishEvent(new InsufficientBalanceEvent(null, account.id(), account.nickname(),
-                        0, targetSeed, strategy.ticker(), null, 0, false, OrderDirection.BUY));
+                eventPublisher.publishEvent(InsufficientBalanceEvent.adminSeedShortage(account.id(), account.nickname(), targetSeed, strategy.ticker()));
                 eventPublisher.publishEvent(new StrategyAutoPausedEvent(userProfile.userId(), account.id(), account.nickname(),
                         strategy.type(), strategy.ticker(), targetSeed, price));
                 return;
@@ -123,8 +121,7 @@ class CycleRotationService {
 
         if (minRequired != null && targetSeed.compareTo(minRequired) < 0) {
             log.warn("[strategyId={}] 최소금액 미달 — 축소된 시드로 재등록 진행: {} < {}", strategy.id(), targetSeed, minRequired);
-            eventPublisher.publishEvent(new InsufficientBalanceEvent(null, account.id(), account.nickname(),
-                    0, targetSeed, strategy.ticker(), null, 0, false, OrderDirection.BUY));
+            eventPublisher.publishEvent(InsufficientBalanceEvent.adminSeedShortage(account.id(), account.nickname(), targetSeed, strategy.ticker()));
         }
         eventPublisher.publishEvent(new NewCycleStartedEvent(userProfile.userId(), account.id(), account.nickname(),
                 strategy.type(), strategy.ticker(), targetSeed)); // 사용자 알림 이벤트

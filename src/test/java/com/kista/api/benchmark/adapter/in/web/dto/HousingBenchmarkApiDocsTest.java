@@ -73,7 +73,7 @@ class HousingBenchmarkApiDocsTest {
                 .containsExactlyInAnyOrder("date", "totalAsset", "principal");
         assertThat(propertyNames(schemas.path("HousingBenchmarkPoint")))
                 .containsExactlyInAnyOrder(
-                        "baseDate", "investmentIndexUsd", "benchmarkIndex",
+                        "baseDate", "investmentIndex", "benchmarkIndex",
                         "investmentPeriodReturn", "benchmarkPeriodReturn");
     }
 

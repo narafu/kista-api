@@ -48,7 +48,7 @@ class CycleCapitalEventPersistenceAdapterTest extends DataJpaTestBase {
                 "INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, ?, now())",
                 versionId, strategyId, 1);
         jdbcTemplate.update(
-                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, start_date, created_at) VALUES (?, ?, ?, ?, ?, now())",
+                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, start_date, created_at) VALUES (?, ?, ?, ?, 0, ?, now())",
                 cycleId, strategyId, versionId, new BigDecimal("1000.00"), LocalDate.now());
         jdbcTemplate.update(
                 "INSERT INTO cycle_position (id, strategy_cycle_id, usd_deposit, holdings, created_at) VALUES (?, ?, ?, ?, now())",
@@ -87,12 +87,5 @@ class CycleCapitalEventPersistenceAdapterTest extends DataJpaTestBase {
     @Test
     void findByCycleIds_emptyInput_returnsEmpty() {
         assertThat(adapter.findByCycleIds(Set.of())).isEmpty();
-    }
-
-    @Test
-    void existsByCycleId_falseBeforeSave_trueAfter() {
-        assertThat(adapter.existsByCycleId(cycleId)).isFalse();
-        adapter.save(event(Kind.INJECT, "10.00", "0", "10.00", Instant.now()));
-        assertThat(adapter.existsByCycleId(cycleId)).isTrue();
     }
 }

@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -15,11 +16,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class TradingParallelRunnerTest {
 
+    // 그룹 키(계좌 id) — 서로 다른 계좌 3개
+    private static final List<UUID> ACCOUNTS = List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+
     @Test
     void runAll_결과는_제출_순서를_유지하고_empty는_제외한다() throws InterruptedException {
         TradingParallelRunner runner = new TradingParallelRunner(2);
         List<TradingParallelRunner.Task<Integer>> tasks = IntStream.range(0, 20)
-                .mapToObj(i -> new TradingParallelRunner.Task<Integer>("acc-" + (i % 3),
+                .mapToObj(i -> new TradingParallelRunner.Task<Integer>(ACCOUNTS.get(i % 3),
                         () -> i % 5 == 0 ? Optional.empty() : Optional.of(i)))
                 .toList();
         List<Integer> results = runner.runAll(tasks);
@@ -32,7 +36,7 @@ class TradingParallelRunnerTest {
         AtomicInteger current = new AtomicInteger();
         AtomicInteger observedMax = new AtomicInteger();
         List<TradingParallelRunner.Task<Integer>> tasks = IntStream.range(0, 10)
-                .mapToObj(i -> new TradingParallelRunner.Task<Integer>("same-account", () -> {
+                .mapToObj(i -> new TradingParallelRunner.Task<Integer>(ACCOUNTS.get(0), () -> {
                     int now = current.incrementAndGet();
                     observedMax.accumulateAndGet(now, Math::max);
                     Thread.sleep(30);
@@ -50,11 +54,11 @@ class TradingParallelRunnerTest {
         CountDownLatch aStarted = new CountDownLatch(1);
         CountDownLatch bStarted = new CountDownLatch(1);
         List<TradingParallelRunner.Task<String>> tasks = List.of(
-                new TradingParallelRunner.Task<>("acc-A", () -> {
+                new TradingParallelRunner.Task<>(ACCOUNTS.get(0), () -> {
                     aStarted.countDown();
                     return bStarted.await(2, TimeUnit.SECONDS) ? Optional.of("A") : Optional.empty();
                 }),
-                new TradingParallelRunner.Task<>("acc-B", () -> {
+                new TradingParallelRunner.Task<>(ACCOUNTS.get(1), () -> {
                     bStarted.countDown();
                     return aStarted.await(2, TimeUnit.SECONDS) ? Optional.of("B") : Optional.empty();
                 }));
@@ -67,7 +71,7 @@ class TradingParallelRunnerTest {
         Thread caller = Thread.currentThread();
         List<Thread> executedOn = new CopyOnWriteArrayList<>();
         List<TradingParallelRunner.Task<Integer>> tasks = IntStream.range(0, 3)
-                .mapToObj(i -> new TradingParallelRunner.Task<Integer>("acc", () -> {
+                .mapToObj(i -> new TradingParallelRunner.Task<Integer>(ACCOUNTS.get(0), () -> {
                     executedOn.add(Thread.currentThread());
                     return Optional.of(i);
                 }))
@@ -80,7 +84,7 @@ class TradingParallelRunnerTest {
     void runAll_격리되지_않은_예외는_IllegalStateException으로_승격한다() {
         TradingParallelRunner runner = new TradingParallelRunner(2);
         List<TradingParallelRunner.Task<Integer>> tasks = List.of(
-                new TradingParallelRunner.Task<>("acc", () -> {
+                new TradingParallelRunner.Task<>(ACCOUNTS.get(0), () -> {
                     throw new RuntimeException("runSafely 밖으로 샌 예외");
                 }));
         assertThrows(IllegalStateException.class, () -> runner.runAll(tasks));

@@ -13,5 +13,4 @@ public interface CycleCapitalEventPort {
     // occurredAt 오름차순, 빈 입력이면 DB 조회 없이 빈 목록
     List<CycleCapitalEvent> findByCycleIds(Collection<UUID> cycleIds);
 
-    boolean existsByCycleId(UUID cycleId);
 }
