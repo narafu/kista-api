@@ -20,7 +20,7 @@
 ## 목표 / 비목표 / 반목표
 
 - 목표: summary, equity-curve, PORTFOLIO 투자지수(벤치마크), 계좌 거래 이력, `/status`, 일별 거래내역이 코인 계좌를 포함하고 통화를 정확히 표기한다.
-- 비목표: 환율 환산, 통화 합산 총액, `usdDeposit` 도메인 필드 개명(아래 참고), `/history`의 SOXL 하드코딩, KRW 묶음 금액이 scale 2로 나오는 문제(`totalAssetWithAvgPriceFallback`. UI `fmtMoney`가 KRW를 정수로 표시하므로 이번에는 그대로 둔다).
+- 비목표: 환율 환산, 통화 합산 총액, `/history`의 SOXL 하드코딩, KRW 묶음 금액이 scale 2로 나오는 문제(`totalAssetWithAvgPriceFallback`. UI `fmtMoney`가 KRW를 정수로 표시하므로 이번에는 그대로 둔다).
 - 반목표: 서로 다른 통화의 금액이 한 숫자로 합쳐지는 것. 코인만을 위한 분기를 서비스에 추가하는 것.
 
 ## API 설계
@@ -79,10 +79,7 @@
     - `TelegramBotService.buildStatusMessage`는 전략마다 블록 하나를 출력한다(유형·종목 헤더, 보유·평가액·예수금·총자산). 빈 목록이면 기존 "데이터 없음" 문구를 쓴다.
     - `$` 리터럴과 `double` 계산 대신 BigDecimal + `Currency.format`을 쓴다. 수량은 `Quantities.normalize` 표기를 쓴다(코인 소수 수량).
     - 통화가 다른 전략의 총자산은 합산하지 않는다.
-- **`usdDeposit`은 개명하지 않는다.** 내 판단이다.
-  - `CyclePosition` 도메인 필드부터 trading-core main 48개 파일과 kista-ui 15개 파일에 걸친 이름이다.
-  - 부분만 개명하면 오히려 비일관이 생긴다. 의미는 "계좌 통화 예수금"으로 문서에 적는다.
-  - 전면 개명은 별도 리팩토링 작업이다.
+- **`usdDeposit`은 `deposit`으로 전면 개명한다**(아래 "6. 예수금 필드 전면 개명", 사용자 확정).
 
 ### 4. 일별 거래내역 (trading-core `AccountStatisticsService.toDailyTransactionResult`)
 
@@ -114,6 +111,35 @@
 - 시드 코인 전략은 **PAUSED**로 넣는다. 복사한 가짜 자격증명으로 로컬 스케줄러가 실제 Binance·Upbit를 호출하지 않게 하려는 것이다.
 - 계좌 화면의 `crypto-portfolio`(실 거래소 잔고 조회)는 로컬 시드 계좌에서 실패할 수 있다. 이건 감수하고 `local-dev.md`에 적는다.
 - 재실행해도 안전해야 한다. 기존 블록의 멱등 패턴을 따른다.
+
+### 6. 예수금 필드 전면 개명 (`usdDeposit` → `deposit`)
+
+kista-ui 세션에서 사용자가 결정했고, 이 세션에서 다시 확인받았다. 코인 원장의 예수금은 USDT·KRW이므로 `usd` 접두사가 틀린 이름이 된다.
+
+- **이름 규칙**
+  - `usdDeposit`은 `deposit`, `UsdDeposit`이 들어간 식별자는 `Deposit`으로 바꾼다. 예: `initialUsdDeposit` → `initialDeposit`.
+  - 이미 있는 `DepositAmounts`·`AccountLedgerTotals.deposit` 표기와 맞춘다.
+- **범위**
+  - 코드: api main 약 74개 파일(trading-core 대부분 + shared contract + root admin), 테스트를 포함하면 약 113개 파일
+  - 응답·내부 계약 DTO 필드: cycle-history, next-orders, 포트폴리오, `PortfolioCurrentResponse` 등
+  - 데이터: `dev-seed.sql`, `flows.yml`의 `usd_deposit` 표기, 현행 agent 문서
+  - archive 문서와 적용된 마이그레이션(V1·V17)은 고치지 않는다.
+- **제외**
+  - 벤더 응답 JSON 필드명(`@JsonProperty`로 매핑하는 KIS·Toss 원문 키)
+  - 진짜 USD 의미인 브로커 값(`getUsdBuyableAmount` 등 `usdBuyable*`)
+  - 판단 기준: 식별자가 원장·전략 예수금을 뜻하면 개명하고, 벤더가 준 USD 원값을 뜻하면 유지한다.
+- **DB**
+  - trading-core 새 마이그레이션(`migration-trading` 최신 다음 번호)으로 `ALTER TABLE trading.cycle_position RENAME COLUMN usd_deposit TO deposit`을 실행한다.
+  - trading 스키마는 expand/contract 대상이 아니고 kista-trading이 stop-first 단일 인스턴스라 한 번에 바꿔도 된다.
+  - 엔티티 `@Column`과 네이티브 쿼리의 컬럼명을 함께 바꾼다.
+- **EPR 위험**
+  - `InsufficientBalanceEvent` 등 `event_publication`에 직렬화되는 이벤트 record의 필드명도 바뀐다.
+  - 배포 직전에 미완료 publication(`completion_date IS NULL`)이 0건인지 읽기 전용 SELECT로 확인하고, 남아 있으면 처리될 때까지 배포를 미룬다. 계획의 배포 체크리스트에 넣는다.
+  - Redis 스트림 payload에 해당 필드가 있는지도 grep으로 확인한다.
+- **커밋**
+  - 동작 변경 없는 리팩토링 커밋으로 따로 만들고 기능 커밋과 섞지 않는다.
+  - 계획의 첫 코드 태스크(시드 다음)로 둔다. 시드 SQL은 새 컬럼명으로 작성한다.
+- **UI 영향**: 응답 필드명이 바뀌므로 UI와 함께 배포해야 한다(깨지는 변경).
 
 ## 테스트 (구현 시 기준)
 
@@ -154,15 +180,17 @@
 - 벤치마크 PORTFOLIO
   - 같은 통화 탭을 두고 `currency` 파라미터를 전달한다.
   - `quality.investmentCurrency`는 이미 반영돼 있다.
-- 계좌 거래 이력 `CycleHistoryTable`: `$`·`fmtUsd`를 계좌 통화 포맷으로 바꾼다. `usdDeposit` 필드명은 그대로 쓴다.
+- 계좌 거래 이력 `CycleHistoryTable` 등: `$`·`fmtUsd`를 계좌 통화 포맷으로 바꾼다.
+- `usdDeposit` → `deposit` 개명: 엔드포인트별로 바뀐 응답 필드 목록, API 커밋 해시, 통화를 어디서 가져오는지(계좌 `currency`/`brokerCurrency`)를 메모에 싣는다. UI는 `fetch:spec`/`gen:types` 후 entities/trade·entities/order·widgets/account-detail·widgets/cycle-history를 고친다.
 - 일별 거래내역
   - `tradeAmountUsd`를 `tradeAmount`로, `quantity`를 number(소수)로 바꾸고 `summary` 필드를 삭제한다.
   - `useDailyTradesRangeQuery`는 날짜와 통화별로 집계한다. 서로 다른 통화를 한 금액으로 합치면 안 된다.
   - `WeeklyMarketCalendar` 배지에 통화별 금액을 표시한다.
-- 깨지는 변경은 일별 거래내역(`tradeAmountUsd`·`quantity`·`summary`) 하나뿐이다. 나머지는 하위 호환이다.
+- 깨지는 변경은 일별 거래내역(`tradeAmountUsd`·`quantity`·`summary`)과 `usdDeposit` 개명이다. 나머지는 하위 호환이다.
+- 인계 대상은 ui-stat 세션이다.
 
 ## 빌더에게 맡기는 것
 
 - `loadCycles`에 통화 인자를 넘기는 방식, `availableCurrencies`를 계산하는 위치(추가 조회 없이 계좌·사이클 로드를 재사용)
 - 시드 SQL의 구체 값(가격 경로, 날짜 범위)
-- 커밋 분할 단위(경로별: 시드 / summary·곡선 / 투자지수·벤치마크 / NON_USD / 일별 거래내역 / 문서)
+- 커밋 분할 단위(경로별: 시드 / 예수금 개명 / summary·곡선 / 투자지수·벤치마크 / NON_USD·`/status` / 일별 거래내역 / 문서)
