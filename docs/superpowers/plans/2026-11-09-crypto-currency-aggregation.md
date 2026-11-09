@@ -45,7 +45,7 @@
   - 응답 JSON 키 `usdDeposit`은 `deposit`으로 바뀐다(cycle-history, next-orders, portfolio-summary 등).
 
 - [ ] **Step 1: 마이그레이션 작성.** `ALTER TABLE trading.cycle_position RENAME COLUMN usd_deposit TO deposit;` 한 줄과 사유 주석을 넣는다. V1·V17은 고치지 않는다.
-- [ ] **Step 2: 식별자를 일괄 개명한다.** 규칙: `usdDeposit`은 `deposit`, `UsdDeposit`은 `Deposit`이다(예: `initialUsdDeposit` → `initialDeposit`, `marketValueUsd`는 범위 밖이라 그대로 둔다). 다음은 바꾸지 않는다.
+- [ ] **Step 2: 식별자를 일괄 개명한다.** 규칙: `usdDeposit`은 `deposit`, `UsdDeposit`은 `Deposit`이다(예: `initialUsdDeposit` → `initialDeposit`). 같은 이유로 `CyclePositionHistoryEntry.marketValueUsd()`·`totalAssetUsd()`도 `marketValue()`·`totalAsset()`으로 바꾼다. 이 entry는 이제 코인 통화 값도 담기 때문이다. 다음은 바꾸지 않는다.
   - 벤더 JSON 원문 키(`@JsonProperty("...")` 문자열)
   - `usdBuyable*`·`getUsdBuyableAmount`
   - 개명 결과가 기존 이름과 충돌하는 지역 변수(같은 스코프에 `deposit`이 이미 있으면 의미가 드러나는 이름으로 바꾼다)
@@ -72,10 +72,13 @@
   - BINANCE ETH, UPBIT BTC DCA 전략을 각각 만든다. `status='PAUSED'`, `type='DCA'`다.
   - `strategy_version`과 `strategy_dca_rule` 1건을 함께 넣는다: BUY, `frequency`는 `DcaFrequency`의 일 단위 값, `order_type`은 DCA 규칙이 허용하는 값, `sizing_type='AMOUNT'`, `shortfall_policy`는 해당 enum의 기본값. 컬럼 값은 `DcaRule` 도메인 enum에서 확인한다.
   - DCA는 position 서브타입 테이블이 없다.
-- [ ] **Step 3: 사이클과 스냅샷.**
-  - 120일 전 시작한 진행 중 사이클을 만든다. 금액은 BINANCE `open_amount=1000`(USDT), UPBIT `1500000`(KRW)이다.
-  - 매일(코인은 주말 포함) 04:30 KST 스냅샷을 넣는다. 매일 보유 수량이 늘고 `deposit`은 0인 DCA 원장이다(`avg_price`, `closing_price`는 사인파 변동).
-  - 60일 전 INJECT `cycle_capital_event` 1건을 넣는다. 컬럼은 V15 DDL을 따른다.
+- [ ] **Step 3: 사이클과 스냅샷.** DCA는 원장 예수금 기반이다(2026-11-06 배포). 회차마다 `deposit`이 매수액만큼 줄고 `holdings`가 늘어난다. 이 모델을 정확히 따라야 로컬 summary·곡선이 의미 있는 값을 낸다. 먼저 `CryptoLedgerRecorder`·`CryptoDcaRoundExecutor`를 읽고 스냅샷 갱신 규칙을 확인한다.
+  - 120일 전 시작한 진행 중 사이클을 만든다. `start_amount`·`open_amount`는 BINANCE `1000`(USDT), UPBIT `1500000`(KRW)이다.
+  - 개장 스냅샷은 `deposit = open_amount`, `holdings = 0`, `avg_price = NULL`이다.
+  - 그 뒤 매일(주말 포함) 04:30 KST 스냅샷을 넣는다. 일 매수액은 BINANCE 5, UPBIT 7500이다. `deposit`은 일 매수액만큼 줄고, `holdings`는 `일 매수액 / closing_price`만큼 늘며, `avg_price`는 누적 매입원가 ÷ holdings다. `closing_price`는 완만한 사인파(ETH 약 3000, BTC 약 95,000,000 기준)로 변한다.
+  - SQL은 `generate_series`와 window 합계(`sum() over (order by d)`)로 누적값을 만든다.
+  - 60일 전 INJECT `cycle_capital_event` 1건을 넣는다(BINANCE 500, UPBIT 750000). 컬럼은 V15 DDL을 따른다. 그날 이후 스냅샷의 `deposit`에 같은 금액을 더한다. `start_amount`의 의미는 `CapitalLedgerService` INJECT 경로를 따른다(start_amount += 금액이면 그대로 맞춘다). `open_amount`는 바꾸지 않는다.
+  - 전제: 로컬 DB에 V18이 적용돼 있어야 한다. 그러려면 Task 1 이후 trading-core를 local로 한 번 기동해야 한다.
 - [ ] **Step 4: 체결 주문.** 소수 수량(`filled_quantity` 예: 0.0123) terminal BUY 주문을 최근 7일에 각 계좌 3건씩 넣는다. 기존 `orders` 블록(:142)의 컬럼 패턴을 따른다.
 - [ ] **Step 5: 재실행을 확인한다.**
   - Run: `docker exec -i <postgres> psql -U kista -d kistadb < scripts/dev-seed/dev-seed.sql`을 두 번 실행한다.
@@ -185,7 +188,9 @@
 - Modify (trading-core):
   - `trading/adapter/out/persistence/CyclePositionPersistenceAdapter.java`, `CyclePositionJpaRepository.java`, `trading/application/port/output/CyclePositionPort.java`
   - `trading/adapter/out/persistence/OrderPersistenceAdapter.java:144`, `OrderJpaRepository`(findByUser 쿼리), `trading/application/port/output/OrderPort.java:48`
-  - `stats/application/usecase/PortfolioUseCase.java`, `stats/application/service/PortfolioService.java`
+  - `stats/application/usecase/PortfolioUseCase.java`, `stats/application/service/PortfolioService.java`(+ `AccountPort` 주입)
+  - Create: `stats/domain/model/PortfolioPosition.java`, `stats/domain/model/PortfolioOrder.java`
+  - `trading/domain/model/CyclePositionHistoryEntry.java`(`accountId` 추가)
   - `stats/adapter/in/web/PortfolioQueryInternalController.java`, `StatsContractMapper.java`
 - Modify (shared): `contract/stats/PortfolioCurrentResponse.java`, `PortfolioOrderResponse.java`
 - Modify (root):
@@ -199,17 +204,19 @@
 **Interfaces:**
 - Produces:
   - `CyclePositionPort.findLatestPerStrategyByUser(UUID userId): List<CyclePositionHistoryEntry>`(전략별 최신 1건, `findRecentByUser` 대체·삭제)
-  - `CyclePositionHistoryEntry`에 `Currency currency`를 추가한다(계좌 `broker` 컬럼에서 매핑).
+  - `CyclePositionHistoryEntry`에 `UUID accountId`를 추가한다(`strategy.accountId()`, 전략이 없으면 null). 어댑터는 지금처럼 `toEntries`·`toEntry`가 `strategyPort`로 찾은 Strategy에서 채운다. 엔티티 네이티브 쿼리에는 계좌 컬럼을 넣지 않는다. 계좌 커서·전략 커서 조회도 같은 `toEntry`를 쓰므로 자동으로 채워진다.
+  - 통화 해석은 stats가 한다. stats `domain/model`에 두 record를 둔다: `PortfolioPosition(CyclePositionHistoryEntry position, Currency currency)`, `PortfolioOrder(Order order, Currency currency)`.
   - `OrderPort.findByUser(UUID userId, LocalDate from, LocalDate to)`(ticker 인자 제거)
-  - `PortfolioUseCase.getCurrent(UUID userId): List<CyclePositionHistoryEntry>`
-  - `PortfolioUseCase.getHistory(UUID userId, LocalDate from, LocalDate to): List<PortfolioOrder>`. `Order` + 계좌 통화를 묶는 stats `domain/model` record이며, 기존 타입으로 충분하면 그것을 쓴다.
+  - `PortfolioUseCase.getCurrent(UUID userId): List<PortfolioPosition>`
+  - `PortfolioUseCase.getHistory(UUID userId, LocalDate from, LocalDate to): List<PortfolioOrder>`
+  - `PortfolioService`는 `accountPort.findByUserId(userId)`로 accountId→`broker().getCurrency()` 맵을 만들어 둘 다 채운다. 맵에 없으면 `IllegalStateException("포지션 계좌를 찾을 수 없습니다.")`/`("주문 계좌를 찾을 수 없습니다.")`을 던진다. entry의 accountId가 null(전략 삭제)인 경우도 같다. 단, 쿼리가 삭제 전략을 이미 거르므로 정상 경로에서는 생기지 않는다.
   - 내부 API `/portfolio/current`는 `List<PortfolioCurrentResponse>`를 반환한다(빈 목록 200, 404 경로 삭제). `/portfolio/history`는 `ticker` 파라미터를 삭제한다.
   - `PortfolioCurrentResponse(StrategyType strategyType, StrategyTicker ticker, Currency currency, BigDecimal holdings, BigDecimal avgPrice, BigDecimal deposit, BigDecimal closingPrice)`
   - `PortfolioOrderResponse(..., Currency currency)`(마지막 필드)
   - root `PortfolioQueryPort.getCurrent(UUID): List<PortfolioCurrentResponse>`, `getHistory(UUID, LocalDate, LocalDate)`
 
 - [ ] **Step 1: DB 테스트를 쓴다(`CyclePositionPersistenceAdapterTest`).**
-  - `전략별_최신_포지션을_계좌_통화와_함께_반환한다`: KIS와 BINANCE 전략에 스냅샷을 2건씩 넣는다. 결과는 2건이고 각각 최신 행이며 currency가 USD·USDT여야 한다.
+  - `전략별_최신_포지션을_반환한다`: KIS와 BINANCE 전략에 스냅샷을 2건씩 넣는다. 결과는 2건이고 각각 최신 행이며 `accountId`가 각 전략의 계좌여야 한다.
   - `삭제된_전략과_스냅샷_없는_전략은_제외한다`
   - `계좌_커서_조회는_코인_계좌_포지션을_포함한다`: BINANCE 계좌로 `findByAccountIdWithCursor`를 호출하면 결과가 비어 있지 않아야 한다.
   - `OrderPersistenceAdapterDbTest.findByUser는_전_종목을_반환한다`: SOXL·TQQQ·ETH 주문이 모두 나와야 한다.
@@ -219,13 +226,16 @@
 - [ ] **Step 3: 영속 계층을 구현한다.**
   - `NON_USD_BROKERS` 상수, `excludedBrokers` 파라미터, `AND a.broker NOT IN (:excludedBrokers)` 절을 삭제한다.
   - 새 네이티브 쿼리: `SELECT DISTINCT ON (s.id) cp.*, a.broker ... ORDER BY s.id, cp.created_at DESC, cp.id DESC`. cp·sc·s·a의 `deleted_at IS NULL`을 건다.
-  - `CyclePositionHistoryEntry.currency`는 `Broker.valueOf(broker).getCurrency()`로 매핑한다. 기존 `toEntries` projection에 broker를 추가한다. 계좌 커서 조회도 같은 entry를 쓰므로 currency가 채워진다.
+  - `toEntry`가 `accountId`를 채운다.
   - `findByUser`의 ticker 조건을 삭제한다.
 - [ ] **Step 4: 서비스와 내부 API.**
-  - `PortfolioService.getCurrent`는 목록을 그대로 반환한다(빈 목록 허용, `NoSuchElementException` 삭제).
-  - `getHistory`는 주문의 accountId → 계좌 통화 맵(`accountPort.findByUserId`)으로 currency를 붙인다. 맵에 없으면 `IllegalStateException("주문 계좌를 찾을 수 없습니다.")`을 던진다.
+  - `PortfolioService`를 Interfaces대로 바꾼다(빈 목록 허용, `NoSuchElementException` 삭제).
+  - `PortfolioServiceTest`에 다음을 추가한다.
+    - `getCurrent는_계좌_통화를_붙인다`(KIS → USD, BINANCE → USDT)
+    - `getHistory는_계좌_통화를_붙인다`
+    - `계좌_맵에_없는_주문은_IllegalStateException`
   - mapper·컨트롤러·contract record를 위 Interfaces대로 바꾼다.
-  - `PortfolioServiceTest`, `PortfolioQueryInternalControllerTest`를 갱신한다(빈 목록 200, `ticker` 파라미터 없음).
+  - `PortfolioQueryInternalControllerTest`를 갱신한다(빈 목록 200, `ticker` 파라미터 없음).
 - [ ] **Step 5: root 텔레그램 테스트를 쓴다(`TelegramBotServiceTest`).**
   - `status는_전략별로_통화_표기해_출력한다`: INFINITE SOXL USD(예수금 1000, 보유 10, 종가 20)와 DCA ETH USDT(보유 0.5, 종가 3000, 예수금 0)를 넣는다. 출력에 `1,000.00 USD`·`1,500.00 USDT`가 포함되고 `$`는 없어야 한다. 정확한 문자열은 `Currency.format` 결과를 따른다.
   - `status는_종가가_없으면_평가액_0으로_출력한다`
