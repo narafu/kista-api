@@ -818,7 +818,7 @@ flows:
         desc: >-
           성과 화면(StatsOverview)은 서버에서 요약(GET /api/stats/summary)과 최근 3개월 누적 자산 곡선(GET /api/stats/equity-curve)을 미리 채우고,
           사이클 성과 목록(GET /api/stats/cycles)은 진행 상태(진행중/종료) 필터와 번호 페이지로 불러온다. 요약·곡선은 모의계좌(MOCK)를 뺀 실제 투자 성과이고, 사이클 목록만 모의계좌도 포함한다.
-          전략 유형 필터를 바꾸면 곡선과 목록이 같이 바뀐다. 결과는 사용자별 5분 캐시를 쓴다. DCA 전략도 내부 원장 기준으로 요약·곡선·목록에 포함되며 원금은 모든 전략에서 사이클 개장 시가 평가(open_amount — 매매 계약인 시작 금액과 달리 PRIVACY 중간 시작의 배수 환산이 없다, DCA는 초기 보유 원가)에 추가·인출을 더한 값이며 곡선의 과거 원금·자산은 투자금 이력(cycle_capital_event)으로 날짜별 복원한다. 요약 실현손익은 종료 사이클만 합산하고 원가 기준은 사이클 개장 시가다(보유분이 승계된 VR은 개장 시가 기준 장부가). 미실현은 총손익에서 뺀 값이다. 사용자 합산 경로(요약·곡선·포트폴리오 투자지수)는 통화가 섞이지 않게 코인 KRW 계좌를 제외하고, 사이클 단위 목록은 포함한다.
+          전략 유형 필터를 바꾸면 곡선과 목록이 같이 바뀐다. 결과는 사용자별 5분 캐시를 쓴다. DCA 전략도 내부 원장 기준으로 요약·곡선·목록에 포함되며 원금은 모든 전략에서 사이클 개장 시가 평가(open_amount — 매매 계약인 시작 금액과 달리 PRIVACY 중간 시작의 배수 환산이 없다, DCA는 초기 보유 원가)에 추가·인출을 더한 값이며 곡선의 과거 원금·자산은 투자금 이력(cycle_capital_event)으로 날짜별 복원한다. 요약 실현손익은 종료 사이클과 진행 중 사이클의 매도 확정분(쿼터매도·PRIVACY 매도·DCA SELL)을 합산하고 원가 기준은 사이클 개장 시가다(보유분이 남으면 개장 시가 기준 장부가). 미실현은 총손익에서 뺀 값이다. 곡선은 후속 없이 끝난 전략의 손익을 원금에서 계속 빼 둬 마지막 손익이 요약 총손익과 같다. 사용자 합산 경로(요약·곡선·포트폴리오 투자지수)는 통화가 섞이지 않게 코인 KRW 계좌를 제외하고, 사이클 단위 목록은 포함한다.
         code: [TradingStatsController#getSummary, TradingStatsController#getEquityCurve, TradingStatsController#getCycles, TradingStatsService#getSummary, TradingStatsService#getEquityCurve, TradingStatsService#getCyclePerformances]
         fail: 한 쪽 조회가 실패해도 다른 쪽은 보인다(서버 prefetch를 각각 무시). 곡선이 실패하면 필터 토글만 남는다.
 
