@@ -2,11 +2,13 @@ package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
+import com.kista.tradingcore.trading.domain.model.CycleCapitalEvent;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.trading.domain.model.StrategyCycleVrDetail;
 import com.kista.tradingcore.trading.domain.model.StrategyVersion;
 import com.kista.tradingcore.matching.domain.model.StrategyVrDetail;
+import com.kista.tradingcore.trading.application.port.output.CycleCapitalEventPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCycleVrPort;
@@ -35,6 +37,7 @@ class CycleSnapshotCreator {
     private final StrategyCycleVrPort strategyCycleVrPort; // VR 사이클 상세 저장
     private final StrategyVersionPort strategyVersionPort; // VR 재설정 시 버전 교체
     private final VrStrategyDetailService vrStrategyDetailService;  // VR 재설정 시 새 버전 상세 저장
+    private final CycleCapitalEventPort cycleCapitalEventPort; // VR 시작 전 재설정 원장 차액 이력
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 새 StrategyCycle + 시작 스냅샷을 하나의 트랜잭션으로 저장 — 중간 실패 시 고아 사이클 방지
@@ -105,16 +108,35 @@ class CycleSnapshotCreator {
         StrategyVrDetail newDetail = issueNewVersion(r);
         UUID cycleId = r.currentCycleId();
         strategyCyclePort.updateStrategyVersion(cycleId, newDetail.strategyVersionId());
-        // 개장 금액 계약 — 개장 예수금 + 개장 보유분 시장가, 개장 평가도 같은 값(첫 행 종가는 갱신하지 않으므로 r.closingPrice 기준)
-        strategyCyclePort.resetStartAndOpenAmount(cycleId, totalAssets(r.postBalance(), r.closingPrice()));
-        // holdings·평단도 바뀌므로 updateCycleStartSnapshot이 아닌 updateBalance — CapitalLedgerService와 같은 in-place 방식
+        // 시작 금액만 새 자본으로 갱신 — openAmount(개장 평가)는 개장 시 1회만 기록하고 이후 변경은 RESET 이력으로 남긴다(첫 행 종가는 갱신하지 않으므로 r.closingPrice 기준)
+        strategyCyclePort.updateStartAmount(cycleId, totalAssets(r.postBalance(), r.closingPrice()));
+        // holdings·평단도 바뀌므로 updateBalance — CapitalLedgerService와 같은 in-place 방식
         CyclePosition latest = cyclePositionPort.findLatestOne(cycleId)
                 .orElseThrow(() -> new IllegalStateException("VR 재설정 전 포지션이 없습니다."));
         // 포지션의 closingPrice는 의도적으로 그대로 둔다(CapitalLedgerService와 동일) — 현재가 평가는 startAmount가 담는다
         cyclePositionPort.updateBalance(latest.id(), r.postBalance());
+        recordResetEvent(cycleId, latest, r.postBalance());
         // 사이클 VR 상세는 PK=cycleId upsert
         strategyCycleVrPort.save(new StrategyCycleVrDetail(cycleId, r.newValue(),
                 newDetail.gradientAt(r.weeks()), newDetail.poolLimitRateAt(r.weeks())));
+    }
+
+    // 재설정의 원장 차액을 RESET 이력으로 기록 — 원금 차액은 원가 기준(주식 추가는 입력 단가, 인출은 평단; VrReconfigureService.applyCapitalAdjustment와 같은 기준), 변화가 없으면 생략
+    private void recordResetEvent(UUID cycleId, CyclePosition latest, AccountBalance post) {
+        AccountBalance old = latest.toBalance();
+        BigDecimal depositDelta = post.usdDeposit().subtract(old.usdDeposit());
+        BigDecimal holdingsDelta = post.holdings().subtract(old.holdings());
+        if (depositDelta.signum() == 0 && holdingsDelta.signum() == 0) return;
+        BigDecimal principalDelta = bookValue(post).subtract(bookValue(old))
+                .setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
+        cycleCapitalEventPort.save(new CycleCapitalEvent(null, cycleId, latest.id(), CycleCapitalEvent.Kind.RESET,
+                depositDelta, holdingsDelta, principalDelta, Instant.now(clock)));
+    }
+
+    // 장부가 = 예수금 + 보유수량 × 평단(없으면 0)
+    private static BigDecimal bookValue(AccountBalance b) {
+        BigDecimal cost = b.avgPrice() != null ? b.avgPrice().multiply(b.holdings()) : BigDecimal.ZERO;
+        return b.usdDeposit().add(cost);
     }
 
     // 활성 버전 소프트삭제 후 새 버전 + VR 버전 상세 발급 (두 재설정 경로 공용)

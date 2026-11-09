@@ -2,6 +2,7 @@ package com.kista.tradingcore.stats.application;
 
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.stats.domain.model.InvestmentPoint;
+import com.kista.tradingcore.trading.domain.model.CycleCapitalEvent;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 
@@ -27,7 +28,7 @@ public final class InvestmentIndexCalculator {
     private static final BigDecimal INITIAL_INDEX = new BigDecimal("100.0000000000"); // 최초 투자지수
 
     public List<InvestmentPoint> calculate(List<StrategyCycle> cycles, List<CyclePosition> positions,
-                                    LocalDate from, LocalDate to) {
+                                           List<CycleCapitalEvent> events, LocalDate from, LocalDate to) {
         if (cycles.isEmpty() || from.isAfter(to)) {
             return List.of();
         }
@@ -41,7 +42,7 @@ public final class InvestmentIndexCalculator {
                 .sorted(InvestmentIndexCalculator::compareCycles)
                 .toList());
 
-        Map<LocalDate, BigDecimal> flows = buildExternalFlows(cyclesByStrategy, cycleById, positions);
+        Map<LocalDate, BigDecimal> flows = buildExternalFlows(cyclesByStrategy, cycleById, positions, events);
         // 일별 USD 평가액과 외부 현금흐름을 분리한 뒤 시간가중수익률을 계산한다.
         List<DailyValuation> valuations = buildDailyValuations(cycleById, cyclesByStrategy, positions, from, to, flows);
         return compoundDailyReturns(valuations, flows);
@@ -111,10 +112,11 @@ public final class InvestmentIndexCalculator {
 
     private Map<LocalDate, BigDecimal> buildExternalFlows(
             Map<UUID, List<StrategyCycle>> cyclesByStrategy, Map<UUID, StrategyCycle> cycleById,
-            List<CyclePosition> positions) {
+            List<CyclePosition> positions, List<CycleCapitalEvent> events) {
         Map<LocalDate, BigDecimal> flows = new HashMap<>();
         Map<UUID, NavigableMap<LocalDate, BigDecimal>> valuesByCycle =
                 buildCompleteValuesByCycle(cycleById, positions);
+        addCapitalEventFlows(flows, cycleById, valuesByCycle, positions, events);
 
         // 전략 최초 진입, 내부 사이클 교체, 최종 종료를 하나의 연속된 외부흐름으로 기록한다.
         for (List<StrategyCycle> ordered : cyclesByStrategy.values()) {
@@ -140,6 +142,36 @@ public final class InvestmentIndexCalculator {
             addExitFlow(flows, last, valuesByCycle.get(last.id()));
         }
         return flows;
+    }
+
+    // 투자금 추가·인출 흐름 규칙: ① 금액은 시장가 변화(예수금 증감 + 보유 증감 × 행 종가) — 복원 가상 스냅샷의 평가와 같은 가격이라 당일 수익이 0이 된다
+    // ② 날짜는 KST 일자 ③ 진입 평가일 이하 이벤트는 진입 흐름(entryValue)에 이미 포함돼 제외한다
+    private static void addCapitalEventFlows(
+            Map<LocalDate, BigDecimal> flows, Map<UUID, StrategyCycle> cycleById,
+            Map<UUID, NavigableMap<LocalDate, BigDecimal>> valuesByCycle,
+            List<CyclePosition> positions, List<CycleCapitalEvent> events) {
+        Map<UUID, CyclePosition> positionById = new HashMap<>();
+        positions.forEach(position -> positionById.putIfAbsent(position.id(), position));
+        for (CycleCapitalEvent event : events) {
+            StrategyCycle cycle = cycleById.get(event.strategyCycleId());
+            CyclePosition row = positionById.get(event.cyclePositionId());
+            NavigableMap<LocalDate, BigDecimal> values = valuesByCycle.get(event.strategyCycleId());
+            if (cycle == null || row == null || values == null || values.isEmpty()) {
+                continue;
+            }
+            LocalDate date = event.occurredAt().atZone(TimeZones.KST).toLocalDate();
+            if (!date.isAfter(entryDate(values, cycle.startDate()))) {
+                continue;
+            }
+            BigDecimal flow = event.depositDelta();
+            if (event.holdingsDelta().signum() != 0) {
+                if (row.closingPrice() == null) {
+                    continue; // ponytail: 종가 없으면 그날 평가값도 null이라 흐름을 건너뛴다
+                }
+                flow = flow.add(event.holdingsDelta().multiply(row.closingPrice()));
+            }
+            flows.merge(date, flow, BigDecimal::add);
+        }
     }
 
     private static void addEntryFlow(Map<LocalDate, BigDecimal> flows, StrategyCycle cycle,
@@ -267,8 +299,13 @@ public final class InvestmentIndexCalculator {
         if (values == null || values.isEmpty()) {
             return null;
         }
-        BigDecimal asOfStart = lastCompleteValue(values, startDate);
-        return asOfStart != null ? asOfStart : values.firstEntry().getValue();
+        return values.get(entryDate(values, startDate));
+    }
+
+    // 진입 평가일 — entryValue가 읽는 값의 날짜
+    private static LocalDate entryDate(NavigableMap<LocalDate, BigDecimal> values, LocalDate startDate) {
+        LocalDate asOfStart = values.floorKey(startDate);
+        return asOfStart != null ? asOfStart : values.firstKey();
     }
 
     private static BigDecimal lastCompleteValue(

@@ -88,11 +88,4 @@ class CycleCapitalEventPersistenceAdapterTest extends DataJpaTestBase {
     void findByCycleIds_emptyInput_returnsEmpty() {
         assertThat(adapter.findByCycleIds(Set.of())).isEmpty();
     }
-
-    @Test
-    void existsByCycleId_falseBeforeSave_trueAfter() {
-        assertThat(adapter.existsByCycleId(cycleId)).isFalse();
-        adapter.save(event(Kind.INJECT, "10.00", "0", "10.00", Instant.now()));
-        assertThat(adapter.existsByCycleId(cycleId)).isTrue();
-    }
 }

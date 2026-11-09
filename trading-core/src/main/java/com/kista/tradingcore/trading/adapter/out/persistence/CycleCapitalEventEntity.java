@@ -33,7 +33,7 @@ class CycleCapitalEventEntity extends BaseCreatedAtEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private CycleCapitalEvent.Kind kind; // INJECT | WITHDRAW
+    private CycleCapitalEvent.Kind kind; // INJECT | WITHDRAW | RESET
 
     @Column(name = "deposit_delta", nullable = false, precision = 20, scale = 2)
     private BigDecimal depositDelta; // 예수금 증감 (USD)

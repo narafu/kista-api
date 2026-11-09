@@ -2,6 +2,7 @@ package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.support.DataJpaTestBase;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
+import com.kista.tradingcore.trading.application.port.output.CycleCapitalEventPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCycleVrPort;
@@ -55,6 +56,7 @@ class CycleSnapshotCreatorDbTest extends DataJpaTestBase {
     @MockitoBean StrategyCycleVrPort strategyCycleVrPort;
     @MockitoBean StrategyVersionPort strategyVersionPort;
     @MockitoBean VrStrategyDetailService vrStrategyDetailService;
+    @MockitoBean CycleCapitalEventPort cycleCapitalEventPort; // VR 재설정 이력 포트(이 테스트 대상 아님)
 
     private UUID accountId;
     private UUID strategyId;

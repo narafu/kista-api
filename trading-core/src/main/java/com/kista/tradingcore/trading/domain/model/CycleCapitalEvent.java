@@ -15,5 +15,6 @@ public record CycleCapitalEvent(
         BigDecimal principalDelta, // 원금 증감 (USD)
         Instant occurredAt
 ) {
-    public enum Kind { INJECT, WITHDRAW }
+    // RESET: 시드 수정·VR 시작 전 재설정의 원장 차액
+    public enum Kind { INJECT, WITHDRAW, RESET }
 }

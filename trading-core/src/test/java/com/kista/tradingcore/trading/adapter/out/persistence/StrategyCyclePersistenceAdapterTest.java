@@ -113,12 +113,6 @@ class StrategyCyclePersistenceAdapterTest extends DataJpaTestBase {
         StrategyCycle injected = cycleAdapter.findLatestByStrategyId(strategyId).orElseThrow();
         assertThat(injected.startAmount()).isEqualByComparingTo("2300.07");
         assertThat(injected.openAmount()).isEqualByComparingTo("2200.00");
-
-        // 시드 수정·VR 시작 전 재설정은 둘 다 같은 값으로
-        cycleAdapter.resetStartAndOpenAmount(saved.id(), new BigDecimal("3000.00"));
-        StrategyCycle reset = cycleAdapter.findLatestByStrategyId(strategyId).orElseThrow();
-        assertThat(reset.startAmount()).isEqualByComparingTo("3000.00");
-        assertThat(reset.openAmount()).isEqualByComparingTo("3000.00");
     }
 
     @Test

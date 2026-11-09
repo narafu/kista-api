@@ -3,11 +3,13 @@ import static com.kista.shared.support.FixedClockTestConfig.FIXED;
 import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
+import com.kista.tradingcore.trading.domain.model.CycleCapitalEvent;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.trading.domain.model.StrategyCycleVrDetail;
 import com.kista.tradingcore.trading.domain.model.StrategyVersion;
 import com.kista.tradingcore.matching.domain.model.StrategyVrDetail;
+import com.kista.tradingcore.trading.application.port.output.CycleCapitalEventPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCycleVrPort;
@@ -40,6 +42,7 @@ class CycleSnapshotCreatorTest {
     @Mock StrategyCycleVrPort strategyCycleVrPort;
     @Mock StrategyVersionPort strategyVersionPort;
     @Mock VrStrategyDetailService vrStrategyDetailService;
+    @Mock CycleCapitalEventPort cycleCapitalEventPort;
 
     @Test
     void createVrCycleAndSnapshot_usesTotalOpeningAssetsForCycleStartAmount() {
@@ -51,7 +54,7 @@ class CycleSnapshotCreatorTest {
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
 
         CycleSnapshotCreator creator = new CycleSnapshotCreator(
-                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, FIXED);
+                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, cycleCapitalEventPort, FIXED);
         creator.createVrCycleAndSnapshot(new CycleSnapshotCreator.VrCycleStart(strategyId, strategyVersionId, postBalance,
                 new BigDecimal("120.00"), new BigDecimal("900.00"), 10, new BigDecimal("0.50"), LocalDate.now(FIXED)));
 
@@ -77,7 +80,7 @@ class CycleSnapshotCreatorTest {
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
 
         CycleSnapshotCreator creator = new CycleSnapshotCreator(
-                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, FIXED);
+                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, cycleCapitalEventPort, FIXED);
         creator.createVrCycleAndSnapshot(new CycleSnapshotCreator.VrCycleStart(strategyId, strategyVersionId, postBalance,
                 new BigDecimal("600.005"), new BigDecimal("900.00"), 10, new BigDecimal("0.50"), LocalDate.now(FIXED)));
 
@@ -95,7 +98,7 @@ class CycleSnapshotCreatorTest {
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenAnswer(i -> i.getArgument(0));
 
         CycleSnapshotCreator creator = new CycleSnapshotCreator(
-                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, FIXED);
+                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, cycleCapitalEventPort, FIXED);
         creator.createCycleAndSnapshot(strategyId, versionId, new BigDecimal("1000.00"), new BigDecimal("50.00"));
 
         ArgumentCaptor<StrategyCycle> cycleCaptor = ArgumentCaptor.forClass(StrategyCycle.class);
@@ -154,7 +157,7 @@ class CycleSnapshotCreatorTest {
                 .thenReturn(newDetail);
 
         CycleSnapshotCreator creator = new CycleSnapshotCreator(
-                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, FIXED);
+                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, cycleCapitalEventPort, FIXED);
         creator.reconfigureVrCycleBeforeStart(new CycleSnapshotCreator.VrReconfiguration(
                 strategyId, cycleId, 4, new BigDecimal("15.00"), 0, ramp,
                 postBalance, new BigDecimal("120.00"), new BigDecimal("1000.00"), 0));
@@ -164,10 +167,18 @@ class CycleSnapshotCreatorTest {
         verify(strategyCyclePort).updateStrategyVersion(cycleId, newVersionId);
         // 700 + 12 × 120 = 2140.00 (scale 2)
         ArgumentCaptor<BigDecimal> startAmount = ArgumentCaptor.forClass(BigDecimal.class);
-        verify(strategyCyclePort).resetStartAndOpenAmount(eq(cycleId), startAmount.capture());
+        verify(strategyCyclePort).updateStartAmount(eq(cycleId), startAmount.capture());
         assertThat(startAmount.getValue()).isEqualTo(new BigDecimal("2140.00"));
-        verify(strategyCyclePort, never()).updateStartAmount(any(), any());
+        verify(strategyCyclePort, never()).save(any()); // openAmount는 재기록하지 않는다
         verify(cyclePositionPort).updateBalance(positionId, postBalance);
+        // 원금 차액은 원가 기준 — 예수금 +200, 주식 +2주(입력 단가 60 = 120) → 320.00
+        ArgumentCaptor<CycleCapitalEvent> event = ArgumentCaptor.forClass(CycleCapitalEvent.class);
+        verify(cycleCapitalEventPort).save(event.capture());
+        assertThat(event.getValue().kind()).isEqualTo(CycleCapitalEvent.Kind.RESET);
+        assertThat(event.getValue().cyclePositionId()).isEqualTo(positionId);
+        assertThat(event.getValue().depositDelta()).isEqualByComparingTo("200.00");
+        assertThat(event.getValue().holdingsDelta()).isEqualByComparingTo("2");
+        assertThat(event.getValue().principalDelta()).isEqualByComparingTo("320.00");
         ArgumentCaptor<StrategyCycleVrDetail> vr = ArgumentCaptor.forClass(StrategyCycleVrDetail.class);
         verify(strategyCycleVrPort).save(vr.capture());
         assertThat(vr.getValue().strategyCycleId()).isEqualTo(cycleId);
@@ -178,6 +189,32 @@ class CycleSnapshotCreatorTest {
         InOrder order = inOrder(strategyVersionPort);
         order.verify(strategyVersionPort).nextVersionNo(strategyId);
         order.verify(strategyVersionPort).softDeleteActiveByStrategyId(eq(strategyId), any());
+    }
+
+    @Test
+    void reconfigureVrCycleBeforeStart_parameterOnly_recordsNoEvent() {
+        UUID strategyId = UUID.randomUUID();
+        UUID cycleId = UUID.randomUUID();
+        UUID newVersionId = UUID.randomUUID();
+        CyclePosition latest = new CyclePosition(
+                UUID.randomUUID(), cycleId, new BigDecimal("500.00"),
+                new BigDecimal("95.00"), new BigDecimal("50.00"), BigDecimal.valueOf(10), null, null);
+        StrategyVrDetail newDetail = new StrategyVrDetail(
+                newVersionId, 4, new BigDecimal("15.00"), 0,
+                10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
+        VrRampParams ramp = new VrRampParams(10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
+        when(cyclePositionPort.findLatestOne(cycleId)).thenReturn(Optional.of(latest));
+        when(strategyVersionPort.nextVersionNo(strategyId)).thenReturn(2);
+        when(strategyVersionPort.save(any())).thenReturn(new StrategyVersion(newVersionId, strategyId, 2, null, null));
+        when(vrStrategyDetailService.saveVersionDetail(newVersionId, 4, new BigDecimal("15.00"), 0, ramp)).thenReturn(newDetail);
+
+        CycleSnapshotCreator creator = new CycleSnapshotCreator(
+                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, cycleCapitalEventPort, FIXED);
+        creator.reconfigureVrCycleBeforeStart(new CycleSnapshotCreator.VrReconfiguration(
+                strategyId, cycleId, 4, new BigDecimal("15.00"), 0, ramp,
+                latest.toBalance(), new BigDecimal("120.00"), new BigDecimal("1000.00"), 0));
+
+        verify(cycleCapitalEventPort, never()).save(any());
     }
 
     private ReconfigureAmounts reconfigure(
@@ -205,7 +242,7 @@ class CycleSnapshotCreatorTest {
         });
 
         CycleSnapshotCreator creator = new CycleSnapshotCreator(
-                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, FIXED);
+                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, cycleCapitalEventPort, FIXED);
         creator.reconfigureVrCycle(new CycleSnapshotCreator.VrReconfiguration(
                 strategyId, currentCycleId, 4, new BigDecimal("15.00"), 0, ramp,
                 postAdjustment, closingPrice, new BigDecimal("1000.00"), 0));

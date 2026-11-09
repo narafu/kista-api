@@ -10,5 +10,4 @@ interface CycleCapitalEventJpaRepository extends JpaRepository<CycleCapitalEvent
 
     List<CycleCapitalEventEntity> findByStrategyCycleIdInOrderByOccurredAtAsc(Collection<UUID> cycleIds);
 
-    boolean existsByStrategyCycleId(UUID cycleId);
 }

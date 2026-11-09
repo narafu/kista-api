@@ -41,9 +41,6 @@ public interface StrategyCyclePort {
     // 투자금 추가·인출 — 사이클 시작금액(startAmount)만 갱신, 개장 평가는 이력 합계로 통계가 더한다
     void updateStartAmount(UUID cycleId, BigDecimal startAmount);
 
-    // 시드 수정·VR 시작 전 재설정 — 시작 금액과 개장 평가(openAmount)를 같은 값으로 갱신
-    void resetStartAndOpenAmount(UUID cycleId, BigDecimal amount);
-
     // 시작 전 VR 재설정 — 사이클의 전략 버전 교체(새 버전 FK)
     void updateStrategyVersion(UUID cycleId, UUID strategyVersionId);
 

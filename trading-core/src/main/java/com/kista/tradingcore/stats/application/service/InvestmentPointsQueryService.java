@@ -4,10 +4,12 @@ import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.KstDays;
+import com.kista.tradingcore.trading.application.port.output.CycleCapitalEventPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
+import com.kista.tradingcore.trading.domain.model.CycleCapitalEvent;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
@@ -34,6 +36,7 @@ class InvestmentPointsQueryService implements InvestmentPointsQuery {
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
     private final CyclePositionPort cyclePositionPort;
+    private final CycleCapitalEventPort cycleCapitalEventPort; // 투자금 추가·인출 이력 — 외부 흐름 분리·행 복원
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
     private final InvestmentIndexCalculator investmentIndexCalculator = new InvestmentIndexCalculator();
 
@@ -67,12 +70,17 @@ class InvestmentPointsQueryService implements InvestmentPointsQuery {
                 ? from
                 : cycles.stream().map(StrategyCycle::startDate).min(LocalDate::compareTo).orElse(effectiveTo);
         Instant toInstant = KstDays.endExclusive(effectiveTo);
-        List<CyclePosition> positions = scope == Scope.STRATEGY
+        List<CyclePosition> rawPositions = scope == Scope.STRATEGY
                 ? cyclePositionPort.findByStrategyAndRange(strategyId, Instant.EPOCH, toInstant)
                 : cyclePositionPort.findByUserAndRange(userId, Instant.EPOCH, toInstant);
 
+        List<CycleCapitalEvent> events = cycles.isEmpty()
+                ? List.of() : cycleCapitalEventPort.findByCycleIds(cycles.stream().map(StrategyCycle::id).toList());
+        // in-place로 바뀐 행을 이력으로 원본 복원해 추가·인출이 당일 수익률로 새지 않게 한다
+        List<CyclePosition> positions = CapitalLedgerTimeline.restore(rawPositions, events);
+
         List<InvestmentPoint> investmentPoints = investmentIndexCalculator.calculate(
-                cycles, positions, effectiveFrom, effectiveTo);
+                cycles, positions, events, effectiveFrom, effectiveTo);
 
         return new InvestmentPointsResult(investmentPoints, effectiveFrom, effectiveTo, selectedStrategy);
     }

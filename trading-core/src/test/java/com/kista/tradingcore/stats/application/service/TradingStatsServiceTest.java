@@ -888,6 +888,30 @@ class TradingStatsServiceTest {
     }
 
     @Test
+    void 시드_수정_후_자산추이_과거_원금선이_바뀌지_않음() {
+        stubUserWithStrategy();
+        StrategyCycle active = cycleWithOpen(STRATEGY_ID, "1500.00", "1000.00", null); // 시작일 2026-01-01
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(active));
+        UUID row = UUID.randomUUID();
+        // 단일 행이 시드 수정으로 현재값(1,500)이 됐다
+        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
+                position(row, active.id(), "1500", null, null, 0, "2026-01-01T03:00:00Z")));
+        when(cycleCapitalEventPort.findByCycleIds(any())).thenReturn(List.of(
+                new CycleCapitalEvent(UUID.randomUUID(), active.id(), row, CycleCapitalEvent.Kind.RESET,
+                        new BigDecimal("500"), BigDecimal.ZERO, new BigDecimal("500"),
+                        Instant.parse("2026-01-03T03:00:00Z"))));
+
+        List<EquityPoint> points = statsService.getEquityCurve(USER_ID, null, null, LocalDate.parse("2026-01-05")).points();
+
+        assertThat(points).extracting(EquityPoint::date)
+                .containsExactly(LocalDate.parse("2026-01-01"), LocalDate.parse("2026-01-03"));
+        assertThat(points.get(0).principal()).isEqualByComparingTo("1000");
+        assertThat(points.get(0).totalAsset()).isEqualByComparingTo("1000");
+        assertThat(points.get(1).principal()).isEqualByComparingTo("1500");
+        assertThat(points.get(1).totalAsset()).isEqualByComparingTo("1500");
+    }
+
+    @Test
     void equityCurve_chainSurplus_usesStartAmountAtRotation() {
         stubUserWithStrategy();
         StrategyCycle c1 = closedCycle("10000.00", "12000.00", "2026-06-01", "2026-06-10");

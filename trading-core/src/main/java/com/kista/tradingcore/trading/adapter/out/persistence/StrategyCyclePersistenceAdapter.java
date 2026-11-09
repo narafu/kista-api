@@ -70,15 +70,6 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
         mutate(cycleId, e -> e.setStartAmount(startAmount));
     }
 
-    @Override
-    public void resetStartAndOpenAmount(UUID cycleId, BigDecimal amount) {
-        // 시드 수정·VR 시작 전 재설정 — 시작 금액과 개장 평가를 같은 값으로 다시 연다
-        mutate(cycleId, e -> {
-            e.setStartAmount(amount);
-            e.setOpenAmount(amount);
-        });
-    }
-
     // 사이클 엔티티 조회 → 변경 → 명시적 save (dirty checking 대신 명시적 저장 유지)
     private void mutate(UUID cycleId, Consumer<StrategyCycleEntity> change) {
         StrategyCycleEntity e = jpaRepository.findById(cycleId)
