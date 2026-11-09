@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.UUID;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 
@@ -30,18 +31,20 @@ class TradingStatsController {
 
     @Operation(summary = "수익 통계 요약", description = "실현·미실현 손익과 전략 타입별 사이클 성과 집계.")
     @GetMapping("/summary")
-    public StatsSummaryResponse getSummary(@AuthenticationPrincipal UUID userId) {
-        return StatsSummaryResponse.from(tradingStats.getSummary(userId));
+    public StatsSummaryResponse getSummary(@AuthenticationPrincipal UUID userId,
+                                             @RequestParam(defaultValue = "USD") Currency currency) {
+        return StatsSummaryResponse.from(tradingStats.getSummary(userId, currency));
     }
 
     @Operation(summary = "누적 자산 곡선", description = "일별 전략 운용 자산·원금.")
     @GetMapping("/equity-curve")
     public EquityCurveResponse getEquityCurve(
             @AuthenticationPrincipal UUID userId,
+            @RequestParam(defaultValue = "USD") Currency currency,
             @RequestParam(required = false) StrategyType type,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return EquityCurveResponse.from(tradingStats.getEquityCurve(userId, type, from, to));
+        return EquityCurveResponse.from(tradingStats.getEquityCurve(userId, currency, type, from, to));
     }
 
     @Operation(summary = "사이클 성과 목록",

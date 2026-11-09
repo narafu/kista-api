@@ -23,6 +23,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyTicker;
 
@@ -37,11 +38,11 @@ class TradingStatsControllerTest {
 
     @Test
     void summary를_반환한다() throws Exception {
-        when(tradingStats.getSummary(USER_ID)).thenReturn(new StatsSummary(
+        when(tradingStats.getSummary(USER_ID, Currency.USD)).thenReturn(new StatsSummary(
                 new BigDecimal("50.00"), new BigDecimal("10.00"), new BigDecimal("1000.00"),
                 List.of(new StrategyTypeStats(StrategyType.INFINITE, 2, 1,
                         new BigDecimal("0.5000"), new BigDecimal("0.0250"), new BigDecimal("20.0"),
-                        new BigDecimal("50.00"), new BigDecimal("10.00")))));
+                        new BigDecimal("50.00"), new BigDecimal("10.00"))), List.of(Currency.USD)));
 
         mockMvc.perform(get("/api/stats/summary").with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
@@ -51,8 +52,31 @@ class TradingStatsControllerTest {
     }
 
     @Test
+    void summary는_currency_생략시_USD로_조회한다() throws Exception {
+        when(tradingStats.getSummary(USER_ID, Currency.USD)).thenReturn(
+                new StatsSummary(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, List.of(), List.of()));
+
+        mockMvc.perform(get("/api/stats/summary").with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk());
+
+        verify(tradingStats).getSummary(USER_ID, Currency.USD);
+    }
+
+    @Test
+    void summary는_currency를_전달하고_availableCurrencies를_싣는다() throws Exception {
+        when(tradingStats.getSummary(USER_ID, Currency.USDT)).thenReturn(
+                new StatsSummary(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, List.of(),
+                        List.of(Currency.USDT)));
+
+        mockMvc.perform(get("/api/stats/summary").param("currency", "USDT")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.availableCurrencies[0]").value("USDT"));
+    }
+
+    @Test
     void equity_curve를_반환한다() throws Exception {
-        when(tradingStats.getEquityCurve(eq(USER_ID), isNull(), any(), any()))
+        when(tradingStats.getEquityCurve(eq(USER_ID), eq(Currency.USD), isNull(), any(), any()))
                 .thenReturn(new EquityCurve(
                         List.of(new EquityPoint(LocalDate.parse("2026-06-02"),
                                 new BigDecimal("1000.00"), new BigDecimal("900.00")))));
@@ -68,7 +92,7 @@ class TradingStatsControllerTest {
 
     @Test
     void equity_curve는_type_필터를_전달한다() throws Exception {
-        when(tradingStats.getEquityCurve(eq(USER_ID), eq(StrategyType.VR), any(), any()))
+        when(tradingStats.getEquityCurve(eq(USER_ID), eq(Currency.USD), eq(StrategyType.VR), any(), any()))
                 .thenReturn(new EquityCurve(List.of()));
 
         mockMvc.perform(get("/api/stats/equity-curve")
@@ -79,7 +103,7 @@ class TradingStatsControllerTest {
                 .andExpect(status().isOk());
 
         verify(tradingStats).getEquityCurve(
-                USER_ID, StrategyType.VR,
+                USER_ID, Currency.USD, StrategyType.VR,
                 LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
     }
 

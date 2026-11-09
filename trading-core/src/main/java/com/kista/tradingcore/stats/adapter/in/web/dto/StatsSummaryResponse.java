@@ -1,5 +1,6 @@
 package com.kista.tradingcore.stats.adapter.in.web.dto;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.stats.domain.model.StatsSummary;
 import com.kista.tradingcore.stats.domain.model.StrategyTypeStats;
 
@@ -10,7 +11,8 @@ public record StatsSummaryResponse(
         BigDecimal totalRealizedPnl,
         BigDecimal totalUnrealizedPnl,
         BigDecimal activePrincipal,
-        List<TypeStats> byType
+        List<TypeStats> byType,
+        List<Currency> availableCurrencies
 ) {
     public record TypeStats(
             String type, String typeDescription,
@@ -29,6 +31,7 @@ public record StatsSummaryResponse(
     public static StatsSummaryResponse from(StatsSummary summary) {
         return new StatsSummaryResponse(summary.totalRealizedPnl(), summary.totalUnrealizedPnl(),
                 summary.activePrincipal(),
-                summary.byType().stream().map(TypeStats::from).toList());
+                summary.byType().stream().map(TypeStats::from).toList(),
+                summary.availableCurrencies());
     }
 }

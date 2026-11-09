@@ -36,6 +36,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import com.kista.shared.kernel.StrategyTicker;
@@ -73,13 +74,13 @@ class TradingStatsService implements TradingStatsUseCase {
             Comparator.comparing(StrategyCycle::createdAt).thenComparing(StrategyCycle::id);
 
     // getSummary 캐시 키
-    private record SummaryKey(UUID userId) {}
+    private record SummaryKey(UUID userId, Currency currency) {}
 
     // getEquityCurve 캐시 키 — 파라미터 조합별로 분리
-    private record EquityCurveKey(UUID userId, StrategyType type, LocalDate from, LocalDate to) {}
+    private record EquityCurveKey(UUID userId, Currency currency, StrategyType type, LocalDate from, LocalDate to) {}
 
     // 사이클 + 소속 전략 조인 뷰 — 원금 = 개장 시가 평가 + 추가·인출 합계(매매 계약 startAmount는 쓰지 않음), 자산 = 예수금 + 보유 평가액(시드 점유 전략 공통)
-    private record CycleView(StrategyCycle cycle, Strategy strategy, List<CycleCapitalEvent> events) {
+    private record CycleView(StrategyCycle cycle, Strategy strategy, List<CycleCapitalEvent> events, Currency currency) {
         boolean closed() {
             return cycle.endAmount() != null && cycle.isEnded();
         }
@@ -127,18 +128,21 @@ class TradingStatsService implements TradingStatsUseCase {
     }
 
     private void invalidateUserCache(UUID userId) {
-        statsResultCache.invalidateIf(key -> key instanceof SummaryKey(UUID u) && u.equals(userId)
+        statsResultCache.invalidateIf(key -> key instanceof SummaryKey s && s.userId().equals(userId)
                 || key instanceof EquityCurveKey k && k.userId().equals(userId));
     }
 
     @Override
-    public StatsSummary getSummary(UUID userId) {
+    public StatsSummary getSummary(UUID userId, Currency currency) {
         return statsResultCache.getOrCompute(
-                new SummaryKey(userId), CURVE_CACHE_TTL, () -> computeSummary(userId));
+                new SummaryKey(userId, currency), CURVE_CACHE_TTL, () -> computeSummary(userId, currency));
     }
 
-    private StatsSummary computeSummary(UUID userId) {
-        List<CycleView> cycles = loadCycles(userId, true);
+    private StatsSummary computeSummary(UUID userId, Currency currency) {
+        List<CycleView> all = loadCycles(userId, a -> a.broker() != Broker.MOCK);
+        // 사용 통화 목록 — 요청 통화와 무관하게 MOCK 제외 전체 기준(enum 선언 순서)
+        List<Currency> availableCurrencies = all.stream().map(CycleView::currency).distinct().sorted().toList();
+        List<CycleView> cycles = all.stream().filter(v -> v.currency() == currency).toList();
         Map<UUID, BigDecimal> unrealizedByCycle = unrealizedByCycle(cycles);
 
         Map<StrategyType, List<CycleView>> byType = cycles.stream()
@@ -161,28 +165,29 @@ class TradingStatsService implements TradingStatsUseCase {
         BigDecimal activePrincipal = sum(cycles.stream()
                 .filter(v -> !v.closed()).map(CycleView::principal));
 
-        return new StatsSummary(totalRealized, totalUnrealized, activePrincipal, typeStats);
+        return new StatsSummary(totalRealized, totalUnrealized, activePrincipal, typeStats, availableCurrencies);
     }
 
     @Override
-    public EquityCurve getEquityCurve(UUID userId, StrategyType type, LocalDate from, LocalDate to) {
+    public EquityCurve getEquityCurve(UUID userId, Currency currency, StrategyType type, LocalDate from, LocalDate to) {
         return statsResultCache.getOrCompute(
-                new EquityCurveKey(userId, type, from, to), CURVE_CACHE_TTL,
-                () -> computeEquityCurve(userId, type, from, to));
+                new EquityCurveKey(userId, currency, type, from, to), CURVE_CACHE_TTL,
+                () -> computeEquityCurve(userId, currency, type, from, to));
     }
 
-    private EquityCurve computeEquityCurve(UUID userId, StrategyType type, LocalDate from, LocalDate to) {
+    private EquityCurve computeEquityCurve(UUID userId, Currency currency, StrategyType type, LocalDate from, LocalDate to) {
         LocalDate effectiveTo = to != null ? to : LocalDate.now(clock);
         // PAUSED 전략처럼 스냅샷 갱신이 멈춘 사이클의 carry-forward 상태를 보장하기 위해
         // 전체 범위 조회 (사용자당 스냅샷 수천 건 규모라 허용)
         Instant fromInstant = Instant.EPOCH;
         Instant toInstant = KstDays.endExclusive(effectiveTo); // KST 자정 경계 — 04:30 배치 스냅샷이 해당 KST 일자에 속함
 
-        List<CycleView> cycles = loadCycles(userId, true).stream()
+        List<CycleView> cycles = loadCycles(userId, a -> a.broker() != Broker.MOCK).stream()
+                .filter(v -> v.currency() == currency)
                 .filter(v -> type == null || v.strategy().type() == type)
                 .toList();
         Set<UUID> cycleIds = cycles.stream().map(v -> v.cycle().id()).collect(Collectors.toSet());
-        // userId 스코프는 loadCycles(userId, true)가 이미 보장 — DB 조회 자체를 cycleIds로 좁혀 불필요한 타입 전체 조회 방지
+        // userId 스코프는 loadCycles가 이미 보장 — DB 조회 자체를 cycleIds로 좁혀 불필요한 타입 전체 조회 방지
         List<CyclePosition> raw = cyclePositionPort.findByCycleIdsAndRange(cycleIds, fromInstant, toInstant);
         // 투자금 추가·인출로 덮어쓴 과거 스냅샷을 이력으로 복원
         List<CyclePosition> positions = CapitalLedgerTimeline.restore(raw,
@@ -195,7 +200,7 @@ class TradingStatsService implements TradingStatsUseCase {
     public CyclePerformancePage getCyclePerformances(UUID userId, StrategyType type, UUID accountId,
                                                      StrategyTicker ticker, CycleStatusFilter status, int page, int size) {
         // loadCycles가 본인 계좌로 한정하므로 타 사용자 accountId는 자연히 빈 결과
-        List<CycleView> filtered = loadCycles(userId, false).stream()
+        List<CycleView> filtered = loadCycles(userId, a -> true).stream()
                 .filter(v -> type == null || v.strategy().type() == type)
                 .filter(v -> accountId == null || v.strategy().accountId().equals(accountId))
                 .filter(v -> ticker == null || v.strategy().ticker() == ticker)
@@ -220,15 +225,13 @@ class TradingStatsService implements TradingStatsUseCase {
 
     // ── private 헬퍼 ─────────────────────────────────────────────────────────
 
-    // aggregate=true: 누적자산추이·전략유형비교처럼 사용자 전체를 합산하는 조회 — 모의계좌(MOCK)와 크립토(KRW) 계좌 제외.
-    //   합산 금액에 통화 구분이 없어(주식 USD + 코인 KRW) 섞이면 의미가 깨지므로 크립토 계좌는 합산 경로에서만 뺀다(후속: 통화별 분리 집계).
-    // 사이클 성과 목록은 사이클별 행(계좌 단일 통화)이고 이력 확인이 목적이라 모의·크립토도 포함(aggregate=false)한다.
-    private List<CycleView> loadCycles(UUID userId, boolean aggregate) {
-        List<UUID> accountIds = accountPort.findByUserId(userId).stream()
-                // USD 합산 — 견적 통화가 USD인 계좌만(코인 KRW·USDT 제외)
-                .filter(a -> !aggregate || (a.broker() != Broker.MOCK && a.broker().getCurrency() == Currency.USD))
-                .map(Account::id)
-                .toList();
+    // accountFilter: 합산 조회(누적자산추이·전략유형비교)는 모의계좌(MOCK)를 뺀 계좌만, 사이클 성과 목록은 이력 확인이 목적이라 전부(a -> true).
+    // 통화(broker.getCurrency())는 사이클마다 달고 가며, 합산 경로는 호출 측에서 요청 통화로 거른다(통화 간 환산 없음).
+    private List<CycleView> loadCycles(UUID userId, Predicate<Account> accountFilter) {
+        List<Account> accounts = accountPort.findByUserId(userId).stream().filter(accountFilter).toList();
+        Map<UUID, Currency> currencyByAccount = accounts.stream()
+                .collect(Collectors.toMap(Account::id, a -> a.broker().getCurrency()));
+        List<UUID> accountIds = accounts.stream().map(Account::id).toList();
         if (accountIds.isEmpty()) return List.of();
         Map<UUID, Strategy> strategies = strategyPort.findByAccountIds(accountIds).values().stream()
                 .flatMap(List::stream)
@@ -239,7 +242,11 @@ class TradingStatsService implements TradingStatsUseCase {
                 .findByCycleIds(cycles.stream().map(StrategyCycle::id).toList()).stream()
                 .collect(Collectors.groupingBy(CycleCapitalEvent::strategyCycleId));
         return cycles.stream()
-                .map(c -> new CycleView(c, strategies.get(c.strategyId()), eventsByCycle.getOrDefault(c.id(), List.of())))
+                .map(c -> {
+                    Strategy strategy = strategies.get(c.strategyId());
+                    return new CycleView(c, strategy, eventsByCycle.getOrDefault(c.id(), List.of()),
+                            currencyByAccount.get(strategy.accountId()));
+                })
                 .toList();
     }
 

@@ -1,6 +1,7 @@
 package com.kista.tradingcore.stats.application.service;
 
 import com.kista.shared.support.FixedClockTestConfig;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
@@ -114,7 +115,7 @@ class TradingStatsServiceTest {
                 closedCycle("1000.00", "1100.00", "2026-01-01", "2026-01-31"), // +100, 30일
                 closedCycle("1000.00", "950.00", "2026-02-01", "2026-02-11")));  // -50, 10일
 
-        StatsSummary summary = statsService.getSummary(USER_ID);
+        StatsSummary summary = statsService.getSummary(USER_ID, Currency.USD);
 
         assertThat(summary.totalRealizedPnl()).isEqualByComparingTo("50.00");
         StrategyTypeStats infinite = summary.byType().getFirst();
@@ -132,7 +133,7 @@ class TradingStatsServiceTest {
                 closedCycle("1000.00", "990.00", "2026-02-01", "2026-02-11"),
                 closedCycle("1000.00", "1000.00", "2026-03-01", "2026-03-11")));
 
-        assertThat(statsService.getSummary(USER_ID).byType().getFirst().winRate()).isEqualByComparingTo("0.5000");
+        assertThat(statsService.getSummary(USER_ID, Currency.USD).byType().getFirst().winRate()).isEqualByComparingTo("0.5000");
     }
 
     @Test
@@ -141,7 +142,7 @@ class TradingStatsServiceTest {
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(
                 closedCycle("1000.00", "1000.00", "2026-01-01", "2026-01-31")));
 
-        assertThat(statsService.getSummary(USER_ID).byType().getFirst().winRate()).isNull();
+        assertThat(statsService.getSummary(USER_ID, Currency.USD).byType().getFirst().winRate()).isNull();
     }
 
     @Test
@@ -156,7 +157,7 @@ class TradingStatsServiceTest {
                 new CyclePosition(UUID.randomUUID(), active.id(), new BigDecimal("500.00"),
                         new BigDecimal("55.00"), new BigDecimal("50.00"), BigDecimal.valueOf(10), Instant.now(), null)));
 
-        StatsSummary summary = statsService.getSummary(USER_ID);
+        StatsSummary summary = statsService.getSummary(USER_ID, Currency.USD);
 
         assertThat(summary.totalUnrealizedPnl()).isEqualByComparingTo("50.00");
         assertThat(summary.activePrincipal()).isEqualByComparingTo("1000.00");
@@ -211,8 +212,7 @@ class TradingStatsServiceTest {
                         new BigDecimal("10.00"), null, BigDecimal.valueOf(5), Instant.parse("2026-06-01T20:00:00Z"), null),
                 new CyclePosition(UUID.randomUUID(), active.id(), new BigDecimal("800.00"),
                         new BigDecimal("10.00"), null, BigDecimal.valueOf(20), Instant.parse("2026-06-01T20:30:00Z"), null)));
-        EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+        EquityCurve curve = statsService.getEquityCurve(USER_ID, Currency.USD, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 
         assertThat(curve.points()).hasSize(1);
         assertThat(curve.points().getFirst().date()).isEqualTo(LocalDate.parse("2026-06-02"));
@@ -233,8 +233,7 @@ class TradingStatsServiceTest {
         when(cyclePositionPort.findByCycleIdsAndRange(eq(Set.of(privacy.id())), any(), any())).thenReturn(List.of(
                 depositSnapshot(privacy.id(), "2300.00", "2026-06-02T01:00:00Z")));
 
-        EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, StrategyType.PRIVACY,
+        EquityCurve curve = statsService.getEquityCurve(USER_ID, Currency.USD, StrategyType.PRIVACY,
                 LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 
         assertThat(curve.points()).hasSize(1);
@@ -266,7 +265,7 @@ class TradingStatsServiceTest {
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(
                 closedCycle("0.00", "500.00", "2026-01-01", "2026-01-31")));
 
-        StatsSummary summary = statsService.getSummary(USER_ID);
+        StatsSummary summary = statsService.getSummary(USER_ID, Currency.USD);
 
         StrategyTypeStats stats = summary.byType().getFirst();
         assertThat(stats.closedCycleCount()).isEqualTo(1);
@@ -352,7 +351,7 @@ class TradingStatsServiceTest {
         when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of());
         ArgumentCaptor<Instant> toCaptor = ArgumentCaptor.forClass(Instant.class);
 
-        statsService.getEquityCurve(USER_ID, null, null, LocalDate.of(2026, 7, 18));
+        statsService.getEquityCurve(USER_ID, Currency.USD, null, null, LocalDate.of(2026, 7, 18));
 
         // to=2026-07-18 → toInstant = 2026-07-19T00:00 KST = 2026-07-18T15:00:00Z
         verify(cyclePositionPort).findByCycleIdsAndRange(any(), any(), toCaptor.capture());
@@ -373,8 +372,7 @@ class TradingStatsServiceTest {
                 depositSnapshot(a.id(), "1000.00", "2026-06-01T01:00:00Z"),
                 depositSnapshot(b.id(), "2000.00", "2026-06-01T02:00:00Z"),
                 depositSnapshot(a.id(), "1100.00", "2026-06-02T01:00:00Z")));
-        EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+        EquityCurve curve = statsService.getEquityCurve(USER_ID, Currency.USD, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 
         assertThat(curve.points()).hasSize(2);
         assertThat(curve.points().get(1).date()).isEqualTo(LocalDate.parse("2026-06-02"));
@@ -393,8 +391,7 @@ class TradingStatsServiceTest {
                 depositSnapshot(ended.id(), "1200.00", "2026-06-01T01:00:00Z"),
                 depositSnapshot(active.id(), "500.00", "2026-06-01T02:00:00Z"),
                 depositSnapshot(active.id(), "550.00", "2026-06-02T01:00:00Z")));
-        EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+        EquityCurve curve = statsService.getEquityCurve(USER_ID, Currency.USD, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 
         assertThat(curve.points()).hasSize(2);
         // 06-01: 교체일 — 후속 사이클만 반영 (이중 합산 방지)
@@ -421,8 +418,7 @@ class TradingStatsServiceTest {
                 depositSnapshot(lowId, "100.00", "2026-06-01T01:00:00Z"),
                 depositSnapshot(highId, "200.00", "2026-06-01T02:00:00Z")));
 
-        EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+        EquityCurve curve = statsService.getEquityCurve(USER_ID, Currency.USD, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 
         // 동률이면 UUID가 큰 쪽만 합산 (이중 합산 방지)
         assertThat(curve.points().getFirst().totalAsset()).isEqualByComparingTo("200.00");
@@ -437,8 +433,7 @@ class TradingStatsServiceTest {
                 depositSnapshot(ended.id(), "1100.00", "2026-06-01T01:00:00Z"),
                 depositSnapshot(ended.id(), "1200.00", "2026-06-02T01:00:00Z"),
                 depositSnapshot(UUID.randomUUID(), "1.00", "2026-06-03T01:00:00Z")));
-        EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+        EquityCurve curve = statsService.getEquityCurve(USER_ID, Currency.USD, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 
         // 06-03 스냅샷은 모르는 사이클이라 합산 0 — 종료 사이클은 06-02까지만 남는다
         assertThat(curve.points().get(1).totalAsset()).isEqualByComparingTo("1200.00");
@@ -456,8 +451,7 @@ class TradingStatsServiceTest {
                 depositSnapshot(old.id(), "1100.00", "2026-06-01T01:00:00Z"),
                 depositSnapshot(fresh.id(), "700.00", "2026-06-02T01:00:00Z"),
                 depositSnapshot(fresh.id(), "720.00", "2026-06-03T01:00:00Z")));
-        EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+        EquityCurve curve = statsService.getEquityCurve(USER_ID, Currency.USD, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 
         assertThat(curve.points()).hasSize(3);
         assertThat(curve.points().get(0).totalAsset()).isEqualByComparingTo("1100.00"); // 06-01: 옛 사이클만
@@ -478,7 +472,7 @@ class TradingStatsServiceTest {
                 depositSnapshot(UUID.randomUUID(), "1", "2026-06-02T01:00:00Z"), // 06-02 점을 만들기 위한 미지 사이클
                 depositSnapshot(b.id(), "1100", "2026-06-03T01:00:00Z")));
 
-        List<EquityPoint> points = statsService.getEquityCurve(USER_ID, null, null, LocalDate.parse("2026-06-30")).points();
+        List<EquityPoint> points = statsService.getEquityCurve(USER_ID, Currency.USD, null, null, LocalDate.parse("2026-06-30")).points();
 
         assertThat(points).hasSize(3);
         assertThat(points.get(1).totalAsset()).isEqualByComparingTo("1100.00");
@@ -497,7 +491,7 @@ class TradingStatsServiceTest {
                 depositSnapshot(a.id(), "1100", "2026-05-31T01:00:00Z"),
                 depositSnapshot(UUID.randomUUID(), "1", "2026-06-02T01:00:00Z"))); // 다른 전략 스냅샷으로 06-02 점 생성
 
-        List<EquityPoint> points = statsService.getEquityCurve(USER_ID, null, null, LocalDate.parse("2026-06-30")).points();
+        List<EquityPoint> points = statsService.getEquityCurve(USER_ID, Currency.USD, null, null, LocalDate.parse("2026-06-30")).points();
 
         // 자산에서는 빠지지만 손익 +100은 원금에서 계속 빼 둔다(CQ-70)
         assertThat(points.getLast().totalAsset()).isEqualByComparingTo("0.00");
@@ -509,7 +503,7 @@ class TradingStatsServiceTest {
         stubUserWithStrategy();
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(cycles);
         when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(snaps);
-        return statsService.getEquityCurve(USER_ID, null, null, LocalDate.parse("2026-12-31")).points().getLast();
+        return statsService.getEquityCurve(USER_ID, Currency.USD, null, null, LocalDate.parse("2026-12-31")).points().getLast();
     }
 
     private static StrategyCycle cycleOf(String start, String end, String startDate, String endDate) {
@@ -600,8 +594,7 @@ class TradingStatsServiceTest {
         when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
                 depositSnapshot(a.id(), "500.00", "2026-06-01T01:00:00Z"),
                 depositSnapshot(b.id(), "300.00", "2026-06-02T01:00:00Z")));
-        EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+        EquityCurve curve = statsService.getEquityCurve(USER_ID, Currency.USD, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 
         assertThat(curve.points().get(1).totalAsset()).isEqualByComparingTo("800.00");
         assertThat(curve.points().get(1).principal()).isEqualByComparingTo("800.00");
@@ -616,19 +609,19 @@ class TradingStatsServiceTest {
                 depositSnapshot(cycle.id(), "500.00", "2026-06-01T01:00:00Z")));
         LocalDate from = LocalDate.parse("2026-06-01");
         LocalDate to = LocalDate.parse("2026-06-30");
-        statsService.getEquityCurve(USER_ID, null, from, to);
+        statsService.getEquityCurve(USER_ID, Currency.USD, null, from, to);
 
         TransactionSynchronizationManager.initSynchronization();
         try {
             statsService.onStrategyCapitalChanged(new StrategyCapitalChangedEvent(USER_ID));
-            statsService.getEquityCurve(USER_ID, null, from, to); // 커밋 전 — 아직 캐시 적중
+            statsService.getEquityCurve(USER_ID, Currency.USD, null, from, to); // 커밋 전 — 아직 캐시 적중
             verify(cyclePositionPort, times(1)).findByCycleIdsAndRange(any(), any(), any());
 
             TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
         } finally {
             TransactionSynchronizationManager.clearSynchronization();
         }
-        statsService.getEquityCurve(USER_ID, null, from, to); // 커밋 후 — 재계산
+        statsService.getEquityCurve(USER_ID, Currency.USD, null, from, to); // 커밋 후 — 재계산
         verify(cyclePositionPort, times(2)).findByCycleIdsAndRange(any(), any(), any());
     }
 
@@ -642,12 +635,12 @@ class TradingStatsServiceTest {
         LocalDate from = LocalDate.parse("2026-06-01");
         LocalDate to = LocalDate.parse("2026-06-30");
 
-        statsService.getEquityCurve(USER_ID, null, from, to);
-        statsService.getEquityCurve(USER_ID, null, from, to); // 캐시 적중
+        statsService.getEquityCurve(USER_ID, Currency.USD, null, from, to);
+        statsService.getEquityCurve(USER_ID, Currency.USD, null, from, to); // 캐시 적중
         verify(cyclePositionPort, times(1)).findByCycleIdsAndRange(any(), any(), any());
 
         statsService.onStrategyCapitalChanged(new StrategyCapitalChangedEvent(USER_ID));
-        statsService.getEquityCurve(USER_ID, null, from, to);
+        statsService.getEquityCurve(USER_ID, Currency.USD, null, from, to);
         verify(cyclePositionPort, times(2)).findByCycleIdsAndRange(any(), any(), any());
     }
 
@@ -677,44 +670,107 @@ class TradingStatsServiceTest {
         when(cyclePositionPort.findLatestByCycleIds(Set.of(cycle.id())))
                 .thenReturn(Map.of(cycle.id(), holdingSnapshot(cycle.id(), "130.00", "2026-06-01T01:00:00Z")));
 
-        StatsSummary summary = statsService.getSummary(USER_ID);
+        StatsSummary summary = statsService.getSummary(USER_ID, Currency.USD);
 
         assertThat(summary.byType()).extracting(StrategyTypeStats::type).containsExactly(StrategyType.DCA);
         assertThat(summary.activePrincipal()).isEqualByComparingTo("100.00"); // 시드 = 시작 원금
         assertThat(summary.totalUnrealizedPnl()).isEqualByComparingTo("30.00"); // 평가 130 - 원금 100
     }
 
-    @Test
-    void 합산_경로는_크립토_KRW_계좌를_제외하지만_사이클_성과_목록은_포함한다() {
-        UUID cryptoAccountId = UUID.randomUUID();
-        Account crypto = new Account(cryptoAccountId, USER_ID, "업비트", "n", "k", "s", null, Broker.UPBIT, null, null);
-        Strategy cryptoDca = new Strategy(UUID.randomUUID(), cryptoAccountId, StrategyType.DCA, StrategyStatus.ACTIVE,
-                StrategyTicker.BTC, StrategyCycleSeedType.NONE);
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(crypto));
+    // 통화별 합산 검증용 — KIS(USD)·BINANCE(USDT)·UPBIT(KRW)·MOCK 계좌 각 1개에 진행 중 DCA 사이클을 두고 원금을 100/200/300/400으로 구분한다
+    private record MultiCurrency(Account kis, Account binance, Account upbit, Account mock,
+                                 Map<UUID, StrategyCycle> cycleByAccount) {}
 
-        // 합산(summary) — 계좌가 전부 제외되므로 전략 조회 자체가 없다
-        assertThat(statsService.getSummary(USER_ID).byType()).isEmpty();
-        verify(strategyPort, never()).findByAccountIds(any());
-
-        // 사이클 성과 목록은 사이클별 행(단일 통화)이라 포함
-        StrategyCycle cycle = activeCycle(cryptoDca.id(), "0", "2026-06-01");
-        when(strategyPort.findByAccountIds(List.of(cryptoAccountId))).thenReturn(Map.of(cryptoAccountId, List.of(cryptoDca)));
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        assertThat(statsService.getCyclePerformances(USER_ID, null, null, null, null, 0, 10).items()).hasSize(1);
+    private MultiCurrency stubMultiCurrencyUser() {
+        Account kis = testAccount();
+        Account binance = new Account(UUID.randomUUID(), USER_ID, "바이낸스", null, "k", "s", null, Broker.BINANCE, null, null);
+        Account upbit = new Account(UUID.randomUUID(), USER_ID, "업비트", "n", "k", "s", null, Broker.UPBIT, null, null);
+        Account mock = new Account(UUID.randomUUID(), USER_ID, "모의", "0", "k", "s", null, Broker.MOCK, null, null);
+        Map<UUID, Account> accounts = new java.util.LinkedHashMap<>();
+        Map<UUID, StrategyCycle> cycleByAccount = new java.util.LinkedHashMap<>();
+        Map<UUID, Strategy> strategyByAccount = new java.util.LinkedHashMap<>();
+        String[] principals = {"100", "200", "300", "400"};
+        int i = 0;
+        for (Account a : List.of(kis, binance, upbit, mock)) {
+            Strategy s = new Strategy(UUID.randomUUID(), a.id(), StrategyType.DCA, StrategyStatus.ACTIVE,
+                    StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+            accounts.put(a.id(), a);
+            strategyByAccount.put(a.id(), s);
+            cycleByAccount.put(a.id(), activeCycle(s.id(), principals[i++], "2026-06-01"));
+        }
+        lenient().when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(kis, binance, upbit, mock));
+        lenient().when(strategyPort.findByAccountIds(any())).thenAnswer(inv -> {
+            Map<UUID, List<Strategy>> result = new java.util.HashMap<>();
+            for (UUID id : (java.util.Collection<UUID>) inv.getArgument(0)) result.put(id, List.of(strategyByAccount.get(id)));
+            return result;
+        });
+        lenient().when(strategyCyclePort.findByStrategyIds(any())).thenAnswer(inv -> {
+            java.util.Collection<UUID> ids = inv.getArgument(0);
+            return cycleByAccount.values().stream().filter(c -> ids.contains(c.strategyId())).toList();
+        });
+        return new MultiCurrency(kis, binance, upbit, mock, cycleByAccount);
     }
 
     @Test
-    void aggregateExcludesBinanceAccount() {
-        UUID binanceAccountId = UUID.randomUUID();
-        Account binance = new Account(binanceAccountId, USER_ID, "바이낸스", null, "k", "s", null, Broker.BINANCE, null, null);
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), binance));
-        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of());
+    void 합산_경로는_요청_통화_계좌만_포함하고_사이클_성과_목록은_전부_포함한다() {
+        MultiCurrency m = stubMultiCurrencyUser();
 
-        statsService.getSummary(USER_ID);
+        assertThat(statsService.getSummary(USER_ID, Currency.USD).activePrincipal()).isEqualByComparingTo("100");
+        assertThat(statsService.getSummary(USER_ID, Currency.USDT).activePrincipal()).isEqualByComparingTo("200");
+        assertThat(statsService.getSummary(USER_ID, Currency.KRW).activePrincipal()).isEqualByComparingTo("300");
+        assertThat(statsService.getCyclePerformances(USER_ID, null, null, null, null, 0, 10).items())
+                .extracting(CyclePerformance::accountId)
+                .containsExactlyInAnyOrder(m.kis().id(), m.binance().id(), m.upbit().id(), m.mock().id());
+    }
 
-        verify(strategyPort).findByAccountIds(List.of(ACCOUNT_ID));
-        verify(strategyPort, never()).findByAccountIds(argThat(ids -> ids.contains(binanceAccountId)));
+    @Test
+    void equityCurve는_요청_통화_계좌만_합산한다() {
+        MultiCurrency m = stubMultiCurrencyUser();
+        StrategyCycle binanceCycle = m.cycleByAccount().get(m.binance().id());
+        when(cyclePositionPort.findByCycleIdsAndRange(eq(Set.of(binanceCycle.id())), any(), any())).thenReturn(List.of(
+                depositSnapshot(binanceCycle.id(), "200.00", "2026-06-02T01:00:00Z")));
+
+        EquityCurve curve = statsService.getEquityCurve(USER_ID, Currency.USDT, null,
+                LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+
+        assertThat(curve.points()).hasSize(1);
+        assertThat(curve.points().getFirst().totalAsset()).isEqualByComparingTo("200.00");
+    }
+
+    @Test
+    void availableCurrencies는_요청_통화와_무관하다() {
+        // BINANCE만 가진 사용자가 USD로 요청 — 합계 0·byType 비어 있고 사용 통화는 [USDT]
+        Account binance = new Account(UUID.randomUUID(), USER_ID, "바이낸스", null, "k", "s", null, Broker.BINANCE, null, null);
+        Strategy s = new Strategy(UUID.randomUUID(), binance.id(), StrategyType.DCA, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(binance));
+        when(strategyPort.findByAccountIds(List.of(binance.id()))).thenReturn(Map.of(binance.id(), List.of(s)));
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(activeCycle(s.id(), "200", "2026-06-01")));
+
+        StatsSummary usd = statsService.getSummary(USER_ID, Currency.USD);
+
+        assertThat(usd.byType()).isEmpty();
+        assertThat(usd.totalRealizedPnl()).isEqualByComparingTo("0");
+        assertThat(usd.availableCurrencies()).containsExactly(Currency.USDT);
+
+        // 4계좌 사용자 — enum 선언 순서, MOCK 제외
+        reset(accountPort, strategyPort, strategyCyclePort);
+        stubMultiCurrencyUser();
+        assertThat(statsService.getSummary(USER_ID, Currency.KRW).availableCurrencies())
+                .containsExactly(Currency.KRW, Currency.USD, Currency.USDT);
+    }
+
+    @Test
+    void summary_캐시는_통화별로_분리된다() {
+        stubMultiCurrencyUser();
+
+        StatsSummary usd = statsService.getSummary(USER_ID, Currency.USD);
+        StatsSummary usdt = statsService.getSummary(USER_ID, Currency.USDT);
+        statsService.getSummary(USER_ID, Currency.USD); // 캐시 적중
+        statsService.getSummary(USER_ID, Currency.USDT); // 캐시 적중
+
+        assertThat(usd.activePrincipal()).isNotEqualByComparingTo(usdt.activePrincipal());
+        verify(accountPort, times(2)).findByUserId(USER_ID); // 통화당 1회
     }
 
     @Test
@@ -727,7 +783,7 @@ class TradingStatsServiceTest {
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(
                 closedCycle("1000.00", "1100.00", "2026-01-01", "2026-01-31")));
 
-        StatsSummary summary = statsService.getSummary(USER_ID);
+        StatsSummary summary = statsService.getSummary(USER_ID, Currency.USD);
 
         assertThat(summary.totalRealizedPnl()).isEqualByComparingTo("100.00");
         assertThat(summary.byType()).hasSize(1);
@@ -746,8 +802,7 @@ class TradingStatsServiceTest {
         when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
                 depositSnapshot(active.id(), "1000.00", "2026-06-02T01:00:00Z")));
 
-        EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+        EquityCurve curve = statsService.getEquityCurve(USER_ID, Currency.USD, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 
         assertThat(curve.points()).hasSize(1);
         verify(strategyPort, never()).findByAccountIds(argThat(ids -> ids.contains(mockAccountId)));
@@ -785,8 +840,8 @@ class TradingStatsServiceTest {
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(
                 closedCycle("1000.00", "1100.00", "2026-01-01", "2026-01-31")));
 
-        StatsSummary first = statsService.getSummary(USER_ID);
-        StatsSummary second = statsService.getSummary(USER_ID);
+        StatsSummary first = statsService.getSummary(USER_ID, Currency.USD);
+        StatsSummary second = statsService.getSummary(USER_ID, Currency.USD);
 
         assertThat(second).isEqualTo(first);
         verify(accountPort, times(1)).findByUserId(USER_ID);
@@ -803,14 +858,14 @@ class TradingStatsServiceTest {
         LocalDate from = LocalDate.parse("2026-06-01");
         LocalDate to = LocalDate.parse("2026-06-30");
 
-        statsService.getSummary(USER_ID);
-        statsService.getEquityCurve(USER_ID, null, from, to);
+        statsService.getSummary(USER_ID, Currency.USD);
+        statsService.getEquityCurve(USER_ID, Currency.USD, null, from, to);
         statsService.onTradingReportReady(reportEvent(UUID.randomUUID())); // 다른 사용자 — 캐시 유지
-        statsService.getSummary(USER_ID);
-        statsService.getEquityCurve(USER_ID, null, from, to);
+        statsService.getSummary(USER_ID, Currency.USD);
+        statsService.getEquityCurve(USER_ID, Currency.USD, null, from, to);
         statsService.onTradingReportReady(reportEvent(USER_ID));
-        statsService.getSummary(USER_ID);
-        statsService.getEquityCurve(USER_ID, null, from, to);
+        statsService.getSummary(USER_ID, Currency.USD);
+        statsService.getEquityCurve(USER_ID, Currency.USD, null, from, to);
 
         verify(accountPort, times(4)).findByUserId(USER_ID); // summary·curve 각 2회(무효화 전후)
         verify(cyclePositionPort, times(4)).findByCycleIdsAndRange(any(), any(), any()); // summary(진행 중 실현)·curve 무효화 전후 각 1회
@@ -829,10 +884,10 @@ class TradingStatsServiceTest {
                 depositSnapshot(active.id(), "1000.00", "2026-06-02T01:00:00Z")));
 
         // 같은 파라미터 2회 → 캐시 1회 조회
-        statsService.getEquityCurve(USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
-        statsService.getEquityCurve(USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+        statsService.getEquityCurve(USER_ID, Currency.USD, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+        statsService.getEquityCurve(USER_ID, Currency.USD, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
         // to가 다른 호출 → 별도 캐시 키로 재조회
-        statsService.getEquityCurve(USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-07-31"));
+        statsService.getEquityCurve(USER_ID, Currency.USD, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-07-31"));
 
         verify(cyclePositionPort, times(2)).findByCycleIdsAndRange(any(), any(), any());
     }
@@ -877,7 +932,7 @@ class TradingStatsServiceTest {
         when(cycleCapitalEventPort.findByCycleIds(any())).thenReturn(List.of(
                 injectEvent(active.id(), p2, "5000", "2026-06-20T03:00:00Z")));
 
-        List<EquityPoint> points = statsService.getEquityCurve(USER_ID, null, null, LocalDate.parse("2026-06-30")).points();
+        List<EquityPoint> points = statsService.getEquityCurve(USER_ID, Currency.USD, null, null, LocalDate.parse("2026-06-30")).points();
 
         assertThat(points).extracting(EquityPoint::date)
                 .containsExactly(LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-10"), LocalDate.parse("2026-06-20"));
@@ -903,7 +958,7 @@ class TradingStatsServiceTest {
                         new BigDecimal("500"), BigDecimal.ZERO, new BigDecimal("500"),
                         Instant.parse("2026-01-03T03:00:00Z"))));
 
-        List<EquityPoint> points = statsService.getEquityCurve(USER_ID, null, null, LocalDate.parse("2026-01-05")).points();
+        List<EquityPoint> points = statsService.getEquityCurve(USER_ID, Currency.USD, null, null, LocalDate.parse("2026-01-05")).points();
 
         assertThat(points).extracting(EquityPoint::date)
                 .containsExactly(LocalDate.parse("2026-01-01"), LocalDate.parse("2026-01-03"));
@@ -927,7 +982,7 @@ class TradingStatsServiceTest {
         when(cycleCapitalEventPort.findByCycleIds(any())).thenReturn(List.of(
                 injectEvent(c2.id(), row, "2000", "2026-06-20T03:00:00Z")));
 
-        List<EquityPoint> points = statsService.getEquityCurve(USER_ID, null, null, LocalDate.parse("2026-06-30")).points();
+        List<EquityPoint> points = statsService.getEquityCurve(USER_ID, Currency.USD, null, null, LocalDate.parse("2026-06-30")).points();
 
         // surplus = 12,000 - 11,000 = 1,000, realized = 2,000
         assertThat(points).hasSize(3);
@@ -962,7 +1017,7 @@ class TradingStatsServiceTest {
                 new CyclePosition(UUID.randomUUID(), c.id(), new BigDecimal("27869.33"), null, null,
                         BigDecimal.ZERO, Instant.parse("2026-02-01T03:00:00Z"), null)));
 
-        StatsSummary summary = statsService.getSummary(USER_ID);
+        StatsSummary summary = statsService.getSummary(USER_ID, Currency.USD);
         CyclePerformance perf = statsService.getCyclePerformances(USER_ID, null, null, null, null, 0, 10).items().getFirst();
 
         assertThat(summary.totalUnrealizedPnl()).isEqualByComparingTo("-10420.44");
@@ -980,7 +1035,7 @@ class TradingStatsServiceTest {
         when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
                 pos(c.id(), "27869.33", null, null, 0, "2026-02-01T03:00:00Z")));
 
-        EquityPoint p = statsService.getEquityCurve(USER_ID, null, null, LocalDate.parse("2026-02-28")).points().getLast();
+        EquityPoint p = statsService.getEquityCurve(USER_ID, Currency.USD, null, null, LocalDate.parse("2026-02-28")).points().getLast();
 
         assertThat(p.principal()).isEqualByComparingTo("38289.77");
         assertThat(p.totalAsset()).isEqualByComparingTo("27869.33");
@@ -997,7 +1052,7 @@ class TradingStatsServiceTest {
                 pos(c.id(), "450", "70", "50", 5, "2026-01-10T03:00:00Z"),
                 pos(c.id(), "800", "70", null, 0, "2026-02-01T03:00:00Z"));
 
-        StrategyTypeStats vr = statsService.getSummary(USER_ID).byType().getFirst();
+        StrategyTypeStats vr = statsService.getSummary(USER_ID, Currency.USD).byType().getFirst();
 
         assertThat(vr.realizedPnl()).isEqualByComparingTo("80.00"); // 장부(평단) 기준 280이 아니다
         assertThat(vr.unrealizedPnl()).isEqualByComparingTo("0.00");
@@ -1012,7 +1067,7 @@ class TradingStatsServiceTest {
                 pos(c.id(), "100", "62", "50", 10, "2026-01-01T03:00:00Z"),
                 pos(c.id(), "100", "65", "50", 10, "2026-02-01T03:00:00Z"));
 
-        StrategyTypeStats vr = statsService.getSummary(USER_ID).byType().getFirst();
+        StrategyTypeStats vr = statsService.getSummary(USER_ID, Currency.USD).byType().getFirst();
 
         assertThat(vr.realizedPnl()).isEqualByComparingTo("0.00");
         assertThat(vr.unrealizedPnl()).isEqualByComparingTo("30.00");
@@ -1027,7 +1082,7 @@ class TradingStatsServiceTest {
                 pos(c.id(), "100", "62", "50", 10, "2026-01-01T03:00:00Z"),
                 pos(c.id(), "450", "66", "50", 5, "2026-02-01T03:00:00Z")); // 5주를 70에 매도
 
-        StrategyTypeStats vr = statsService.getSummary(USER_ID).byType().getFirst();
+        StrategyTypeStats vr = statsService.getSummary(USER_ID, Currency.USD).byType().getFirst();
 
         assertThat(vr.realizedPnl()).isEqualByComparingTo("40.00"); // 5 x (70 - 62)
         assertThat(vr.unrealizedPnl()).isEqualByComparingTo("20.00");
@@ -1046,7 +1101,7 @@ class TradingStatsServiceTest {
         when(cyclePositionPort.findLatestByCycleIds(Set.of(c2.id()))).thenReturn(Map.of(c2.id(),
                 position(UUID.randomUUID(), c2.id(), "6200", "160", "100", 40, "2026-02-02T03:00:00Z")));
 
-        StrategyTypeStats vr = statsService.getSummary(USER_ID).byType().getFirst();
+        StrategyTypeStats vr = statsService.getSummary(USER_ID, Currency.USD).byType().getFirst();
 
         // 장부가 실현 = 10,200 - 10,000, 미실현 = 합 2,600 - 200
         assertThat(vr.realizedPnl()).isEqualByComparingTo("200.00");
@@ -1066,7 +1121,7 @@ class TradingStatsServiceTest {
         when(cyclePositionPort.findLatestByCycleIds(Set.of(c2.id()))).thenReturn(Map.of(c2.id(),
                 position(UUID.randomUUID(), c2.id(), "6200", "160", "100", 40, "2026-02-02T03:00:00Z")));
 
-        StrategyTypeStats vr = statsService.getSummary(USER_ID).byType().getFirst();
+        StrategyTypeStats vr = statsService.getSummary(USER_ID, Currency.USD).byType().getFirst();
 
         assertThat(vr.realizedPnl().scale()).isEqualTo(2);
         assertThat(vr.realizedPnl()).isEqualTo(new BigDecimal("204.94"));
@@ -1083,7 +1138,7 @@ class TradingStatsServiceTest {
                 position(UUID.randomUUID(), c1.id(), "5000", "100", "100", 50, "2026-01-01T03:00:00Z"),
                 position(UUID.randomUUID(), c1.id(), "5000", "110", "100", 50, "2026-02-01T03:00:00Z"));
 
-        StrategyTypeStats vr = statsService.getSummary(USER_ID).byType().getFirst();
+        StrategyTypeStats vr = statsService.getSummary(USER_ID, Currency.USD).byType().getFirst();
 
         assertThat(vr.realizedPnl()).isEqualByComparingTo("0.00");
         assertThat(vr.unrealizedPnl()).isEqualByComparingTo("500.00");
@@ -1098,7 +1153,7 @@ class TradingStatsServiceTest {
                 position(UUID.randomUUID(), c1.id(), "4000", "80", "60", 100, "2026-01-01T03:00:00Z"),
                 position(UUID.randomUUID(), c1.id(), "11000", null, null, 0, "2026-02-01T03:00:00Z"));
 
-        StrategyTypeStats privacy = statsService.getSummary(USER_ID).byType().getFirst();
+        StrategyTypeStats privacy = statsService.getSummary(USER_ID, Currency.USD).byType().getFirst();
 
         assertThat(privacy.realizedPnl()).isEqualByComparingTo("1000.00");
         assertThat(privacy.unrealizedPnl()).isEqualByComparingTo("0.00");
@@ -1135,7 +1190,7 @@ class TradingStatsServiceTest {
         StrategyCycle active = stubActiveInfiniteQuarterSell();
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(active));
 
-        StatsSummary summary = statsService.getSummary(USER_ID);
+        StatsSummary summary = statsService.getSummary(USER_ID, Currency.USD);
 
         // 총손익 = 800 + 5 × 58 − 1000 = 90, 실현 = 5 × (60 − 50) = 50, 미실현 = 90 − 50
         assertThat(summary.totalRealizedPnl()).isEqualByComparingTo("50.00");
@@ -1158,7 +1213,7 @@ class TradingStatsServiceTest {
                 pos(active.id(), "100", "62", "50", 10, "2026-01-01T03:00:00Z"), latest));
         when(cyclePositionPort.findLatestByCycleIds(Set.of(active.id()))).thenReturn(Map.of(active.id(), latest));
 
-        StrategyTypeStats privacy = statsService.getSummary(USER_ID).byType().getFirst();
+        StrategyTypeStats privacy = statsService.getSummary(USER_ID, Currency.USD).byType().getFirst();
 
         assertThat(privacy.realizedPnl()).isEqualByComparingTo("40.00"); // 5 × (70 − 62), 평단 기준 100이 아니다
         assertThat(privacy.unrealizedPnl()).isEqualByComparingTo("20.00");
@@ -1173,7 +1228,7 @@ class TradingStatsServiceTest {
                 closedCycle("1000.00", "950.00", "2026-02-01", "2026-02-11"),
                 active));
 
-        StrategyTypeStats infinite = statsService.getSummary(USER_ID).byType().getFirst();
+        StrategyTypeStats infinite = statsService.getSummary(USER_ID, Currency.USD).byType().getFirst();
         CyclePerformance activePerf = statsService.getCyclePerformances(USER_ID, null, null, null, null, 0, 10)
                 .items().getFirst();
 
@@ -1208,8 +1263,8 @@ class TradingStatsServiceTest {
                 bLatest));
         when(cyclePositionPort.findLatestByCycleIds(Set.of(b.id()))).thenReturn(Map.of(b.id(), bLatest));
 
-        EquityPoint last = statsService.getEquityCurve(USER_ID, null, null, LocalDate.parse("2026-06-30")).points().getLast();
-        StatsSummary summary = statsService.getSummary(USER_ID);
+        EquityPoint last = statsService.getEquityCurve(USER_ID, Currency.USD, null, null, LocalDate.parse("2026-06-30")).points().getLast();
+        StatsSummary summary = statsService.getSummary(USER_ID, Currency.USD);
 
         assertThat(last.date()).isEqualTo(LocalDate.parse("2026-06-12"));
         assertThat(last.totalAsset()).isEqualByComparingTo("520.00"); // 끝난 전략 자산은 빠진다
