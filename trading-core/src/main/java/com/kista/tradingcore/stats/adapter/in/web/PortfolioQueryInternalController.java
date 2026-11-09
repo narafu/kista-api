@@ -2,7 +2,6 @@ package com.kista.tradingcore.stats.adapter.in.web;
 
 import com.kista.shared.contract.stats.PortfolioCurrentResponse;
 import com.kista.shared.contract.stats.PortfolioOrderResponse;
-import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.stats.application.usecase.PortfolioUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,20 +22,21 @@ public class PortfolioQueryInternalController {
 
     private final PortfolioUseCase portfolioUseCase;
 
-    @Operation(summary = "현재 포트폴리오 현황 조회", description = "가장 최근 포지션 1건. 없으면 404. X-Internal-Token 헤더 필수.")
+    @Operation(summary = "현재 포트폴리오 현황 조회", description = "전략별 최신 포지션(코인 계좌 포함, 통화 표기). 없으면 빈 목록. X-Internal-Token 헤더 필수.")
     @GetMapping("/current")
-    public PortfolioCurrentResponse getCurrent(@RequestParam UUID userId) {
-        return StatsContractMapper.toResponse(portfolioUseCase.getCurrent(userId));
+    public List<PortfolioCurrentResponse> getCurrent(@RequestParam UUID userId) {
+        return portfolioUseCase.getCurrent(userId).stream()
+                .map(StatsContractMapper::toResponse)
+                .toList();
     }
 
-    @Operation(summary = "거래 내역 조회", description = "기간·종목별 주문 내역. X-Internal-Token 헤더 필수.")
+    @Operation(summary = "거래 내역 조회", description = "기간별 전 종목 주문 내역(통화 표기). X-Internal-Token 헤더 필수.")
     @GetMapping("/history")
     public List<PortfolioOrderResponse> getHistory(
             @RequestParam UUID userId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam StrategyTicker ticker) {
-        return portfolioUseCase.getHistory(userId, from, to, ticker).stream()
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return portfolioUseCase.getHistory(userId, from, to).stream()
                 .map(StatsContractMapper::toResponse)
                 .toList();
     }

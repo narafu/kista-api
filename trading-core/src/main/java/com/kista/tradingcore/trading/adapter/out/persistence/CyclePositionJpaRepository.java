@@ -62,19 +62,17 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
             @Param("from") Instant from,
             @Param("to") Instant to);
 
-    // 사용자 스코프 최근 N건 (관리자 /status — 본인 데이터만, native, DCA 포함·USD 표시 전제라 excludedBrokers(원화 코인) 계좌 제외)
+    // 사용자 스코프 전략별 최신 포지션 1건 (관리자 /status — 본인 데이터만, native, 코인 계좌 포함: 통화 표기는 서비스가 계좌에서 해석)
     @Query(value = """
-            SELECT cp.* FROM cycle_position cp
+            SELECT DISTINCT ON (s.id) cp.* FROM cycle_position cp
             JOIN strategy_cycle sc ON cp.strategy_cycle_id = sc.id
             JOIN strategy s ON sc.strategy_id = s.id
             JOIN accounts a ON s.account_id = a.id
-            WHERE a.user_id = :userId AND a.broker NOT IN (:excludedBrokers)
+            WHERE a.user_id = :userId
               AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL AND s.deleted_at IS NULL AND a.deleted_at IS NULL
-            ORDER BY cp.created_at DESC
+            ORDER BY s.id, cp.created_at DESC, cp.id DESC
             """, nativeQuery = true)
-    List<CyclePositionEntity> findRecentByUserId(@Param("userId") UUID userId,
-                                                 @Param("excludedBrokers") Collection<String> excludedBrokers,
-                                                 Pageable pageable);
+    List<CyclePositionEntity> findLatestPerStrategyByUserId(@Param("userId") UUID userId);
 
     // 사용자 스코프 범위 조회 (통계 — created_at 오름차순, native, DCA 포함: DCA도 자기 원장 스냅샷을 가진다)
     @Query(value = """
@@ -102,20 +100,19 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
     List<CyclePositionEntity> findByCycleIdsAndRange(
             @Param("cycleIds") Set<UUID> cycleIds, @Param("from") Instant from, @Param("to") Instant to);
 
-    // 계좌 기준 커서 페이지네이션 (native — strategy_cycle → strategy → accounts JOIN, DCA 포함·USD 표시 전제라 excludedBrokers(원화 코인) 계좌 제외)
+    // 계좌 기준 커서 페이지네이션 (native — strategy_cycle → strategy → accounts JOIN, 코인 계좌 포함)
     @Query(value = """
             SELECT cp.* FROM cycle_position cp
             JOIN strategy_cycle sc ON cp.strategy_cycle_id = sc.id
             JOIN strategy s ON sc.strategy_id = s.id
             JOIN accounts a ON s.account_id = a.id
-            WHERE s.account_id = :accountId AND a.broker NOT IN (:excludedBrokers)
+            WHERE s.account_id = :accountId
               AND cp.created_at >= :from AND cp.created_at < :cursor
               AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL AND s.deleted_at IS NULL AND a.deleted_at IS NULL
             ORDER BY cp.created_at DESC
             """, nativeQuery = true)
     List<CyclePositionEntity> findByAccountIdWithCursor(
             @Param("accountId") UUID accountId,
-            @Param("excludedBrokers") Collection<String> excludedBrokers,
             @Param("from") Instant from,
             @Param("cursor") Instant cursor,
             Pageable pageable);

@@ -12,12 +12,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// 사용자 최근/계좌 커서 조회가 DCA cycle_position을 포함하되 원화 코인(CRYPTO_KRW) 계좌는 제외하는지 실 DB로 검증
+// 사용자 전략별 최신/계좌 커서 조회가 DCA·코인 계좌 cycle_position을 포함하는지 실 DB로 검증
 @Execution(ExecutionMode.SAME_THREAD)
 class CyclePositionDcaInclusionDbTest extends DataJpaTestBase {
 
@@ -25,23 +24,23 @@ class CyclePositionDcaInclusionDbTest extends DataJpaTestBase {
     @Autowired CyclePositionJpaRepository repo;
 
     @Test
-    void user_and_account_queries_include_dca_but_exclude_krw_crypto_accounts() {
+    void user_and_account_queries_include_dca_and_crypto_accounts() {
         UUID userId = UUID.randomUUID();
         UUID accountId = insertAccount(userId, "KIS");
         UUID upbitAccountId = insertAccount(userId, "UPBIT");
         UUID infinitePos = insertPosition(accountId, "INFINITE");
         UUID dcaPos = insertPosition(accountId, "DCA");
-        insertPosition(upbitAccountId, "DCA"); // 원화 코인 DCA — USD 표시 화면에서 제외
+        UUID upbitPos = insertPosition(upbitAccountId, "DCA"); // 코인 DCA도 포함 (통화는 서비스가 계좌에서 해석)
 
         Instant from = Instant.EPOCH;
         Instant to = Instant.now().plusSeconds(3600);
-        List<String> excluded = List.of("UPBIT");
 
-        assertThat(repo.findRecentByUserId(userId, excluded, PageRequest.of(0, 10))).extracting(CyclePositionEntity::getId)
-                .containsExactlyInAnyOrder(infinitePos, dcaPos);
-        assertThat(repo.findByAccountIdWithCursor(accountId, excluded, from, to, PageRequest.of(0, 10)))
+        assertThat(repo.findLatestPerStrategyByUserId(userId)).extracting(CyclePositionEntity::getId)
+                .containsExactlyInAnyOrder(infinitePos, dcaPos, upbitPos);
+        assertThat(repo.findByAccountIdWithCursor(accountId, from, to, PageRequest.of(0, 10)))
                 .extracting(CyclePositionEntity::getId).containsExactlyInAnyOrder(infinitePos, dcaPos);
-        assertThat(repo.findByAccountIdWithCursor(upbitAccountId, excluded, from, to, PageRequest.of(0, 10))).isEmpty();
+        assertThat(repo.findByAccountIdWithCursor(upbitAccountId, from, to, PageRequest.of(0, 10)))
+                .extracting(CyclePositionEntity::getId).containsExactly(upbitPos);
     }
 
     @Test
@@ -50,8 +49,8 @@ class CyclePositionDcaInclusionDbTest extends DataJpaTestBase {
         insertPosition(accountId, "INFINITE");
         jdbc.update("UPDATE accounts SET deleted_at = now() WHERE id = ?", accountId);
 
-        // 삭제 계좌의 포지션은 커서 조회에 나오지 않는다 (findRecentByUserId 등 같은 JOIN 쿼리와 일관)
-        assertThat(repo.findByAccountIdWithCursor(accountId, List.of("UPBIT"), Instant.EPOCH,
+        // 삭제 계좌의 포지션은 커서 조회에 나오지 않는다 (findLatestPerStrategyByUserId 등 같은 JOIN 쿼리와 일관)
+        assertThat(repo.findByAccountIdWithCursor(accountId, Instant.EPOCH,
                 Instant.now().plusSeconds(3600), PageRequest.of(0, 10))).isEmpty();
     }
 

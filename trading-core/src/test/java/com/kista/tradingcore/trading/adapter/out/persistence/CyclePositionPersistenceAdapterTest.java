@@ -581,4 +581,74 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(result).extracting(CyclePosition::deposit)
                 .containsExactly(new BigDecimal("10.00"), new BigDecimal("20.00"), new BigDecimal("30.00"));
     }
+
+    // ===== 코인 계좌 포함 조회 (findLatestPerStrategyByUser·계좌 커서) =====
+
+    private UUID insertBrokerAccount(String broker) {
+        UUID accId = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
+                accId, userId, "코인계좌", broker, accId.toString().substring(0, 8), "01", "key", "secret");
+        return accId;
+    }
+
+    // 지정 종목·삭제 여부로 전략 체인을 만들고 cycleId를 반환
+    private UUID insertChain(UUID accId, String type, String ticker, boolean deletedStrategy) {
+        UUID strategyId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        UUID cycleId = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO strategy (id, account_id, type, ticker, status, cycle_seed_type, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, now(), now(), ?)",
+                strategyId, accId, type, ticker, "ACTIVE", "NONE", deletedStrategy ? Timestamp.from(Instant.now()) : null);
+        jdbcTemplate.update("INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, ?, now())",
+                versionId, strategyId, 1);
+        jdbcTemplate.update(
+                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, start_date, created_at) VALUES (?, ?, ?, ?, 0, ?, now())",
+                cycleId, strategyId, versionId, new BigDecimal("1000.00"), LocalDate.now());
+        return cycleId;
+    }
+
+    @Test
+    void 전략별_최신_포지션을_반환한다() {
+        Instant base = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(1, ChronoUnit.HOURS);
+        UUID binanceId = insertBrokerAccount("BINANCE");
+        UUID kisCycle = insertChain(accountId, "INFINITE", "SOXL", false);
+        UUID coinCycle = insertChain(binanceId, "DCA", "ETH", false);
+        insertPosition(kisCycle, new BigDecimal("100.00"), base, false);
+        UUID kisLatest = insertPosition(kisCycle, new BigDecimal("200.00"), base.plusSeconds(60), false);
+        insertPosition(coinCycle, new BigDecimal("1.00"), base, false);
+        UUID coinLatest = insertPosition(coinCycle, new BigDecimal("2.00"), base.plusSeconds(60), false);
+
+        List<CyclePositionHistoryEntry> result = cyclePositionAdapter.findLatestPerStrategyByUser(userId);
+
+        assertThat(result).extracting(CyclePositionHistoryEntry::id).containsExactlyInAnyOrder(kisLatest, coinLatest);
+        assertThat(result).filteredOn(e -> e.id().equals(kisLatest)).singleElement()
+                .satisfies(e -> assertThat(e.accountId()).isEqualTo(accountId));
+        assertThat(result).filteredOn(e -> e.id().equals(coinLatest)).singleElement()
+                .satisfies(e -> {
+                    assertThat(e.accountId()).isEqualTo(binanceId);
+                    assertThat(e.ticker()).isEqualTo(StrategyTicker.ETH);
+                });
+    }
+
+    @Test
+    void 삭제된_전략과_스냅샷_없는_전략은_제외한다() {
+        Instant base = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(1, ChronoUnit.HOURS);
+        UUID deletedCycle = insertChain(accountId, "INFINITE", "SOXL", true);
+        insertPosition(deletedCycle, new BigDecimal("100.00"), base, false);
+        insertChain(accountId, "VR", "TQQQ", false); // 스냅샷 없음
+
+        assertThat(cyclePositionAdapter.findLatestPerStrategyByUser(userId)).isEmpty();
+    }
+
+    @Test
+    void 계좌_커서_조회는_코인_계좌_포지션을_포함한다() {
+        Instant base = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(1, ChronoUnit.HOURS);
+        UUID binanceId = insertBrokerAccount("BINANCE");
+        UUID coinCycle = insertChain(binanceId, "DCA", "ETH", false);
+        UUID pos = insertPosition(coinCycle, new BigDecimal("2.00"), base, false);
+
+        assertThat(cyclePositionAdapter.findByAccountIdWithCursor(binanceId, Instant.EPOCH, Instant.now().plusSeconds(60), 10))
+                .extracting(CyclePositionHistoryEntry::id).containsExactly(pos);
+    }
 }

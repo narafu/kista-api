@@ -174,6 +174,17 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
                 accountId, cycleId, tradeDate, leg, createdAt);
     }
 
+
+    @Test
+    void findByUser는_전_종목을_반환한다() {
+        LocalDate day = LocalDate.now();
+        insertOrderForAccount(accountId, cycleId, day, "SOXL", "BUY", "PLACED", null, null);
+        insertOrderForAccount(accountId, cycleId, day, "TQQQ", "BUY", "PLACED", null, null);
+        insertOrderForAccount(accountId, cycleId, day, "ETH", "BUY", "PLACED", null, null);
+
+        assertThat(adapter.findByUser(userId, day, day)).extracting(Order::ticker)
+                .containsExactlyInAnyOrder(StrategyTicker.SOXL, StrategyTicker.TQQQ, StrategyTicker.ETH);
+    }
     @Test
     void savesAndReloadsFractionalQuantity() {
         Order saved = adapter.save(Order.cryptoMarket(accountId, cycleId, LocalDate.of(2026, 10, 18),

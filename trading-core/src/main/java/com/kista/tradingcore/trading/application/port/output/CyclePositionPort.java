@@ -44,8 +44,8 @@ public interface CyclePositionPort {
     // 여러 사이클의 최신 포지션 배치 조회 (목록 조회 N+1 방지) — cycleId 기준 최신 1건씩
     Map<UUID, CyclePosition> findLatestByCycleIds(Collection<UUID> cycleIds);
 
-    // 사용자 스코프 최근 N건 (대시보드 — 본인 데이터만)
-    List<CyclePositionHistoryEntry> findRecentByUser(UUID userId, int limit);
+    // 사용자 스코프 전략별 최신 포지션 1건 (관리자 /status — 본인 데이터만, 코인 계좌 포함)
+    List<CyclePositionHistoryEntry> findLatestPerStrategyByUser(UUID userId);
 
     // 사용자 스코프 스냅샷 범위 조회 (통계 equity curve용) — created_at 오름차순
     List<CyclePosition> findByUserAndRange(UUID userId, Instant from, Instant to);

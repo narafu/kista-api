@@ -13,6 +13,7 @@ import com.kista.shared.kernel.StrategyType;
 // cycle_position + strategy_cycle + strategy join 조회 결과 (계좌·사이클 기준 이력 조회 전용)
 public record CyclePositionHistoryEntry(
         UUID id,
+        UUID accountId,           // strategy.accountId (전략 없으면 null)
         StrategyTicker ticker,    // strategy.ticker
         StrategyType strategyType, // strategy.type (전략 없으면 null)
         BigDecimal deposit,     // 통합주문가능금액

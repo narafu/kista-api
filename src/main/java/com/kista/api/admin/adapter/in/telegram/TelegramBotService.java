@@ -2,7 +2,8 @@ package com.kista.api.admin.adapter.in.telegram;
 
 import com.kista.shared.contract.stats.PortfolioCurrentResponse;
 import com.kista.shared.contract.stats.PortfolioOrderResponse;
-import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.Currency;
+import com.kista.shared.kernel.Quantities;
 import com.kista.api.admin.application.port.output.PortfolioQueryPort;
 import com.kista.shared.platform.telegram.TelegramHttpClient;
 import com.kista.shared.platform.telegram.TelegramProperties;
@@ -13,11 +14,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -125,21 +127,24 @@ class TelegramBotService {
         // adminChatId로 사용자 UUID 조회 — 미설정이면 데이터 없음 메시지
         return userUseCase.findUserIdByTelegramChatId(adminChatId())
                 .map(userId -> {
-                    try {
-                        PortfolioCurrentResponse s = portfolioQueryPort.getCurrent(userId);
-                        // closingPrice가 null이면 평가액 0으로 처리
-                        double marketValue = s.closingPrice() != null
-                                ? s.closingPrice().multiply(s.holdings()).doubleValue() : 0.0;
-                        double totalAsset = marketValue + (s.deposit() != null ? s.deposit().doubleValue() : 0.0);
-                        double avgPrice = s.avgPrice() != null ? s.avgPrice().doubleValue() : 0.0;
-                        return "<b>포트폴리오 현황</b>%n보유: %s주 @ $%.4f%n평가액: $%.2f%n예수금: $%.2f%n총자산: $%.2f".formatted(
-                                s.holdings().toPlainString(), avgPrice, marketValue,
-                                s.deposit() != null ? s.deposit().doubleValue() : 0.0, totalAsset);
-                    } catch (NoSuchElementException _) {
-                        return "포트폴리오 데이터가 없습니다.";
-                    }
+                    List<PortfolioCurrentResponse> list = portfolioQueryPort.getCurrent(userId);
+                    if (list.isEmpty()) return "포트폴리오 데이터가 없습니다.";
+                    // 전략마다 블록 하나 — 블록 사이 빈 줄
+                    return list.stream().map(this::statusBlock).collect(Collectors.joining("\n\n"));
                 })
                 .orElse(NOT_LINKED_MSG);
+    }
+
+    // 전략 1개의 현황 블록 — 금액은 계좌 통화로 표기
+    private String statusBlock(PortfolioCurrentResponse s) {
+        Currency c = s.currency();
+        // closingPrice가 null이면 평가액 0으로 처리
+        BigDecimal marketValue = s.closingPrice() != null ? s.closingPrice().multiply(s.holdings()) : BigDecimal.ZERO;
+        BigDecimal deposit = s.deposit() != null ? s.deposit() : BigDecimal.ZERO;
+        BigDecimal avgPrice = s.avgPrice() != null ? s.avgPrice() : BigDecimal.ZERO;
+        return "<b>%s %s</b>%n보유: %s%n평단: %s%n평가액: %s%n예수금: %s%n총자산: %s".formatted(
+                s.strategyType(), s.ticker(), Quantities.normalize(s.holdings()).toPlainString(),
+                c.format(avgPrice), c.format(marketValue), c.format(deposit), c.format(marketValue.add(deposit)));
     }
 
     private String buildHistoryMessage(int days) {
@@ -148,11 +153,12 @@ class TelegramBotService {
         // adminChatId로 사용자 UUID 조회 — 미설정이면 데이터 없음 메시지
         return userUseCase.findUserIdByTelegramChatId(adminChatId())
                 .map(userId -> {
-                    List<PortfolioOrderResponse> list = portfolioQueryPort.getHistory(userId, from, to, StrategyTicker.SOXL);
+                    List<PortfolioOrderResponse> list = portfolioQueryPort.getHistory(userId, from, to);
                     if (list.isEmpty()) return "최근 " + days + "일 거래 내역이 없습니다.";
                     StringBuilder sb = new StringBuilder("<b>최근 " + days + "일 거래 내역</b>\n");
-                    list.forEach(h -> sb.append("%s %s %s %s주 $%.4f%n".formatted(
-                            h.tradeDate(), h.direction(), h.orderType(), h.quantity().toPlainString(), h.price())));
+                    list.forEach(h -> sb.append("%s %s %s %s %s @ %s%n".formatted(
+                            h.tradeDate(), h.ticker(), h.direction(), h.orderType(),
+                            Quantities.normalize(h.quantity()).toPlainString(), h.currency().format(h.price()))));
                     return sb.toString().trim();
                 })
                 .orElse(NOT_LINKED_MSG);

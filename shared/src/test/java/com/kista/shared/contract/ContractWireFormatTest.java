@@ -69,7 +69,8 @@ class ContractWireFormatTest {
     @DisplayName("PortfolioCurrentResponse — 정수 보유수량은 \"holdings\":5로 직렬화된다")
     void portfolio_current_holdings_serializes_as_integer() {
         PortfolioCurrentResponse response = new PortfolioCurrentResponse(
-                StrategyTicker.SOXL, new BigDecimal("5"), BigDecimal.TEN, BigDecimal.ONE, BigDecimal.ONE);
+                com.kista.shared.kernel.StrategyType.INFINITE, StrategyTicker.SOXL, com.kista.shared.kernel.Currency.USD,
+                new BigDecimal("5"), BigDecimal.TEN, BigDecimal.ONE, BigDecimal.ONE);
 
         assertThat(objectMapper.writeValueAsString(response)).contains("\"holdings\":5,");
     }

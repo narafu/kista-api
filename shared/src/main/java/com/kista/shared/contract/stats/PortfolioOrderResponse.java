@@ -1,5 +1,6 @@
 package com.kista.shared.contract.stats;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.StrategyTicker;
@@ -14,5 +15,6 @@ public record PortfolioOrderResponse(
         OrderDirection direction,   // 매매 방향
         OrderType orderType,        // 주문 유형
         BigDecimal quantity,        // 주문 수량 (주식 정수 값·코인 소수)
-        BigDecimal price            // 주문 가격
+        BigDecimal price,           // 주문 가격
+        Currency currency           // 계좌 통화 (USD·USDT·KRW)
 ) {}

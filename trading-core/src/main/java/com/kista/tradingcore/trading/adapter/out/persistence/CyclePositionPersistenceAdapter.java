@@ -20,18 +20,12 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import com.kista.shared.kernel.Broker;
-import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.trading.domain.model.Strategy;
-import java.util.Arrays;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class CyclePositionPersistenceAdapter implements CyclePositionPort {
 
-    // 사용자 합산·계좌 이력 화면은 USD 표시 전제 — USD 견적 아님(코인 KRW·USDT 등)은 제외 (통계 합산 경로의 USD 포함식 필터와 동일)
-    private static final List<String> NON_USD_BROKERS = Arrays.stream(Broker.values())
-            .filter(b -> b.getCurrency() != Currency.USD).map(Enum::name).toList();
 
     private final CyclePositionJpaRepository positionRepo;
     private final StrategyCycleJpaRepository cycleRepo;     // strategy_cycle 조인: 현재 사이클 조회
@@ -95,8 +89,8 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     }
 
     @Override
-    public List<CyclePositionHistoryEntry> findRecentByUser(UUID userId, int limit) {
-        return toEntries(positionRepo.findRecentByUserId(userId, NON_USD_BROKERS, PageRequest.of(0, limit)));
+    public List<CyclePositionHistoryEntry> findLatestPerStrategyByUser(UUID userId) {
+        return toEntries(positionRepo.findLatestPerStrategyByUserId(userId));
     }
 
     @Override
@@ -121,7 +115,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     @Override
     public List<CyclePositionHistoryEntry> findByAccountIdWithCursor(UUID accountId, Instant from,
                                                                       Instant cursor, int limit) {
-        return toEntries(positionRepo.findByAccountIdWithCursor(accountId, NON_USD_BROKERS, from, cursor, PageRequest.of(0, limit)));
+        return toEntries(positionRepo.findByAccountIdWithCursor(accountId, from, cursor, PageRequest.of(0, limit)));
     }
 
     @Override
@@ -185,10 +179,11 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
         return entities.stream().map(e -> toEntry(e, strategyMap.get(e.getStrategyCycleId()))).toList();
     }
 
-    // strategy가 없으면(삭제 등) ticker·type null
+    // strategy가 없으면(삭제 등) accountId·ticker·type null
     private CyclePositionHistoryEntry toEntry(CyclePositionEntity e, Strategy strategy) {
         return new CyclePositionHistoryEntry(
-                e.getId(), strategy != null ? strategy.ticker() : null, strategy != null ? strategy.type() : null,
+                e.getId(), strategy != null ? strategy.accountId() : null,
+                strategy != null ? strategy.ticker() : null, strategy != null ? strategy.type() : null,
                 e.getDeposit(), e.getClosingPrice(), e.getAvgPrice(),
                 e.getHoldings(), e.getCreatedAt()
         );

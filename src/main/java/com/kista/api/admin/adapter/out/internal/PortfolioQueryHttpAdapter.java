@@ -2,9 +2,7 @@ package com.kista.api.admin.adapter.out.internal;
 
 import com.kista.shared.contract.stats.PortfolioCurrentResponse;
 import com.kista.shared.contract.stats.PortfolioOrderResponse;
-import com.kista.shared.platform.internalapi.InternalApiStatusHandlers;
 import com.kista.api.admin.application.port.output.PortfolioQueryPort;
-import com.kista.shared.kernel.StrategyTicker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
@@ -21,22 +19,18 @@ class PortfolioQueryHttpAdapter implements PortfolioQueryPort {
     private final RestClient internalApiRestClient;
 
     @Override
-    public PortfolioCurrentResponse getCurrent(UUID userId) {
-        RestClient.ResponseSpec spec = internalApiRestClient.get()
+    public List<PortfolioCurrentResponse> getCurrent(UUID userId) {
+        return internalApiRestClient.get()
                 .uri(b -> b.path("/api/internal/trading/stats/portfolio/current").queryParam("userId", userId).build())
-                .retrieve();
-        // trading 쪽 GlobalExceptionHandler가 매핑한 상태코드를 원래 예외 타입으로 되돌린다 — 없으면
-        // NoSuchElementException(포트폴리오 데이터 없음)이 HttpClientErrorException으로 흘러 TelegramBotService의
-        // catch(NoSuchElementException)가 동작하지 않는다
-        return InternalApiStatusHandlers.notFoundAsNoSuchElement(spec, "포트폴리오 데이터가 없습니다.")
-                .body(PortfolioCurrentResponse.class);
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<PortfolioCurrentResponse>>() {});
     }
 
     @Override
-    public List<PortfolioOrderResponse> getHistory(UUID userId, LocalDate from, LocalDate to, StrategyTicker ticker) {
+    public List<PortfolioOrderResponse> getHistory(UUID userId, LocalDate from, LocalDate to) {
         return internalApiRestClient.get()
                 .uri(b -> b.path("/api/internal/trading/stats/portfolio/history")
-                        .queryParam("userId", userId).queryParam("from", from).queryParam("to", to).queryParam("ticker", ticker)
+                        .queryParam("userId", userId).queryParam("from", from).queryParam("to", to)
                         .build())
                 .retrieve()
                 .body(new ParameterizedTypeReference<List<PortfolioOrderResponse>>() {});

@@ -9,6 +9,8 @@ import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.stats.domain.model.InvestmentPoint;
 import com.kista.tradingcore.stats.domain.model.InvestmentPointsResult;
+import com.kista.tradingcore.stats.domain.model.PortfolioOrder;
+import com.kista.tradingcore.stats.domain.model.PortfolioPosition;
 
 // 내부 API(/api/internal/trading/stats/**) 도메인 → contract 매핑 — 도메인 record를 wire에 직접 태우지 않는다
 final class StatsContractMapper {
@@ -31,11 +33,14 @@ final class StatsContractMapper {
         return new InvestmentPointsResponse.StrategyRefDto(s.id(), s.type(), s.ticker(), currency);
     }
 
-    static PortfolioCurrentResponse toResponse(CyclePositionHistoryEntry e) {
-        return new PortfolioCurrentResponse(e.ticker(), e.holdings(), e.avgPrice(), e.deposit(), e.closingPrice());
+    static PortfolioCurrentResponse toResponse(PortfolioPosition p) {
+        CyclePositionHistoryEntry e = p.position();
+        return new PortfolioCurrentResponse(e.strategyType(), e.ticker(), p.currency(),
+                e.holdings(), e.avgPrice(), e.deposit(), e.closingPrice());
     }
 
-    static PortfolioOrderResponse toResponse(Order o) {
-        return new PortfolioOrderResponse(o.tradeDate(), o.ticker(), o.direction(), o.orderType(), o.quantity(), o.price());
+    static PortfolioOrderResponse toResponse(PortfolioOrder p) {
+        Order o = p.order();
+        return new PortfolioOrderResponse(o.tradeDate(), o.ticker(), o.direction(), o.orderType(), o.quantity(), o.price(), p.currency());
     }
 }

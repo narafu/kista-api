@@ -5,7 +5,9 @@ import com.kista.shared.contract.stats.PortfolioCurrentResponse;
 import com.kista.shared.contract.stats.PortfolioOrderResponse;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
 import com.kista.api.admin.application.port.output.PortfolioQueryPort;
 import com.kista.shared.platform.telegram.TelegramHttpClient;
 import com.kista.shared.platform.telegram.TelegramProperties;
@@ -22,7 +24,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -73,55 +74,75 @@ class TelegramBotServiceTest {
         assertThat(captor.getValue()).contains("/status").contains("/history");
     }
 
-    @Test
-    void status_command_returns_portfolio_info() {
-        PortfolioCurrentResponse snap = new PortfolioCurrentResponse(
-                StrategyTicker.SOXL, BigDecimal.valueOf(100), new BigDecimal("25.0000"),
-                new BigDecimal("1000.00"), new BigDecimal("26.00"));
-        when(portfolioQueryPort.getCurrent(any())).thenReturn(snap);
-
-        sut.handle(update("/status"));
-
+    private String sentMessage() {
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(telegramHttpClient).sendMessage(any(), captor.capture(), any());
-        assertThat(captor.getValue()).contains("100주");
+        return captor.getValue();
     }
 
     @Test
-    void status_when_no_snapshot_returns_fallback_message() {
-        when(portfolioQueryPort.getCurrent(any())).thenThrow(new NoSuchElementException());
+    void status는_전략별로_통화_표기해_출력한다() {
+        when(portfolioQueryPort.getCurrent(any())).thenReturn(List.of(
+                new PortfolioCurrentResponse(StrategyType.INFINITE, StrategyTicker.SOXL, Currency.USD,
+                        BigDecimal.TEN, new BigDecimal("19.5000"), new BigDecimal("1000.00"), new BigDecimal("20.00")),
+                new PortfolioCurrentResponse(StrategyType.DCA, StrategyTicker.ETH, Currency.USDT,
+                        new BigDecimal("0.5"), new BigDecimal("2900.00"), BigDecimal.ZERO, new BigDecimal("3000.00"))));
 
         sut.handle(update("/status"));
 
-        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(telegramHttpClient).sendMessage(any(), captor.capture(), any());
-        assertThat(captor.getValue()).contains("데이터가 없습니다");
+        String msg = sentMessage();
+        assertThat(msg).contains("<b>INFINITE SOXL</b>", "<b>DCA ETH</b>", "보유: 10", "보유: 0.5",
+                "예수금: 1,000.00 USD", "평가액: 200.00 USD", "총자산: 1,200.00 USD",
+                "평가액: 1,500.00 USDT", "총자산: 1,500.00 USDT")
+                .doesNotContain("$")
+                .contains("\n\n<b>DCA ETH</b>"); // 블록 사이 빈 줄
+    }
+
+    @Test
+    void status는_종가가_없으면_평가액_0으로_출력한다() {
+        when(portfolioQueryPort.getCurrent(any())).thenReturn(List.of(
+                new PortfolioCurrentResponse(StrategyType.VR, StrategyTicker.TQQQ, Currency.USD,
+                        BigDecimal.TEN, null, new BigDecimal("500.00"), null)));
+
+        sut.handle(update("/status"));
+
+        assertThat(sentMessage()).contains("평가액: 0.00 USD", "총자산: 500.00 USD");
+    }
+
+    @Test
+    void status는_빈_목록이면_데이터_없음_문구를_출력한다() {
+        when(portfolioQueryPort.getCurrent(any())).thenReturn(List.of());
+
+        sut.handle(update("/status"));
+
+        assertThat(sentMessage()).isEqualTo("포트폴리오 데이터가 없습니다.");
     }
 
     @Test
     void history_command_with_days_delegates_to_usecase() {
-        when(portfolioQueryPort.getHistory(any(), any(), any(), eq(StrategyTicker.SOXL))).thenReturn(List.of());
+        when(portfolioQueryPort.getHistory(any(), any(), any())).thenReturn(List.of());
 
         sut.handle(update("/history 14"));
 
         verify(portfolioQueryPort).getHistory(
-                eq(USER_ID), eq(LocalDate.now(FixedClockTestConfig.FIXED).minusDays(14)), eq(LocalDate.now(FixedClockTestConfig.FIXED)), eq(StrategyTicker.SOXL));
+                eq(USER_ID), eq(LocalDate.now(FixedClockTestConfig.FIXED).minusDays(14)), eq(LocalDate.now(FixedClockTestConfig.FIXED)));
     }
 
     @Test
-    void history_command_formats_decimal_quantity() {
-        when(portfolioQueryPort.getHistory(any(), any(), any(), eq(StrategyTicker.SOXL))).thenReturn(List.of(
-                new PortfolioOrderResponse(LocalDate.of(2026, 10, 16), StrategyTicker.SOXL, OrderDirection.BUY,
-                        OrderType.LOC, new BigDecimal("12"), new BigDecimal("22.5000"))));
+    void history는_전_종목을_통화_표기해_출력한다() {
+        when(portfolioQueryPort.getHistory(any(), any(), any())).thenReturn(List.of(
+                new PortfolioOrderResponse(LocalDate.of(2026, 10, 16), StrategyTicker.TQQQ, OrderDirection.BUY,
+                        OrderType.LOC, new BigDecimal("12"), new BigDecimal("22.5000"), Currency.USD),
+                new PortfolioOrderResponse(LocalDate.of(2026, 10, 16), StrategyTicker.ETH, OrderDirection.BUY,
+                        OrderType.MARKET, new BigDecimal("0.00500000"), new BigDecimal("3000.00"), Currency.USDT)));
 
         sut.handle(update("/history 14"));
 
-        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(telegramHttpClient, atLeastOnce()).sendMessage(any(), captor.capture(), any());
-        assertThat(captor.getValue()).contains("12주");
+        assertThat(sentMessage()).contains(
+                "2026-10-16 TQQQ BUY LOC 12 @ 22.50 USD",
+                "2026-10-16 ETH BUY MARKET 0.005 @ 3,000.00 USDT");
     }
 
-    @Test
     void run_command_returns_v2_info_immediately() {
         sut.handle(update("/run"));
 
