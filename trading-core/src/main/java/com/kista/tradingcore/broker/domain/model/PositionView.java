@@ -7,5 +7,5 @@ import java.math.BigDecimal;
 public record PositionView(
         int holdings,          // 보유 수량
         BigDecimal avgPrice,   // 평균 매입 단가 (holdings=0이면 null)
-        BigDecimal usdDeposit  // 통합주문가능금액
+        BigDecimal deposit  // 통합주문가능금액
 ) {}

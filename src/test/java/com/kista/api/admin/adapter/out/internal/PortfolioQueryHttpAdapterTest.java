@@ -46,7 +46,7 @@ class PortfolioQueryHttpAdapterTest {
         UUID userId = UUID.randomUUID();
         server.enqueue(new MockResponse.Builder()
                 .code(200).addHeader("Content-Type", "application/json")
-                .body("{\"ticker\":\"TQQQ\",\"holdings\":10,\"avgPrice\":100.50,\"usdDeposit\":500.00,\"closingPrice\":105.00}")
+                .body("{\"ticker\":\"TQQQ\",\"holdings\":10,\"avgPrice\":100.50,\"deposit\":500.00,\"closingPrice\":105.00}")
                 .build());
 
         PortfolioCurrentResponse current = adapter.getCurrent(userId);

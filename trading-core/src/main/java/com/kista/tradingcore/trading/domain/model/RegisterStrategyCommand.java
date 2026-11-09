@@ -12,7 +12,7 @@ import com.kista.tradingcore.trading.domain.creation.VrRampInput;
 public record RegisterStrategyCommand(
         StrategyType type,
         StrategyTicker ticker,                      // null이면 전략 기본값
-        BigDecimal initialUsdDeposit,                // null 허용 (선택 입력), VR에서는 예수금(초기 pool)으로 재사용
+        BigDecimal initialDeposit,                // null 허용 (선택 입력), VR에서는 예수금(초기 pool)으로 재사용
         StrategyCycleSeedType cycleSeedType,        // null이면 NONE으로 처리
         Integer divisionCount,                       // 분할 수 (20/30/40), null이면 런타임 기본값 적용 (INFINITE 전용)
         // 중간부터 시작 — 기존 보유 수량·평단가 (세 전략 공통, null/0이면 빈 포지션에서 시작)

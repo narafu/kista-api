@@ -142,8 +142,8 @@ class StrategyDetailAssembler {
                             .flatMap(versionId -> Optional.ofNullable(vrDetails.get(versionId)))
                             .flatMap(vrDetail -> latestCycle.flatMap(cycle -> Optional.ofNullable(cycleVrDetails.get(cycle.id())))
                                     .map(cycleVr -> vrStrategyDetailService.buildSummary(
-                                            vrDetail, cycleVr, openingPosition.map(CyclePosition::usdDeposit).orElse(null),
-                                            latestPos.map(CyclePosition::usdDeposit).orElse(null))))
+                                            vrDetail, cycleVr, openingPosition.map(CyclePosition::deposit).orElse(null),
+                                            latestPos.map(CyclePosition::deposit).orElse(null))))
                             .orElse(null)
                     : null;
 
@@ -162,15 +162,15 @@ class StrategyDetailAssembler {
                                      Optional<CyclePosition> openingPosition, Optional<CyclePosition> latestPosition,
                                      Integer divisionCount, boolean isReverseMode, VrSummary vrSummary,
                                      DcaSummary dcaSummary) {
-        BigDecimal initialUsdDeposit = strategy.isVr()
-                ? openingPosition.map(CyclePosition::usdDeposit).orElse(null)
+        BigDecimal initialDeposit = strategy.isVr()
+                ? openingPosition.map(CyclePosition::deposit).orElse(null)
                 : latestCycle.map(StrategyCycle::startAmount).orElse(null);
         LocalDate startDate = latestCycle.map(StrategyCycle::startDate).orElse(null);
 
         // 회차는 INFINITE 전용 — 그 외 타입은 null (divisionCount도 INFINITE만 채워진다)
         Double currentRound = !strategy.isInfinite() ? null :
                 latestPosition.map(pos -> InfinitePosition.calcCurrentRound(
-                        pos.avgPrice(), pos.toBalance().wholeShares(), pos.usdDeposit(),
+                        pos.avgPrice(), pos.toBalance().wholeShares(), pos.deposit(),
                         divisionCount)).orElse(null);
 
         // 코인은 소수 원장이라 wholeShares()를 부르지 않는다(StrategyDetail도 코인 보유 수량은 싣지 않음)
@@ -180,7 +180,7 @@ class StrategyDetailAssembler {
         // 진행 중 사이클 여부 — CapitalLedgerService NO_ACTIVE_CYCLE 거절 조건(사이클 없음·최신 사이클 종료)의 반대
         boolean cycleInProgress = latestCycle.map(cycle -> !cycle.isEnded()).orElse(false);
 
-        return new StrategyDetail(strategy, initialUsdDeposit, startDate, divisionCount, isReverseMode, currentRound, currentHoldings, vrSummary, dcaSummary, cycleInProgress,
-                latestPosition.map(CyclePosition::usdDeposit).orElse(null));
+        return new StrategyDetail(strategy, initialDeposit, startDate, divisionCount, isReverseMode, currentRound, currentHoldings, vrSummary, dcaSummary, cycleInProgress,
+                latestPosition.map(CyclePosition::deposit).orElse(null));
     }
 }

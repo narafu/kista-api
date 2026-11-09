@@ -23,7 +23,7 @@ public record TradingCycleResponse(
         @Schema(description = "거래 종목", example = "TQQQ")
         String ticker,
         @Schema(description = "초기 입금액", example = "2000.00")
-        BigDecimal initialUsdDeposit,
+        BigDecimal initialDeposit,
         @Schema(description = "사이클 시작일 (미래면 시작예정일 — 시작예정일 밤 미국장부터 매매 시작)", example = "2026-08-01")
         LocalDate startDate,
         @Schema(description = "연속 사이클 정책", example = "NONE")
@@ -62,7 +62,7 @@ public record TradingCycleResponse(
             int recurringAmount,
             @Schema(description = "pool 상한 금액 (USD)")
             BigDecimal poolLimit,
-            @Schema(description = "현재 pool(예수금, USD) — 최신 포지션 기준, 개장값(initialUsdDeposit)과 다름")
+            @Schema(description = "현재 pool(예수금, USD) — 최신 포지션 기준, 개장값(initialDeposit)과 다름")
             BigDecimal currentPool,
             @Schema(description = "pool 상한 비율(0~1) — 현재 사이클 고정 스냅샷", example = "0.75")
             BigDecimal poolLimitRate,
@@ -103,7 +103,7 @@ public record TradingCycleResponse(
         return new TradingCycleResponse(
                 c.id(), c.accountId(),
                 c.type().name(), c.status().name(),
-                c.ticker().name(), detail.initialUsdDeposit(),
+                c.ticker().name(), detail.initialDeposit(),
                 detail.startDate(),
                 c.cycleSeedType().name(),
                 detail.divisionCount(),

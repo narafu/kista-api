@@ -101,7 +101,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
         // 인출식(recurringAmount<0) 최소자산 검증 — 등록 시점(VrRegistration)과 동일 규칙,
         // 재설정으로 recurringAmount를 인출식으로 바꾸는 경우도 동일하게 검증되도록 재적용
         // 재설정은 override 개념이 없어 gate·required 양쪽에 같은 값을 넘긴다
-        BigDecimal totalAssets = newValue.add(postBalance.usdDeposit());
+        BigDecimal totalAssets = newValue.add(postBalance.deposit());
         VrRampValidator.validateWithdrawalSufficiency(recurringAmount, intervalWeeks, totalAssets, totalAssets);
 
         // 램프 시계 — 전략 최초 사이클 startDate 기준 경과 주수 (재설정해도 리셋하지 않음)
@@ -137,19 +137,19 @@ class VrReconfigureService implements VrReconfigureUseCase {
         // (향후 @Transactional을 붙이면 AFTER_COMMIT 리스너가 지연 실행되어 이 try/catch가 무력화됨에 주의)
         try {
             eventPublisher.publishEvent(new NewCycleStartedEvent(requesterId, account.id(), account.nickname(),
-                    strategy.type(), strategy.ticker(), postBalance.usdDeposit()));
+                    strategy.type(), strategy.ticker(), postBalance.deposit()));
         } catch (Exception e) {
             log.warn("[strategyId={}] VR 재설정 알림 실패: {}", strategyId, e.getMessage());
             eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
         }
     }
 
-    // 투자금 추가/인출 계산 — injectShares>0: holdings+=N, 평단가 가중평균, V+=N×현재가 / injectDeposit: usdDeposit+=X
-    // withdrawShares>0: holdings-=N(보유량 초과 불가, 평단가는 그대로 유지 — 잔여 수량의 원가는 불변) / withdrawDeposit: usdDeposit-=X(보유 예수금 초과 불가)
+    // 투자금 추가/인출 계산 — injectShares>0: holdings+=N, 평단가 가중평균, V+=N×현재가 / injectDeposit: deposit+=X
+    // withdrawShares>0: holdings-=N(보유량 초과 불가, 평단가는 그대로 유지 — 잔여 수량의 원가는 불변) / withdrawDeposit: deposit-=X(보유 예수금 초과 불가)
     // 인출을 먼저 반영한 뒤(잔여 수량 기준) 주입의 가중평균을 계산 — 같은 요청에서 인출+주입이 함께 와도 순서가 명확하도록
-    // 아무것도 없으면 holdings·avgPrice·usdDeposit 그대로 이월(순수 파라미터 수정)
+    // 아무것도 없으면 holdings·avgPrice·deposit 그대로 이월(순수 파라미터 수정)
     private AccountBalance applyCapitalAdjustment(ReconfigureVrCommand cmd, CyclePosition latestPosition) {
-        cmd.validateCapitalAdjustment(latestPosition.toBalance().wholeShares(), latestPosition.holdings(), latestPosition.usdDeposit());
+        cmd.validateCapitalAdjustment(latestPosition.toBalance().wholeShares(), latestPosition.holdings(), latestPosition.deposit());
         int injectShares = cmd.injectSharesOrZero();
         int withdrawShares = cmd.withdrawSharesOrZero();
         BigDecimal injectDeposit = cmd.injectDepositOrZero();
@@ -173,8 +173,8 @@ class VrReconfigureService implements VrReconfigureUseCase {
             newAvgPrice = newHoldings == 0 ? null : latestPosition.avgPrice();
         }
 
-        BigDecimal newUsdDeposit = latestPosition.usdDeposit().add(injectDeposit).subtract(withdrawDeposit);
-        return new AccountBalance(newHoldings, newAvgPrice, newUsdDeposit);
+        BigDecimal newDeposit = latestPosition.deposit().add(injectDeposit).subtract(withdrawDeposit);
+        return new AccountBalance(newHoldings, newAvgPrice, newDeposit);
     }
 
     // V 증분 — 수량 주입 시 V += N×현재가, 없으면 V 이월(순수 파라미터 수정)

@@ -132,7 +132,7 @@ class CycleRotationServiceTest {
 
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof InsufficientBalanceEvent ibe
                 && ibe.userId() == null && ACCOUNT.id().equals(ibe.accountId())
-                && ibe.usdDeposit().compareTo(deposit) == 0 && ibe.ticker() == StrategyTicker.SOXL));
+                && ibe.deposit().compareTo(deposit) == 0 && ibe.ticker() == StrategyTicker.SOXL));
         verify(cycleSnapshotCreator).createCycleAndSnapshot(strategy.id(), STRATEGY_VERSION_ID, deposit, PRICE);
     }
 

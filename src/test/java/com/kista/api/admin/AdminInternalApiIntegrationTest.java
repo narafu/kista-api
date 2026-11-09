@@ -94,9 +94,9 @@ class AdminInternalApiIntegrationTest {
                 "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, start_date, created_at) "
                         + "VALUES (?, ?, ?, ?, ?, ?, now())",
                 cycleId, strategyId, versionId, new BigDecimal("1000.00"), new BigDecimal("1000.00"), today);
-        // 개장 포지션 스냅샷: holdings=2, avgPrice=100.00, usdDeposit=1000.00
+        // 개장 포지션 스냅샷: holdings=2, avgPrice=100.00, deposit=1000.00
         jdbcTemplate.update(
-                "INSERT INTO cycle_position (id, strategy_cycle_id, usd_deposit, avg_price, holdings, created_at) "
+                "INSERT INTO cycle_position (id, strategy_cycle_id, deposit, avg_price, holdings, created_at) "
                         + "VALUES (?, ?, ?, ?, ?, now())",
                 UUID.randomUUID(), cycleId, new BigDecimal("1000.00"), new BigDecimal("100.00"), 2);
 
@@ -107,11 +107,11 @@ class AdminInternalApiIntegrationTest {
 
         TradeCorrectionResponse result = adminTradeCorrectionUseCase.correctManualFills(userId, command);
 
-        // BUY 1주@120 반영 후: holdings=3, avgPrice=(100*2+120)/3=106.6667, usdDeposit=1000-120=880.00
+        // BUY 1주@120 반영 후: holdings=3, avgPrice=(100*2+120)/3=106.6667, deposit=1000-120=880.00
         assertThat(result.processedCount()).isEqualTo(1);
         assertThat(result.finalHoldings()).isEqualTo(3);
         assertThat(result.finalAvgPrice()).isEqualByComparingTo("106.6667");
-        assertThat(result.finalUsdDeposit()).isEqualByComparingTo("880.00");
+        assertThat(result.finalDeposit()).isEqualByComparingTo("880.00");
         assertThat(result.cycleEnded()).isFalse();
 
         // 실제 HTTP 왕복이 DB까지 반영됐는지 — 포지션 스냅샷 append + FILLED 주문 이력 생성

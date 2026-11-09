@@ -8,7 +8,7 @@ import com.kista.shared.kernel.StrategyTicker;
 
 // 사이클 1개의 성과 — 진행 중이면 endAmount=최신 스냅샷 평가액, closed=false
 // 근사 한계: 수수료 미반영. VR 적립금(recurringAmount)은 V' 목표값 계산과 주문 사이징 입력으로만 쓰이고
-// 사이클 도중 usd_deposit에 가산되지 않는다는 전제 — 그런 경로가 생기면 pnl이 과대평가된다
+// 사이클 도중 deposit에 가산되지 않는다는 전제 — 그런 경로가 생기면 pnl이 과대평가된다
 public record CyclePerformance(
         UUID cycleId,
         UUID accountId,

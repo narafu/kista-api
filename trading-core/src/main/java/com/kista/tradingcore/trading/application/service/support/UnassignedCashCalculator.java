@@ -16,7 +16,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
-// 계좌 미배정 현금(계좌 통화) = 주문 가능 현금 − 계좌 전략들의 최신 원장(usd_deposit) 합 — 전략 등록 폼 가용 예수금 경고용
+// 계좌 미배정 현금(계좌 통화) = 주문 가능 현금 − 계좌 전략들의 최신 원장(deposit) 합 — 전략 등록 폼 가용 예수금 경고용
 // 주문 가능 현금: 주식은 증권사 USD 매수가능금액, 코인은 거래소 견적 통화 주문 가능 잔고(접수 주문 잠금분 제외)
 // 미체결 BUY는 각 전략 원장 예수금이 체결 전까지 그대로 들고 있어 따로 빼지 않는다 — 접수(PLACED)분은 증권사·거래소 쪽에서도 빠져 보수적으로 이중 차감된다
 @Component
@@ -37,7 +37,7 @@ public class UnassignedCashCalculator {
     public record SeedHolder(Strategy strategy, @Nullable CyclePosition latest) {
         // 최신 원장이 없으면 예수금 0
         public BigDecimal deposit() {
-            return latest == null ? BigDecimal.ZERO : latest.usdDeposit();
+            return latest == null ? BigDecimal.ZERO : latest.deposit();
         }
 
         // 최신 원장이 없으면 보유 0

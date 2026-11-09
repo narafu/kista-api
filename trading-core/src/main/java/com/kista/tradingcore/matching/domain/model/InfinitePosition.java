@@ -25,8 +25,8 @@ public record InfinitePosition(
         return balance.wholeShares();
     }
 
-    public BigDecimal usdDeposit() {
-        return balance.usdDeposit();
+    public BigDecimal deposit() {
+        return balance.deposit();
     }
 
     // --- 무한매수법 핵심 수식 연산 (행위) ---
@@ -41,7 +41,7 @@ public record InfinitePosition(
     }
 
     public BigDecimal totalAssets() {
-        return usdDeposit().add(purchaseAmount());
+        return deposit().add(purchaseAmount());
     }
 
     public BigDecimal unitAmount() {
@@ -55,11 +55,11 @@ public record InfinitePosition(
     }
 
     // static 헬퍼: DB 저장값(CyclePosition)만으로 회차 계산 — KIS 실시간 조회 없이 StrategyDetail 조립 시 사용
-    public static double calcCurrentRound(BigDecimal avgPrice, int holdings, BigDecimal usdDeposit,
+    public static double calcCurrentRound(BigDecimal avgPrice, int holdings, BigDecimal deposit,
                                           int divisionCount) {
         if (divisionCount == 0 || holdings == 0 || avgPrice == null) return 0.0;
         BigDecimal purchaseAmount = avgPrice.multiply(BigDecimal.valueOf(holdings));
-        BigDecimal unitAmount = usdDeposit.add(purchaseAmount)
+        BigDecimal unitAmount = deposit.add(purchaseAmount)
                 .divide(BigDecimal.valueOf(divisionCount), Currency.USD.amountScale(), HALF_UP);
         return purchaseAmount.divide(unitAmount, Currency.USD.amountScale(), HALF_UP).doubleValue();
     }
@@ -89,9 +89,9 @@ public record InfinitePosition(
         return priceOffsetRate().compareTo(BigDecimal.ZERO) > 0;
     }
 
-    // 마지막 회차(매도 소진 구간) — unitAmount > usdDeposit ⟺ currentRound > 19, 또는 기준가 1주도 원장을 넘어 매수 불가
+    // 마지막 회차(매도 소진 구간) — unitAmount > deposit ⟺ currentRound > 19, 또는 기준가 1주도 원장을 넘어 매수 불가
     public boolean isFinalRound() {
-        return unitAmount().compareTo(usdDeposit()) > 0 || referencePrice().compareTo(usdDeposit()) > 0;
+        return unitAmount().compareTo(deposit()) > 0 || referencePrice().compareTo(deposit()) > 0;
     }
 
     // 체결 후 리버스모드 상태 전이 — prevReverseMode: 이전 상태
@@ -155,7 +155,7 @@ public record InfinitePosition(
         return holdings() - sellQuantityQuarter();
     }
 
-    // 후반(unitAmount>usdDeposit) MOC 매도 수량 — calcLocSellQuantity와 계산식은 같지만 별개 주문(LOC vs MOC)
+    // 후반(unitAmount>deposit) MOC 매도 수량 — calcLocSellQuantity와 계산식은 같지만 별개 주문(LOC vs MOC)
     public int calcMocSellQuantity() {
         return sellQuantityQuarter();
     }

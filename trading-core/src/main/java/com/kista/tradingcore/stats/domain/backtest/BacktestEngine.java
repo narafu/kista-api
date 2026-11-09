@@ -172,7 +172,7 @@ public class BacktestEngine {
         if (candle.date().isBefore(dueDate)) return;
 
         // 인출 반영 후 예수금이 음수면 V′ 계산 전에 보류 — 운영과 동일(예수금을 0으로 깎아 진행하지 않는다)
-        if (state.balance.usdDeposit().add(BigDecimal.valueOf(command.vrRecurringAmount())).signum() < 0) {
+        if (state.balance.deposit().add(BigDecimal.valueOf(command.vrRecurringAmount())).signum() < 0) {
             state.warnHold(warnings, candle.date() + ": 인출액이 예수금을 초과해 VR 주기 갱신을 보류했습니다.");
             return;
         }
@@ -181,7 +181,7 @@ public class BacktestEngine {
         long weeks = ChronoUnit.WEEKS.between(state.firstCycleStartDate, candle.date());
         DailyCandle evaluationCandle = state.dueEvaluationCandle;
         BigDecimal evaluation = marketValue(evaluationCandle, state.balance.wholeShares());
-        BigDecimal newValue = VrPosition.nextValue(state.value, state.balance.usdDeposit(),
+        BigDecimal newValue = VrPosition.nextValue(state.value, state.balance.deposit(),
                 detail.gradientAt(weeks), command.vrRecurringAmount(), evaluation);
 
         // V′≤0이면 롤오버 보류 — cycleStartDate를 갱신하지 않아 다음 거래일에 재판정한다
@@ -195,7 +195,7 @@ public class BacktestEngine {
         // 새 사이클 시작일 = 평가 기준일(항상 실제 거래일) — 실행일을 쓰면 휴장 due일마다 N주 스케줄이 누적해서 밀린다
         state.cycleStartDate = evaluationCandle.date();
         // 새 사이클의 poolLimit — 자본 조정까지 반영한 개장 예수금 × 램프 재계산 비율
-        state.poolLimit = StrategyVrDetail.poolLimitOf(state.balance.usdDeposit(), detail.poolLimitRateAt(weeks));
+        state.poolLimit = StrategyVrDetail.poolLimitOf(state.balance.deposit(), detail.poolLimitRateAt(weeks));
         state.poolUsed = BigDecimal.ZERO;
         state.startNextCycle(state.cycleStartDate);
         state.holdReason = null;
@@ -324,7 +324,7 @@ public class BacktestEngine {
     }
 
     // 다음 세션 주문 생성 — PlanContext 조립 후 기존 PrivacyCycleOrderStrategy.plan()에 위임
-    // 배수(multiple = initialUsdDeposit ÷ currentCycleStart)는 PrivacyStrategy가 내부에서 산출한다 — 여기서 재계산하지 않는다
+    // 배수(multiple = initialDeposit ÷ currentCycleStart)는 PrivacyStrategy가 내부에서 산출한다 — 여기서 재계산하지 않는다
     // privacyBases 키는 기준표가 적용되는 세션 날짜다 — 오늘 만든 주문은 다음 세션에 체결되므로 다음 세션의 기준표를 쓴다
     // (첫 캔들 세션은 그 전날 계획 단계가 없어 매매 없음 — 운영도 등록 다음 배치부터 주문한다)
     private List<PlannedOrder> planPrivacyOrders(PrivacyState state, BacktestCommand command,
@@ -419,14 +419,14 @@ public class BacktestEngine {
 
         // 주문 가능 현금 = 전략 잔고 예수금 + 유휴 현금 — 운영 예산 검증이 보는 증권사 실잔고에 해당
         BigDecimal availableCash() {
-            return balance.usdDeposit().add(idleCash);
+            return balance.deposit().add(idleCash);
         }
 
         // 체결로 전략 잔고 예수금이 음수가 되면 유휴 현금에서 메운다 (유휴 현금이 없으면 예산 검증상 음수가 될 수 없다)
         void coverShortfallFromIdle() {
-            if (balance.usdDeposit().signum() >= 0) return;
-            idleCash = idleCash.add(balance.usdDeposit());
-            balance = balance.withUsdDeposit(BigDecimal.ZERO);
+            if (balance.deposit().signum() >= 0) return;
+            idleCash = idleCash.add(balance.deposit());
+            balance = balance.withDeposit(BigDecimal.ZERO);
         }
 
         // 청산 후 사이클 재시작 — 운영 CycleRotationService의 잔고검증 ON 의미론(백테스트 현금은 실제 돈이라 원장만 믿는 OFF는 없는 돈을 만든다)
@@ -447,10 +447,10 @@ public class BacktestEngine {
                         return false;
                     }
                     // 시작 금액만 전략 잔고로, 나머지는 유휴 현금으로 — 다음 사이클도 같은 시작 금액을 유지한다
-                    balance = balance.withUsdDeposit(cycleStartAmount);
+                    balance = balance.withDeposit(cycleStartAmount);
                     idleCash = cash.subtract(cycleStartAmount);
                 }
-                case MAX -> cycleStartAmount = balance.usdDeposit(); // 청산 시점 예수금 전액 이월
+                case MAX -> cycleStartAmount = balance.deposit(); // 청산 시점 예수금 전액 이월
             }
             startNextCycle(date);
             return true;
@@ -520,7 +520,7 @@ public class BacktestEngine {
             if (recurringAmount == 0) return;
             BigDecimal amount = BigDecimal.valueOf(recurringAmount);
             principal = principal.add(amount);
-            balance = balance.withUsdDeposit(balance.usdDeposit().add(amount));
+            balance = balance.withDeposit(balance.deposit().add(amount));
         }
     }
 

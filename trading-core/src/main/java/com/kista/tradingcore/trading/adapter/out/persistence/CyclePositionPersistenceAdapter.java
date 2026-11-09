@@ -138,7 +138,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
                 .orElseThrow(() -> new NoSuchElementException("포지션 이력이 없습니다."));
         entity.setHoldings(balance.holdings());
         entity.setAvgPrice(balance.avgPrice());
-        entity.setUsdDeposit(balance.usdDeposit());
+        entity.setDeposit(balance.deposit());
         positionRepo.save(entity);
     }
 
@@ -189,7 +189,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     private CyclePositionHistoryEntry toEntry(CyclePositionEntity e, Strategy strategy) {
         return new CyclePositionHistoryEntry(
                 e.getId(), strategy != null ? strategy.ticker() : null, strategy != null ? strategy.type() : null,
-                e.getUsdDeposit(), e.getClosingPrice(), e.getAvgPrice(),
+                e.getDeposit(), e.getClosingPrice(), e.getAvgPrice(),
                 e.getHoldings(), e.getCreatedAt()
         );
     }
@@ -197,7 +197,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     private CyclePosition toDomain(CyclePositionEntity e) {
         return new CyclePosition(
                 e.getId(), e.getStrategyCycleId(),
-                e.getUsdDeposit(), e.getClosingPrice(), e.getAvgPrice(),
+                e.getDeposit(), e.getClosingPrice(), e.getAvgPrice(),
                 e.getHoldings(), e.getCreatedAt(), e.getDeletedAt()
         );
     }
@@ -206,7 +206,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
         CyclePositionEntity e = new CyclePositionEntity();
         e.setId(p.id()); // null이면 @UuidGenerator가 UUID v7 생성
         e.setStrategyCycleId(p.strategyCycleId());
-        e.setUsdDeposit(p.usdDeposit());
+        e.setDeposit(p.deposit());
         e.setClosingPrice(p.closingPrice());
         e.setAvgPrice(p.avgPrice());
         e.setHoldings(p.holdings());

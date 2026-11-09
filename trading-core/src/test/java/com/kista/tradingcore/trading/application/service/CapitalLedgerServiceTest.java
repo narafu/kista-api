@@ -132,7 +132,7 @@ class CapitalLedgerServiceTest {
         service.inject(strategyId, userId, new InjectCapitalCommand(new BigDecimal("300.00"), null, null));
 
         AccountBalance p = updatedBalance();
-        assertThat(p.usdDeposit()).isEqualByComparingTo("800.00");
+        assertThat(p.deposit()).isEqualByComparingTo("800.00");
         assertThat(p.holdings()).isEqualByComparingTo("10");
         assertThat(p.avgPrice()).isEqualByComparingTo("20.0000");
         verify(strategyCyclePort).updateStartAmount(cycleId, new BigDecimal("1300.00"));
@@ -204,7 +204,7 @@ class CapitalLedgerServiceTest {
         AccountBalance p = updatedBalance();
         assertThat(p.holdings()).isEqualByComparingTo("20");
         assertThat(p.avgPrice()).isEqualByComparingTo("25.0000"); // (20×10 + 30×10) / 20
-        assertThat(p.usdDeposit()).isEqualByComparingTo("500.00");
+        assertThat(p.deposit()).isEqualByComparingTo("500.00");
         verify(strategyCyclePort).updateStartAmount(cycleId, new BigDecimal("1300.00"));
     }
 
@@ -236,7 +236,7 @@ class CapitalLedgerServiceTest {
         service.inject(strategyId, userId, new InjectCapitalCommand(new BigDecimal("100.00"), 5, new BigDecimal("40.00")));
 
         AccountBalance p = updatedBalance();
-        assertThat(p.usdDeposit()).isEqualByComparingTo("600.00");
+        assertThat(p.deposit()).isEqualByComparingTo("600.00");
         assertThat(p.holdings()).isEqualByComparingTo("15");
         assertThat(p.avgPrice()).isEqualByComparingTo("26.67"); // (200 + 200) / 15 = 26.666… → scale 2 HALF_UP
         verify(strategyCyclePort).updateStartAmount(cycleId, new BigDecimal("1300.00")); // 1000 + 100 + 5×40
@@ -333,7 +333,7 @@ class CapitalLedgerServiceTest {
 
         service.inject(strategyId, userId, new InjectCapitalCommand(new BigDecimal("300.00"), null, null));
 
-        assertThat(updatedBalance().usdDeposit()).isEqualByComparingTo("800.00");
+        assertThat(updatedBalance().deposit()).isEqualByComparingTo("800.00");
         verify(strategyCyclePort).updateStartAmount(cycleId, new BigDecimal("1300.00"));
     }
 
@@ -354,7 +354,7 @@ class CapitalLedgerServiceTest {
 
         service.inject(strategyId, userId, new InjectCapitalCommand(new BigDecimal("100000"), null, null));
 
-        assertThat(updatedBalance().usdDeposit()).isEqualByComparingTo("100500.00");
+        assertThat(updatedBalance().deposit()).isEqualByComparingTo("100500.00");
         verify(orderPort, never()).findByStrategyId(any(), any(), any());
     }
 
@@ -403,7 +403,7 @@ class CapitalLedgerServiceTest {
         verify(strategyCyclePort, never()).lockForUpdate(any());
     }
 
-    // ===== 투자금 인출 — 기본 stub: usdDeposit 500.00, startAmount 1000.00, FIXED 시계(오늘 2026-01-06, 다음 거래일 2026-01-07) =====
+    // ===== 투자금 인출 — 기본 stub: deposit 500.00, startAmount 1000.00, FIXED 시계(오늘 2026-01-06, 다음 거래일 2026-01-07) =====
     private static final LocalDate TODAY = LocalDate.of(2026, 1, 6);
     private static final LocalDate NEXT = LocalDate.of(2026, 1, 7);
 
@@ -437,7 +437,7 @@ class CapitalLedgerServiceTest {
         withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("200.00")));
 
         AccountBalance p = updatedBalance();
-        assertThat(p.usdDeposit()).isEqualByComparingTo("300.00");
+        assertThat(p.deposit()).isEqualByComparingTo("300.00");
         assertThat(p.holdings()).isEqualByComparingTo("10");
         assertThat(p.avgPrice()).isEqualByComparingTo("20.0000");
         verify(strategyCyclePort).updateStartAmount(cycleId, new BigDecimal("800.00"));
@@ -450,7 +450,7 @@ class CapitalLedgerServiceTest {
 
         withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("500.00")));
 
-        assertThat(updatedBalance().usdDeposit()).isEqualByComparingTo("0.00");
+        assertThat(updatedBalance().deposit()).isEqualByComparingTo("0.00");
         verify(strategyCyclePort).updateStartAmount(cycleId, new BigDecimal("500.00"));
     }
 
@@ -554,7 +554,7 @@ class CapitalLedgerServiceTest {
         withdrawRejected("300.01", IllegalArgumentException.class,
                 "투자금 인출 금액이 인출 가능액 $300.00를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소 전에 체결된 매수 금액을 뺀 만큼 인출할 수 있습니다.");
         withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("300.00")));
-        assertThat(updatedBalance().usdDeposit()).isEqualByComparingTo("200.00");
+        assertThat(updatedBalance().deposit()).isEqualByComparingTo("200.00");
     }
 
     @Test
@@ -697,7 +697,7 @@ class CapitalLedgerServiceTest {
         withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("500.00")));
 
         verify(orderPort, never()).findCancelledByCycleAndDate(cycleId, TODAY);
-        assertThat(updatedBalance().usdDeposit()).isEqualByComparingTo("0.00");
+        assertThat(updatedBalance().deposit()).isEqualByComparingTo("0.00");
     }
 
     @Test
@@ -710,7 +710,7 @@ class CapitalLedgerServiceTest {
 
         withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("500.00")));
 
-        assertThat(updatedBalance().usdDeposit()).isEqualByComparingTo("0.00");
+        assertThat(updatedBalance().deposit()).isEqualByComparingTo("0.00");
     }
 
     @Test

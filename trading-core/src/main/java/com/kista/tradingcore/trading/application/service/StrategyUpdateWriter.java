@@ -120,9 +120,9 @@ class StrategyUpdateWriter {
 
         // openAmount(개장 평가)는 개장 시 1회만 기록 — 이후 변경은 RESET 이력으로 남겨 원금 = openAmount + Σ principalDelta를 유지
         strategyCyclePort.updateStartAmount(cycle.id(), newSeed);
-        cyclePositionPort.updateBalance(latest.id(), latest.toBalance().withUsdDeposit(newSeed));
+        cyclePositionPort.updateBalance(latest.id(), latest.toBalance().withDeposit(newSeed));
         // 보유 0이라 예수금 차액 = 원금 차액
-        BigDecimal delta = newSeed.subtract(latest.usdDeposit());
+        BigDecimal delta = newSeed.subtract(latest.deposit());
         if (delta.signum() != 0) {
             cycleCapitalEventPort.save(new CycleCapitalEvent(null, cycle.id(), latest.id(), CycleCapitalEvent.Kind.RESET,
                     delta, BigDecimal.ZERO, delta, Instant.now(clock)));

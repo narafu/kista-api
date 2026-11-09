@@ -41,7 +41,7 @@ class CycleOrderComputer {
     private final OrderPort orderPort;                       // VR poolUsed 조회용
 
     // 전략 계산 + 주문 유효성 검증을 묶어 계산만 수행 (부수효과 없음)
-    // currentCycle: PRIVACY는 initialUsdDeposit 산출에, INFINITE은 리버스모드 판단에 사용
+    // currentCycle: PRIVACY는 initialDeposit 산출에, INFINITE은 리버스모드 판단에 사용
     // currentPrice: VR 실주문 기준가격(PRIVACY는 소비하지 않음) — preview/수동실행 시 null
     // Optional.empty() = 전략 차원 skip (예: PRIVACY 기준매매표 미수신)
     Optional<CycleOrderStrategy.OrderPlan> compute(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
@@ -55,7 +55,7 @@ class CycleOrderComputer {
                                                    LocalDate tradeDate, StrategyCycle currentCycle,
                                                    PrivacyTradeBase privacyBase, UUID accountId, BigDecimal currentPrice,
                                                    CycleOrderStrategy.PlanContext.DcaPlanInputs dcaInputs) {
-        BigDecimal initialUsdDeposit = strategy.isPrivacy()
+        BigDecimal initialDeposit = strategy.isPrivacy()
                 ? currentCycle.startAmount()
                 : null;
         Integer divisionCount = resolveDivisionCount(strategy, currentCycle);
@@ -80,7 +80,7 @@ class CycleOrderComputer {
                         divisionCount, prevClosePrice, starPointPrice, isReverseMode, isFirstReverseDay);
         CycleOrderStrategy.PlanContext.PrivacyInputs privacyInputs =
                 new CycleOrderStrategy.PlanContext.PrivacyInputs(
-                        initialUsdDeposit, privacyBase == null ? null : privacyBase.toPlan(), currentPrice);
+                        initialDeposit, privacyBase == null ? null : privacyBase.toPlan(), currentPrice);
 
         // VR 전략 전용 입력 조립 — 사이클·버전 상세를 DB에서 조회, 미존재 시 데이터 무결성 오류로 fail-fast
         CycleOrderStrategy.PlanContext.VrInputs vrInputs = null;
@@ -93,7 +93,7 @@ class CycleOrderComputer {
             // poolLimit(달러)은 개장 포지션의 예수금 × 고정 poolLimitRate 스냅샷
             CyclePosition openingPosition = cyclePositionPort.findFirstOne(currentCycle.id())
                     .orElseThrow(() -> new IllegalStateException("VR 시작 포지션이 없습니다."));
-            BigDecimal poolLimit = StrategyVrDetail.poolLimitOf(openingPosition.usdDeposit(), cycleVr.poolLimitRate());
+            BigDecimal poolLimit = StrategyVrDetail.poolLimitOf(openingPosition.deposit(), cycleVr.poolLimitRate());
             // referencePrice: bootstrap·일반 사다리 캡 판정 공용 기준가 — currentPrice 없으면(preview·수동실행) 전일종가로 대체
             BigDecimal vrReferencePrice = currentPrice != null ? currentPrice : prevClosePrice;
             vrInputs = new CycleOrderStrategy.PlanContext.VrInputs(

@@ -66,7 +66,7 @@ class TradingCommandHttpAdapterTest {
                 .code(200).addHeader("Content-Type", "application/json")
                 .body("""
                     {"userId":"%s","accountId":"%s","strategyId":"%s","processedCount":1,"finalHoldings":0,
-                     "finalAvgPrice":266.65,"finalUsdDeposit":7200.05,"strategyStatus":"PAUSED",
+                     "finalAvgPrice":266.65,"finalDeposit":7200.05,"strategyStatus":"PAUSED",
                      "cycleEnded":true,"cycleEndDate":"2026-07-01"}
                     """.formatted(userId, accountId, strategyId))
                 .build());

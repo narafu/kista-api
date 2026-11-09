@@ -28,9 +28,9 @@ public record VrPosition(
         return balance.wholeShares();
     }
 
-    // 현재 예수금 (= usdDeposit)
+    // 현재 예수금 (= deposit)
     public BigDecimal pool() {
-        return balance.usdDeposit();
+        return balance.deposit();
     }
 
     // --- 밴드 계산 ---

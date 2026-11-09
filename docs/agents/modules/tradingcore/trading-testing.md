@@ -14,4 +14,4 @@
 - 배치 실패 격리 테스트는 서로 다른 account의 context를 함께 전달하고 원장 조회·`saveAll`·잔고 부족 알림을 각각 예외 처리해 성공 계좌의 저장·접수와 `TradingErrorEvent` 발행(`eventPublisher.publishEvent`)을 함께 검증한다.
 - 주식 DCA BUY 가용 테스트: 커널(`DcaCycleOrderStrategyTest`)은 `availableCash` 직접 주입으로 PARTIAL 축소(캡가 기준)·REJECT·null=DATA_UNAVAILABLE·`plan()` 앞 BUY 누적을, 수집기(`DcaPlanInputCollectorTest`)는 `StrategyLedgerBudget`(원장 예수금 − 당일 BUY)을 상한으로 쓰는지·전략당 1회 조회·원장 없음 skip을 검증한다. 기존 커널·플래너 테스트는 `availableCash`에 충분한 값을 직접 넘긴다(`UNLIMITED_CASH` 제거). 미배정 현금 계산(`UnassignedCashCalculatorTest` — 주식 매수가능금액·코인 견적 통화 잔고)은 DCA를 포함한 시드 점유 전략 원장 예수금을 모두 빼는 경계를 잠근다.
 - DCA SELL 규칙 테스트(`DcaPlanInputCollectorTest`)는 원장 쪽(보유 − `existingOrders` SELL − 취소된 접수 SELL)이 규칙 입력이 되는 경계(원장 초과 REJECT/PARTIAL, 원장 없음 DATA_UNAVAILABLE)를 검증한다. 수집기는 브로커 포트를 주입받지 않는다.
-- `AccountBalance` 테스트 데이터: `usdDeposit = 통합주문가능금액(현금 대용)`; quantity=0이면 usdDeposit만 의미 있음. `AccountBalance(q>0, 전반)` 잔고는 전략 계산 시 최대 4건(LOC매수×2 + LOC매도 + 지정가매도)
+- `AccountBalance` 테스트 데이터: `deposit = 통합주문가능금액(현금 대용)`; quantity=0이면 deposit만 의미 있음. `AccountBalance(q>0, 전반)` 잔고는 전략 계산 시 최대 4건(LOC매수×2 + LOC매도 + 지정가매도)

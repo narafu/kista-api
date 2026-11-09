@@ -62,7 +62,7 @@ class CyclePositionPersistor {
             // 사이클 종료 기록(DB 쓰기만) — 마커와 같은 트랜잭션: 마커만 커밋되고 종료가 빠지면 재개가 건너뛰어 사이클이 영영 안 닫힌다
             // 종료금액=청산 후 통합주문가능금액, 종료일자=KST 매매일
             if (cycleEnds) {
-                strategyCyclePort.markEnded(currentCycle.id(), balance.usdDeposit(), today);
+                strategyCyclePort.markEnded(currentCycle.id(), balance.deposit(), today);
             }
             batchRunPort.markReported(today, strategy.id());
         });
@@ -102,8 +102,8 @@ class CyclePositionPersistor {
         boolean nextReverseMode = ip.nextReverseMode(prevReverseMode);
 
         if (!prevReverseMode && nextReverseMode) {
-            log.info("[strategyId={}] 소진 발동 → 리버스모드 진입 (unitAmount={}, usdDeposit={})",
-                    strategy.id(), ip.unitAmount(), balance.usdDeposit());
+            log.info("[strategyId={}] 소진 발동 → 리버스모드 진입 (unitAmount={}, deposit={})",
+                    strategy.id(), ip.unitAmount(), balance.deposit());
         } else if (prevReverseMode && !nextReverseMode) {
             log.info("[strategyId={}] 리버스모드 종료 → 일반모드 복귀 (closingPrice={}, avgPrice={})",
                     strategy.id(), closingPrice, balance.avgPrice());

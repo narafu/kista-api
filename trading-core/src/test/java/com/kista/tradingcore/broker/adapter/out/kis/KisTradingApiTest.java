@@ -72,7 +72,7 @@ class KisTradingApiTest {
             assertThat(result.items()).hasSize(1);
             assertThat(result.items().getFirst().ticker()).isEqualTo(StrategyTicker.SOXL);
             assertThat(result.items().getFirst().holdings()).isEqualTo(10);
-            assertThat(result.totalAssetUsd()).isEqualByComparingTo("1000.00");
+            assertThat(result.totalAsset()).isEqualByComparingTo("1000.00");
             assertThat(result.totalReturnRate()).isEqualByComparingTo("2.0");
         }
 
@@ -85,7 +85,7 @@ class KisTradingApiTest {
             PresentBalanceResult result = api.getPresentBalance(ACCOUNT);
 
             assertThat(result.items()).isEmpty();
-            assertThat(result.totalAssetUsd()).isEqualByComparingTo("0");
+            assertThat(result.totalAsset()).isEqualByComparingTo("0");
         }
 
         @Test

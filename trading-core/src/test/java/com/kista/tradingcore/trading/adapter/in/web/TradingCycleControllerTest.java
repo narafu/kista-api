@@ -227,7 +227,7 @@ class TradingCycleControllerTest {
     }
 
     @Test
-    void update_withSeed_returns200WithUpdatedInitialUsdDeposit() throws Exception {
+    void update_withSeed_returns200WithUpdatedInitialDeposit() throws Exception {
         Strategy strategy = new Strategy(CYCLE_ID, UUID.randomUUID(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("5000.00"), LocalDate.now(), 20, false, null, 0, null, null, true, null);
@@ -237,10 +237,10 @@ class TradingCycleControllerTest {
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"type":"INFINITE","cycleSeedType":"NONE","initialUsdDeposit":5000.00}
+                                {"type":"INFINITE","cycleSeedType":"NONE","initialDeposit":5000.00}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.initialUsdDeposit").value(5000.00));
+                .andExpect(jsonPath("$.initialDeposit").value(5000.00));
     }
 
     @Test
@@ -252,7 +252,7 @@ class TradingCycleControllerTest {
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"type":"INFINITE","cycleSeedType":"NONE","initialUsdDeposit":100.00}
+                                {"type":"INFINITE","cycleSeedType":"NONE","initialDeposit":100.00}
                                 """))
                 .andExpect(status().isBadRequest());
     }
@@ -375,7 +375,7 @@ class TradingCycleControllerTest {
                         .content("""
                                 {
                                   "type": "VR",
-                                  "initialUsdDeposit": 2000.00,
+                                  "initialDeposit": 2000.00,
                                   "intervalWeeks": 4,
                                   "bandWidth": 15.00,
                                   "recurringAmount": 0

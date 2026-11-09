@@ -36,8 +36,8 @@ public class PrivacyCycleOrderStrategy implements CycleOrderStrategy {
             log.warn("[PRIVACY] 기준 매매표 미수신 — 매매 건너뜀: [accountId={}]", ctx.accountId());
             return Optional.empty();
         }
-        // initialUsdDeposit은 PlanContext에서 직접 수신 (StrategyCycle에서 출처)
-        List<PlannedOrder> orders = privacyStrategy.buildOrders(ctx.balance(), inputs.initialUsdDeposit(), inputs.privacyPlan());
+        // initialDeposit은 PlanContext에서 직접 수신 (StrategyCycle에서 출처)
+        List<PlannedOrder> orders = privacyStrategy.buildOrders(ctx.balance(), inputs.initialDeposit(), inputs.privacyPlan());
         return Optional.of(new OrderPlan(null, null, orders));
     }
 

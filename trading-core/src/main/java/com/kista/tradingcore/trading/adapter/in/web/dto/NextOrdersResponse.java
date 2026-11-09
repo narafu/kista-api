@@ -47,7 +47,7 @@ public record NextOrdersResponse(
             @Schema(description = "평균 매입가 (0회차: 전일종가)")
             BigDecimal averagePrice, // 평균 매입가 (0회차: 전일종가)
             @Schema(description = "통합주문가능금액")
-            BigDecimal usdDeposit,   // 통합주문가능금액
+            BigDecimal deposit,   // 통합주문가능금액
             @Schema(description = "가격 보정률 (전반: 양수, 후반: 0 이하)")
             BigDecimal priceOffsetRate, // 가격 보정률 (전반: >0, 후반: ≤0)
             @Schema(description = "현재 회차 (소수점 허용)", example = "3.5")
@@ -66,7 +66,7 @@ public record NextOrdersResponse(
                     p.ticker(),
                     BigDecimal.valueOf(p.holdings()),
                     p.averagePrice(),
-                    p.usdDeposit(),
+                    p.deposit(),
                     p.priceOffsetRate(),
                     p.currentRound(),
                     p.unitAmount(),
@@ -131,7 +131,7 @@ public record NextOrdersResponse(
         }
     }
 
-    // 전략 원장(cycle_position.usd_deposit) 대비 BUY 판정 — 배치와 같은 StrategyLedgerBudget 산출
+    // 전략 원장(cycle_position.deposit) 대비 BUY 판정 — 배치와 같은 StrategyLedgerBudget 산출
     public record LedgerCheckSummary(
             @Schema(description = "전략 원장 잔여 (같은 날 저장된 BUY 차감 후, USD)")
             BigDecimal remainingLedger,

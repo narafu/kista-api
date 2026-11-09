@@ -186,7 +186,7 @@ class CyclePositionPersistorTest {
         persistor.saveCyclePosition(TODAY, balance, batchCtx, PRICE, null);
 
         // INFINITE: markEnded + rotate 호출
-        verify(strategyCyclePort).markEnded(CYCLE_ID, balance.usdDeposit(), TODAY);
+        verify(strategyCyclePort).markEnded(CYCLE_ID, balance.deposit(), TODAY);
         verify(cycleRotationService).rotate(strategy, cycle, ACCOUNT, USER, PRICE, null);
         // INFINITE가 아닌 VR이 아니므로 vrCycleRolloverService 미호출
         verifyNoInteractions(vrCycleRolloverService);
@@ -235,7 +235,7 @@ class CyclePositionPersistorTest {
 
         verify(cyclePositionPort).save(any());
         verify(batchRunPort).markReported(TODAY, STRATEGY_ID);
-        verify(strategyCyclePort).markEnded(CYCLE_ID, balance.usdDeposit(), TODAY);
+        verify(strategyCyclePort).markEnded(CYCLE_ID, balance.deposit(), TODAY);
         verify(cycleRotationService, never()).rotate(any(), any(), any(), any(), any(), any());
     }
 

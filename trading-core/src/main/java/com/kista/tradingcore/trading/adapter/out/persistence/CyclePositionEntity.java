@@ -29,8 +29,8 @@ class CyclePositionEntity extends BaseCreatedAtEntity {
     @Column(name = "strategy_cycle_id", nullable = false, columnDefinition = "UUID")
     private UUID strategyCycleId; // FK → strategy_cycle.id (ON DELETE CASCADE)
 
-    @Column(name = "usd_deposit", nullable = false, precision = 20, scale = 2)
-    private BigDecimal usdDeposit; // 통합주문가능금액 (매매 공식 B 기준)
+    @Column(name = "deposit", nullable = false, precision = 20, scale = 2)
+    private BigDecimal deposit; // 통합주문가능금액 (매매 공식 B 기준)
 
     @Column(name = "closing_price", precision = 12, scale = 2)
     private BigDecimal closingPrice; // 종가

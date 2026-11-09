@@ -49,13 +49,13 @@ class CycleLifecycleNotifierTest {
     void onNewCycleStarted_notifiesUserOfNewCycle() {
         when(userProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(PROFILE));
         CycleLifecycleNotifier notifier = new CycleLifecycleNotifier(userNotificationPort, userProfilePort);
-        BigDecimal initialUsdDeposit = new BigDecimal("1000.00");
+        BigDecimal initialDeposit = new BigDecimal("1000.00");
         NewCycleStartedEvent event = new NewCycleStartedEvent(USER_ID, ACCOUNT_ID, ACCOUNT_NICKNAME,
-                StrategyType.INFINITE, StrategyTicker.SOXL, initialUsdDeposit);
+                StrategyType.INFINITE, StrategyTicker.SOXL, initialDeposit);
 
         notifier.onNewCycleStarted(event);
 
         verify(userNotificationPort).notifyNewCycleStarted(PROFILE, ACCOUNT_NICKNAME,
-                StrategyType.INFINITE, StrategyTicker.SOXL, initialUsdDeposit);
+                StrategyType.INFINITE, StrategyTicker.SOXL, initialDeposit);
     }
 }

@@ -55,8 +55,8 @@ register() {
   return 0
 }
 CREDENTIAL_INVALID=0
-register INFINITE:SOXL '{"type":"INFINITE","ticker":"SOXL","initialUsdDeposit":5000,"initialHoldings":40,"initialAvgPrice":28.15}'
-register VR:TQQQ '{"type":"VR","ticker":"TQQQ","initialUsdDeposit":3000,"intervalWeeks":2,"bandWidth":15,"recurringAmount":0,"initialHoldings":30,"initialAvgPrice":70}'
+register INFINITE:SOXL '{"type":"INFINITE","ticker":"SOXL","initialDeposit":5000,"initialHoldings":40,"initialAvgPrice":28.15}'
+register VR:TQQQ '{"type":"VR","ticker":"TQQQ","initialDeposit":3000,"intervalWeeks":2,"bandWidth":15,"recurringAmount":0,"initialHoldings":30,"initialAvgPrice":70}'
 # MOCK 시세(Toss 관리자 키)의 OAuth 403 "IP address not allowed"도 BROKER_CREDENTIAL_INVALID(422)로 매핑된다 — 키보다 허용 IP 누락이 흔하다
 if (( CREDENTIAL_INVALID )); then
   echo "힌트: trading-core 로그에 'IP address not allowed'가 있으면 Toss 허용 IP에 현재 공인 IP($(curl -fsS --max-time 3 https://api.ipify.org || echo '조회 실패'))를 추가 — 키 문제가 아님" >&2

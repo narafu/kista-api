@@ -7,7 +7,7 @@ import java.time.LocalDate;
 // Strategy + 현재 StrategyCycle 상태 — API 응답 조립용 (TradingCycleResponse)
 public record StrategyDetail(
         Strategy strategy,
-        BigDecimal initialUsdDeposit,
+        BigDecimal initialDeposit,
         LocalDate startDate,    // 사이클 시작일(예정) — 미래면 아직 매매 시작 전
         Integer divisionCount,
         boolean isReverseMode,

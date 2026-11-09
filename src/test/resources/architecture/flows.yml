@@ -513,7 +513,7 @@ flows:
         code: [AccountPort#requireOwnedAccount, StrategyCreationService#resolveCreationSettings, BootstrapPosition#validate,
                StrategyCreationService#resolveScheduledStart, StrategyCreationService#validateUniqueTicker, DcaStrategyConfig#requireCompatible,
                InfiniteMinSeedGuard#minSeed, DepositAmounts#normalizeForRegistration]
-        fail: 위반이면 400, 계좌+종목 중복은 409(DuplicateStrategyTickerException, 전 전략 유형 공통). DCA도 같은 계좌·종목 전략은 1개(매수·매도는 한 전략의 규칙)이고 런타임 정책(기본 비활성)이 켜져 있어야 등록된다. DCA 규칙 ruleKey는 서버가 발급한다(등록 요청에 ruleKey를 보내면 400, 수정 시 기존 키 재전송·생략=신규·없는 키 400). 중간부터 시작(initialHoldings·initialAvgPrice)은 DCA에도 허용하며 주식은 정수·코인은 소수 8자리다. 예수금(initialUsdDeposit)은 전 유형 공통으로 0 이상·계좌 통화 금액 자릿수 이하(생략=0)여야 하며 DCA는 이를 받아 시작 금액 = 예수금 + 평단×보유로 기록하고, 일반 수정(PUT)은 DCA 시드 변경을 거부한다. INFINITE는 시작 금액(예수금+보유 평가금)이 최소 시드(전일종가×분할×2) 미만이면 400 — 전일종가 조회가 실패하면 이 검증만 건너뛴다(폼이 같은 기준으로 먼저 막는다).
+        fail: 위반이면 400, 계좌+종목 중복은 409(DuplicateStrategyTickerException, 전 전략 유형 공통). DCA도 같은 계좌·종목 전략은 1개(매수·매도는 한 전략의 규칙)이고 런타임 정책(기본 비활성)이 켜져 있어야 등록된다. DCA 규칙 ruleKey는 서버가 발급한다(등록 요청에 ruleKey를 보내면 400, 수정 시 기존 키 재전송·생략=신규·없는 키 400). 중간부터 시작(initialHoldings·initialAvgPrice)은 DCA에도 허용하며 주식은 정수·코인은 소수 8자리다. 예수금(initialDeposit)은 전 유형 공통으로 0 이상·계좌 통화 금액 자릿수 이하(생략=0)여야 하며 DCA는 이를 받아 시작 금액 = 예수금 + 평단×보유로 기록하고, 일반 수정(PUT)은 DCA 시드 변경을 거부한다. INFINITE는 시작 금액(예수금+보유 평가금)이 최소 시드(전일종가×분할×2) 미만이면 400 — 전일종가 조회가 실패하면 이 검증만 건너뛴다(폼이 같은 기준으로 먼저 막는다).
 
       - id: balance
         lane: trading
@@ -881,7 +881,7 @@ flows:
           인출 가능액은 최신 장부 예수금에서 오늘·다음 거래일의 체결 전 매수 주문 금액과 아직 마감 리포트 전인 날짜의 장중 취소된 매수 주문의 기록된 체결분(체결량을 모르면 주문 금액 전체)을 뺀 값이며, 이를 넘거나 인출 후 시작 금액이 0 이하가 되면 거절한다.
           INFINITE는 인출 후 시작 금액이 최소 시드(전일종가×분할×2) 미만이어도 거절한다(전일종가는 트랜잭션 밖에서 조회하고, 조회 실패 시 이 검사만 건너뛴다). 통과하면 최신 포지션 행의 예수금과 사이클 시작 금액을 같은 금액만큼 줄인다(강제 매도·주문 취소 없음, 다음 주문 계산부터 반영).
         code: [TradingCycleController#withdrawCapital, CapitalWithdrawalService#withdraw, CapitalLedgerService#withdraw, InfiniteMinSeedGuard#minSeed, StrategyCyclePort#lockForUpdate, StrategyCyclePort#updateStartAmount, CyclePositionPort#updateBalance, CycleCapitalEventPort#save]
-        state: "최신 cycle_position.usd_deposit -= 인출액 · strategy_cycle.start_amount -= 인출액 · cycle_capital_event(WITHDRAW) 이력 추가"
+        state: "최신 cycle_position.deposit -= 인출액 · strategy_cycle.start_amount -= 인출액 · cycle_capital_event(WITHDRAW) 이력 추가"
         fail: 금액 0 이하·금액 자릿수 초과·PRIVACY/INFINITE/DCA 외 전략·인출 가능액 초과·인출 후 시작 금액 0 이하면 400, INFINITE 인출 후 최소 시드 미만이면 400(시세 조회 실패 시 건너뜀), 사이클이 이미 종료됐거나 마감 리포트 진행 중이면 400, 내 전략이 아니면 403, 없으면 404.
 
   pause-stop:

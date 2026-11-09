@@ -191,7 +191,7 @@ class AccountBalanceTest {
         @Test
         @DisplayName("BUY 합계 = available (정확히 같을 때) — 통과")
         void buyTotalEqualsAvailable_returnsTrue() {
-            // usdDeposit=1000, otherTotal=200 → available=800
+            // deposit=1000, otherTotal=200 → available=800
             // BUY 2주 @ $400 → newBuyTotal=800 = available → true
             AccountBalance balance = new AccountBalance(0, null, new BigDecimal("1000"));
             List<PlannedOrder> orders = List.of(buyOrder(2, "400.00"));
@@ -201,7 +201,7 @@ class AccountBalanceTest {
         @Test
         @DisplayName("BUY 합계 < available — 통과")
         void buyTotalBelowAvailable_returnsTrue() {
-            // usdDeposit=1000, otherTotal=0 → available=1000
+            // deposit=1000, otherTotal=0 → available=1000
             // BUY 2주 @ $300 → newBuyTotal=600 < available=1000 → true
             AccountBalance balance = new AccountBalance(0, null, new BigDecimal("1000"));
             List<PlannedOrder> orders = List.of(buyOrder(2, "300.00"));
@@ -211,7 +211,7 @@ class AccountBalanceTest {
         @Test
         @DisplayName("otherTotal 차감 없이도 BUY 합계가 예수금 초과 — false")
         void buyExceedsDepositWithNoOtherTotal_returnsFalse() {
-            // usdDeposit=500, otherTotal=0 → available=500
+            // deposit=500, otherTotal=0 → available=500
             // BUY 2주 @ $300 → newBuyTotal=600 > available=500 → false
             AccountBalance balance = new AccountBalance(0, null, new BigDecimal("500"));
             List<PlannedOrder> orders = List.of(buyOrder(2, "300.00"));
@@ -221,8 +221,8 @@ class AccountBalanceTest {
         @Test
         @DisplayName("BUY 합계 < 예수금이지만 타 전략 차감 후 부족 — false")
         void buyPassesAloneButFailsAfterOtherTotalDeducted_returnsFalse() {
-            // usdDeposit=1000, otherTotal=500 → available=500
-            // BUY 2주 @ $300 → newBuyTotal=600 < usdDeposit(1000)이지만 > available(500) → false
+            // deposit=1000, otherTotal=500 → available=500
+            // BUY 2주 @ $300 → newBuyTotal=600 < deposit(1000)이지만 > available(500) → false
             AccountBalance balance = new AccountBalance(0, null, new BigDecimal("1000"));
             List<PlannedOrder> orders = List.of(buyOrder(2, "300.00"));
             assertThat(balance.hasSufficientDepositFor(orders, new BigDecimal("500"))).isFalse();

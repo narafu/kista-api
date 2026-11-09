@@ -96,7 +96,7 @@ CROSS JOIN LATERAL (SELECT (now() AT TIME ZONE 'Asia/Seoul')::date - 60 AS start
 WHERE v.id = md5('dev-seed:kis:version')::uuid
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO trading.cycle_position (id, strategy_cycle_id, usd_deposit, closing_price, avg_price, holdings, created_at)
+INSERT INTO trading.cycle_position (id, strategy_cycle_id, deposit, closing_price, avg_price, holdings, created_at)
 SELECT md5('dev-seed:kis:pos:open')::uuid, c.id, 3000, 30.00, NULL, 0, c.created_at
 FROM trading.strategy_cycle c WHERE c.id = md5('dev-seed:kis:cycle')::uuid
 ON CONFLICT (id) DO NOTHING;
@@ -114,13 +114,13 @@ END $$;
 
 CREATE TEMP TABLE seed_positions ON COMMIT DROP AS
 SELECT md5('dev-seed:pos:' || c.id || ':' || d::date)::uuid AS id, c.id AS cycle_id, s.type,
-       p.usd_deposit,
+       p.deposit,
        round((30 + 6 * sin(extract(epoch FROM d) / 86400 / 9) + (d::date - c.start_date) * 0.02)::numeric, 2) AS closing_price,
        (d::date + time '04:30') AT TIME ZONE 'Asia/Seoul' AS created_at
 FROM trading.strategy_cycle c
 JOIN trading.strategy s ON s.id = c.strategy_id
 JOIN trading.accounts a ON a.id = s.account_id
-JOIN LATERAL (SELECT usd_deposit FROM trading.cycle_position
+JOIN LATERAL (SELECT deposit FROM trading.cycle_position
               WHERE strategy_cycle_id = c.id AND deleted_at IS NULL ORDER BY created_at LIMIT 1) p ON true
 CROSS JOIN generate_series(c.start_date + 1, (now() AT TIME ZONE 'Asia/Seoul')::date - 1, interval '1 day') d
 WHERE a.user_id = '00000000-0000-0000-0000-000000000001' AND a.broker = 'KIS'
@@ -128,8 +128,8 @@ WHERE a.user_id = '00000000-0000-0000-0000-000000000001' AND a.broker = 'KIS'
   AND c.end_date IS NULL AND c.deleted_at IS NULL AND s.deleted_at IS NULL AND a.deleted_at IS NULL
   AND extract(isodow FROM d) < 6;
 
-INSERT INTO trading.cycle_position (id, strategy_cycle_id, usd_deposit, closing_price, avg_price, holdings, created_at)
-SELECT id, cycle_id, usd_deposit, closing_price, 30.00, 100, created_at FROM seed_positions
+INSERT INTO trading.cycle_position (id, strategy_cycle_id, deposit, closing_price, avg_price, holdings, created_at)
+SELECT id, cycle_id, deposit, closing_price, 30.00, 100, created_at FROM seed_positions
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO trading.cycle_position_infinite (cycle_position_id, is_reverse_mode)
@@ -206,15 +206,15 @@ ON CONFLICT (id) DO NOTHING;
 -- 진행 중 사이클의 개장·최신 포지션(미실현 손익 계산용) — 최신은 보유 30주·종가 +4%
 CREATE TEMP TABLE seed_open_positions ON COMMIT DROP AS
 SELECT md5('dev-seed:cycles:pos:' || t.ticker || ':' || p.kind)::uuid AS id, c.id AS cycle_id,
-       p.usd_deposit, round(t.price * p.price_rate, 2) AS closing_price,
+       p.deposit, round(t.price * p.price_rate, 2) AS closing_price,
        CASE WHEN p.holdings > 0 THEN t.price END AS avg_price, p.holdings,
        CASE WHEN p.kind = 'open' THEN c.created_at ELSE now() END AS created_at
 FROM seed_cycle_tickers t
 JOIN trading.strategy_cycle c ON c.id = md5('dev-seed:cycles:cycle:' || t.ticker || ':' || (t.closed_n + 1))::uuid
-CROSS JOIN (VALUES ('open', 6000, 1.00, 0), ('latest', 4200, 1.04, 30)) AS p(kind, usd_deposit, price_rate, holdings);
+CROSS JOIN (VALUES ('open', 6000, 1.00, 0), ('latest', 4200, 1.04, 30)) AS p(kind, deposit, price_rate, holdings);
 
-INSERT INTO trading.cycle_position (id, strategy_cycle_id, usd_deposit, closing_price, avg_price, holdings, created_at)
-SELECT id, cycle_id, usd_deposit, closing_price, avg_price, holdings, created_at FROM seed_open_positions
+INSERT INTO trading.cycle_position (id, strategy_cycle_id, deposit, closing_price, avg_price, holdings, created_at)
+SELECT id, cycle_id, deposit, closing_price, avg_price, holdings, created_at FROM seed_open_positions
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO trading.cycle_position_infinite (cycle_position_id, is_reverse_mode)

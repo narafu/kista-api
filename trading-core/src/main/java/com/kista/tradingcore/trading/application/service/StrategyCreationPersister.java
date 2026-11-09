@@ -37,7 +37,7 @@ class StrategyCreationPersister {
     // resolved: 런타임 정책이 해석한 ticker·divisionCount·VR 주기/밴드/적립액, ramp: VR 등록일 때만 non-null,
     // vrValue: VR V값(override 반영) — 비VR은 null, dca: DCA 등록일 때만 non-null
     record Draft(UUID accountId, StrategyType type, StrategyCycleSeedType seedType, ResolvedCreation resolved,
-                 VrRampParams ramp, BigDecimal initialUsdDeposit, BigDecimal initialHoldings, BigDecimal initialAvgPrice,
+                 VrRampParams ramp, BigDecimal initialDeposit, BigDecimal initialHoldings, BigDecimal initialAvgPrice,
                  BigDecimal marketPrice, BigDecimal startAmount, BigDecimal openAmount, BigDecimal vrValue, LocalDate scheduledStart,
                  DcaStrategyConfig dca) {}
 
@@ -71,8 +71,8 @@ class StrategyCreationPersister {
         // DCA는 marketPrice 없음(closingPrice null) — 시작 원장 = 초기 보유·평단, 예수금 0
         CyclePosition initialPosition = d.initialHoldings().signum() > 0
                 ? cyclePositionPort.save(CyclePosition.bootstrapSnapshot(
-                        cycle.id(), d.initialUsdDeposit(), d.initialHoldings(), d.initialAvgPrice(), d.marketPrice()))
-                : cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), d.initialUsdDeposit()));
+                        cycle.id(), d.initialDeposit(), d.initialHoldings(), d.initialAvgPrice(), d.marketPrice()))
+                : cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), d.initialDeposit()));
 
         switch (saved.type()) {
             case INFINITE -> cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(initialPosition.id(), false));

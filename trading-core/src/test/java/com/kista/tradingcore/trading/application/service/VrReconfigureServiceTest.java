@@ -173,7 +173,7 @@ class VrReconfigureServiceTest {
     // --- 1) 순수 파라미터 수정 (투자금 추가 없음) ---
 
     @Test
-    @DisplayName("순수 파라미터 수정: bandWidth만 변경 → V 이월, holdings/usdDeposit 불변, 나머지 램프값 상속")
+    @DisplayName("순수 파라미터 수정: bandWidth만 변경 → V 이월, holdings/deposit 불변, 나머지 램프값 상속")
     void reconfigure_pureParamChange_carriesOverBalanceAndValue() {
         stubHappyPathChain();
         ReconfigureVrCommand cmd = reconfigureVr().bandWidth("20.00").build();
@@ -193,9 +193,9 @@ class VrReconfigureServiceTest {
         assertThat(captured.pGraceWeeks()).isEqualTo(currentDetail.pGraceWeeks());
         assertThat(captured.pStepWeeks()).isEqualTo(currentDetail.pStepWeeks());
         assertThat(captured.poolLimitFloor()).isEqualByComparingTo(currentDetail.poolLimitFloor());
-        // 투자금 추가 없음 → holdings/usdDeposit 불변, V 이월
+        // 투자금 추가 없음 → holdings/deposit 불변, V 이월
         assertThat(captured.postBalance().holdings()).isEqualTo(latestPosition.holdings());
-        assertThat(captured.postBalance().usdDeposit()).isEqualByComparingTo(latestPosition.usdDeposit());
+        assertThat(captured.postBalance().deposit()).isEqualByComparingTo(latestPosition.deposit());
         assertThat(captured.newValue()).isEqualByComparingTo(currentCycleVr.value());
 
         verify(orderCancelService).cancelByCycle(strategyId, requesterId);
@@ -245,7 +245,7 @@ class VrReconfigureServiceTest {
     // --- 3) 예수금 주입 ---
 
     @Test
-    @DisplayName("예수금 주입: usdDeposit 증가, holdings/avgPrice 불변, V 이월")
+    @DisplayName("예수금 주입: deposit 증가, holdings/avgPrice 불변, V 이월")
     void reconfigure_injectDeposit_updatesDepositOnly() {
         stubHappyPathChain();
         ReconfigureVrCommand cmd = reconfigureVr().injectDeposit("200.00").build();
@@ -253,7 +253,7 @@ class VrReconfigureServiceTest {
         service.reconfigure(strategyId, requesterId, cmd);
 
         CapturedCall captured = captureReconfigureCall();
-        assertThat(captured.postBalance().usdDeposit()).isEqualByComparingTo("700.00"); // 500.00 + 200.00
+        assertThat(captured.postBalance().deposit()).isEqualByComparingTo("700.00"); // 500.00 + 200.00
         assertThat(captured.postBalance().holdings()).isEqualTo(latestPosition.holdings());
         assertThat(captured.postBalance().avgPrice()).isEqualByComparingTo(latestPosition.avgPrice());
         // 수량 주입 없으므로 V 이월 (증분 없음)
@@ -280,7 +280,7 @@ class VrReconfigureServiceTest {
     }
 
     @Test
-    @DisplayName("예수금 인출: usdDeposit 감소, holdings/avgPrice 불변, V 이월")
+    @DisplayName("예수금 인출: deposit 감소, holdings/avgPrice 불변, V 이월")
     void reconfigure_withdrawDeposit_reducesDepositOnly() {
         stubHappyPathChain();
         ReconfigureVrCommand cmd = reconfigureVr().withdrawDeposit("150.00").build();
@@ -288,7 +288,7 @@ class VrReconfigureServiceTest {
         service.reconfigure(strategyId, requesterId, cmd);
 
         CapturedCall captured = captureReconfigureCall();
-        assertThat(captured.postBalance().usdDeposit()).isEqualByComparingTo("350.00"); // 500.00 - 150.00
+        assertThat(captured.postBalance().deposit()).isEqualByComparingTo("350.00"); // 500.00 - 150.00
         assertThat(captured.postBalance().holdings()).isEqualTo(latestPosition.holdings());
         assertThat(captured.postBalance().avgPrice()).isEqualByComparingTo(latestPosition.avgPrice());
         assertThat(captured.newValue()).isEqualByComparingTo(currentCycleVr.value());
@@ -311,7 +311,7 @@ class VrReconfigureServiceTest {
     @DisplayName("투자금 인출 예수금이 보유 예수금을 초과 → IllegalArgumentException, cycleSnapshotCreator 미호출")
     void reconfigure_withdrawDepositExceedsBalance_throws() {
         stubHappyPathChain();
-        // latestPosition.usdDeposit() == 500.00
+        // latestPosition.deposit() == 500.00
         ReconfigureVrCommand cmd = reconfigureVr().withdrawDeposit("500.01").build();
 
         assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))

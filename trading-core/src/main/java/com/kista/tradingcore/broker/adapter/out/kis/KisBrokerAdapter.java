@@ -32,7 +32,7 @@ public class KisBrokerAdapter implements BrokerCapabilitiesPort {
     public PresentBalanceResult getPresentBalance(BrokerAccountRef account) {
         PresentBalanceResult portfolio = kisTradingApi.getPresentBalance(account);
         List<MarginItem> margins = kisTradingApi.getMargin(account);
-        BigDecimal usdDeposit = margins.stream()
+        BigDecimal deposit = margins.stream()
                 .filter(m -> m.currency() == Currency.USD)
                 .map(MarginItem::purchasableAmount)
                 .findFirst().orElse(BigDecimal.ZERO);
@@ -41,8 +41,8 @@ public class KisBrokerAdapter implements BrokerCapabilitiesPort {
                 .map(MarginItem::usdToKrwRate)
                 .findFirst().orElse(BigDecimal.ZERO);
         return new PresentBalanceResult(
-                portfolio.items(), portfolio.totalAssetUsd(), portfolio.totalEvalProfit(),
-                portfolio.totalReturnRate(), usdDeposit, rate
+                portfolio.items(), portfolio.totalAsset(), portfolio.totalEvalProfit(),
+                portfolio.totalReturnRate(), deposit, rate
         );
     }
 

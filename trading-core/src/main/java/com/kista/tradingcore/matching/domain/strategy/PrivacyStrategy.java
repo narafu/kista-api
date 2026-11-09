@@ -24,14 +24,14 @@ import static com.kista.shared.kernel.OrderTiming.AT_CLOSE;
 @Slf4j
 public class PrivacyStrategy {
 
-    // initialUsdDeposit ÷ plan.currentCycleStart() 로 배수를 동적 산출
-    public List<PlannedOrder> buildOrders(AccountBalance balance, BigDecimal initialUsdDeposit, PrivacyPlan plan) {
-        if (initialUsdDeposit == null || initialUsdDeposit.signum() <= 0) {
+    // initialDeposit ÷ plan.currentCycleStart() 로 배수를 동적 산출
+    public List<PlannedOrder> buildOrders(AccountBalance balance, BigDecimal initialDeposit, PrivacyPlan plan) {
+        if (initialDeposit == null || initialDeposit.signum() <= 0) {
             throw new IllegalStateException("PRIVACY 초기 예수금은 0보다 커야 합니다.");
         }
         BigDecimal start = plan.currentCycleStart();
-        BigDecimal multiple = initialUsdDeposit.divide(start, 2, RoundingMode.FLOOR);
-        log.info("[PRIVACY] 배수 산출: initialUsdDeposit={}, currentCycleStart={}, multiple={}", initialUsdDeposit, start, multiple);
+        BigDecimal multiple = initialDeposit.divide(start, 2, RoundingMode.FLOOR);
+        log.info("[PRIVACY] 배수 산출: initialDeposit={}, currentCycleStart={}, multiple={}", initialDeposit, start, multiple);
 
         List<BuyEntry> buyEntries = new ArrayList<>();
         List<PrivacyPlannedTrade> explicitSells = new ArrayList<>();

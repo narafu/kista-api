@@ -212,7 +212,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
                                                      Strategy updatedStrategy, boolean cycleEnded) {
         return new ManualTradeCorrectionResult(
                 command.userId(), account.id(), strategy.id(),
-                command.fills().size(), balance.holdings(), balance.avgPrice(), balance.usdDeposit(),
+                command.fills().size(), balance.holdings(), balance.avgPrice(), balance.deposit(),
                 updatedStrategy.status(), cycleEnded,
                 cycleEnded ? command.fills().getLast().tradeDate() : null);
     }

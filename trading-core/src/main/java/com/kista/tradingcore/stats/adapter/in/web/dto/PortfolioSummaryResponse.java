@@ -43,17 +43,17 @@ public record PortfolioSummaryResponse(
     @Schema(name = "PortfolioSummaryDto")
     public record SummaryDto(
             @Schema(description = "총자산 (KRW — 필드명은 usd지만 KRW 값을 담고 있는 KIS 응답 원본 quirk 유지)")
-            BigDecimal totalAssetUsd,           // tot_asst_amt: 총자산 (KRW — 필드명 quirk 유지)
+            BigDecimal totalAsset,           // tot_asst_amt: 총자산 (KRW — 필드명 quirk 유지)
             @Schema(description = "총평가손익 (KRW)")
             BigDecimal totalEvalProfit,         // tot_evlu_pfls_amt: 총평가손익 (KRW)
             @Schema(description = "총수익률 (%)")
             BigDecimal totalReturnRate,         // evlu_erng_rt1: 총수익률 %
             @Schema(description = "USD 총자산 (포지션 평가금 + 예수금)")
-            BigDecimal totalAssetUsdActual,     // USD 총자산 (포지션+예수금)
+            BigDecimal totalAssetActual,     // USD 총자산 (포지션+예수금)
             @Schema(description = "USD 평가손익 합계")
             BigDecimal evalProfitUsdSum,        // USD 평가손익 합계
             @Schema(description = "USD 예수금")
-            BigDecimal usdDeposit,              // USD 예수금
+            BigDecimal deposit,              // USD 예수금
             @Schema(description = "USD 평가금 (포지션 evalAmountUsd 합계)")
             BigDecimal posEvalUsd,              // USD 평가금 (포지션 evalAmountUsd 합계)
             @Schema(description = "환율 (1 USD = ? KRW)")
@@ -68,18 +68,18 @@ public record PortfolioSummaryResponse(
                 ))
                 .toList();
         // USD 예수금·포지션 평가금 분리
-        BigDecimal usdDeposit = balance.usdDepositActual();
+        BigDecimal deposit = balance.depositActual();
         BigDecimal posEvalUsd = balance.items().stream()
                 .map(Item::evalAmountUsd).reduce(ZERO, BigDecimal::add);
         // USD 총자산 = 포지션 USD 합계 + USD 예수금
-        BigDecimal totalAssetUsdActual = posEvalUsd.add(usdDeposit);
+        BigDecimal totalAssetActual = posEvalUsd.add(deposit);
         // USD 평가손익 = 포지션 USD 손익 합계
         BigDecimal evalProfitUsdSum = balance.items().stream()
                 .map(Item::profitLossUsd).reduce(ZERO, BigDecimal::add);
         SummaryDto summary = new SummaryDto(
-                balance.totalAssetUsd(), balance.totalEvalProfit(), balance.totalReturnRate(),
-                totalAssetUsdActual, evalProfitUsdSum,
-                usdDeposit, posEvalUsd, balance.exchangeRateKrwPerUsd()
+                balance.totalAsset(), balance.totalEvalProfit(), balance.totalReturnRate(),
+                totalAssetActual, evalProfitUsdSum,
+                deposit, posEvalUsd, balance.exchangeRateKrwPerUsd()
         );
         return new PortfolioSummaryResponse(positions, summary);
     }

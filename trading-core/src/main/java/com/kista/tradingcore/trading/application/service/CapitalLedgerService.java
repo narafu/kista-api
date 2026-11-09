@@ -93,7 +93,7 @@ class CapitalLedgerService implements InjectCapitalUseCase {
             BigDecimal existingCost = old.avgPrice() != null ? old.avgPrice().multiply(old.holdings()) : BigDecimal.ZERO;
             newAvg = existingCost.add(injectedCost).divide(newHoldings, AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP);
         }
-        AccountBalance newBalance = new AccountBalance(newHoldings, newAvg, old.usdDeposit().add(deposit));
+        AccountBalance newBalance = new AccountBalance(newHoldings, newAvg, old.deposit().add(deposit));
 
         // 최신 행 in-place 갱신 — detail(리버스모드)은 같은 행에 붙어 있어 그대로 유지
         cyclePositionPort.updateBalance(latest.id(), newBalance);
@@ -103,8 +103,8 @@ class CapitalLedgerService implements InjectCapitalUseCase {
                 deposit, sharesBd, deposit.add(injectedCost), Instant.now(clock)));
 
         eventPublisher.publishEvent(new StrategyCapitalChangedEvent(requesterId));
-        log.info("[strategyId={}] 투자금 추가: deposit={}, shares={}, sharePrice={}, holdings={}, usdDeposit={}",
-                strategyId, deposit, shares, cmd.sharePrice(), newBalance.holdings(), newBalance.usdDeposit());
+        log.info("[strategyId={}] 투자금 추가: deposit={}, shares={}, sharePrice={}, holdings={}, deposit={}",
+                strategyId, deposit, shares, cmd.sharePrice(), newBalance.holdings(), newBalance.deposit());
     }
 
     // 인출 DB 변경 본문 — CapitalWithdrawalService(트랜잭션 밖)가 전일종가 HTTP 뒤에 호출한다. 메서드는 public이어야 클래스 레벨 @Transactional 프록시가 적용된다
@@ -118,7 +118,7 @@ class CapitalLedgerService implements InjectCapitalUseCase {
         CyclePosition latest = locked.latest();
 
         // 인출 가능액 = 장부 예수금 − 체결 전 BUY 약정 − 장중 취소 BUY의 보류 체결분. 오늘 마감 전 주문과 22:00 개장 배치가 미리 저장한 다음 거래일 주문이
-        // 장부 예수금으로 체결되므로 두 날짜를 모두 빼야 체결 후 usdDeposit이 음수가 되지 않는다(StrategyLedgerBudget.remaining과 같은 약정 정의)
+        // 장부 예수금으로 체결되므로 두 날짜를 모두 빼야 체결 후 deposit이 음수가 되지 않는다(StrategyLedgerBudget.remaining과 같은 약정 정의)
         List<Order> committedOrders;
         List<Order> cancelledOrders;
         if (owned.crypto()) {
@@ -157,7 +157,7 @@ class CapitalLedgerService implements InjectCapitalUseCase {
         InfiniteMinSeedGuard.requireAtLeast(minSeed, newStartAmount); // INFINITE는 인출 후에도 0회차 교착 시드 미만이 되면 거부
 
         AccountBalance old = latest.toBalance();
-        AccountBalance newBalance = old.withUsdDeposit(old.usdDeposit().subtract(amount));
+        AccountBalance newBalance = old.withDeposit(old.deposit().subtract(amount));
         // 최신 행 in-place 갱신 — append하면 리버스 판정·별점가·이력이 왜곡되고 detail은 같은 행에 유지된다
         cyclePositionPort.updateBalance(latest.id(), newBalance);
         strategyCyclePort.updateStartAmount(cycle.id(), newStartAmount);
@@ -166,8 +166,8 @@ class CapitalLedgerService implements InjectCapitalUseCase {
                 amount.negate(), BigDecimal.ZERO, amount.negate(), Instant.now(clock)));
 
         eventPublisher.publishEvent(new StrategyCapitalChangedEvent(requesterId));
-        log.info("[strategyId={}] 투자금 인출: amount={}, usdDeposit={}, startAmount={}",
-                strategyId, amount, newBalance.usdDeposit(), newStartAmount);
+        log.info("[strategyId={}] 투자금 인출: amount={}, deposit={}, startAmount={}",
+                strategyId, amount, newBalance.deposit(), newStartAmount);
     }
 
     // 인출 입력 검증(금액 부호·지원 전략·자릿수) — HTTP 전 선검증과 트랜잭션 본문이 함께 쓴다

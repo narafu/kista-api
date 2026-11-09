@@ -124,7 +124,7 @@ class CycleSnapshotCreator {
     // 재설정의 원장 차액을 RESET 이력으로 기록 — 원금 차액은 원가 기준(주식 추가는 입력 단가, 인출은 평단; VrReconfigureService.applyCapitalAdjustment와 같은 기준), 변화가 없으면 생략
     private void recordResetEvent(UUID cycleId, CyclePosition latest, AccountBalance post) {
         AccountBalance old = latest.toBalance();
-        BigDecimal depositDelta = post.usdDeposit().subtract(old.usdDeposit());
+        BigDecimal depositDelta = post.deposit().subtract(old.deposit());
         BigDecimal holdingsDelta = post.holdings().subtract(old.holdings());
         if (depositDelta.signum() == 0 && holdingsDelta.signum() == 0) return;
         BigDecimal principalDelta = bookValue(post).subtract(bookValue(old))
@@ -136,7 +136,7 @@ class CycleSnapshotCreator {
     // 장부가 = 예수금 + 보유수량 × 평단(없으면 0)
     private static BigDecimal bookValue(AccountBalance b) {
         BigDecimal cost = b.avgPrice() != null ? b.avgPrice().multiply(b.holdings()) : BigDecimal.ZERO;
-        return b.usdDeposit().add(cost);
+        return b.deposit().add(cost);
     }
 
     // 활성 버전 소프트삭제 후 새 버전 + VR 버전 상세 발급 (두 재설정 경로 공용)
@@ -153,7 +153,7 @@ class CycleSnapshotCreator {
     }
 
     private static BigDecimal totalAssets(AccountBalance balance, BigDecimal closingPrice) {
-        return balance.usdDeposit()
+        return balance.deposit()
                 .add(closingPrice.multiply(balance.holdings()))
                 .setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
     }

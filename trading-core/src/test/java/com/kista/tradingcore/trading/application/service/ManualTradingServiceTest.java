@@ -145,8 +145,8 @@ class ManualTradingServiceTest {
                 .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("22.00")));
     }
 
-    private void stubLedger(BigDecimal usdDeposit) {
-        CyclePosition pos = new CyclePosition(null, CYCLE.id(), usdDeposit, new BigDecimal("22.00"),
+    private void stubLedger(BigDecimal deposit) {
+        CyclePosition pos = new CyclePosition(null, CYCLE.id(), deposit, new BigDecimal("22.00"),
                 new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         when(cyclePositionPort.findLatestOne(CYCLE.id())).thenReturn(Optional.of(pos));
     }
@@ -245,7 +245,7 @@ class ManualTradingServiceTest {
 
     @Test
     void execute_sufficientBalance_savesOrders() {
-        // BUY 1주, 원장 충분(usdDeposit=$1,000) → saveAll 호출, 주문 반환
+        // BUY 1주, 원장 충분(deposit=$1,000) → saveAll 호출, 주문 반환
         Order buyTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE,
                 OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"),
@@ -325,7 +325,7 @@ class ManualTradingServiceTest {
     // 수동실행이 배치와 동일하게 "캡 적용 후" 금액으로 검증하도록 바뀐 것을 고정하는 회귀 테스트
     @Test
     void execute_buyPriceExceedsCapButCappedAmountFitsBudget_savesOrders() {
-        // 원가 100.00×1주=100.00은 원장 usdDeposit(60.00)을 초과하지만,
+        // 원가 100.00×1주=100.00은 원장 deposit(60.00)을 초과하지만,
         // 현재가 50.00 기준 캡(52.50)으로 보정된 뒤 금액(52.50)은 예산 안에 든다
         Order buyTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE,
@@ -343,7 +343,7 @@ class ManualTradingServiceTest {
         // 캡 판단용 현재가 50.00 → cap = 52.50
         when(kisPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("50.00")));
-        // 원장 usdDeposit=60.00 — 캡 전(100.00)은 부족, 캡 후(52.50)는 충분
+        // 원장 deposit=60.00 — 캡 전(100.00)은 부족, 캡 후(52.50)는 충분
         stubLedger(new BigDecimal("60.00"));
         Order savedOrder = new Order(UUID.randomUUID(), ACCOUNT.id(), CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE,
@@ -376,7 +376,7 @@ class ManualTradingServiceTest {
                 });
         when(kisPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("50.00")));
-        // 원장 usdDeposit=10.00 — 캡 후 금액(52.50)조차 초과
+        // 원장 deposit=10.00 — 캡 후 금액(52.50)조차 초과
         stubLedger(new BigDecimal("10.00"));
 
         assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
@@ -400,7 +400,7 @@ class ManualTradingServiceTest {
                 .thenThrow(new RuntimeException("시세 오류"));
         // TradingPriceFetcher는 포트 실패를 삼키고 관리자 알림을 발행한다 — 그 발행마저 실패해 fetchPrices가 던지는 경로
         doThrow(new RuntimeException("알림 발행 실패")).when(eventPublisher).publishEvent(any(Object.class));
-        // 원장 usdDeposit=60.00 — 캡 미적용 원가(100.00)는 부족
+        // 원장 deposit=60.00 — 캡 미적용 원가(100.00)는 부족
         stubLedger(new BigDecimal("60.00"));
 
         assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))

@@ -114,7 +114,7 @@ class ManualTradeCorrectionServiceTest {
         ArgumentCaptor<CyclePosition> captor = ArgumentCaptor.forClass(CyclePosition.class);
         verify(cyclePositionPort).save(captor.capture());
         assertThat(captor.getValue().holdings()).isZero();
-        assertThat(captor.getValue().usdDeposit()).isEqualByComparingTo("7200.05");
+        assertThat(captor.getValue().deposit()).isEqualByComparingTo("7200.05");
     }
 
     // ===== 마감 리포트 전 번호 없는 보정 가드 =====
@@ -292,11 +292,11 @@ class ManualTradeCorrectionServiceTest {
 
         assertThat(result.finalHoldings()).isZero();
         assertThat(result.cycleEnded()).isFalse();
-        assertThat(result.finalUsdDeposit()).isEqualByComparingTo("7200.05");
+        assertThat(result.finalDeposit()).isEqualByComparingTo("7200.05");
         verify(strategyCyclePort, never()).markEnded(any(), any(), any());
         ArgumentCaptor<CyclePosition> captor = ArgumentCaptor.forClass(CyclePosition.class);
         verify(cyclePositionPort).save(captor.capture());
-        assertThat(captor.getValue().usdDeposit()).isEqualByComparingTo("7200.05");
+        assertThat(captor.getValue().deposit()).isEqualByComparingTo("7200.05");
         verify(orderPort).saveAll(any());
     }
 
@@ -313,7 +313,7 @@ class ManualTradeCorrectionServiceTest {
 
         // 기존 보유 2 + 0.00123456
         assertThat(result.finalHoldings()).isEqualByComparingTo("2.00123456");
-        assertThat(result.finalUsdDeposit()).isEqualByComparingTo("-116790.69"); // 기존 예수금 6665.31 − 0.00123456 × 1억
+        assertThat(result.finalDeposit()).isEqualByComparingTo("-116790.69"); // 기존 예수금 6665.31 − 0.00123456 × 1억
         verify(orderPort).saveAll(any());
     }
 

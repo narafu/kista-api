@@ -541,9 +541,9 @@ class InvestmentIndexCalculatorTest {
                 null, null, BigDecimal.valueOf(0), at(date, time), null);
     }
 
-    private static CyclePosition position(StrategyCycle cycle, LocalDate date, String usdDeposit,
+    private static CyclePosition position(StrategyCycle cycle, LocalDate date, String deposit,
                                           String closingPrice, String avgPrice, int holdings) {
-        return new CyclePosition(UUID.randomUUID(), cycle.id(), new BigDecimal(usdDeposit),
+        return new CyclePosition(UUID.randomUUID(), cycle.id(), new BigDecimal(deposit),
                 decimal(closingPrice), decimal(avgPrice), BigDecimal.valueOf(holdings), at(date, LocalTime.NOON), null);
     }
 

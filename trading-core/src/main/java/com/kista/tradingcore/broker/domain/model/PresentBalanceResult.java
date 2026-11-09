@@ -8,10 +8,10 @@ import java.util.List;
 
 public record PresentBalanceResult(
         List<Item> items,              // output1: 종목별 잔고
-        BigDecimal totalAssetUsd,      // output3: tot_asst_amt (총자산 — KRW)
+        BigDecimal totalAsset,      // output3: tot_asst_amt (총자산 — KRW)
         BigDecimal totalEvalProfit,    // output3: tot_evlu_pfls_amt (총평가손익 — KRW)
         BigDecimal totalReturnRate,    // output3: evlu_erng_rt1 (총수익률 %)
-        BigDecimal usdDepositActual,   // USD 예수금 (TOSS: 실 USD 예수금, KIS: margin 조회값)
+        BigDecimal depositActual,   // USD 예수금 (TOSS: 실 USD 예수금, KIS: margin 조회값)
         BigDecimal exchangeRateKrwPerUsd  // 환율 (1 USD = ? KRW, TOSS: 실값, KIS: margin 조회값)
 ) {
     public record Item(
@@ -38,7 +38,7 @@ public record PresentBalanceResult(
     // Toss 전용 집계 팩토리 — 종목별 평가·손익·수익률 및 KRW 환산 총자산·총수익률 계산 (KIS는 API가 총계를 내려줌)
     public static PresentBalanceResult aggregateToss(
             List<TossHolding> holdings,
-            BigDecimal usdDeposit,
+            BigDecimal deposit,
             BigDecimal krwDeposit,
             BigDecimal rate
     ) {
@@ -75,7 +75,7 @@ public record PresentBalanceResult(
         boolean hasRate = rate.compareTo(BigDecimal.ZERO) > 0;
         // totalAssetKrw = (포지션USD + USD예수금) × 환율 + KRW예수금
         BigDecimal totalAssetKrw = hasRate
-                ? totalEvalUsd.add(usdDeposit).multiply(rate).add(krwDeposit)
+                ? totalEvalUsd.add(deposit).multiply(rate).add(krwDeposit)
                   .setScale(0, RoundingMode.HALF_UP)
                 : krwDeposit.setScale(0, RoundingMode.HALF_UP);
         // totalEvalProfitKrw = 평가손익USD × 환율
@@ -94,7 +94,7 @@ public record PresentBalanceResult(
         BigDecimal krwAsUsd = hasRate
                 ? krwDeposit.divide(rate, Currency.USD.amountScale(), RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
-        BigDecimal totalUsdDeposit = usdDeposit.add(krwAsUsd).setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
-        return new PresentBalanceResult(items, totalAssetKrw, totalEvalProfitKrw, totalReturnRate, totalUsdDeposit, rate);
+        BigDecimal totalDeposit = deposit.add(krwAsUsd).setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
+        return new PresentBalanceResult(items, totalAssetKrw, totalEvalProfitKrw, totalReturnRate, totalDeposit, rate);
     }
 }

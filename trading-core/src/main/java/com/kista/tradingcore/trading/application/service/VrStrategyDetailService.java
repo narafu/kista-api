@@ -47,8 +47,8 @@ class VrStrategyDetailService {
                 .flatMap(vrDetail -> latestCycle
                         .flatMap(cycle -> strategyCycleVrPort.findByCycleId(cycle.id())
                                 .map(cycleVr -> {
-                                    BigDecimal openingPool = openingPosition.map(CyclePosition::usdDeposit).orElse(null);
-                                    BigDecimal currentPool = latestPosition.map(CyclePosition::usdDeposit).orElse(null);
+                                    BigDecimal openingPool = openingPosition.map(CyclePosition::deposit).orElse(null);
+                                    BigDecimal currentPool = latestPosition.map(CyclePosition::deposit).orElse(null);
                                     return buildSummary(vrDetail, cycleVr, openingPool, currentPool);
                                 })));
     }

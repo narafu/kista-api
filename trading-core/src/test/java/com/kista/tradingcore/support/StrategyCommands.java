@@ -41,7 +41,7 @@ public final class StrategyCommands {
     public static final class Register {
         private final StrategyType type;               // 전략 타입
         private StrategyTicker ticker;                 // 종목 (null=전략 기본값)
-        private BigDecimal initialUsdDeposit;          // 초기 예수금
+        private BigDecimal initialDeposit;          // 초기 예수금
         private StrategyCycleSeedType cycleSeedType;   // 사이클 시드 타입
         private Integer divisionCount;                 // 분할 수 (null=미입력)
         private BigDecimal initialHoldings;            // 중간 시작 보유 수량
@@ -59,7 +59,7 @@ public final class StrategyCommands {
         }
 
         public Register ticker(StrategyTicker v) { ticker = v; return this; }
-        public Register deposit(BigDecimal v) { initialUsdDeposit = v; return this; }
+        public Register deposit(BigDecimal v) { initialDeposit = v; return this; }
         public Register deposit(String v) { return deposit(new BigDecimal(v)); }
         public Register cycleSeedType(StrategyCycleSeedType v) { cycleSeedType = v; return this; }
         public Register divisionCount(Integer v) { divisionCount = v; return this; }
@@ -76,7 +76,7 @@ public final class StrategyCommands {
         public Register dcaConfig(DcaStrategyConfig v) { dca = v; return this; }
 
         public RegisterStrategyCommand build() {
-            return new RegisterStrategyCommand(type, ticker, initialUsdDeposit, cycleSeedType, divisionCount,
+            return new RegisterStrategyCommand(type, ticker, initialDeposit, cycleSeedType, divisionCount,
                     initialHoldings, initialAvgPrice, intervalWeeks, bandWidth, recurringAmount, vrRamp,
                     scheduledStartDate, initialVrValue, dca);
         }

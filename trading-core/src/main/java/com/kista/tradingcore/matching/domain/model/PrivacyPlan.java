@@ -12,7 +12,7 @@ import java.util.List;
 // 변환은 데이터 소유자가 담당한다(PrivacyTradeBase.toPlan()) — matching은 privacy를 참조하지 않는다
 public record PrivacyPlan(
         int holdings,                      // 기준표 목표 보유 수량
-        BigDecimal currentCycleStart,      // 현재 사이클 기준가 — 배수(initialUsdDeposit ÷ currentCycleStart) 산출 기준
+        BigDecimal currentCycleStart,      // 현재 사이클 기준가 — 배수(initialDeposit ÷ currentCycleStart) 산출 기준
         List<PrivacyPlannedTrade> trades   // 기준표 계획 주문 목록
 ) {
     public PrivacyPlan {

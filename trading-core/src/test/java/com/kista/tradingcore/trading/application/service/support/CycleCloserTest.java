@@ -60,8 +60,8 @@ class CycleCloserTest {
         CycleCloser.CycleEndResult result = CycleCloser.closeIfExhausted(
                 strategyCyclePort, strategyPort, strategy, cycle, balance, tradeDate);
 
-        // 사이클 종료 기록 — 종료금액=usdDeposit, 종료일자=tradeDate
-        verify(strategyCyclePort).markEnded(cycle.id(), balance.usdDeposit(), tradeDate);
+        // 사이클 종료 기록 — 종료금액=deposit, 종료일자=tradeDate
+        verify(strategyCyclePort).markEnded(cycle.id(), balance.deposit(), tradeDate);
         // 조건부 pause — 전체 save는 동시 보관(ARCHIVED)을 덮어쓸 수 있다
         verify(strategyPort).pause(strategyId);
         verify(strategyPort, never()).save(any());
@@ -99,6 +99,6 @@ class CycleCloserTest {
                 strategyCyclePort, strategyPort, strategy, cycle, balance, tradeDate);
 
         assertThat(result.ended()).isTrue();
-        verify(strategyCyclePort).markEnded(cycle.id(), balance.usdDeposit(), tradeDate);
+        verify(strategyCyclePort).markEnded(cycle.id(), balance.deposit(), tradeDate);
     }
 }

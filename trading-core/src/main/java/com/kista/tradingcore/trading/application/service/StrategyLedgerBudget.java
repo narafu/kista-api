@@ -21,7 +21,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
-// 전략 자기 원장(cycle_position.usd_deposit) 기준 BUY 상한 — 계좌 단위 예산 배정(live 잔고 조회)을 대체하는 순수 계산
+// 전략 자기 원장(cycle_position.deposit) 기준 BUY 상한 — 계좌 단위 예산 배정(live 잔고 조회)을 대체하는 순수 계산
 @Component
 @RequiredArgsConstructor
 class StrategyLedgerBudget {
@@ -43,7 +43,7 @@ class StrategyLedgerBudget {
 
     // 이미 조회한 최신 포지션·같은 날 PLANNED/SUBMITTING/PLACED 주문·리포트 전 취소 BUY(unreportedCancelledBuys)로 계산하는 순수 버전 — 미리보기·인출이 미리 모은 목록을 넘긴다(미리보기의 취소 목록은 전략당 조회), 공식은 여기 한 곳
     BigDecimal remaining(StrategyCycle cycle, Optional<CyclePosition> latest, List<Order> sameDayOrders, List<Order> unreportedCancelled) {
-        BigDecimal ledger = latest.map(CyclePosition::usdDeposit).orElse(cycle.startAmount());
+        BigDecimal ledger = latest.map(CyclePosition::deposit).orElse(cycle.startAmount());
         if (ledger == null) ledger = BigDecimal.ZERO;
         BigDecimal committed = sameDayOrders.stream()
                 .filter(o -> o.direction() == OrderDirection.BUY)

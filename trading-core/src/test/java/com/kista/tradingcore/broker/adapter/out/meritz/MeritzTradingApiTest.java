@@ -142,6 +142,6 @@ class MeritzTradingApiTest {
         });
         assertThat(r.exchangeRateKrwPerUsd()).isEqualByComparingTo("1325.5");
         // USD 예수금 + KRW 예수금(19609/1325.5=14.79) 환산
-        assertThat(r.usdDepositActual()).isEqualByComparingTo("6828.01");
+        assertThat(r.depositActual()).isEqualByComparingTo("6828.01");
     }
 }

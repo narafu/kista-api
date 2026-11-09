@@ -330,7 +330,7 @@ class VrCycleRolloverServiceTest {
         // 종료금액은 인출 반영 전 pool(1000) 기준 총자산 그대로
         verify(cycleSnapshotCreator).rolloverVrCycle(eq(CYCLE_ID), eq(new BigDecimal("1500.00")), eq(today), any());
         CycleSnapshotCreator.VrCycleStart start = created();
-        assertThat(start.postBalance().usdDeposit()).isEqualByComparingTo(new BigDecimal("900.00"));
+        assertThat(start.postBalance().deposit()).isEqualByComparingTo(new BigDecimal("900.00"));
     }
 
     @Test
@@ -399,7 +399,7 @@ class VrCycleRolloverServiceTest {
         AccountBalance captured = start.postBalance();
         assertThat(captured.wholeShares()).isEqualTo(10);
         assertThat(captured.avgPrice()).isEqualByComparingTo(new BigDecimal("45.00"));
-        assertThat(captured.usdDeposit()).isEqualByComparingTo(USD_DEPOSIT);
+        assertThat(captured.deposit()).isEqualByComparingTo(USD_DEPOSIT);
     }
 
     @Test

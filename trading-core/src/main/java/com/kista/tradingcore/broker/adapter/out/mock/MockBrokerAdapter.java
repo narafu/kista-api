@@ -197,12 +197,12 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
     public PresentBalanceResult getPresentBalance(BrokerAccountRef account) {
         List<StrategyRefLite> strategies = mockSimulationDataPort.findStrategiesByAccountId(account.id());
         List<PresentBalanceResult.TossHolding> holdings = new ArrayList<>();
-        BigDecimal totalUsdDeposit = BigDecimal.ZERO;
+        BigDecimal totalDeposit = BigDecimal.ZERO;
         for (StrategyRefLite strategy : strategies) {
             Optional<PositionView> latest = mockSimulationDataPort.findLatestPosition(strategy.id());
             if (latest.isEmpty()) continue;
             PositionView position = latest.get();
-            totalUsdDeposit = totalUsdDeposit.add(position.usdDeposit());
+            totalDeposit = totalDeposit.add(position.deposit());
             if (position.holdings() > 0 && position.avgPrice() != null) {
                 BigDecimal currentPrice = priceFeed.getPrice(strategy.ticker());
                 holdings.add(new PresentBalanceResult.TossHolding(strategy.ticker(), position.holdings(), position.avgPrice(), currentPrice));
@@ -210,6 +210,6 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
         }
         // 모의계좌는 KRW 환전 개념이 없음 — krwDeposit=0, rate=0으로 집계(문서화된 근사치, DB 스냅샷 기반)
         // rate=0이면 aggregateToss()가 hasRate=false 경로로 0으로 나누지 않고 안전하게 처리
-        return PresentBalanceResult.aggregateToss(holdings, totalUsdDeposit, BigDecimal.ZERO, BigDecimal.ZERO);
+        return PresentBalanceResult.aggregateToss(holdings, totalDeposit, BigDecimal.ZERO, BigDecimal.ZERO);
     }
 }

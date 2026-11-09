@@ -71,12 +71,12 @@ class TradingAlertNotifierTest {
 
     @Test
     void onInsufficientBalance_adminPath_callsNotifyPortWithScalars() {
-        BigDecimal usdDeposit = new BigDecimal("100.00");
+        BigDecimal deposit = new BigDecimal("100.00");
 
         notifier().onInsufficientBalance(new InsufficientBalanceEvent(null, accountId, accountNickname,
-                0, usdDeposit, StrategyTicker.SOXL, null, 0, false, null));
+                0, deposit, StrategyTicker.SOXL, null, 0, false, null));
 
-        verify(notifyPort).notifyInsufficientBalance(0, usdDeposit, StrategyTicker.SOXL);
+        verify(notifyPort).notifyInsufficientBalance(0, deposit, StrategyTicker.SOXL);
         verify(userNotificationPort, never()).notifyInsufficientBalance(any(), any(), any(), any(), anyInt(), anyBoolean(), any());
     }
 

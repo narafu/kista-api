@@ -14,7 +14,7 @@ public record TradeCorrectionResponse(
         int processedCount,             // 처리된 체결 건수
         BigDecimal finalHoldings,       // 보정 후 보유 수량
         BigDecimal finalAvgPrice,       // 보정 후 평단가
-        BigDecimal finalUsdDeposit,     // 보정 후 예수금(USD)
+        BigDecimal finalDeposit,     // 보정 후 예수금(USD)
         StrategyStatus strategyStatus,  // 보정 후 전략 상태
         boolean cycleEnded,             // 보정으로 사이클이 종료됐는지
         LocalDate cycleEndDate          // 사이클 종료일 (cycleEnded=false면 null)

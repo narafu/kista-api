@@ -767,7 +767,7 @@ class StrategyServiceTest {
         verify(strategyCyclePort).save(cycleCaptor.capture());
         assertThat(cycleCaptor.getValue().startAmount()).isEqualByComparingTo("874.50");
         verify(cyclePositionPort).save(argThat(p ->
-                p.usdDeposit().compareTo(new BigDecimal("874.50")) == 0 && p.holdings().signum() == 0));
+                p.deposit().compareTo(new BigDecimal("874.50")) == 0 && p.holdings().signum() == 0));
         verify(strategyPort).updateStatusUnlessArchived(STRATEGY_ID, StrategyStatus.ACTIVE);
         verify(eventPublisher).publishEvent(new StrategyCapitalChangedEvent(USER_ID)); // 새 사이클 생성 → stats 캐시 무효화
     }
@@ -928,7 +928,7 @@ class StrategyServiceTest {
                 new UpdateStrategyCommand(StrategyCycleSeedType.MAINTAIN, null));
 
         assertThat(result.strategy().cycleSeedType()).isEqualTo(StrategyCycleSeedType.MAINTAIN);
-        assertThat(result.initialUsdDeposit()).isEqualTo(new BigDecimal("1000"));
+        assertThat(result.initialDeposit()).isEqualTo(new BigDecimal("1000"));
         // 전체 save가 아니라 정책 컬럼만 조건부 갱신한다(오래된 스냅샷이 status를 덮지 않게)
         verify(strategyPort, never()).save(any());
         verify(strategyCyclePort, never()).updateStartAmount(any(), any());
@@ -989,7 +989,7 @@ class StrategyServiceTest {
 
         verify(strategyCyclePort).lockForUpdate(CYCLE_ID);
         verify(strategyCyclePort).updateStartAmount(CYCLE_ID, new BigDecimal("3000"));
-        verify(cyclePositionPort).updateBalance(latest.id(), latest.toBalance().withUsdDeposit(new BigDecimal("3000")));
+        verify(cyclePositionPort).updateBalance(latest.id(), latest.toBalance().withDeposit(new BigDecimal("3000")));
         ArgumentCaptor<CycleCapitalEvent> event = ArgumentCaptor.forClass(CycleCapitalEvent.class);
         verify(cycleCapitalEventPort).save(event.capture());
         assertThat(event.getValue().kind()).isEqualTo(CycleCapitalEvent.Kind.RESET);
@@ -1362,23 +1362,23 @@ class StrategyServiceTest {
     }
 
     @Test
-    @DisplayName("INFINITE register()는 initialUsdDeposit null이면 0으로 저장한다")
+    @DisplayName("INFINITE register()는 initialDeposit null이면 0으로 저장한다")
     void register_infinite_nullDeposit_persistsZero() {
         stubSuccessfulRegistration(StrategyType.INFINITE, StrategyTicker.SOXL);
 
         strategyService.register(USER_ID, ACCOUNT_ID, infinite().build());
 
-        verify(cyclePositionPort).save(argThat(p -> p.usdDeposit().compareTo(BigDecimal.ZERO) == 0));
+        verify(cyclePositionPort).save(argThat(p -> p.deposit().compareTo(BigDecimal.ZERO) == 0));
     }
 
     @Test
-    @DisplayName("PRIVACY register()는 initialUsdDeposit null이면 0으로 저장한다")
+    @DisplayName("PRIVACY register()는 initialDeposit null이면 0으로 저장한다")
     void register_privacy_nullDeposit_persistsZero() {
         stubSuccessfulRegistration(StrategyType.PRIVACY, StrategyTicker.SOXL);
 
         strategyService.register(USER_ID, ACCOUNT_ID, register(StrategyType.PRIVACY).build());
 
-        verify(cyclePositionPort).save(argThat(p -> p.usdDeposit().compareTo(BigDecimal.ZERO) == 0));
+        verify(cyclePositionPort).save(argThat(p -> p.deposit().compareTo(BigDecimal.ZERO) == 0));
     }
 
     @Test
@@ -1509,7 +1509,7 @@ class StrategyServiceTest {
 
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
-        assertThat(result.initialUsdDeposit()).isEqualByComparingTo("600");
+        assertThat(result.initialDeposit()).isEqualByComparingTo("600");
         verifyNoInteractions(marginPort);
     }
 
@@ -1817,7 +1817,7 @@ class StrategyServiceTest {
     }
 
     @Test
-    @DisplayName("VR register() 적립식 initialUsdDeposit null이면 0으로 정규화한다")
+    @DisplayName("VR register() 적립식 initialDeposit null이면 0으로 정규화한다")
     void register_vr_recurringDeposit_nullPool_defaultsToZero() {
         RegisterStrategyCommand cmd = vr().intervalWeeks(4).bandWidth("15.00").recurringAmount(200).build();
         Account account = ownerAccount();
@@ -1838,7 +1838,7 @@ class StrategyServiceTest {
 
         // recurringAmount=200(적립식) → 기본 poolLimitRate=1.0 (개장 pool=0이라 달러 파생 poolLimit은 0이지만 저장 비율 자체는 1.0)
         verify(strategyCycleVrPort).save(argThat(cv -> cv.poolLimitRate().compareTo(BigDecimal.ONE) == 0));
-        verify(cyclePositionPort).save(argThat(p -> p.usdDeposit().compareTo(BigDecimal.ZERO) == 0));
+        verify(cyclePositionPort).save(argThat(p -> p.deposit().compareTo(BigDecimal.ZERO) == 0));
     }
 
     @Test
@@ -1897,7 +1897,7 @@ class StrategyServiceTest {
     @DisplayName("VR register() 램프 8필드 모두 생략 — 인출식(recurringAmount<0)은 initialGradient=40/gMax=50/initialPoolLimitRate=0.1 기본값 적용")
     void register_vr_rampFieldsOmitted_withdrawal_appliesGradient40() {
         stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
-        // 인출식: recurringAmount=-100, intervalWeeks=2 → 필요 최소자산 = 100×100×4/2 = 20000, initialUsdDeposit=20000으로 충족
+        // 인출식: recurringAmount=-100, intervalWeeks=2 → 필요 최소자산 = 100×100×4/2 = 20000, initialDeposit=20000으로 충족
         RegisterStrategyCommand cmd = vr().deposit("20000").intervalWeeks(2).bandWidth("15.00").recurringAmount(-100).build();
 
         strategyService.register(USER_ID, ACCOUNT_ID, cmd);
@@ -2037,7 +2037,7 @@ class StrategyServiceTest {
         assertThat(detail.currentRound()).isNull();
         // toDetail()이 조립하는 startDate는 findLatestByStrategyId로 조회한 사이클의 startDate와 일치해야 함
         assertThat(detail.startDate()).isEqualTo(vrCycle.startDate());
-        assertThat(detail.initialUsdDeposit()).isEqualByComparingTo("1000.00");
+        assertThat(detail.initialDeposit()).isEqualByComparingTo("1000.00");
         assertThat(detail.vr()).isNotNull();
         assertThat(detail.vr().intervalWeeks()).isEqualTo(4);
         assertThat(detail.vr().bandWidth()).isEqualByComparingTo("15.00");
@@ -2258,7 +2258,7 @@ class StrategyServiceTest {
         assertThat(batch).hasSize(1);
         assertThat(batch.getFirst()).isEqualTo(single);
         assertThat(single.startDate()).isNull();
-        assertThat(single.initialUsdDeposit()).isNull();
+        assertThat(single.initialDeposit()).isNull();
         assertThat(single.divisionCount()).isEqualTo(StrategyDefaults.DEFAULT_DIVISION_COUNT);
         assertThat(single.currentRound()).isNull();
         assertThat(single.currentHoldings()).isNull();
@@ -2361,7 +2361,7 @@ class StrategyServiceTest {
                 p.holdings().compareTo(BigDecimal.valueOf(10)) == 0
                         && p.avgPrice().compareTo(new BigDecimal("45.50")) == 0
                         && p.closingPrice().compareTo(new BigDecimal("50.00")) == 0
-                        && p.usdDeposit().compareTo(new BigDecimal("1500")) == 0));
+                        && p.deposit().compareTo(new BigDecimal("1500")) == 0));
         verify(cyclePositionInfiniteDetailPort).save(argThat(d -> !d.isReverseMode()));
         assertThat(result.currentHoldings()).isEqualTo(10);
         assertThat(result.currentRound()).isNotNull(); // 등록 응답도 조회 경로와 같이 중간 시작 회차를 계산한다
@@ -2456,7 +2456,7 @@ class StrategyServiceTest {
         verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("1600.00")) == 0
                 && c.openAmount().compareTo(new BigDecimal("1600.00")) == 0));
         verify(strategyCycleVrPort).save(argThat(cv -> cv.value().compareTo(new BigDecimal("600.00")) == 0));
-        assertThat(result.initialUsdDeposit()).isEqualByComparingTo("1000.00");
+        assertThat(result.initialDeposit()).isEqualByComparingTo("1000.00");
         assertThat(result.vr().value()).isEqualByComparingTo("600.00");
         assertThat(result.vr().poolLimit()).isEqualByComparingTo("750.00");
         // VR live 잔고 조회는 완전히 제거됨 — BrokerPricePort 시장가 조회 1회로만 V가 계산된다
@@ -2851,7 +2851,7 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
             assertThat(r.rule().ruleKey()).hasSize(36);
             assertThat(r.nextKstTradeDate()).isNotNull();
         });
-        assertThat(detail.initialUsdDeposit()).isEqualByComparingTo("0");
+        assertThat(detail.initialDeposit()).isEqualByComparingTo("0");
         // DCA는 잔고 검증·시세 조회를 하지 않는다
         verifyNoInteractions(marginPort, brokerPricePort);
     }
@@ -2881,9 +2881,9 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
                 dcaCommand(StrategyTicker.UPRO, dcaConfig(OrderDirection.BUY), new BigDecimal("10"), new BigDecimal("40")));
 
         assertThat(detail.currentHoldings()).isEqualTo(10);
-        assertThat(detail.initialUsdDeposit()).isEqualByComparingTo("400"); // 조회 경로와 동일 — 사이클 시작금액(보유 10 × 평단 40)
+        assertThat(detail.initialDeposit()).isEqualByComparingTo("400"); // 조회 경로와 동일 — 사이클 시작금액(보유 10 × 평단 40)
         verify(cyclePositionPort).save(argThat(p -> p.holdings().compareTo(BigDecimal.TEN) == 0
-                && p.usdDeposit().signum() == 0 && p.avgPrice().compareTo(new BigDecimal("40")) == 0));
+                && p.deposit().signum() == 0 && p.avgPrice().compareTo(new BigDecimal("40")) == 0));
         verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("400")) == 0));
         verifyNoInteractions(marginPort, brokerPricePort);
     }
@@ -2898,7 +2898,7 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
         strategyService.register(USER_ID, ACCOUNT_ID, dca().ticker(StrategyTicker.UPRO).holdings(new BigDecimal("10"))
                 .avgPrice(new BigDecimal("40")).deposit(new BigDecimal("1000.50")).dcaConfig(dcaConfig(OrderDirection.BUY)).build());
 
-        verify(cyclePositionPort).save(argThat(p -> p.usdDeposit().compareTo(new BigDecimal("1000.50")) == 0
+        verify(cyclePositionPort).save(argThat(p -> p.deposit().compareTo(new BigDecimal("1000.50")) == 0
                 && p.holdings().compareTo(BigDecimal.TEN) == 0));
         verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("1400.50")) == 0)); // 예수금 + 40 × 10
     }
@@ -2930,7 +2930,7 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
 
         assertThat(detail.currentHoldings()).isNull();
         verify(cyclePositionPort).save(argThat(p -> p.holdings().compareTo(new BigDecimal("0.01234567")) == 0
-                && p.usdDeposit().signum() == 0 && p.closingPrice() == null));
+                && p.deposit().signum() == 0 && p.closingPrice() == null));
         // 초기 투입 원가 = 0.01234567 × 90,000,000 = 1,111,110.30
         verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("1111110.30")) == 0));
         verifyNoInteractions(marginPort, brokerPricePort);

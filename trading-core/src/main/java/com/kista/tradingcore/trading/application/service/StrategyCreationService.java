@@ -100,7 +100,7 @@ class StrategyCreationService {
         tradingUserProfilePort.findByUserId(userId)
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
         // 예수금 — 생략(null)은 0으로 여기서 한 번만 정규화, 전 전략 공통으로 음수 거부·계좌 통화(주식 USD·코인 견적 통화) 자릿수 검증
-        BigDecimal initialUsdDeposit = DepositAmounts.normalizeForRegistration(cmd.initialUsdDeposit(), account.broker().getCurrency());
+        BigDecimal initialDeposit = DepositAmounts.normalizeForRegistration(cmd.initialDeposit(), account.broker().getCurrency());
 
         // 중간부터 시작 시 시장가(전일종가) 1회 조회 — holdings=0이면 조회 자체를 건너뛰어 기존 동작 보존
         // DCA는 시장가를 조회하지 않고 초기 투입 원가(보유 × 평단)를 start_amount로 둔다 — 코인은 BrokerPricePort 경로가 없다
@@ -109,7 +109,7 @@ class StrategyCreationService {
                 : (dca ? cmd.initialAvgPrice() : marketPrice).multiply(initialHoldings).setScale(AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP);
 
         // VR 전략 파라미터 해석·검증 — V값은 시장가×보유수량 기준 (비VR은 null)
-        VrRegistration vr = cmd.type() == StrategyType.VR ? VrRegistration.resolve(cmd, resolved, initialUsdDeposit, initialStockValue) : null;
+        VrRegistration vr = cmd.type() == StrategyType.VR ? VrRegistration.resolve(cmd, resolved, initialDeposit, initialStockValue) : null;
 
         // 연속 사이클 정책을 지원하지 않는 전략(VR·DCA)은 NONE으로 강제하고 나머지는 요청 값을 따른다.
         StrategyCycleSeedType seedType = !cmd.type().capability().supportsCycleSeed()
@@ -117,8 +117,8 @@ class StrategyCreationService {
                 : (cmd.cycleSeedType() != null ? cmd.cycleSeedType() : StrategyCycleSeedType.NONE);
 
         // 시작금액 산출 — 개장 평가(통계 원금)는 예수금 + 보유 평가(DCA는 원가)로, PRIVACY 중간 시작의 배수 환산과 분리한다
-        BigDecimal startAmount = startAmountCalculator.calculate(cmd.type(), initialUsdDeposit, initialHoldings, initialStockValue);
-        BigDecimal openAmount = initialUsdDeposit.add(initialStockValue);
+        BigDecimal startAmount = startAmountCalculator.calculate(cmd.type(), initialDeposit, initialHoldings, initialStockValue);
+        BigDecimal openAmount = initialDeposit.add(initialStockValue);
 
         // INFINITE 최소 시드 검증 — 폼이 먼저 막지만 API 직접 호출도 0회차 교착 시드를 만들지 못하게 서버에서도 막는다
         if (cmd.type() == StrategyType.INFINITE) {
@@ -131,7 +131,7 @@ class StrategyCreationService {
         Strategy strategy;
         try {
             strategy = creationPersister.persist(new StrategyCreationPersister.Draft(
-                    accountId, cmd.type(), seedType, resolved, vr != null ? vr.ramp() : null, initialUsdDeposit, initialHoldings,
+                    accountId, cmd.type(), seedType, resolved, vr != null ? vr.ramp() : null, initialDeposit, initialHoldings,
                     cmd.initialAvgPrice(), marketPrice, startAmount, openAmount, vr != null ? vr.vrValue() : null, scheduledStart, dcaConfig));
         } catch (DataIntegrityViolationException e) {
             // 선검사(validateUniqueTicker)를 동시에 통과한 경합 — 유니크 인덱스 위반만 409로 바꾸고 다른 제약 위반은 그대로 던진다

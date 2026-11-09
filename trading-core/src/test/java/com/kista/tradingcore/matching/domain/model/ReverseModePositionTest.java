@@ -17,7 +17,7 @@ class ReverseModePositionTest {
     @Test
     @DisplayName("별지점이 있고 쿼터매수 예산으로 1주도 못 사면 예산 소진으로 판정한다")
     void isQuotaBuyExhausted_trueWhenBudgetTooSmall() {
-        // usdDeposit=3.00 → 쿼터매수 예산 0.75, buyPrice=19.99 → floor(0.75/19.99)=0
+        // deposit=3.00 → 쿼터매수 예산 0.75, buyPrice=19.99 → floor(0.75/19.99)=0
         ReverseModePosition position = new ReverseModePosition(
                 100, new BigDecimal("10.00"), new BigDecimal("3.00"),
                 StrategyTicker.SOXL, 20, new BigDecimal("20.00"), false);
@@ -38,7 +38,7 @@ class ReverseModePositionTest {
     @Test
     @DisplayName("쿼터매수 예산이 충분하면 예산 소진이 아니다")
     void isQuotaBuyExhausted_falseWhenBudgetSufficient() {
-        // usdDeposit=1000.00 → 쿼터매수 예산 250.00, buyPrice=19.99 → floor(250/19.99)=12 (>0)
+        // deposit=1000.00 → 쿼터매수 예산 250.00, buyPrice=19.99 → floor(250/19.99)=12 (>0)
         ReverseModePosition position = new ReverseModePosition(
                 100, new BigDecimal("10.00"), new BigDecimal("1000.00"),
                 StrategyTicker.SOXL, 20, new BigDecimal("20.00"), false);

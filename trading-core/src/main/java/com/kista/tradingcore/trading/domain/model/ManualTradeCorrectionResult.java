@@ -14,7 +14,7 @@ public record ManualTradeCorrectionResult(
         int processedCount,
         BigDecimal finalHoldings,
         BigDecimal finalAvgPrice,
-        BigDecimal finalUsdDeposit,
+        BigDecimal finalDeposit,
         StrategyStatus strategyStatus,
         boolean cycleEnded,
         LocalDate cycleEndDate

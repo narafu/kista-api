@@ -627,7 +627,7 @@ class BacktestEngineTest {
                         "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03");
 
         // 자산은 시드로 리셋되지 않고 그대로 이월된다 — 예수금 0 + 매도대금 950 = 950.00
-        assertThat(restarted.balance().usdDeposit()).isEqualByComparingTo("950");
+        assertThat(restarted.balance().deposit()).isEqualByComparingTo("950");
         // 5일차: 새 사이클 매수 5주가 종가 90에 체결 → 예수금 500 + 5주×90 = 950.00
         assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("950");
         assertThat(output.warnings()).isEmpty();
@@ -654,7 +654,7 @@ class BacktestEngineTest {
         assertThat(output.cycleCount()).isEqualTo(2);
         // 청산 당일이 곧 사이클 B의 0회차 — 0회차 매수①만 체결(매수①이 unitAmount를 다 써 매수② 없음)이라 예수금 1000 + 매도대금 1150 = 2150.00이 그대로 이월된다
         assertThat(recorder.on("2024-01-04").balance().holdings()).isZero();
-        assertThat(recorder.on("2024-01-04").balance().usdDeposit()).isEqualByComparingTo("2150.00");
+        assertThat(recorder.on("2024-01-04").balance().deposit()).isEqualByComparingTo("2150.00");
 
         assertThat(recorder.on("2024-01-07").inputs().isFirstReverseDay()).isTrue();
 
@@ -788,7 +788,7 @@ class BacktestEngineTest {
     @Test
     @DisplayName("배수 계약 회귀: 시드를 2배로 올리면 같은 기준표에 대해 주문 수량도 정확히 2배가 된다")
     void 시드를_2배로_올리면_주문_수량도_2배가_된다() {
-        // base.holdings=0이라 보유 보정(diff)이 0 — 순수하게 multiple = initialUsdDeposit ÷ currentCycleStart만 검증한다
+        // base.holdings=0이라 보유 보정(diff)이 0 — 순수하게 multiple = initialDeposit ÷ currentCycleStart만 검증한다
         // currentCycleStart=500 기준: seed 1000 → 배수 2.00 → 3주×2 = 6주 / seed 2000 → 배수 4.00 → 3주×4 = 12주
         Map<LocalDate, PrivacyTradeBase> bases = Map.of(LocalDate.parse("2024-01-02"), privacyBase("500", 0,
                 trade("2024-01-02", OrderType.LOC, OrderDirection.BUY, 3, "90")));
@@ -1009,7 +1009,7 @@ class BacktestEngineTest {
         BacktestEngine.Output output = runPrivacyExit(recorder, StrategyCycleSeedType.MAINTAIN, 150, "51", 51, true);
 
         // 전략 예수금 1,000 − 1,020 = −20 → 유휴 현금 50에서 20을 메워 전략 예수금 0, 유휴 30
-        assertThat(recorder.balances.get(LocalDate.parse("2024-01-04")).usdDeposit()).isEqualByComparingTo("0");
+        assertThat(recorder.balances.get(LocalDate.parse("2024-01-04")).deposit()).isEqualByComparingTo("0");
         assertThat(output.warnings()).noneMatch(w -> w.contains("매수 주문 합계"));
         // 총자산 = 전략 예수금 0 + 유휴 30 + 20주 × 51 = 1,050
         assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("1050");

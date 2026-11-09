@@ -21,7 +21,7 @@ public interface TradingUserNotificationPort {
     void notifyCycleCompleted(TradingUserProfile profile, String accountNickname, StrategyType strategyType,
                                StrategyTicker ticker, StrategyCycleSeedType cycleSeedType);
     void notifyNewCycleStarted(TradingUserProfile profile, String accountNickname, StrategyType strategyType,
-                               StrategyTicker ticker, BigDecimal initialUsdDeposit);
+                               StrategyTicker ticker, BigDecimal initialDeposit);
     // 소액 시드로 새 사이클을 열 수 없어 전략이 자동 일시정지됨
     void notifyStrategyAutoPaused(TradingUserProfile profile, String accountNickname, StrategyType strategyType,
                                   StrategyTicker ticker, BigDecimal seed, BigDecimal price);

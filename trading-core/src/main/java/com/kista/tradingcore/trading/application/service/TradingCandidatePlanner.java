@@ -117,7 +117,7 @@ class TradingCandidatePlanner {
     private AccountBalance loadBalance(Strategy strategy, TradingAccount account) {
         AccountBalance balance = balanceLoader.loadBalanceOrThrow(strategy);
         log.info("[accountId={}] 잔고 조회: {} {}주, 통합주문가능금액 ${}",
-                account.id(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
+                account.id(), strategy.ticker().name(), balance.holdings(), balance.deposit());
         return balance;
     }
 

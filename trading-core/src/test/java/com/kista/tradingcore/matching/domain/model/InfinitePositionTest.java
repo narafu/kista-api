@@ -31,7 +31,7 @@ class InfinitePositionTest {
         assertThat(pos.currentRound()).isEqualTo(0.0);
         assertThat(pos.unitAmount()).isEqualByComparingTo("100.00");
         assertThat(pos.priceOffsetRate()).isEqualByComparingTo("0.2000"); // SOXL targetProfitRate=0.20
-        assertThat(pos.usdDeposit()).isEqualByComparingTo("2000");
+        assertThat(pos.deposit()).isEqualByComparingTo("2000");
         assertThat(pos.referencePrice()).isEqualByComparingTo("21.60"); // 18 × (1+0.2000)
         assertThat(pos.targetPrice()).isEqualByComparingTo("21.60");
     }
@@ -50,7 +50,7 @@ class InfinitePositionTest {
         assertThat(pos.currentRound()).isCloseTo(1.33, within(0.01));
         assertThat(pos.unitAmount()).isEqualByComparingTo("150.00");
         assertThat(pos.priceOffsetRate()).isEqualByComparingTo("0.17"); // 0.20 × (1 - 2×1.33/20) = 0.1734 → scale=2 반올림 0.17
-        assertThat(pos.usdDeposit()).isEqualByComparingTo("2800");
+        assertThat(pos.deposit()).isEqualByComparingTo("2800");
         assertThat(pos.referencePrice()).isEqualByComparingTo("23.40"); // 20 × (1+0.17) = 23.40
         assertThat(pos.targetPrice()).isEqualByComparingTo("24.00");
     }
@@ -69,7 +69,7 @@ class InfinitePositionTest {
         assertThat(pos.currentRound()).isEqualTo(5.0);
         assertThat(pos.unitAmount()).isEqualByComparingTo("100.00");
         assertThat(pos.priceOffsetRate()).isEqualByComparingTo("0.1000");
-        assertThat(pos.usdDeposit()).isEqualByComparingTo("1500");
+        assertThat(pos.deposit()).isEqualByComparingTo("1500");
         assertThat(pos.referencePrice()).isEqualByComparingTo("5.50"); // 5 × (1+0.1000)
         assertThat(pos.targetPrice()).isEqualByComparingTo("6.00");
     }
@@ -110,15 +110,15 @@ class InfinitePositionTest {
     @Test
     @DisplayName("nextReverseMode: 일반모드 + isFinalRound → 리버스모드 진입")
     void nextReverseMode_enters_when_finalRound() {
-        // unitAmount=100.00, usdDeposit=50 → isFinalRound=true (unitAmount > usdDeposit)
+        // unitAmount=100.00, deposit=50 → isFinalRound=true (unitAmount > deposit)
         // holdings=5, avgPrice=20 → purchaseAmount=100, totalAssets=150, unitAmount=7.50
-        // unitAmount(7.50) > usdDeposit(50)? → No... 재계산: deposit=50, holdings=5, avg=20
+        // unitAmount(7.50) > deposit(50)? → No... 재계산: deposit=50, holdings=5, avg=20
         // totalAssets=50+100=150, unitAmount=150/20=7.50 → isFinalRound: 7.50>50? No
-        // 소진 조건은 unitAmount > usdDeposit: holdings=18, avg=22, deposit=22 → purchase=396, total=418, unit=20.90 > 22 → true
+        // 소진 조건은 unitAmount > deposit: holdings=18, avg=22, deposit=22 → purchase=396, total=418, unit=20.90 > 22 → true
         AccountBalance balance = new AccountBalance(18, new BigDecimal("22"), new BigDecimal("22"));
         InfinitePosition pos = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("22"), 20);
 
-        // unitAmount(20.90) > usdDeposit(22)? No... 재계산
+        // unitAmount(20.90) > deposit(22)? No... 재계산
         // totalAssets=22+(22*18)=22+396=418, unitAmount=418/20=20.90 → 20.90 < 22 → isFinalRound=false
         // holdings=19, avg=22, deposit=8 → purchase=418, total=426, unit=21.30 > 8 → true
         AccountBalance balance2 = new AccountBalance(19, new BigDecimal("22"), new BigDecimal("8"));
@@ -134,8 +134,8 @@ class InfinitePositionTest {
         AccountBalance balance = new AccountBalance(10, new BigDecimal("41.5"), new BigDecimal("25"));
         InfinitePosition pos = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("40"), 20);
 
-        assertThat(pos.unitAmount()).isLessThanOrEqualTo(pos.usdDeposit());
-        assertThat(pos.referencePrice()).isGreaterThan(pos.usdDeposit());
+        assertThat(pos.unitAmount()).isLessThanOrEqualTo(pos.deposit());
+        assertThat(pos.referencePrice()).isGreaterThan(pos.deposit());
         assertThat(pos.isFinalRound()).isTrue();
     }
 
@@ -218,7 +218,7 @@ class InfinitePositionTest {
             "40, 3900, 100, false", // 39.00회차
             "40, 3910, 90, true"    // 39.10회차
     })
-    @DisplayName("isFinalRound: unitAmount > usdDeposit 경계가 분할수-1 회차 부근에 있다 (30분할 29, 40분할 39)")
+    @DisplayName("isFinalRound: unitAmount > deposit 경계가 분할수-1 회차 부근에 있다 (30분할 29, 40분할 39)")
     void isFinalRound_boundary_30_40div(int div, int holdings, int deposit, boolean expected) {
         assertThat(posAtAvg1(holdings, deposit, div).isFinalRound()).isEqualTo(expected);
     }

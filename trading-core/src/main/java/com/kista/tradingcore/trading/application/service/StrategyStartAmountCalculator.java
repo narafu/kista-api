@@ -31,14 +31,14 @@ class StrategyStartAmountCalculator {
     // PRIVACY 중간부터 시작 시작금액 — 원가 기준 자산 비율로 배수를 구해 FIDA 사이클 시작금액에 곱한다
     // 배수 = (예수금 + 보유×FIDA 평단) ÷ (FIDA 사이클 시작금액 + 실현손익), 소수 2자리 버림(PrivacyStrategy 배수 산출과 동일)
     // 예: 3,445.25 + 417×125.95 = 55,966.40 ÷ (14,434.58 − 454.07) = 4.00배 → 57,738.32
-    private BigDecimal privacyBootstrapStartAmount(BigDecimal initialUsdDeposit, BigDecimal initialHoldings) {
+    private BigDecimal privacyBootstrapStartAmount(BigDecimal initialDeposit, BigDecimal initialHoldings) {
         PrivacyCurrentBase base = privacyTradePort.findSeedPreviewBase()
                 .orElseThrow(() -> new IllegalArgumentException("PRIVACY 기준 매매표가 없어 중간부터 시작할 수 없습니다."));
         BigDecimal fidaBookValue = base.currentCycleStart().add(base.currentCycleRealizedPnl());
         if (base.avgPrice() == null || fidaBookValue.signum() <= 0) {
             throw new IllegalArgumentException("PRIVACY 기준 매매표에 보유 평단이 없어 중간부터 시작할 수 없습니다.");
         }
-        BigDecimal userBookValue = initialUsdDeposit.add(initialHoldings.multiply(base.avgPrice()));
+        BigDecimal userBookValue = initialDeposit.add(initialHoldings.multiply(base.avgPrice()));
         BigDecimal multiple = userBookValue.divide(fidaBookValue, 2, RoundingMode.FLOOR);
         log.info("[PRIVACY] 중간부터 시작 배수: userBookValue={}, fidaBookValue={}, multiple={}", userBookValue, fidaBookValue, multiple);
         if (multiple.signum() <= 0) {

@@ -34,13 +34,13 @@ class PresentBalanceResultTest {
         assertThat(item.exchangeCode()).isEqualTo("AMEX");
 
         // totalAssetKrw = (110 + 1000)×1400 + 140000 = 1,554,000 + 140,000 = 1,694,000
-        assertThat(result.totalAssetUsd()).isEqualByComparingTo("1694000");
+        assertThat(result.totalAsset()).isEqualByComparingTo("1694000");
         // totalEvalProfitKrw = 10×1400 = 14,000
         assertThat(result.totalEvalProfit()).isEqualByComparingTo("14000");
         // 매입금액KRW = 100×1400 = 140,000 → 수익률 = 14000/140000×100 = 10.00%
         assertThat(result.totalReturnRate()).isEqualByComparingTo("10.00");
-        // krwAsUsd = 140000/1400 = 100.00 → totalUsdDeposit = 1000 + 100 = 1100.00
-        assertThat(result.usdDepositActual()).isEqualByComparingTo("1100.00");
+        // krwAsUsd = 140000/1400 = 100.00 → totalDeposit = 1000 + 100 = 1100.00
+        assertThat(result.depositActual()).isEqualByComparingTo("1100.00");
         assertThat(result.exchangeRateKrwPerUsd()).isEqualByComparingTo("1400");
     }
 
@@ -57,11 +57,11 @@ class PresentBalanceResultTest {
         // 종목별 계산은 환율과 무관하게 동일하게 수행됨
         assertThat(result.items().getFirst().evalAmountUsd()).isEqualByComparingTo("110.00");
         // 환율 0 → totalAssetKrw = krwDeposit = 50,000
-        assertThat(result.totalAssetUsd()).isEqualByComparingTo("50000");
+        assertThat(result.totalAsset()).isEqualByComparingTo("50000");
         assertThat(result.totalEvalProfit()).isEqualByComparingTo("0");
         assertThat(result.totalReturnRate()).isEqualByComparingTo("0");
-        // 환율 0 → krwAsUsd = 0 → totalUsdDeposit = usdDeposit
-        assertThat(result.usdDepositActual()).isEqualByComparingTo("1000.00");
+        // 환율 0 → krwAsUsd = 0 → totalDeposit = deposit
+        assertThat(result.depositActual()).isEqualByComparingTo("1000.00");
     }
 
     // 평단 0 경계값 — 0 나눗셈 방지, 종목 수익률 0
@@ -92,10 +92,10 @@ class PresentBalanceResultTest {
 
         assertThat(result.items()).isEmpty();
         // totalAssetKrw = (0 + 500)×1400 + 70000 = 700000 + 70000 = 770,000
-        assertThat(result.totalAssetUsd()).isEqualByComparingTo("770000");
+        assertThat(result.totalAsset()).isEqualByComparingTo("770000");
         assertThat(result.totalEvalProfit()).isEqualByComparingTo("0");
         assertThat(result.totalReturnRate()).isEqualByComparingTo("0");
-        // totalUsdDeposit = 500 + 70000/1400(=50.00) = 550.00
-        assertThat(result.usdDepositActual()).isEqualByComparingTo("550.00");
+        // totalDeposit = 500 + 70000/1400(=50.00) = 550.00
+        assertThat(result.depositActual()).isEqualByComparingTo("550.00");
     }
 }

@@ -51,7 +51,7 @@ class ReverseInfiniteStrategyTest {
     @Test
     @DisplayName("쿼터매수 예산 소진 시 동일 수량 MOC SELL leg 한 건만 생성한다")
     void buildOrders_quotaBuyExhausted_producesMocSellOnly() {
-        // usdDeposit=3.00 → 쿼터매수 예산 소진, holdings=100·divisionCount=20 → calcLocSellQuantity=10
+        // deposit=3.00 → 쿼터매수 예산 소진, holdings=100·divisionCount=20 → calcLocSellQuantity=10
         ReverseModePosition position = new ReverseModePosition(
                 100, new BigDecimal("10.00"), new BigDecimal("3.00"),
                 StrategyTicker.SOXL, 20, new BigDecimal("20.00"), false);

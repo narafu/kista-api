@@ -33,7 +33,7 @@ final class TradingContractMapper {
 
     static TradeCorrectionResponse toResponse(ManualTradeCorrectionResult r) {
         return new TradeCorrectionResponse(r.userId(), r.accountId(), r.strategyId(), r.processedCount(),
-                r.finalHoldings(), r.finalAvgPrice(), r.finalUsdDeposit(), r.strategyStatus(),
+                r.finalHoldings(), r.finalAvgPrice(), r.finalDeposit(), r.strategyStatus(),
                 r.cycleEnded(), r.cycleEndDate());
     }
 

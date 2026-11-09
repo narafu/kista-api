@@ -56,7 +56,7 @@ adapter/out/kis/    ← KisHttpClient(공통 헤더 + executeWithRetry: 401 시 
 - `GET /api/market/holidays?year=YYYY&month=MM` — `MarketHolidayController`(root `market` 모듈), 해당 월 미국 시장 휴장일 날짜 목록(`List<String>`, ISO 형식), JWT 인증 필요
 
 ### 잔고 조회 주의사항 (TTTC2101R)
-- `usdDeposit` = `itgr_ord_psbl_amt`(통합주문가능금액) — `frcr_dncl_amt_2`(환전된 외화만) 대신 사용 (원화 자동 환전 포함)
+- `deposit` = `itgr_ord_psbl_amt`(통합주문가능금액) — `frcr_dncl_amt_2`(환전된 외화만) 대신 사용 (원화 자동 환전 포함)
 - **필터 기준: `natn_name == "미국"` 단일 행** — `crcy_cd == "USD"`로 필터하면 동일 값의 중복 행이 여러 개 반환됨
 - `MarginItem` 도메인 모델: `currency`/`integratedOrderableAmount`/`foreignOrderableAmount`/`purchasableAmount`/`usdToKrwRate` (필드 정의가 SSOT)
 - API 파라미터 불확실 시 `kis-coding-mcp`의 `search_overseas_stock_api` + `read_source_code`로 공식 확인

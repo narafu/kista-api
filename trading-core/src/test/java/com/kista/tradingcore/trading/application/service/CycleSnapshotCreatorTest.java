@@ -66,7 +66,7 @@ class CycleSnapshotCreatorTest {
         assertThat(cycleCaptor.getValue().startAmount()).isEqualByComparingTo("1600.00");
         assertThat(cycleCaptor.getValue().startAmount().scale()).isEqualTo(2);
         assertThat(cycleCaptor.getValue().openAmount()).isEqualByComparingTo(cycleCaptor.getValue().startAmount()); // 개장 평가 = 종가 평가 시작 금액
-        assertThat(positionCaptor.getValue().usdDeposit()).isEqualByComparingTo("1000.00");
+        assertThat(positionCaptor.getValue().deposit()).isEqualByComparingTo("1000.00");
         assertThat(positionCaptor.getValue().holdings()).isEqualTo(new BigDecimal("5"));
     }
 

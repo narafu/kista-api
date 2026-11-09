@@ -17,7 +17,7 @@ com.kista.tradingcore.privacy/   ← Spring Modulith 모듈(CLOSED) — FIDA 기
   - 저장 순서: **BUY → SELL**, BUY는 price **내림차순**, SELL은 price **오름차순** — `PrivacyTradePersistenceAdapter` 정렬 처리
 - 조회: `findTodayTrade(거래일)`은 발행일 == `releaseDateFor(거래일)` 정확 일치만 반환(없으면 empty — 미래 기준표를 끌어오지 않는다). `findSeedPreviewBase`만 `>=` 유지
 - FIDA 수신 흐름: `(tradeDate, ticker)` 없음 → 201 / 내용 동일 → 200(멱등) / 내용 다름 → `PrivacyTradeConflictException` → 409
-- 스케쥴러: `StrategyType.PRIVACY` → `PrivacyCycleOrderStrategy.plan()` → `PrivacyStrategy.buildOrders(balance, initialUsdDeposit, PrivacyPlan)` (`CycleOrderComputer`가 전략별 분기, 스케쥴러 배치 흐름 상세는 `docs/agents/workflow-batch.md`)
+- 스케쥴러: `StrategyType.PRIVACY` → `PrivacyCycleOrderStrategy.plan()` → `PrivacyStrategy.buildOrders(balance, initialDeposit, PrivacyPlan)` (`CycleOrderComputer`가 전략별 분기, 스케쥴러 배치 흐름 상세는 `docs/agents/workflow-batch.md`)
 
 ### 보유 초과·부족분 처리 (의도된 동작)
 - 목표 보유량과 실제 보유량의 차이(diff)는 BUY 수량 조정으로만 흡수한다. 부족분은 가장 싼 BUY에 더하고, 초과분은 가장 비싼 BUY부터 줄인다. BUY가 없으면 조정하지 않는다. SELL은 diff로 늘리지 않는다. 실제 보유량을 넘는 SELL은 `capSellQuantitiesToHoldings`가 별도로 잘라낸다(SELL cap은 이 흡수와 별도로 동작한다).

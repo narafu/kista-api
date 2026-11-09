@@ -12,7 +12,7 @@ import com.kista.shared.kernel.StrategyTicker;
 public record ReverseModePosition(
         int holdings,                   // 현재 보유 수량
         BigDecimal avgPrice,            // 평단가
-        BigDecimal usdDeposit,          // 가용 잔금
+        BigDecimal deposit,          // 가용 잔금
         StrategyTicker ticker,         // 거래 종목
         int divisionCount,              // 분할 수 (20/30/40)
         BigDecimal starPointPrice,      // 별지점 = 직전 5거래일 종가 평균 (null이면 계산 불가)
@@ -21,7 +21,7 @@ public record ReverseModePosition(
     // 잔고 스냅샷 기반 생성 — 리버스모드 전용 필드(별지점·첫날 여부)만 별도 전달
     public static ReverseModePosition of(AccountBalance balance, StrategyTicker ticker, int divisionCount,
                                          BigDecimal starPointPrice, boolean isFirstDay) {
-        return new ReverseModePosition(balance.wholeShares(), balance.avgPrice(), balance.usdDeposit(),
+        return new ReverseModePosition(balance.wholeShares(), balance.avgPrice(), balance.deposit(),
                 ticker, divisionCount, starPointPrice, isFirstDay);
     }
 
@@ -38,18 +38,18 @@ public record ReverseModePosition(
         return divisor > 0 ? holdings / divisor : 0;
     }
 
-    // 쿼터매수 금액 — usdDeposit / SELL_QUARTER_DIVISOR(4)
+    // 쿼터매수 금액 — deposit / SELL_QUARTER_DIVISOR(4)
     public BigDecimal calcLocBuyAmount() {
-        return quotaBuyAmount(usdDeposit);
+        return quotaBuyAmount(deposit);
     }
 
     // static 헬퍼: 쿼터매수 수량 = 쿼터 예산 ÷ 매수가(FLOOR) — 별지점 매수가와 가격 캡(InfiniteCycleOrderStrategy.capBuyOrders) 재산정 공용
-    public static int quotaBuyQuantity(BigDecimal usdDeposit, BigDecimal buyPrice) {
-        return quotaBuyAmount(usdDeposit).divide(buyPrice, 0, FLOOR).intValue();
+    public static int quotaBuyQuantity(BigDecimal deposit, BigDecimal buyPrice) {
+        return quotaBuyAmount(deposit).divide(buyPrice, 0, FLOOR).intValue();
     }
 
-    private static BigDecimal quotaBuyAmount(BigDecimal usdDeposit) {
-        return usdDeposit.divide(BigDecimal.valueOf(InfinitePosition.SELL_QUARTER_DIVISOR), Currency.USD.amountScale(), HALF_UP);
+    private static BigDecimal quotaBuyAmount(BigDecimal deposit) {
+        return deposit.divide(BigDecimal.valueOf(InfinitePosition.SELL_QUARTER_DIVISOR), Currency.USD.amountScale(), HALF_UP);
     }
 
     // 쿼터매수 수량 — 별지점 아래에서 매수: 별지점 - TICK_SIZE($0.01)
@@ -58,7 +58,7 @@ public record ReverseModePosition(
         if (starPointPrice == null || starPointPrice.compareTo(BigDecimal.ZERO) <= 0) return 0;
         BigDecimal buyPrice = starPointPrice.subtract(InfinitePosition.TICK_SIZE);
         if (buyPrice.compareTo(BigDecimal.ZERO) <= 0) return 0;
-        return quotaBuyQuantity(usdDeposit, buyPrice);
+        return quotaBuyQuantity(deposit, buyPrice);
     }
 
     // 예산 소진 판정: 별지점은 계산됐지만(데이터 존재) 쿼터매수 예산으로 1주도 못 사는 경우

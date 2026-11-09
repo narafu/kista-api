@@ -181,12 +181,12 @@ class PrivacyStrategyTest {
         // BUY: $298.8×3, $279.02×3, multiple=0.5
         // 실수 수량: 1.5, 1.5 → floor: 1, 1 → fraction: 0.5, 0.5 → totalFraction=1.0 → bonus=1
         // 작은 매수(279.02$): 1.5 + 1 = 2.5 → floor=2
-        BigDecimal initialUsdDeposit = new BigDecimal("500"); // 500/1000 = 0.50
+        BigDecimal initialDeposit = new BigDecimal("500"); // 500/1000 = 0.50
         PrivacyPlan base = base(6, List.of(
                 buy(3, "298.8"),
                 buy(3, "279.02")
         ));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(3), initialUsdDeposit, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(3), initialDeposit, base);
 
         List<PlannedOrder> buys = buyOrders(orders);
         assertThat(buys).hasSize(2);
@@ -202,9 +202,9 @@ class PrivacyStrategyTest {
         // BUY: $10×7, $9×7, $8×7, multiple=0.99
         // 실수: 6.93, 6.93, 6.93 → floor: 6, 6, 6 → fraction: 0.93×3=2.79 → bonus=2
         // 작은 매수(8$): 6.93+2=8.93 → floor=8
-        BigDecimal initialUsdDeposit = new BigDecimal("990"); // 990/1000 = 0.99
+        BigDecimal initialDeposit = new BigDecimal("990"); // 990/1000 = 0.99
         PrivacyPlan base = base(21, List.of(buy(7, "10"), buy(7, "9"), buy(7, "8")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(21), initialUsdDeposit, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(21), initialDeposit, base);
 
         List<PlannedOrder> buys = buyOrders(orders);
         assertThat(buys).hasSize(3);
@@ -220,9 +220,9 @@ class PrivacyStrategyTest {
         // BUY: $10×5, $9×3, multiple=1.1
         // 실수: 5.5, 3.3 → fraction: 0.5+0.3=0.8 → bonus=0 → floor: 5, 3 그대로
         // diff=0: base.holdings(10) × 1.1 = 11 = balance(11)
-        BigDecimal initialUsdDeposit = new BigDecimal("1100"); // 1100/1000 = 1.10
+        BigDecimal initialDeposit = new BigDecimal("1100"); // 1100/1000 = 1.10
         PrivacyPlan base = base(10, List.of(buy(5, "10"), buy(3, "9")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(11), initialUsdDeposit, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(11), initialDeposit, base);
 
         List<PlannedOrder> buys = buyOrders(orders);
         assertThat(buys).hasSize(2);
@@ -235,9 +235,9 @@ class PrivacyStrategyTest {
     void multipleSmallFloorResultsInZero() {
         // BUY: $500×1, multiple=0.3 → 실수 수량 0.3
         // target=0.3, balance=0 → diff=+0.3 → 0.3+0.3=0.6 → floor=0 → BUY 없음
-        BigDecimal initialUsdDeposit = new BigDecimal("300"); // 300/1000 = 0.30
+        BigDecimal initialDeposit = new BigDecimal("300"); // 300/1000 = 0.30
         PrivacyPlan base = base(1, List.of(buy(1, "500")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(0), initialUsdDeposit, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(0), initialDeposit, base);
 
         assertThat(buyOrders(orders)).isEmpty();
     }
@@ -253,14 +253,14 @@ class PrivacyStrategyTest {
     }
 
     @Test
-    @DisplayName("multiple 적용 — initialUsdDeposit/currentCycleStart=1.5 → BUY/SELL 수량 1.5배 반영 (소수점 버림)")
+    @DisplayName("multiple 적용 — initialDeposit/currentCycleStart=1.5 → BUY/SELL 수량 1.5배 반영 (소수점 버림)")
     void multipleApplied() {
-        // initialUsdDeposit=1500, currentCycleStart=1000 → multiple=1.50
+        // initialDeposit=1500, currentCycleStart=1000 → multiple=1.50
         // 100주→150주, 80주→120주, sell 50주→75주
-        BigDecimal initialUsdDeposit = new BigDecimal("1500"); // 1500/1000 = 1.50
+        BigDecimal initialDeposit = new BigDecimal("1500"); // 1500/1000 = 1.50
         PrivacyPlan base = base(200, List.of(buy(100, "10"), buy(80, "9"), sell(50, "12")));
         // balance=300(=200*1.5), target=300 → diff=0
-        List<PlannedOrder> orders = strategy.buildOrders(balance(300), initialUsdDeposit, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(300), initialDeposit, base);
 
         assertThat(buyOrders(orders)).extracting(PlannedOrder::quantity).containsExactlyInAnyOrder(150, 120);
         assertThat(sellOrders(orders)).extracting(PlannedOrder::quantity).containsExactly(75);
@@ -273,10 +273,10 @@ class PrivacyStrategyTest {
     void zeroQuantitySellExcludedAfterFloor() {
         // multiple=0.10 — 8/10/9주 → floor 0/1/0 → 버림 보정 bonus=1(가장 비싼 113.94에 가산) → 최종 0/1/1
         // quantity=0(98.30)은 제외되고 나머지 2건만 반환
-        BigDecimal initialUsdDeposit = new BigDecimal("100"); // 100/1000 = 0.10
+        BigDecimal initialDeposit = new BigDecimal("100"); // 100/1000 = 0.10
         PrivacyPlan base = base(0, List.of(
                 sell(8, "98.30"), sell(10, "101.39"), sell(9, "113.94")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(91), initialUsdDeposit, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(91), initialDeposit, base);
 
         assertThat(sellOrders(orders)).hasSize(2);
         assertThat(sellOrders(orders)).extracting(PlannedOrder::price, PlannedOrder::quantity)
@@ -289,9 +289,9 @@ class PrivacyStrategyTest {
     @DisplayName("SELL 버림 후 quantity=0 — 버림 보정도 없는 단건은 결과에서 완전히 제외")
     void zeroQuantitySellExcludedWithoutBonus() {
         // multiple=0.20 — 3주 → 0.6 → floor=0, totalFraction=0.6<1 → bonus=0 → 결과 없음
-        BigDecimal initialUsdDeposit = new BigDecimal("200"); // 200/1000 = 0.20
+        BigDecimal initialDeposit = new BigDecimal("200"); // 200/1000 = 0.20
         PrivacyPlan base = base(0, List.of(sell(3, "10")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(0), initialUsdDeposit, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(0), initialDeposit, base);
 
         assertThat(sellOrders(orders)).isEmpty();
     }
@@ -367,11 +367,11 @@ class PrivacyStrategyTest {
     @Test
     @DisplayName("multiple 적용 — null SELL은 절대 잔량 기준, 명시 SELL은 multiple 적용")
     void nullSellMultipleApplied() {
-        // initialUsdDeposit=1500, currentCycleStart=1000 → multiple=1.50
+        // initialDeposit=1500, currentCycleStart=1000 → multiple=1.50
         // 명시 SELL: 10 × 1.5 = 15, null SELL: 30 - 15 = 15
-        BigDecimal initialUsdDeposit = new BigDecimal("1500");
+        BigDecimal initialDeposit = new BigDecimal("1500");
         PrivacyPlan base = base(100, List.of(sell(10, "12"), sellNull("13")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(30), initialUsdDeposit, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(30), initialDeposit, base);
 
         assertThat(sellOrders(orders)).hasSize(2);
         assertThat(sellOrders(orders)).extracting(PlannedOrder::quantity).containsExactlyInAnyOrder(15, 15);

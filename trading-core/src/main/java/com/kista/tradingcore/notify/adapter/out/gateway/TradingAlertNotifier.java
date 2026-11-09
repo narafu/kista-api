@@ -46,7 +46,7 @@ public class TradingAlertNotifier {
     @TransactionalEventListener(fallbackExecution = true)
     public void onInsufficientBalance(InsufficientBalanceEvent event) {
         if (event.userId() == null) {
-            notifyPort.notifyInsufficientBalance(event.holdings(), event.usdDeposit(), event.ticker());
+            notifyPort.notifyInsufficientBalance(event.holdings(), event.deposit(), event.ticker());
         } else {
             TradingUserProfile profile = TradingUserProfiles.requireProfile(userProfilePort, event.userId());
             userNotificationPort.notifyInsufficientBalance(profile, event.accountNickname(), event.strategyType(), event.ticker(),

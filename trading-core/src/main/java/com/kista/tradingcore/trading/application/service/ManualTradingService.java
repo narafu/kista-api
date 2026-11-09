@@ -63,7 +63,7 @@ class ManualTradingService {
         if (!strategy.isActive())
             throw new IllegalStateException("활성 상태의 전략만 수동 실행할 수 있습니다.");
 
-        // 현재 StrategyCycle 조회 — initialUsdDeposit 필요
+        // 현재 StrategyCycle 조회 — initialDeposit 필요
         StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
 
         // 스케쥴러와 동일 today 계산: KST 04:00 이후면 +1일(= 다음 US 거래일)

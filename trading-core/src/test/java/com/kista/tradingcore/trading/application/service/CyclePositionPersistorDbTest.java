@@ -125,7 +125,7 @@ class CyclePositionPersistorDbTest extends DataJpaTestBase {
     @Test
     void saveCyclePosition_rollsBackPositionAndMarker_whenMarkEndedFails() {
         // 직전 보유 이력 + 이번 청산(holdings=0) — markEnded가 마커와 같은 트랜잭션이므로 실패 시 포지션·마커도 롤백돼야 한다
-        jdbcTemplate.update("INSERT INTO cycle_position (id, strategy_cycle_id, usd_deposit, holdings, created_at) VALUES (?, ?, ?, ?, now() - interval '1 hour')",
+        jdbcTemplate.update("INSERT INTO cycle_position (id, strategy_cycle_id, deposit, holdings, created_at) VALUES (?, ?, ?, ?, now() - interval '1 hour')",
                 UUID.randomUUID(), cycleId, new BigDecimal("500.00"), new BigDecimal("5"));
         StrategyCyclePort failingCycles = mock(StrategyCyclePort.class);
         doAnswer(inv -> { throw new IllegalStateException("주입된 실패"); }).when(failingCycles).markEnded(any(), any(), any());
@@ -141,7 +141,7 @@ class CyclePositionPersistorDbTest extends DataJpaTestBase {
     @Test
     @DisplayName("CQ-38: 마커 커밋 뒤 rotate가 던지면 예외가 전파되고 포지션·종료·마커는 커밋된 채 남는다 — 원장 보존, PAUSE는 rotate가 책임진다")
     void saveCyclePosition_keepsCommittedEndAndMarker_whenRotateThrowsAfterCommit_cq38() {
-        jdbcTemplate.update("INSERT INTO cycle_position (id, strategy_cycle_id, usd_deposit, holdings, created_at) VALUES (?, ?, ?, ?, now() - interval '1 hour')",
+        jdbcTemplate.update("INSERT INTO cycle_position (id, strategy_cycle_id, deposit, holdings, created_at) VALUES (?, ?, ?, ?, now() - interval '1 hour')",
                 UUID.randomUUID(), cycleId, new BigDecimal("500.00"), new BigDecimal("5"));
         CycleRotationService rotation = mock(CycleRotationService.class);
         doAnswer(inv -> { throw new IllegalStateException("rotate 주입된 실패"); })

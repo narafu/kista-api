@@ -115,7 +115,7 @@ class CryptoLedgerRecorderIT extends DataJpaTestBase {
         assertThat(latest()).satisfies(p -> {
             assertThat(p.holdings()).isEqualByComparingTo("0.001");
             assertThat(p.avgPrice()).isEqualByComparingTo(PRICE);
-            assertThat(p.usdDeposit()).isEqualByComparingTo("-100050"); // 수수료 포함 실지출만큼 한 번만 차감
+            assertThat(p.deposit()).isEqualByComparingTo("-100050"); // 수수료 포함 실지출만큼 한 번만 차감
             assertThat(p.closingPrice()).isEqualByComparingTo(PRICE);
         });
         assertThat(orderPort.findById(order.id())).get().satisfies(o -> {
@@ -139,7 +139,7 @@ class CryptoLedgerRecorderIT extends DataJpaTestBase {
         // 평단 = (0.0004×1억 + 0.0006×1.1억) / 0.001 = 1.06억 — 누적 금액 기준 증분
         assertThat(latest.avgPrice()).isEqualByComparingTo(avgAll);
         // 예수금 차감은 누적 견적 금액을 증분 비율(delta/volume)로 배분: 40000 + 106000 × 0.0006/0.001 = 103600 (체결가가 달라지면 누적 106000과 약간 어긋남)
-        assertThat(latest.usdDeposit()).isEqualByComparingTo("-103600");
+        assertThat(latest.deposit()).isEqualByComparingTo("-103600");
     }
 
     @Test
@@ -174,7 +174,7 @@ class CryptoLedgerRecorderIT extends DataJpaTestBase {
 
         assertThat(latest()).satisfies(p -> {
             assertThat(p.holdings()).isEqualByComparingTo("0");
-            assertThat(p.usdDeposit()).isEqualByComparingTo("9895"); // -100050 + 109945
+            assertThat(p.deposit()).isEqualByComparingTo("9895"); // -100050 + 109945
         });
     }
 }

@@ -12,9 +12,9 @@ import static java.math.RoundingMode.HALF_UP;
 public record AccountBalance(
         BigDecimal holdings,  // 보유 수량 (소수 허용 — 주식 공식은 wholeShares()로 읽는다)
         BigDecimal avgPrice,  // 평균 매입가 (holdings==0이면 null)
-        BigDecimal usdDeposit // 통합주문가능금액 (USD, 환전 여부 무관 — TTTC2101R itgr_ord_psbl_amt)
+        BigDecimal deposit // 통합주문가능금액 (USD, 환전 여부 무관 — TTTC2101R itgr_ord_psbl_amt)
 ) {
-    public static final int LEDGER_SCALE = 2; // 원장 금액·평단 자릿수 — cycle_position usd_deposit·avg_price numeric(20,2), 통화 무관(코인 DCA 포함)
+    public static final int LEDGER_SCALE = 2; // 원장 금액·평단 자릿수 — cycle_position deposit·avg_price numeric(20,2), 통화 무관(코인 DCA 포함)
 
     public AccountBalance {
         Objects.requireNonNull(holdings, "holdings");
@@ -22,8 +22,8 @@ public record AccountBalance(
     }
 
     // 주식 호출부·테스트 호환용 정수 편의 생성자
-    public AccountBalance(int holdings, BigDecimal avgPrice, BigDecimal usdDeposit) {
-        this(BigDecimal.valueOf(holdings), avgPrice, usdDeposit);
+    public AccountBalance(int holdings, BigDecimal avgPrice, BigDecimal deposit) {
+        this(BigDecimal.valueOf(holdings), avgPrice, deposit);
     }
 
     // 주식 공식용 정수 보유수량 — 소수 보유면 ArithmeticException(조용히 자르지 않는다)
@@ -56,18 +56,18 @@ public record AccountBalance(
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    // 수동 실행용 예수금 검증: 신규 BUY 합계 ≤ (live usdDeposit − 타 전략 당일 PLANNED BUY 합계)
+    // 수동 실행용 예수금 검증: 신규 BUY 합계 ≤ (live deposit − 타 전략 당일 PLANNED BUY 합계)
     // 배치 스케쥴러 경로와 달리 타 전략 점유분 차감 포함 — ManualTradingService 전용
     public boolean hasSufficientDepositFor(List<PlannedOrder> orders, BigDecimal otherStrategyBuyTotal) {
         BigDecimal newBuyTotal = buyTotal(orders);
         if (newBuyTotal.compareTo(BigDecimal.ZERO) <= 0) return true; // BUY 없으면 통과
-        BigDecimal available = usdDeposit().subtract(otherStrategyBuyTotal);
+        BigDecimal available = deposit().subtract(otherStrategyBuyTotal);
         return newBuyTotal.compareTo(available) <= 0;
     }
 
     // 예수금만 교체 — 예수금 플로어 클램프·적립/인출 반영·사이클 롤오버 개장잔고 구성에 사용
-    public AccountBalance withUsdDeposit(BigDecimal newUsdDeposit) {
-        return new AccountBalance(holdings, avgPrice, newUsdDeposit);
+    public AccountBalance withDeposit(BigDecimal newDeposit) {
+        return new AccountBalance(holdings, avgPrice, newDeposit);
     }
 
     // 체결 목록 반영 후 매매 후 잔고 — 평단가 = (매도 후 잔여 보유금 + 금일 매수금) ÷ 신규 보유수량 (매도는 평단가 불변)
@@ -88,8 +88,8 @@ public record AccountBalance(
         BigDecimal newAvgPrice = newHoldings.signum() > 0
                 ? costAfterSell.add(buyAmount).divide(newHoldings, LEDGER_SCALE, HALF_UP)
                 : null;
-        BigDecimal newUsdDeposit = usdDeposit.subtract(buyAmount).add(sellAmount);
-        return new AccountBalance(newHoldings, newAvgPrice, newUsdDeposit);
+        BigDecimal newDeposit = deposit.subtract(buyAmount).add(sellAmount);
+        return new AccountBalance(newHoldings, newAvgPrice, newDeposit);
     }
 
     private static BigDecimal sumQuantity(List<? extends Fill> executions, OrderDirection direction) {

@@ -79,7 +79,7 @@ class TossHoldingsApi {
     public PresentBalanceResult getPresentBalance(BrokerAccountRef account) {
         // 1~4. 보유 종목·USD·KRW 예수금·환율 4개 독립 HTTP 호출을 virtual thread로 병렬 실행
         HoldingsResponse holdingsResponse;
-        BigDecimal usdDeposit;
+        BigDecimal deposit;
         BigDecimal krwDeposit;
         BigDecimal rate;
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
@@ -92,7 +92,7 @@ class TossHoldingsApi {
 
             TossResult<HoldingsResponse> holdingsWrapper = await(holdingsFuture);
             holdingsResponse = holdingsWrapper != null ? holdingsWrapper.result() : null;
-            usdDeposit = await(usdFuture);
+            deposit = await(usdFuture);
             krwDeposit = await(krwFuture);
             rate = await(rateFuture);
         }
@@ -117,7 +117,7 @@ class TossHoldingsApi {
         }
 
         // 6. KRW 환산·총자산·수익률 집계는 도메인 팩토리에 위임
-        return PresentBalanceResult.aggregateToss(holdings, usdDeposit, krwDeposit, rate);
+        return PresentBalanceResult.aggregateToss(holdings, deposit, krwDeposit, rate);
     }
 
     // currency 파라미터로 매수가능금액 단건 조회

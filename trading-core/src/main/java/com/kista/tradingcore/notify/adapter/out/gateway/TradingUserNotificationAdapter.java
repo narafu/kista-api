@@ -51,12 +51,12 @@ class TradingUserNotificationAdapter implements TradingUserNotificationPort {
 
     @Override
     public void notifyNewCycleStarted(TradingUserProfile profile, String accountNickname, StrategyType strategyType,
-                                       StrategyTicker ticker, BigDecimal initialUsdDeposit) {
+                                       StrategyTicker ticker, BigDecimal initialDeposit) {
         String text = """
                 🚀 <b>새 사이클 시작</b> — %s%n\
                 [%s] %s 사이클이 시작되었습니다.%n\
                 투자금: $%.2f""".formatted(
-                TelegramHttpClient.escapeHtml(accountNickname), strategyType.name(), ticker.name(), initialUsdDeposit);
+                TelegramHttpClient.escapeHtml(accountNickname), strategyType.name(), ticker.name(), initialDeposit);
         notify(profile, "새 사이클 시작", text);
     }
 

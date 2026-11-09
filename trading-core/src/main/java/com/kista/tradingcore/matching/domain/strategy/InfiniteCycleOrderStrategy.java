@@ -159,15 +159,15 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
         // 리버스 쿼터매수 — 가격만 캡, 수량은 쿼터 예산 ÷ 캡 가격으로 재산정(일반모드 캡과 같은 예산 보존 방식)
         // 일반모드 사다리 재구성(buildCappedBuyOrders)으로 넘기면 리버스 BUY가 일반모드 주문으로 바뀌므로 먼저 분기한다
         if (buyOrders.stream().anyMatch(o -> ReverseInfiniteStrategy.LOC_BUY_LEG.equals(o.orderLeg()))) {
-            return buyOrders.stream().map(o -> capReverseQuotaBuy(o, cap, position.usdDeposit())).toList();
+            return buyOrders.stream().map(o -> capReverseQuotaBuy(o, cap, position.deposit())).toList();
         }
         return infiniteStrategy.buildCappedBuyOrders(position, tradeDate, buyOrders, cap);
     }
 
-    private static PlannedOrder capReverseQuotaBuy(PlannedOrder order, BigDecimal cap, BigDecimal usdDeposit) {
+    private static PlannedOrder capReverseQuotaBuy(PlannedOrder order, BigDecimal cap, BigDecimal deposit) {
         if (order.price().compareTo(cap) <= 0) return order;
         // 같은 원장이면 캡 가격이 원래 매수가보다 낮아 수량은 원래 이상이 된다 — 쿼터 예산 상한은 그대로
-        return order.withPrice(cap).withQuantity(ReverseModePosition.quotaBuyQuantity(usdDeposit, cap));
+        return order.withPrice(cap).withQuantity(ReverseModePosition.quotaBuyQuantity(deposit, cap));
     }
 
     @Override

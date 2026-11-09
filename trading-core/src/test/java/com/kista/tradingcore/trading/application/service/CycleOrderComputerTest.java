@@ -120,7 +120,7 @@ class CycleOrderComputerTest {
     }
 
     @Test
-    @DisplayName("VR 전략 — opening position usdDeposit으로 pool limit을 계산한다")
+    @DisplayName("VR 전략 — opening position deposit으로 pool limit을 계산한다")
     void compute_vrStrategy_derivesPoolLimitFromOpeningPositionDeposit() {
         StrategyCycle rolloverCycle = new StrategyCycle(
                 UUID.randomUUID(), VR_STRATEGY.id(), STRATEGY_VERSION_ID,
@@ -264,7 +264,7 @@ class CycleOrderComputerTest {
         // 가격 캡 트리거 픽스처:
         // holdings=1, value=10000, bandWidth=15% → lowerBand=8500, buyPrice(m=1) = 8500/1 = 8500
         // currentPrice=700 → PriceCapPolicy 기준 cap = 700×1.05 = 735.00 (8500 > 735)
-        // usdDeposit을 충분히 크게 둬(예산 부족으로 rung 자체가 제외되지 않도록) 순수 cap 미적용 여부만 검증
+        // deposit을 충분히 크게 둬(예산 부족으로 rung 자체가 제외되지 않도록) 순수 cap 미적용 여부만 검증
         BigDecimal currentPrice = new BigDecimal("700.00");
         BigDecimal cap = PriceCapPolicy.capFor(currentPrice); // 735.00
         AccountBalance balance = new AccountBalance(1, new BigDecimal("100.00"), new BigDecimal("100000.00"));

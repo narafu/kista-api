@@ -32,7 +32,7 @@ final class StatsContractMapper {
     }
 
     static PortfolioCurrentResponse toResponse(CyclePositionHistoryEntry e) {
-        return new PortfolioCurrentResponse(e.ticker(), e.holdings(), e.avgPrice(), e.usdDeposit(), e.closingPrice());
+        return new PortfolioCurrentResponse(e.ticker(), e.holdings(), e.avgPrice(), e.deposit(), e.closingPrice());
     }
 
     static PortfolioOrderResponse toResponse(Order o) {

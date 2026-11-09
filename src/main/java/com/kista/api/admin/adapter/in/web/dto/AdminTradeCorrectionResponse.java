@@ -22,7 +22,7 @@ public record AdminTradeCorrectionResponse(
         @Schema(description = "보정 후 최종 평단가")
         BigDecimal finalAvgPrice,
         @Schema(description = "보정 후 최종 예수금 (USD)")
-        BigDecimal finalUsdDeposit,
+        BigDecimal finalDeposit,
         @Schema(description = "보정 후 전략 상태", example = "ACTIVE")
         String strategyStatus,
         @Schema(description = "보정으로 사이클이 종료됐는지 여부")
@@ -38,7 +38,7 @@ public record AdminTradeCorrectionResponse(
                 result.processedCount(),
                 result.finalHoldings(),
                 result.finalAvgPrice(),
-                result.finalUsdDeposit(),
+                result.finalDeposit(),
                 result.strategyStatus().name(),
                 result.cycleEnded(),
                 result.cycleEndDate()

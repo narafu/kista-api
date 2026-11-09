@@ -74,7 +74,7 @@ public class InfiniteStrategy {
         for (int i = 0; i < CORRECTION_ORDER_COUNT; i++) {
             addCorrectionOrder(tradeDate, position, result, position.unitAmount(), i + 1);
         }
-        return trimCorrectionsToBudget(result, position.usdDeposit());
+        return trimCorrectionsToBudget(result, position.deposit());
     }
 
     // 후반 단일 LOC 매수: unitAmount/referencePrice

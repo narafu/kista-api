@@ -29,7 +29,7 @@ class InfiniteStrategyTypeTest {
     @Test
     @DisplayName("buildOrders 전반 holdings>0: LOC매수①② + 보정3 + LOC매도 + 지정가매도 = 7건")
     void buildOrders_frontHalf_withQuantity() {
-        // averagePrice=20, holdings=10, usdDeposit=1000 → totalAssets=1200, unitAmount=60, currentRound=3.33, priceOffsetRate=0.13 (전반)
+        // averagePrice=20, holdings=10, deposit=1000 → totalAssets=1200, unitAmount=60, currentRound=3.33, priceOffsetRate=0.13 (전반)
         // referencePrice=20×1.13=22.60, targetPrice=20×1.20=24.00
         // BUY①: floor(60/2/20)=1, BUY②: floor((60−20×1)/22.60)=floor(1.77)=1
         // 보정: 60/3=20.00, 60/4=15.00, 60/5=12.00 (FLOOR)
@@ -100,7 +100,7 @@ class InfiniteStrategyTypeTest {
         assertThat(corrections).isNotEmpty().hasSizeLessThan(3);
         assertThat(corrections).isEqualTo(List.of("INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03")
                 .subList(0, corrections.size()));
-        assertThat(AccountBalance.buyTotal(buys)).isLessThanOrEqualTo(position.usdDeposit());
+        assertThat(AccountBalance.buyTotal(buys)).isLessThanOrEqualTo(position.deposit());
     }
 
     @Test
@@ -116,7 +116,7 @@ class InfiniteStrategyTypeTest {
     @Test
     @DisplayName("buildOrders 0회차: 최근 종가를 평단가 대용으로 사용 — LOC매수①② + 보정3 = 5건, SELL 없음")
     void buildOrders_zeroRound_usesPrevClose() {
-        // 0회차: averagePrice=prevClose=22 (현재가 20과 무관), holdings=0, usdDeposit=1000 → totalAssets=1000, unitAmount=50
+        // 0회차: averagePrice=prevClose=22 (현재가 20과 무관), holdings=0, deposit=1000 → totalAssets=1000, unitAmount=50
         // referencePrice=22×1.20=26.40
         // BUY①: floor(50/2/22)=1(비용=22), BUY②: floor((50-22)/26.40)=floor(1.06)=1
         // SELL: holdings/4=0 → 없음
@@ -141,7 +141,7 @@ class InfiniteStrategyTypeTest {
     @Test
     @DisplayName("buildOrders 후반 기준가 1주>원장: MOC 매도 1건만")
     void lateStageOneShareOverDepositEmitsMocSellOnly() {
-        // unitAmount=22 <= usdDeposit=25 이지만 기준가(≈34) > 25 → 1주도 못 사므로 최종회차
+        // unitAmount=22 <= deposit=25 이지만 기준가(≈34) > 25 → 1주도 못 사므로 최종회차
         AccountBalance balance = new AccountBalance(10, new BigDecimal("41.5"), new BigDecimal("25"));
         InfinitePosition position = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("40"), 20);
 
@@ -152,9 +152,9 @@ class InfiniteStrategyTypeTest {
     }
 
     @Test
-    @DisplayName("buildOrders 후반 unitAmount>usdDeposit: MOC 매도 1건만")
+    @DisplayName("buildOrders 후반 unitAmount>deposit: MOC 매도 1건만")
     void buildOrders_backHalf_insufficientDeposit() {
-        // averagePrice=5, holdings=200, usdDeposit=50 → totalAssets=1050, unitAmount=52.50, currentRound≈19.05 (후반), unitAmount(52.50)>usdDeposit(50)
+        // averagePrice=5, holdings=200, deposit=50 → totalAssets=1050, unitAmount=52.50, currentRound≈19.05 (후반), unitAmount(52.50)>deposit(50)
         AccountBalance balance = new AccountBalance(200, new BigDecimal("5"),
                 new BigDecimal("50"));
         InfinitePosition position = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("4.8"), 20);
@@ -168,9 +168,9 @@ class InfiniteStrategyTypeTest {
     }
 
     @Test
-    @DisplayName("buildOrders 후반 unitAmount<=usdDeposit: LOC매수 + 보정3 + LOC매도 + 지정가매도 = 6건")
+    @DisplayName("buildOrders 후반 unitAmount<=deposit: LOC매수 + 보정3 + LOC매도 + 지정가매도 = 6건")
     void buildOrders_backHalf_sufficientDeposit() {
-        // averagePrice=5, holdings=200, usdDeposit=100 → totalAssets=1100, unitAmount=55, currentRound≈18.18 (후반), unitAmount(55)<=usdDeposit(100)
+        // averagePrice=5, holdings=200, deposit=100 → totalAssets=1100, unitAmount=55, currentRound≈18.18 (후반), unitAmount(55)<=deposit(100)
         AccountBalance balance = new AccountBalance(200, new BigDecimal("5"),
                 new BigDecimal("100"));
         InfinitePosition position = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("4.9"), 20);
@@ -189,7 +189,7 @@ class InfiniteStrategyTypeTest {
     @Test
     @DisplayName("buildOrders 후반 소액 예수금: 1주 미만 계산이어도 LOC매수 1주 보장")
     void buildOrders_backHalf_smallDeposit_guaranteesMinimumOneShare() {
-        // averagePrice=48.31, holdings=10, usdDeposit=455.90 → totalAssets=939.00, unitAmount=46.95, currentRound≈10.29 (후반)
+        // averagePrice=48.31, holdings=10, deposit=455.90 → totalAssets=939.00, unitAmount=46.95, currentRound≈10.29 (후반)
         // referencePrice=48.31, late buy qty=floor(46.95/48.31)=0 이어도 최소 1주
         AccountBalance balance = new AccountBalance(10, new BigDecimal("48.31"),
                 new BigDecimal("455.90"));
@@ -208,7 +208,7 @@ class InfiniteStrategyTypeTest {
     @Test
     @DisplayName("buildOrders 0회차 + 소액 예수금: 매수①은 최소 1주, 매수①이 unitAmount를 다 쓰면 매수② 없음 = 1건")
     void buildOrders_zeroRound_smallDeposit_guaranteesMinimumOneShare() {
-        // 0회차: averagePrice=prevClose=100, usdDeposit=20 → totalAssets=20, unitAmount=1.00
+        // 0회차: averagePrice=prevClose=100, deposit=20 → totalAssets=20, unitAmount=1.00
         // BUY①: floor((1.00/2)/100)=0 → 최소 1
         // BUY②: 잔여 1.00-100×1<0 → 0주(미생성)
         // SELL: holdings=0 → 없음
@@ -238,17 +238,17 @@ class InfiniteStrategyTypeTest {
     }
 
     // ── buildCappedBuyOrders() 시나리오 ──────────────────────────────────────
-    // holdings=0 → unitAmount = usdDeposit ÷ 20
+    // holdings=0 → unitAmount = deposit ÷ 20
 
-    private InfinitePosition positionWithUnitAmount(String usdDeposit) {
+    private InfinitePosition positionWithUnitAmount(String deposit) {
         return new InfinitePosition(
-                new AccountBalance(0, null, new BigDecimal(usdDeposit)),
+                new AccountBalance(0, null, new BigDecimal(deposit)),
                 StrategyTicker.SOXL, new BigDecimal("10.00"), 20);
     }
 
     // 평단 50, 매입액=예수금(currentRound=10) → priceOffsetRate 0 = 후반
-    private InfinitePosition lateStagePosition(int holdings, String usdDeposit) {
-        return new InfinitePosition(new AccountBalance(holdings, new BigDecimal("50"), new BigDecimal(usdDeposit)),
+    private InfinitePosition lateStagePosition(int holdings, String deposit) {
+        return new InfinitePosition(new AccountBalance(holdings, new BigDecimal("50"), new BigDecimal(deposit)),
                 StrategyTicker.SOXL, new BigDecimal("50"), 20);
     }
 
@@ -382,7 +382,7 @@ class InfiniteStrategyTypeTest {
     @Test
     @DisplayName("buildCappedBuyOrders 비0회차 전반(currentRound=9): buy② 수량이 priceOffsetRate 기준 — targetProfitRate 사용 시 수량 달라짐")
     void buildCappedBuyOrders_nonZeroRound_usesOffsetRateNotProfitRate() {
-        // holdings=180, avgPrice=5, usdDeposit=1100 → totalAssets=2000, unitAmount=100
+        // holdings=180, avgPrice=5, deposit=1100 → totalAssets=2000, unitAmount=100
         // currentRound=9.00, priceOffsetRate=0.20×(1−0.9)=0.02, referencePrice=5.10, targetProfitRate=0.20, targetPrice=6.00
         // priceOffsetRate(0.02) ≠ targetProfitRate(0.20) → 수량 공식 rate 선택이 결과에 영향
         // BUY①: floor(50/5.00)=10, BUY②(priceOffsetRate): floor(50/5.10)=9 — targetProfitRate 사용 시: floor(50/6.00)=8
@@ -413,7 +413,7 @@ class InfiniteStrategyTypeTest {
     @DisplayName("buildCappedBuyOrders 후반 1건, 캡 후 수량 0이어도 최소 1주+보정 3건")
     void buildCappedBuyOrders_singleBuy_cappedQuantityZero_guaranteesMinimumOneShare() {
         // cap=55, unitAmount=50 / qty = floor(50/55) = 0 이어도 최소 1주
-        InfinitePosition position = lateStagePosition(10, "500"); // holdings=10·평단 50·usdDeposit=500 → 총자산 1000÷20 = unitAmount 50, 후반
+        InfinitePosition position = lateStagePosition(10, "500"); // holdings=10·평단 50·deposit=500 → 총자산 1000÷20 = unitAmount 50, 후반
         List<PlannedOrder> buyOrders = List.of(buy("200.00", 1));
 
         List<PlannedOrder> result = strategy.buildCappedBuyOrders(position, TODAY, buyOrders, new BigDecimal("55.00"));
@@ -526,7 +526,7 @@ class InfiniteStrategyTypeTest {
     @Test
     @DisplayName("buildCappedBuyOrders 보정 가격은 FLOOR — (N+1)×가격 ≤ unitAmount")
     void buildCappedBuyOrders_correctionPriceFloors() {
-        // 0회차 prevClose=50, usdDeposit=20000 → unitAmount=1000, cap=52.50(현재가 50)
+        // 0회차 prevClose=50, deposit=20000 → unitAmount=1000, cap=52.50(현재가 50)
         // base 50×10, 52.50×9 (N=19) → 보정 1000/20=50.00, 1000/21=47.61(HALF_UP이면 47.62), 1000/22=45.45
         InfinitePosition position = new InfinitePosition(new AccountBalance(0, null, new BigDecimal("20000")), StrategyTicker.SOXL, new BigDecimal("50"), 20);
         List<PlannedOrder> base = strategy.buildOrders(position, TODAY).stream()
@@ -540,7 +540,7 @@ class InfiniteStrategyTypeTest {
     @Test
     @DisplayName("buildCappedBuyOrders 전반 매수② 0주 + cap 발동: 후반 공식이 아닌 전반 공식으로 재산정")
     void capped_earlyStageWithoutBuy2_staysOnEarlyFormula() {
-        // 0회차 prevClose=100, usdDeposit=2000 → unitAmount=100, 매수① 1주×100 ≥ 100 → base 1건(매수② 0주)
+        // 0회차 prevClose=100, deposit=2000 → unitAmount=100, 매수① 1주×100 ≥ 100 → base 1건(매수② 0주)
         // cap=84(현재가 80): 전반 공식 cappedAvg=cappedRef=84 → q1=1, 잔여 16>0 → q2=1 → 병합 84×2
         // (후반 공식이면 floor(100/84)=1주 — 이 단언이 분기 결함을 잡는다)
         InfinitePosition position = new InfinitePosition(new AccountBalance(0, null, new BigDecimal("2000")), StrategyTicker.SOXL, new BigDecimal("100"), 20);

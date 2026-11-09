@@ -37,9 +37,9 @@ class CapitalLedgerTimelineTest {
 
         assertThat(out).hasSize(2);
         assertThat(out.get(0).createdAt()).isEqualTo(Instant.parse("2026-06-10T00:00:00Z"));
-        assertThat(out.get(0).usdDeposit()).isEqualByComparingTo("10000");
+        assertThat(out.get(0).deposit()).isEqualByComparingTo("10000");
         assertThat(out.get(1).createdAt()).isEqualTo(Instant.parse("2026-06-20T01:00:00Z"));
-        assertThat(out.get(1).usdDeposit()).isEqualByComparingTo("15000");
+        assertThat(out.get(1).deposit()).isEqualByComparingTo("15000");
         assertThat(out.get(1).id()).isEqualTo(id);
     }
 
@@ -52,11 +52,11 @@ class CapitalLedgerTimelineTest {
                 ev(id, "2026-06-20T01:00:00Z", 5000, 5, 5000)));
 
         assertThat(out).hasSize(3);
-        assertThat(out.get(0).usdDeposit()).isEqualByComparingTo("10000");
+        assertThat(out.get(0).deposit()).isEqualByComparingTo("10000");
         assertThat(out.get(0).holdings()).isEqualByComparingTo("10");
-        assertThat(out.get(1).usdDeposit()).isEqualByComparingTo("15000");
+        assertThat(out.get(1).deposit()).isEqualByComparingTo("15000");
         assertThat(out.get(1).holdings()).isEqualByComparingTo("15");
-        assertThat(out.get(2).usdDeposit()).isEqualByComparingTo("14000");
+        assertThat(out.get(2).deposit()).isEqualByComparingTo("14000");
         assertThat(out.get(2).holdings()).isEqualByComparingTo("15");
     }
 
@@ -66,8 +66,8 @@ class CapitalLedgerTimelineTest {
         var r = pos(id, "2026-06-10T00:00:00Z", 7000, 0, null);
         var out = CapitalLedgerTimeline.restore(List.of(r), List.of(ev(id, "2026-06-20T01:00:00Z", -3000, 0, -3000)));
 
-        assertThat(out.get(0).usdDeposit()).isEqualByComparingTo("10000");
-        assertThat(out.get(1).usdDeposit()).isEqualByComparingTo("7000");
+        assertThat(out.get(0).deposit()).isEqualByComparingTo("10000");
+        assertThat(out.get(1).deposit()).isEqualByComparingTo("7000");
     }
 
     @Test

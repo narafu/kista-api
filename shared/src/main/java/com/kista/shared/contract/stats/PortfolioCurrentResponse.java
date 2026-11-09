@@ -9,6 +9,6 @@ public record PortfolioCurrentResponse(
         StrategyTicker ticker,      // 거래 종목
         BigDecimal holdings,        // 보유 수량
         BigDecimal avgPrice,        // 평단가
-        BigDecimal usdDeposit,      // 예수금(USD)
+        BigDecimal deposit,      // 예수금(USD)
         BigDecimal closingPrice     // 종가
 ) {}

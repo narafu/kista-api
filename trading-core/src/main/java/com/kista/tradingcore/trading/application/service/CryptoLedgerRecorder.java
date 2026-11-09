@@ -53,8 +53,8 @@ class CryptoLedgerRecorder {
         // 증분은 scale 8 중간값 — 최종 예수금은 DB numeric(20,2)가 한 번만 반올림한다(증분을 먼저 2자리로 자르면 경계에서 0.01 어긋남)
         BigDecimal cashDelta = quoteAmount.multiply(delta).divide(volume, 8, RoundingMode.HALF_UP);
         BigDecimal deposit = current.direction() == OrderDirection.BUY
-                ? base.usdDeposit().subtract(cashDelta) : base.usdDeposit().add(cashDelta);
-        AccountBalance updated = base.applyExecutions(List.of(fill)).withUsdDeposit(deposit);
+                ? base.deposit().subtract(cashDelta) : base.deposit().add(cashDelta);
+        AccountBalance updated = base.applyExecutions(List.of(fill)).withDeposit(deposit);
         cyclePositionPort.save(CyclePosition.tradeSnapshot(cycleId, updated, avgPrice)); // closing_price = 체결 평균가
 
         orderPort.markFilled(order.id(), volume, avgPrice, OrderStatus.FILLED);

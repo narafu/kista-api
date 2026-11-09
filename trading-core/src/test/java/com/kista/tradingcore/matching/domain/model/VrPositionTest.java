@@ -168,7 +168,7 @@ class VrPositionTest {
     // ── pool() / holdings() 위임 ────────────────────────────────────────────
 
     @Test
-    @DisplayName("pool()은 balance.usdDeposit() 반환, holdings()는 balance.holdings() 반환")
+    @DisplayName("pool()은 balance.deposit() 반환, holdings()는 balance.holdings() 반환")
     void pool_and_holdings_delegateToBalance() {
         VrPosition pos = position(7, new BigDecimal("3000"), new BigDecimal("8000"), new BigDecimal("20.00"));
         assertThat(pos.holdings()).isEqualTo(7);

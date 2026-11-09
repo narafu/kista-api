@@ -31,6 +31,6 @@ class CycleLifecycleNotifier {
     public void onNewCycleStarted(NewCycleStartedEvent event) {
         TradingUserProfile profile = TradingUserProfiles.requireProfile(userProfilePort, event.userId());
         userNotificationPort.notifyNewCycleStarted(profile, event.accountNickname(),
-                event.strategyType(), event.ticker(), event.initialUsdDeposit());
+                event.strategyType(), event.ticker(), event.initialDeposit());
     }
 }

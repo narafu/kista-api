@@ -61,7 +61,7 @@ class CycleRotationService {
                 return;
             }
 
-            // 시드는 전략 자신의 원장(마지막 CyclePosition.usdDeposit)만으로 정한다 — 원장 이상으로 키울 수 없으므로 부족 분기가 없다
+            // 시드는 전략 자신의 원장(마지막 CyclePosition.deposit)만으로 정한다 — 원장 이상으로 키울 수 없으므로 부족 분기가 없다
             BigDecimal maxSeed = calcLastPositionDeposit(strategy, currentCycle);
             targetSeed = strategy.cycleSeedType() == StrategyCycleSeedType.MAX
                     ? maxSeed
@@ -127,10 +127,10 @@ class CycleRotationService {
                 strategy.type(), strategy.ticker(), targetSeed)); // 사용자 알림 이벤트
     }
 
-    // 마지막 CyclePosition의 usdDeposit = MAX 시드의 내부 원장 기준
+    // 마지막 CyclePosition의 deposit = MAX 시드의 내부 원장 기준
     private BigDecimal calcLastPositionDeposit(Strategy strategy, StrategyCycle currentCycle) {
         return cyclePositionPort.findLatestOneByStrategyId(strategy.id())
-                .map(CyclePosition::usdDeposit)
+                .map(CyclePosition::deposit)
                 .orElse(currentCycle.startAmount()); // fallback: 현재 사이클 시드
     }
 }

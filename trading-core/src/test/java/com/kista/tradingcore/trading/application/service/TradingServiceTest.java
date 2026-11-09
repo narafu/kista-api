@@ -204,7 +204,7 @@ class TradingServiceTest {
                     return new CyclePosition(
                             position.id() != null ? position.id() : UUID.randomUUID(),
                             position.strategyCycleId(),
-                            position.usdDeposit(),
+                            position.deposit(),
                             position.closingPrice(),
                             position.avgPrice(),
                             position.holdings(),
@@ -512,13 +512,13 @@ class TradingServiceTest {
         // AT_CLOSE는 이제 개장 스케쥴러에서 생성되지 않음(close 전담) — AT_OPEN BUY로 대체
         BigDecimal prevClose = new BigDecimal("19.00");
         Order bigBuy = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
-                OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(100), new BigDecimal("500.00"), // 50,000 >> usdDeposit=10
+                OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(100), new BigDecimal("500.00"), // 50,000 >> deposit=10
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_BIG_BUY");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(new BigDecimal("500.00"), prevClose)));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(LOW_HISTORY));
-        when(cycleHistoryPort.findLatestOne(STRATEGY_CYCLE.id())).thenReturn(Optional.of(LOW_HISTORY)); // 원장 usdDeposit=10
+        when(cycleHistoryPort.findLatestOne(STRATEGY_CYCLE.id())).thenReturn(Optional.of(LOW_HISTORY)); // 원장 deposit=10
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(bigBuy.toPlanned()));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
@@ -895,7 +895,7 @@ class TradingServiceTest {
                 .thenReturn(List.of(bigBuy.toPlanned()));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
                 .thenReturn(List.of());
-        when(cycleHistoryPort.findLatestOne(STRATEGY_CYCLE.id())).thenReturn(Optional.of(NORMAL_HISTORY)); // 원장 usdDeposit=1000
+        when(cycleHistoryPort.findLatestOne(STRATEGY_CYCLE.id())).thenReturn(Optional.of(NORMAL_HISTORY)); // 원장 deposit=1000
         // 원장 부족: BUY $50,000 > 전략 원장 $1,000
 
         service.executeBatch(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
@@ -1746,14 +1746,14 @@ class TradingServiceTest {
     @Test
     void executeBatch_MAX_holdingsZero_fetchesMarginAndRotatesAndNotifiesUser() throws InterruptedException {
         BigDecimal marginAmount = new BigDecimal("2000.00");
-        // MAX: maxSeed = 마지막 CyclePosition.usdDeposit = FRESH_HISTORY.usdDeposit = 1000
+        // MAX: maxSeed = 마지막 CyclePosition.deposit = FRESH_HISTORY.deposit = 1000
         // actualBalance(2000) >= maxSeed(1000) → targetSeed = 1000
         Strategy maxStrategy = new Strategy(
                 UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAX);
         StrategyCycle maxCycle = new StrategyCycle(
                 UUID.randomUUID(), maxStrategy.id(), UUID.randomUUID(), new BigDecimal("500.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
-        BigDecimal expectedSeed = FRESH_HISTORY.usdDeposit(); // 1000.00
+        BigDecimal expectedSeed = FRESH_HISTORY.deposit(); // 1000.00
 
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
@@ -1799,7 +1799,7 @@ class TradingServiceTest {
         verify(cycleSnapshotCreator).createCycleAndSnapshot(
                 eq(maxStrategy.id()), any(UUID.class), eq(new BigDecimal("500.00")), eq(PRICE));
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof InsufficientBalanceEvent ibe
-                && ibe.userId() == null && ACCOUNT.id().equals(ibe.accountId()) && ibe.usdDeposit() != null && ibe.ticker() == StrategyTicker.SOXL));
+                && ibe.userId() == null && ACCOUNT.id().equals(ibe.accountId()) && ibe.deposit() != null && ibe.ticker() == StrategyTicker.SOXL));
     }
 
     @Test
@@ -1834,7 +1834,7 @@ class TradingServiceTest {
         UUID vrVersionId = UUID.randomUUID();
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrat.id(), vrVersionId,
                 new BigDecimal("5000.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
-        // VR 잔고 이력 — holdings=5, usdDeposit=$5000 (live 잔고 검증 통과용)
+        // VR 잔고 이력 — holdings=5, deposit=$5000 (live 잔고 검증 통과용)
         CyclePosition vrHistory = new CyclePosition(
                 null, vrCycle.id(), new BigDecimal("5000.00"), new BigDecimal("22.00"),
                 new BigDecimal("20.00"), BigDecimal.valueOf(5), null, null);
@@ -2171,7 +2171,7 @@ class TradingServiceTest {
 
         // Y(15주, 1777.00)에 이 체결(BUY 1주 × PRICE)이 얹힌다 — X(10주, 1000.00) 기준이 아님
         verify(cycleHistoryPort).save(argThat(p -> p.holdings().compareTo(BigDecimal.valueOf(16)) == 0
-                && p.usdDeposit().compareTo(new BigDecimal("1777.00").subtract(PRICE)) == 0));
+                && p.deposit().compareTo(new BigDecimal("1777.00").subtract(PRICE)) == 0));
     }
 
     @Test

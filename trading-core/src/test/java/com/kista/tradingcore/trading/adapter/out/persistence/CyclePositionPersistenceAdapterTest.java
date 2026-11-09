@@ -130,7 +130,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(reloaded.id()).isEqualTo(saved.id());
         assertThat(reloaded.holdings()).isEqualByComparingTo("8");
         assertThat(reloaded.avgPrice()).isEqualByComparingTo("12.5000");
-        assertThat(reloaded.usdDeposit()).isEqualByComparingTo("1200.00");
+        assertThat(reloaded.deposit()).isEqualByComparingTo("1200.00");
         assertThat(reloaded.closingPrice()).isEqualByComparingTo("30.00");
     }
 
@@ -439,12 +439,12 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         return cycleId;
     }
 
-    private UUID insertPosition(UUID cycleId, BigDecimal usdDeposit, Instant createdAt, boolean deleted) {
+    private UUID insertPosition(UUID cycleId, BigDecimal deposit, Instant createdAt, boolean deleted) {
         UUID positionId = UUID.randomUUID();
         jdbcTemplate.update(
-                "INSERT INTO cycle_position (id, strategy_cycle_id, usd_deposit, holdings, created_at, deleted_at) "
+                "INSERT INTO cycle_position (id, strategy_cycle_id, deposit, holdings, created_at, deleted_at) "
                         + "VALUES (?, ?, ?, ?, ?, ?)",
-                positionId, cycleId, usdDeposit, 0,
+                positionId, cycleId, deposit, 0,
                 Timestamp.from(createdAt), deleted ? Timestamp.from(createdAt) : null);
         return positionId;
     }
@@ -462,7 +462,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         List<CyclePosition> result = cyclePositionAdapter.findByUserAndRange(
                 userId, base.minus(1, ChronoUnit.HOURS), base.plus(1, ChronoUnit.HOURS));
 
-        assertThat(result).extracting(CyclePosition::usdDeposit)
+        assertThat(result).extracting(CyclePosition::deposit)
                 .containsExactly(new BigDecimal("111.00"));
     }
 
@@ -489,7 +489,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         List<CyclePosition> result = cyclePositionAdapter.findByUserAndRange(
                 userId, base.minus(1, ChronoUnit.HOURS), base.plus(1, ChronoUnit.HOURS));
 
-        assertThat(result).extracting(CyclePosition::usdDeposit)
+        assertThat(result).extracting(CyclePosition::deposit)
                 .containsExactly(new BigDecimal("1.00"));
     }
 
@@ -510,7 +510,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
 
         List<CyclePosition> result = cyclePositionAdapter.findByUserAndRange(userId, from, to);
 
-        assertThat(result).extracting(CyclePosition::usdDeposit)
+        assertThat(result).extracting(CyclePosition::deposit)
                 .containsExactly(new BigDecimal("10.00"), new BigDecimal("20.00"), new BigDecimal("30.00"));
     }
 
@@ -536,7 +536,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         List<CyclePosition> result = cyclePositionAdapter.findByCycleIdsAndRange(
                 Set.of(includedCycleId), base.minus(1, ChronoUnit.HOURS), base.plus(1, ChronoUnit.HOURS));
 
-        assertThat(result).extracting(CyclePosition::usdDeposit)
+        assertThat(result).extracting(CyclePosition::deposit)
                 .containsExactly(new BigDecimal("111.00"));
     }
 
@@ -556,7 +556,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
                 Set.of(activeCycleId, deletedCycleId),
                 base.minus(1, ChronoUnit.HOURS), base.plus(1, ChronoUnit.HOURS));
 
-        assertThat(result).extracting(CyclePosition::usdDeposit)
+        assertThat(result).extracting(CyclePosition::deposit)
                 .containsExactly(new BigDecimal("1.00"));
     }
 
@@ -578,7 +578,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         List<CyclePosition> result = cyclePositionAdapter.findByCycleIdsAndRange(
                 Set.of(cycleId), from, to);
 
-        assertThat(result).extracting(CyclePosition::usdDeposit)
+        assertThat(result).extracting(CyclePosition::deposit)
                 .containsExactly(new BigDecimal("10.00"), new BigDecimal("20.00"), new BigDecimal("30.00"));
     }
 }

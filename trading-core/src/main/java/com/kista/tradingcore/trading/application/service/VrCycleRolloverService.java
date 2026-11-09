@@ -103,11 +103,11 @@ class VrCycleRolloverService {
 
         // 적립/인출 반영 pool — recurringAmount(양수=적립·음수=인출)를 실측 예수금에 실제로 더해 다음 사이클의 실 현금으로 승계
         int recurringAmount = detail.recurringAmount();
-        BigDecimal adjustedPool = postBalance.usdDeposit()
+        BigDecimal adjustedPool = postBalance.deposit()
                 .add(BigDecimal.valueOf(recurringAmount)).setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
         if (adjustedPool.compareTo(BigDecimal.ZERO) < 0) {
             log.warn("[strategyId={}] VR 롤오버 보류 — 인출 반영 후 예수금 음수 (pool={}, recurringAmount={})",
-                    strategy.id(), postBalance.usdDeposit(), recurringAmount);
+                    strategy.id(), postBalance.deposit(), recurringAmount);
             eventPublisher.publishEvent(new TradingErrorEvent(null,
                     "VR 인출 반영 후 예수금 음수 — 롤오버 보류: strategyId=" + strategy.id() + " adjustedPool=" + adjustedPool));
             eventPublisher.publishEvent(new TradingErrorEvent(ctx.userProfile().userId(),
@@ -120,7 +120,7 @@ class VrCycleRolloverService {
         BigDecimal evaluation = postBalance.holdings().multiply(evaluationClosingPrice);
         BigDecimal newValue = VrPosition.nextValue(
                 cycleVr.value(),
-                postBalance.usdDeposit(),
+                postBalance.deposit(),
                 detail.gradientAt(weeks),
                 recurringAmount,
                 evaluation
@@ -142,7 +142,7 @@ class VrCycleRolloverService {
 
         // 사이클 종료 — 종료금액=마감 후 예수금+보유분 종가 평가액, 종료일자=evaluationDate(due일 기준 실제 거래일 — 배치 실행일 아님)
         // ponytail: 평가일 종가 × 실행일 매매 후 잔고 — 롤오버가 지연되면 그 사이 체결이 옛 사이클 평가에 섞인다. 정확히 하려면 평가일 이후 체결을 역산해 평가일 잔고를 재구성
-        BigDecimal endAmount = postBalance.usdDeposit().add(evaluation)
+        BigDecimal endAmount = postBalance.deposit().add(evaluation)
                 .setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
         // 새 poolLimitRate — 경과 주수 기준 램프 재계산값 (달러 파생은 조회 시점에 개장 pool×rate로 수행)
         BigDecimal newPoolLimitRate = detail.poolLimitRateAt(weeks);
@@ -150,7 +150,7 @@ class VrCycleRolloverService {
         // 옛 사이클 종료 + 새 사이클 + holdings 승계 스냅샷 단일 트랜잭션 — pool은 적립/인출 반영된 실 현금(adjustedPool)으로 개장
         // 시작일은 evaluationDate(항상 실제 거래일)로 고정 — dueDate(휴장일일 수 있음) 그대로 쓰면 시작일이 비거래일이 되고,
         // 배치 실행일(today)을 쓰면 실행이 며칠 밀릴 때마다 다음 due일도 함께 밀려 N주 스케줄이 누적 drift된다
-        AccountBalance newCycleBalance = postBalance.withUsdDeposit(adjustedPool);
+        AccountBalance newCycleBalance = postBalance.withDeposit(adjustedPool);
         cycleSnapshotCreator.rolloverVrCycle(cycle.id(), endAmount, evaluationDate, new CycleSnapshotCreator.VrCycleStart(
                 strategy.id(),
                 cycle.strategyVersionId(),

@@ -101,7 +101,7 @@ class TradingStatsServiceTest {
                 Instant.parse(startDate + "T00:00:00Z"), null);
     }
 
-    // holdings=0 스냅샷 — 자산 = usdDeposit
+    // holdings=0 스냅샷 — 자산 = deposit
     private static CyclePosition depositSnapshot(UUID cycleId, String deposit, String createdAt) {
         return new CyclePosition(UUID.randomUUID(), cycleId, new BigDecimal(deposit),
                 null, null, BigDecimal.valueOf(0), Instant.parse(createdAt), null);
@@ -660,7 +660,7 @@ class TradingStatsServiceTest {
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
     }
 
-    // 자산 = 보유 수량 × 종가 (usdDeposit 0)
+    // 자산 = 보유 수량 × 종가 (deposit 0)
     private static CyclePosition holdingSnapshot(UUID cycleId, String closing, String createdAt) {
         return holdingSnapshot(cycleId, closing, BigDecimal.ONE, createdAt);
     }

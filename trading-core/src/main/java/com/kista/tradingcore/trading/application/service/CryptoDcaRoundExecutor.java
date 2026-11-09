@@ -106,7 +106,7 @@ class CryptoDcaRoundExecutor {
                 AccountBalance ledger = position == null ? AccountBalance.empty() : position.toBalance();
                 // 원장 기준 가용 — 미체결·같은 틱 앞 규칙 약정을 뺀다
                 BigDecimal sellable = ledger.holdings().subtract(committed.sold.getOrDefault(cycleId, BigDecimal.ZERO)).max(BigDecimal.ZERO);
-                BigDecimal cash = ledger.usdDeposit().subtract(committed.spent.getOrDefault(cycleId, BigDecimal.ZERO)).max(BigDecimal.ZERO);
+                BigDecimal cash = ledger.deposit().subtract(committed.spent.getOrDefault(cycleId, BigDecimal.ZERO)).max(BigDecimal.ZERO);
                 BigDecimal fearGreed = null;
                 if (rule.hasIndicator(DcaIndicator.FEAR_GREED)) {
                     if (fearGreedMemo.isEmpty()) fearGreedMemo.add(fearGreedPort.latest());

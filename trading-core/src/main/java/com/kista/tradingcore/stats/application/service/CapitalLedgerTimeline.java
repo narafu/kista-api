@@ -35,13 +35,13 @@ final class CapitalLedgerTimeline {
             }
             // 원본 = 현재값 − 모든 이벤트 증감
             result.add(withValues(row, row.createdAt(),
-                    row.usdDeposit().subtract(sum(rowEvents, 0, CycleCapitalEvent::depositDelta)),
+                    row.deposit().subtract(sum(rowEvents, 0, CycleCapitalEvent::depositDelta)),
                     row.holdings().subtract(sum(rowEvents, 0, CycleCapitalEvent::holdingsDelta))));
             // e_k 직후 스냅샷 = 현재값 − 이후 이벤트 증감 (avgPrice는 R 현재값 사용)
             // ponytail: 가상 스냅샷 avgPrice는 R 현재값 — 종가 없을 때 평단 대체 평가에만 쓰여 오차 허용
             for (int k = 0; k < rowEvents.size(); k++) {
                 result.add(withValues(row, rowEvents.get(k).occurredAt(),
-                        row.usdDeposit().subtract(sum(rowEvents, k + 1, CycleCapitalEvent::depositDelta)),
+                        row.deposit().subtract(sum(rowEvents, k + 1, CycleCapitalEvent::depositDelta)),
                         row.holdings().subtract(sum(rowEvents, k + 1, CycleCapitalEvent::holdingsDelta))));
             }
         }
@@ -64,7 +64,7 @@ final class CapitalLedgerTimeline {
     // 장부가 = 예수금 + 보유수량 × 평단(없으면 0)
     static BigDecimal bookValue(CyclePosition p) {
         BigDecimal avg = p.avgPrice() != null ? p.avgPrice() : BigDecimal.ZERO;
-        return p.usdDeposit().add(p.holdings().multiply(avg));
+        return p.deposit().add(p.holdings().multiply(avg));
     }
 
     // 개장 시가 기준 장부 실현손익 — 개장 프리미엄 D(= 개장 평가 − 개장 장부가, 승계 보유분의 시가−평단 차)를 매도 비율만큼 줄이며 스냅샷을 재생한다.

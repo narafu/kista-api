@@ -173,7 +173,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 
 ### CQ-08 `CyclePosition.toBalance()`가 있는데 인라인 생성
 - 주제: 매핑. 유형: 보일러플레이트.
-- 위치 ✔: `trading/application/service/support/TradingBalanceLoader.java:29,37`. `new AccountBalance(h.holdings(), h.avgPrice(), h.usdDeposit())` 형태다.
+- 위치 ✔: `trading/application/service/support/TradingBalanceLoader.java:29,37`. `new AccountBalance(h.holdings(), h.avgPrice(), h.deposit())` 형태다.
 - 기준 패턴: `trading/domain/model/CyclePosition.java:52` `toBalance()`. 이 메서드를 쓰는 곳은 `CryptoDcaRoundExecutor.java:113`, `CryptoLedgerRecorder.java:45`, `StrategyDetailAssembler.java:170`이다.
 - 근거: 같은 3필드 변환이 이 파일에서만 인라인돼 있다.
 - 예상 효과: 보일러플레이트 제거.
@@ -348,7 +348,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
     - resolver는 `DEFAULT_DIVISION_COUNT`(20)를 쓴다: `PrivacyCreationResolver.java:18`, `DcaCreationResolver.java:18`, `VrCreationResolver.java:23`.
     - 조회 폴백은 `.orElse(DEFAULT_DIVISION_COUNT)`다: `CyclePositionPersistor.java:92`, `CycleRotationService.java:79`, `StrategyDetailAssembler.java:50,130`, `CycleOrderComputer.java:132,136`.
     - matching 쪽: `InfiniteCycleOrderStrategy.java:113,129` ✔.
-  - `initialUsdDeposit` null → ZERO:
+  - `initialDeposit` null → ZERO:
     - `StrategyCreationService.java:115`
     - `StrategyCreationPersister.java:64`
     - `VrRegistration.java:58`
@@ -360,7 +360,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: 기본값을 한 곳에서만 지정하고, 0과 20의 불일치 여지를 제거한다.
 - 위험: 높음(공식). 전략 등록 결과가 바뀔 수 있고, INFINITE 분할 수는 공식 입력이다. 비공식 필드(broker 기본값 등)만 먼저 분리해 진행할 수 있다.
 - 가드(`constraints.md` "persistence 기본값" 확장 문장 초안): "web DTO의 `toCommand()`도 기본값을 정하지 않는다. null을 그대로 넘기고 도메인 resolver·팩토리가 정한다."
-- 상태: done(e6b1470f1). DTO 기본값 제거·`divisionCount` Integer(null=생략, 명시 0은 400)·VR `recurringAmount` 생략은 정책 기본 recurringMode(운영 DEPOSIT → 400)·`initialUsdDeposit` 정규화 `StrategyCreationService` 1곳·broker 기본값 `AccountService.brokerOrDefault`. 조회 경로 `.orElse(DEFAULT_DIVISION_COUNT)`는 유지 목록. 가드: `constraints.md` "persistence 기본값"의 web DTO 문장 + `StrategyServiceTest.register_infinite_explicitZeroDivisionCount_rejected` 등.
+- 상태: done(e6b1470f1). DTO 기본값 제거·`divisionCount` Integer(null=생략, 명시 0은 400)·VR `recurringAmount` 생략은 정책 기본 recurringMode(운영 DEPOSIT → 400)·`initialDeposit` 정규화 `StrategyCreationService` 1곳·broker 기본값 `AccountService.brokerOrDefault`. 조회 경로 `.orElse(DEFAULT_DIVISION_COUNT)`는 유지 목록. 가드: `constraints.md` "persistence 기본값"의 web DTO 문장 + `StrategyServiceTest.register_infinite_explicitZeroDivisionCount_rejected` 등.
 
 ### CQ-20 USD 금액 scale 리터럴 2 산재와 `MONEY_SCALE` 이중 정의
 - 주제: 금액·수량 스케일. 유형: 중복.
@@ -871,7 +871,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 주제: 코드철학. 유형: 죽은 코드·보일러플레이트·stale 주석·가시성. 위험: 낮음.
 - 위치:
   - 미사용 지역변수 `Strategy strategy = owned.strategy()`: `StrategyService:73` ✔, `support/StrategyHistoryQueryService:100,114` ✔.
-  - 헬퍼 우회: `TradingPreviewService:297` `status() == ACTIVE`(→ `isActive()`) ✔, `:79` `TradingAccount.from(account).brokerRef().broker()`(→ `account.broker()`) ✔, `CapitalInjectionService:169` 수기 `new AccountBalance`(→ `withUsdDeposit`) ✔.
+  - 헬퍼 우회: `TradingPreviewService:297` `status() == ACTIVE`(→ `isActive()`) ✔, `:79` `TradingAccount.from(account).brokerRef().broker()`(→ `account.broker()`) ✔, `CapitalInjectionService:169` 수기 `new AccountBalance`(→ `withDeposit`) ✔.
   - 도달 불가 가드: `VrStrategyDetailService:69` `vrDetail == null || cycleVr == null`(호출처 2곳 모두 `Optional.map` 람다 안) ✔, openingPool 가드 `:50-53`·`:70-72` 중복 ✔.
   - `CyclePositionPersistor:41,57,60` `cycleOrderStrategies.of(...)` 4회 호출·`:52` 별칭 변수·`:50-51` 주석 위치 ✔.
   - stale 주석 "application/service/trading 패키지 전용": `StrategyOrderPlanBuilder:30`, `TradingOrderSlots:16`(사용처도 틀림), `VrReconfigureService:44` ✔.

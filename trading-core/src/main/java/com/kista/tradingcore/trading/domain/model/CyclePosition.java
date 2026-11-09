@@ -13,7 +13,7 @@ import java.util.UUID;
 public record CyclePosition(
         UUID id,                  // PK (null이면 @UuidGenerator)
         UUID strategyCycleId,     // FK → strategy_cycle.id
-        BigDecimal usdDeposit,    // 통합주문가능금액 (매매 공식 B 계산 기준)
+        BigDecimal deposit,    // 통합주문가능금액 (매매 공식 B 계산 기준)
         BigDecimal closingPrice,  // 종가
         BigDecimal avgPrice,      // 평균 매입 단가 (holdings=0이면 null)
         BigDecimal holdings,      // 보유 수량 (원장 — 소수 가능, 정규화됨)
@@ -25,31 +25,31 @@ public record CyclePosition(
     }
 
     // 최초 전략 등록 시 시작점 포지션 (holdings=0, avgPrice=null, 종가 없음)
-    public static CyclePosition initialSnapshot(UUID strategyCycleId, BigDecimal usdDeposit) {
-        return new CyclePosition(null, strategyCycleId, usdDeposit, null, null, BigDecimal.ZERO, null, null);
+    public static CyclePosition initialSnapshot(UUID strategyCycleId, BigDecimal deposit) {
+        return new CyclePosition(null, strategyCycleId, deposit, null, null, BigDecimal.ZERO, null, null);
     }
 
     // 사이클 재등록 시 시작점 포지션 (holdings=0, avgPrice=null)
     // closingPrice: 종료된 사이클의 장마감 가격
-    public static CyclePosition cycleStartSnapshot(UUID strategyCycleId, BigDecimal usdDeposit, BigDecimal closingPrice) {
-        return new CyclePosition(null, strategyCycleId, usdDeposit, closingPrice, null, BigDecimal.ZERO, null, null);
+    public static CyclePosition cycleStartSnapshot(UUID strategyCycleId, BigDecimal deposit, BigDecimal closingPrice) {
+        return new CyclePosition(null, strategyCycleId, deposit, closingPrice, null, BigDecimal.ZERO, null, null);
     }
 
     public static CyclePosition tradeSnapshot(UUID strategyCycleId, AccountBalance balance, BigDecimal closingPrice) {
         return new CyclePosition(null, strategyCycleId,
-                balance.usdDeposit(), closingPrice, balance.avgPrice(), balance.holdings(), null, null);
+                balance.deposit(), closingPrice, balance.avgPrice(), balance.holdings(), null, null);
     }
 
     // 중간부터 시작 — 기존 보유 수량·평단가로 seed하는 초기 포지션 (세 전략 공통)
     // closingPrice: 등록 시점 조회한 시장가(전일종가) — startAmount·VR V값과 동일 기준으로 정합해 등록 직후 미실현손익 0
-    public static CyclePosition bootstrapSnapshot(UUID strategyCycleId, BigDecimal usdDeposit,
+    public static CyclePosition bootstrapSnapshot(UUID strategyCycleId, BigDecimal deposit,
                                                     BigDecimal holdings, BigDecimal avgPrice, BigDecimal closingPrice) {
-        return new CyclePosition(null, strategyCycleId, usdDeposit, closingPrice, avgPrice, holdings, null, null);
+        return new CyclePosition(null, strategyCycleId, deposit, closingPrice, avgPrice, holdings, null, null);
     }
 
     // DB 저장 포지션 → 매매 계산용 잔고 변환 (tradeSnapshot의 역방향)
     public AccountBalance toBalance() {
-        return new AccountBalance(holdings, avgPrice, usdDeposit);
+        return new AccountBalance(holdings, avgPrice, deposit);
     }
 
     // 총자산(예수금 + 보유분 종가 평가) — 보유분이 있는데 종가가 없으면 평가 불완전이라 null(수익률 계산용, 평단가로 대체하지 않음), 반올림 없음
@@ -58,14 +58,14 @@ public record CyclePosition(
             return null;
         }
         BigDecimal unitPrice = closingPrice != null ? closingPrice : BigDecimal.ZERO;
-        return usdDeposit.add(unitPrice.multiply(holdings));
+        return deposit.add(unitPrice.multiply(holdings));
     }
 
     // 총자산 — 종가 없으면 평단가, 그것도 없으면 0으로 대체해 항상 값 산출(화면 표시용), scale=2 HALF_UP
     public BigDecimal totalAssetWithAvgPriceFallback() {
         BigDecimal unitPrice = closingPrice != null ? closingPrice
                 : avgPrice != null ? avgPrice : BigDecimal.ZERO;
-        return usdDeposit.add(unitPrice.multiply(holdings))
+        return deposit.add(unitPrice.multiply(holdings))
                 .setScale(AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP);
     }
 }

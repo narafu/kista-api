@@ -12,6 +12,6 @@ import java.math.BigDecimal;
 public interface TradingNotifyPort {
     void notifyError(Exception e);
     void notifyInfo(String message);
-    void notifyInsufficientBalance(int holdings, BigDecimal usdDeposit, StrategyTicker ticker);
+    void notifyInsufficientBalance(int holdings, BigDecimal deposit, StrategyTicker ticker);
     void notifyMarketClosed();
 }
