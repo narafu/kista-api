@@ -761,6 +761,36 @@ class TradingStatsServiceTest {
     }
 
     @Test
+    void availableCurrencies는_MOCK_계좌를_제외한다() {
+        // MOCK·BINANCE 계좌 각각 사이클 보유 — 사용 통화는 [USDT]만
+        Account mock = new Account(UUID.randomUUID(), USER_ID, "모의", "0", "k", "s", null, Broker.MOCK, null, null);
+        Account binance = new Account(UUID.randomUUID(), USER_ID, "바이낸스", null, "k", "s", null, Broker.BINANCE, null, null);
+        Strategy mockStrategy = new Strategy(UUID.randomUUID(), mock.id(), StrategyType.DCA, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        Strategy binanceStrategy = new Strategy(UUID.randomUUID(), binance.id(), StrategyType.DCA, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(mock, binance));
+        // 실제 포트처럼 요청한 id의 전략·사이클만 돌려준다
+        Map<UUID, List<Strategy>> strategyByAccount = Map.of(
+                mock.id(), List.of(mockStrategy), binance.id(), List.of(binanceStrategy));
+        List<StrategyCycle> allCycles = List.of(
+                activeCycle(mockStrategy.id(), "100", "2026-06-01"),
+                activeCycle(binanceStrategy.id(), "200", "2026-06-01"));
+        when(strategyPort.findByAccountIds(any())).thenAnswer(inv -> {
+            Map<UUID, List<Strategy>> result = new java.util.HashMap<>();
+            for (UUID id : (java.util.Collection<UUID>) inv.getArgument(0)) result.put(id, strategyByAccount.get(id));
+            return result;
+        });
+        when(strategyCyclePort.findByStrategyIds(any())).thenAnswer(inv -> {
+            java.util.Collection<UUID> ids = inv.getArgument(0);
+            return allCycles.stream().filter(c -> ids.contains(c.strategyId())).toList();
+        });
+
+        assertThat(statsService.getSummary(USER_ID, Currency.USD).availableCurrencies())
+                .containsExactly(Currency.USDT);
+    }
+
+    @Test
     void summary_캐시는_통화별로_분리된다() {
         stubMultiCurrencyUser();
 

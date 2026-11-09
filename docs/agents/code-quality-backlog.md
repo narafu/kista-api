@@ -776,7 +776,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 주제: 불필요한 코드·영속성 일관성. 유형: 죽은 코드·비일관. 위험: 낮음.
 - 위치:
   - 죽은 코드: `CyclePositionPort.java:49`(3-인자 `findByAccountId`)·`:52`(`findByStrategyIdAndDateRange`), 어댑터 `CyclePositionPersistenceAdapter.java:99-109`, `CyclePositionJpaRepository.java:75`(`findByAccountIdAndDateRange`)·`:81`(`findAllByOrderByCreatedAtDesc(Pageable)`). main·루트 test에서 호출처 0건이다(어댑터 테스트 제외) ✔. JPA `findByStrategyIdAndDateRange`는 어댑터 `:132`가 쓰므로 유지한다.
-  - 필터 누락: `CyclePositionJpaRepository.java` `findByAccountIdWithCursor`에 `a.deleted_at IS NULL`이 없다 ✔. 같은 JOIN을 쓰는 `findRecentByUserId`·`findByUserIdAndRange`에는 있다 ✔. 호출 전 계좌 소유 검증이 삭제 계좌를 막으므로 실제 영향은 없다.
+  - 필터 누락: `CyclePositionJpaRepository.java` `findByAccountIdWithCursor`에 `a.deleted_at IS NULL`이 없다 ✔. 같은 JOIN을 쓰는 `findLatestPerStrategyByUserId`(구 `findRecentByUserId`)·`findByUserIdAndRange`에는 있다 ✔. 호출 전 계좌 소유 검증이 삭제 계좌를 막으므로 실제 영향은 없다.
 - 수정안: 죽은 메서드 4개와 해당 어댑터 테스트를 지우고 필터를 추가한다.
 - 가드: 없음.
 - 상태: done(b53504f24).
