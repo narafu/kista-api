@@ -818,7 +818,7 @@ flows:
         desc: >-
           성과 화면(StatsOverview)은 서버에서 요약(GET /api/stats/summary)과 최근 3개월 누적 자산 곡선(GET /api/stats/equity-curve)을 미리 채우고,
           사이클 성과 목록(GET /api/stats/cycles)은 진행 상태(진행중/종료) 필터와 번호 페이지로 불러온다. 요약·곡선은 모의계좌(MOCK)를 뺀 실제 투자 성과이고, 사이클 목록만 모의계좌도 포함한다.
-          전략 유형 필터를 바꾸면 곡선과 목록이 같이 바뀐다. 결과는 사용자별 5분 캐시를 쓴다. DCA 전략도 내부 원장 기준으로 요약·곡선·목록에 포함되며 원금은 모든 전략에서 사이클 개장 시가 평가(open_amount — 매매 계약인 시작 금액과 달리 PRIVACY 중간 시작의 배수 환산이 없다, DCA는 초기 보유 원가)에 추가·인출을 더한 값이며 곡선의 과거 원금·자산은 투자금 이력(cycle_capital_event)으로 날짜별 복원한다. 요약 실현손익은 종료 사이클과 진행 중 사이클의 매도 확정분(쿼터매도·PRIVACY 매도·DCA SELL)을 합산하고 원가 기준은 사이클 개장 시가다(보유분이 남으면 개장 시가 기준 장부가). 미실현은 총손익에서 뺀 값이다. 곡선은 후속 없이 끝난 전략의 손익을 원금에서 계속 빼 둬 마지막 손익이 요약 총손익과 같다. 사용자 합산 경로(요약·곡선·포트폴리오 투자지수)는 통화가 섞이지 않게 코인 KRW 계좌를 제외하고, 사이클 단위 목록은 포함한다.
+          전략 유형 필터를 바꾸면 곡선과 목록이 같이 바뀐다. 결과는 사용자별 5분 캐시를 쓴다. DCA 전략도 내부 원장 기준으로 요약·곡선·목록에 포함되며 원금은 모든 전략에서 사이클 개장 시가 평가(open_amount — 매매 계약인 시작 금액과 달리 PRIVACY 중간 시작의 배수 환산이 없다, DCA는 초기 보유 원가)에 추가·인출을 더한 값이며 곡선의 과거 원금·자산은 투자금 이력(cycle_capital_event)으로 날짜별 복원한다. 요약 실현손익은 종료 사이클과 진행 중 사이클의 매도 확정분(쿼터매도·PRIVACY 매도·DCA SELL)을 합산하고 원가 기준은 사이클 개장 시가다(보유분이 남으면 개장 시가 기준 장부가). 미실현은 총손익에서 뺀 값이다. 곡선은 후속 없이 끝난 전략의 손익을 원금에서 계속 빼 둬 마지막 손익이 요약 총손익과 같다. 사용자 합산 경로(요약·곡선·포트폴리오 투자지수)는 요청 통화(?currency=, 기본 USD) 계좌만 합산하고 요약은 선택 가능한 통화 목록(availableCurrencies)을 함께 주며, 사이클 단위 목록은 통화와 무관하게 전부 포함한다.
         code: [TradingStatsController#getSummary, TradingStatsController#getEquityCurve, TradingStatsController#getCycles, TradingStatsService#getSummary, TradingStatsService#getEquityCurve, TradingStatsService#getCyclePerformances]
         fail: 한 쪽 조회가 실패해도 다른 쪽은 보인다(서버 prefetch를 각각 무시). 곡선이 실패하면 필터 토글만 남는다.
 
@@ -828,7 +828,7 @@ flows:
         title: 계좌 상세(잔고·전략·거래 이력)
         desc: >-
           계좌 상세 화면(AccountDetailContent)은 서버에서 계좌·전략 목록·전략별 다음 주문 미리보기와 증권사 실시간 포트폴리오(GET /api/accounts/{id}/portfolio)를 채운다.
-          모의계좌는 포트폴리오 조회를 건너뛴다. 거래 탭(TradesTab)은 계좌의 사이클 포지션 이력을 커서 페이지로 보여 준다(GET /api/accounts/{id}/cycle-history — DCA 포함·행마다 strategyType, USD 표시라 업비트·바이낸스 계좌는 빈 목록).
+          모의계좌는 포트폴리오 조회를 건너뛴다. 거래 탭(TradesTab)은 계좌의 사이클 포지션 이력을 커서 페이지로 보여 준다(GET /api/accounts/{id}/cycle-history — DCA 포함·행마다 strategyType, 필드 deposit은 계좌 통화 예수금이라 코인 계좌도 포함).
           코인 거래소(업비트·바이낸스) 계좌는 /portfolio 대신 코인 포트폴리오(GET /api/accounts/{id}/crypto-portfolio — 계좌 통화(KRW·USDT) 예수금·코인별 보유·평단·현재가·평가액, 거래소 평단이 없으면 원장 평단)를 부른다.
           실잔고에 없는 원장 보유(DCA 상세)는 코인 현재가(GET /api/accounts/{id}/crypto-prices — 계좌 거래소 공개 시세, 잔고 무관)로 평가한다.
         code: [StatisticsController#getPresentBalance, DashboardController#getCycleHistory, AccountStatisticsService#getPresentBalance, AccountStatisticsService#getByAccount, CryptoPortfolioController#getCryptoPortfolio, CryptoPortfolioService#getCryptoPortfolio, CryptoPortfolioController#getCryptoPrices, CryptoPortfolioService#getCurrentPrices]
@@ -840,7 +840,7 @@ flows:
         title: 계좌 단위 일별 거래내역
         desc: >-
           계좌의 체결 내역은 증권사를 부르지 않고 DB에 저장된 체결 주문(체결수량이 있는 주문)을 기간으로 읽어 일자·방향·종목·수량·단가·금액으로 합산해 돌려준다.
-          사용자 전체를 합친 조회(GET /api/daily-trades)는 대시보드 달력이 쓰고, 계좌별 조회(GET /api/accounts/{id}/daily-trades)는 같은 계산을 계좌 하나로 한정한다.
+          사용자 전체를 합친 조회(GET /api/daily-trades)는 대시보드 달력이 쓰고, 계좌별 조회(GET /api/accounts/{id}/daily-trades)는 같은 계산을 계좌 하나로 한정한다. 코인 체결도 포함하며 행은 소수 quantity·tradeAmount·계좌 통화 currency를 싣는다.
         code: [StatisticsController#getDailyTransactions, AccountStatisticsService#getDailyTransactions, AccountStatisticsService#toDailyTransactionResult]
         fail: 계좌 소유자가 아니면 403.
 
