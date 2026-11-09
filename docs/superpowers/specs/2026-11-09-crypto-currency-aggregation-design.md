@@ -93,7 +93,7 @@
   - `DailyTransactionSummary`도 함께 제거한다.
 - MOCK 포함 여부는 지금 동작을 유지한다(사용자 단위 쿼리에 broker 필터가 없다).
 - 계좌 맵에 없는 주문은 `IllegalStateException`으로 처리한다. 사용자 단위 쿼리가 이미 `accounts.deleted_at IS NULL`로 조인하므로 정상 경로에서는 생기지 않는다. USD로 가정해 조용히 잘못 표기하거나 건너뛰지 않는다. 내 판단이다. 구현 시 조인 조건을 확인한다.
-- 미국 휴장일 캘린더(`WeeklyMarketCalendar`) 칸에 주말·휴장일 코인 체결이 표시되는 것은 "일관" 원칙에 따라 그대로 둔다. 내 판단이다.
+- 미국 휴장일 캘린더(`WeeklyMarketCalendar`)는 주말·휴장일의 코인 체결도 **표시한다**(사용자 확정). API는 날짜 필터 없이 모든 체결일을 반환한다. 캘린더가 평일 칸만 그리거나 휴장일 칸에 배지를 숨기고 있다면 UI에서 고친다(인계 메모에 포함).
 
 ### 5. 로컬 크립토 시드 (`scripts/dev-seed`)
 
@@ -185,7 +185,7 @@ kista-ui 세션에서 사용자가 결정했고, 이 세션에서 다시 확인�
 - 일별 거래내역
   - `tradeAmountUsd`를 `tradeAmount`로, `quantity`를 number(소수)로 바꾸고 `summary` 필드를 삭제한다.
   - `useDailyTradesRangeQuery`는 날짜와 통화별로 집계한다. 서로 다른 통화를 한 금액으로 합치면 안 된다.
-  - `WeeklyMarketCalendar` 배지에 통화별 금액을 표시한다.
+  - `WeeklyMarketCalendar` 배지에 통화별 금액을 표시한다. 주말·휴장일 칸에도 코인 체결 배지를 보여준다(사용자 확정). 평일만 그리는 구조라면 고친다.
 - 깨지는 변경은 일별 거래내역(`tradeAmountUsd`·`quantity`·`summary`)과 `usdDeposit` 개명이다. 나머지는 하위 호환이다.
 - 인계 대상은 ui-stat 세션이다.
 
