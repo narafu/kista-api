@@ -80,7 +80,8 @@ class ContractWireFormatTest {
         InvestmentPointsResponse response = new InvestmentPointsResponse(
                 java.util.List.of(new InvestmentPointsResponse.InvestmentPointDto(
                         LocalDate.of(2026, 9, 1), new BigDecimal("101.5"), new BigDecimal("0.015"))),
-                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), null);
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30),
+                com.kista.shared.kernel.Currency.USDT, null);
 
         InvestmentPointsResponse back = objectMapper.readValue(objectMapper.writeValueAsString(response), InvestmentPointsResponse.class);
 

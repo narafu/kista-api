@@ -1,5 +1,6 @@
 package com.kista.tradingcore.stats.application.usecase;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.stats.domain.model.InvestmentPointsResult;
 
 import java.time.LocalDate;
@@ -12,6 +13,6 @@ public interface InvestmentPointsQuery {
 
     enum Scope { STRATEGY, PORTFOLIO }
 
-    InvestmentPointsResult fetch(UUID userId, Scope scope, UUID strategyId,
+    InvestmentPointsResult fetch(UUID userId, Scope scope, UUID strategyId, Currency currency,
                                  LocalDate from, LocalDate to);
 }

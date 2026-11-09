@@ -4,6 +4,7 @@ import com.kista.shared.contract.stats.InvestmentPointsResponse;
 import com.kista.tradingcore.stats.application.usecase.BrokerStatisticsUseCase;
 import com.kista.tradingcore.stats.application.usecase.InvestmentPointsQuery;
 import com.kista.tradingcore.stats.domain.model.InvestmentPointsResult;
+import com.kista.shared.kernel.Currency;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -29,9 +30,10 @@ public class TradingStatsInternalController {
             @RequestParam UUID userId,
             @RequestParam InvestmentPointsQuery.Scope scope,
             @RequestParam(required = false) UUID strategyId,
+            @RequestParam(defaultValue = "USD") Currency currency, // STRATEGY scope는 무시(전략 계좌 통화 사용)
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        InvestmentPointsResult result = investmentPointsQuery.fetch(userId, scope, strategyId, from, to);
+        InvestmentPointsResult result = investmentPointsQuery.fetch(userId, scope, strategyId, currency, from, to);
         return StatsContractMapper.toResponse(result);
     }
 

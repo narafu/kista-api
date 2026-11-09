@@ -14,6 +14,7 @@ public record InvestmentPointsResponse(
         List<InvestmentPointDto> points,    // 시점별 누적 투자지수
         LocalDate effectiveFrom,            // 실제 적용된 조회 시작일
         LocalDate effectiveTo,              // 실제 적용된 조회 종료일
+        Currency currency,                  // 투자 통화 — STRATEGY=전략 계좌 통화, PORTFOLIO=요청 통화
         StrategyRefDto selectedStrategy     // STRATEGY scope의 선택 전략 (PORTFOLIO면 null)
 ) {
     // 투자 누적지수 시점(월별·주별·일별)과 해당 구간의 현금흐름 조정 수익률

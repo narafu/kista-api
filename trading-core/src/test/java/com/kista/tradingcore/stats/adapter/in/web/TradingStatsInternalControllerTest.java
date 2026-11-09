@@ -51,9 +51,9 @@ class TradingStatsInternalControllerTest {
     @Test
     void 투자_성과_시리즈를_조회한다() throws Exception {
         InvestmentPointsResult response = new InvestmentPointsResult(
-                List.of(), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1), null, null);
+                List.of(), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1), null, com.kista.shared.kernel.Currency.USD);
         given(investmentPointsQuery.fetch(eq(USER_ID), eq(InvestmentPointsQuery.Scope.PORTFOLIO),
-                isNull(), any(), any()))
+                isNull(), eq(com.kista.shared.kernel.Currency.USD), any(), any()))
                 .willReturn(response);
 
         mockMvc.perform(get("/api/internal/trading/stats/investment-points")
@@ -69,12 +69,28 @@ class TradingStatsInternalControllerTest {
     }
 
     @Test
+    void currency_파라미터를_유스케이스에_전달하고_응답에_싣는다() throws Exception {
+        given(investmentPointsQuery.fetch(eq(USER_ID), eq(InvestmentPointsQuery.Scope.PORTFOLIO),
+                isNull(), eq(com.kista.shared.kernel.Currency.USDT), isNull(), isNull()))
+                .willReturn(new InvestmentPointsResult(
+                        List.of(), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1), null, com.kista.shared.kernel.Currency.USDT));
+
+        mockMvc.perform(get("/api/internal/trading/stats/investment-points")
+                        .header("X-Internal-Token", VALID_TOKEN)
+                        .param("userId", USER_ID.toString())
+                        .param("scope", "PORTFOLIO")
+                        .param("currency", "USDT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currency").value("USDT"));
+    }
+
+    @Test
     void 구버전_root가_보내는_granularity_파라미터는_무시한다() throws Exception {
         // 배포 스큐(새 kista-trading + 구 kista-api) 구간에도 400 없이 응답해야 한다
         given(investmentPointsQuery.fetch(eq(USER_ID), eq(InvestmentPointsQuery.Scope.PORTFOLIO),
-                isNull(), isNull(), isNull()))
+                isNull(), eq(com.kista.shared.kernel.Currency.USD), isNull(), isNull()))
                 .willReturn(new InvestmentPointsResult(
-                        List.of(), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1), null, null));
+                        List.of(), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1), null, com.kista.shared.kernel.Currency.USD));
 
         mockMvc.perform(get("/api/internal/trading/stats/investment-points")
                         .header("X-Internal-Token", VALID_TOKEN)

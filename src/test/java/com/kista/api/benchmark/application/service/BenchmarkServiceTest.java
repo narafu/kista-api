@@ -58,14 +58,14 @@ class BenchmarkServiceTest {
 
     private void stubPortfolioWeekly(List<InvestmentPoint> points, LocalDate from, LocalDate to) {
         when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.PORTFOLIO), isNull(),
-                any(), any()))
-                .thenReturn(new InvestmentPointsPort.Result(points, from, to, null));
+                any(), any(), any()))
+                .thenReturn(new InvestmentPointsPort.Result(points, from, to, null, Currency.USD));
     }
 
     private void stubStrategyWeekly(List<InvestmentPoint> points, LocalDate from, LocalDate to) {
         when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.STRATEGY), eq(STRATEGY_ID),
-                any(), any()))
-                .thenReturn(new InvestmentPointsPort.Result(points, from, to, STRATEGY));
+                any(), any(), any()))
+                .thenReturn(new InvestmentPointsPort.Result(points, from, to, STRATEGY, Currency.USD));
     }
 
     // 첫 KB 조사일(01-05)~마지막(02-23)까지 이어지는 단순 포트폴리오 투자 시리즈 + KB 지수 스텁
@@ -120,7 +120,7 @@ class BenchmarkServiceTest {
                 new BigDecimal("1365.20"));
 
         BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(result.scope()).isEqualTo(BenchmarkScope.PORTFOLIO);
@@ -163,7 +163,7 @@ class BenchmarkServiceTest {
                 new BigDecimal("1365.20"));
 
         BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2027, 1, 5));
 
         assertThat(result.summary().investmentAnnualizedReturn()).isCloseTo(
@@ -186,7 +186,7 @@ class BenchmarkServiceTest {
                 weeklyIndex(LocalDate.of(2026, 2, 16), "121")));
 
         BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 16));
 
         assertThat(result.points()).extracting(BenchmarkPoint::baseDate)
@@ -215,7 +215,7 @@ class BenchmarkServiceTest {
                 weeklyIndex(LocalDate.of(2026, 1, 13), "110")));
 
         BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000",
                 LocalDate.of(2026, 1, 9), LocalDate.of(2026, 1, 13));
 
         assertThat(result.points()).extracting(BenchmarkPoint::baseDate)
@@ -243,7 +243,7 @@ class BenchmarkServiceTest {
                 weeklyIndex(LocalDate.of(2026, 1, 27), "150")));
 
         BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000",
                 LocalDate.of(2026, 1, 9), LocalDate.of(2026, 1, 27));
 
         // 투자 종료(01-13) 이후 조사일(01-20, 01-27)은 지수 고정 없이 스킵된다
@@ -270,7 +270,7 @@ class BenchmarkServiceTest {
                                 null, java.time.Instant.parse("2026-02-16T00:00:00Z"))));
 
         BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "2600000000",
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "2600000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(result.benchmark().regionCode()).isEqualTo("2600000000");
@@ -294,7 +294,7 @@ class BenchmarkServiceTest {
                 weeklyIndex(LocalDate.of(2026, 2, 23), "121")));
 
         BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(result.points()).extracting(BenchmarkPoint::baseDate)
@@ -314,7 +314,7 @@ class BenchmarkServiceTest {
                 weeklyIndex(LocalDate.of(2026, 2, 2), "135")));
 
         BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 2));
 
         assertThat(result.summary().investmentMaxDrawdown()).isEqualByComparingTo("-0.2");
@@ -330,14 +330,14 @@ class BenchmarkServiceTest {
                 anyString(), anyString(), any(), any())).thenReturn(weeklyIndices());
 
         BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.STRATEGY, STRATEGY_ID, "1100000000",
+                USER_ID, BenchmarkScope.STRATEGY, STRATEGY_ID, Currency.USD, "1100000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(result.strategy().id()).isEqualTo(STRATEGY_ID);
         assertThat(result.strategy().type()).isEqualTo(StrategyType.INFINITE);
         assertThat(result.strategy().ticker()).isEqualTo(StrategyTicker.SOXL);
         verify(investmentPointsPort).fetch(eq(USER_ID), eq(BenchmarkScope.STRATEGY), eq(STRATEGY_ID),
-                any(), any());
+                any(), any(), any());
     }
 
     // 소유권 검증은 investmentPointsPort.fetch() 내부(trading 쪽 HTTP 호출)에서 일어난다 —
@@ -345,11 +345,11 @@ class BenchmarkServiceTest {
     @Test
     void 소유하지_않은_전략은_예외를_전파하고_환율을_조회하지_않는다() {
         when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.STRATEGY), eq(STRATEGY_ID),
-                any(), any()))
+                any(), any(), any()))
                 .thenThrow(new SecurityException("소유하지 않은 계좌입니다"));
 
         assertThatThrownBy(() -> statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.STRATEGY, STRATEGY_ID, "1100000000", FROM, TO))
+                USER_ID, BenchmarkScope.STRATEGY, STRATEGY_ID, Currency.USD, "1100000000", FROM, TO))
                 .isInstanceOf(SecurityException.class);
 
         verify(currentExchangeRatePort, never()).getMidRate();
@@ -358,7 +358,7 @@ class BenchmarkServiceTest {
     @Test
     void 역전된_기간은_데이터를_읽기_전에_거부한다() {
         assertThatThrownBy(() -> statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000", TO, FROM))
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000", TO, FROM))
                 .isInstanceOf(IllegalArgumentException.class);
 
         verifyNoInteractions(investmentPointsPort, housingPriceIndexPort, currentExchangeRatePort);
@@ -371,7 +371,7 @@ class BenchmarkServiceTest {
                 anyString(), anyString(), any(), any())).thenReturn(weeklyIndices());
 
         BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000", FROM, TO);
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000", FROM, TO);
 
         assertThat(result.points()).isEmpty();
         assertThat(result.summary()).isNull();
@@ -387,7 +387,7 @@ class BenchmarkServiceTest {
                 .thenReturn(List.of(weeklyIndex(LocalDate.of(2026, 1, 5), "100")));
 
         BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(result.points()).isEmpty();
@@ -574,11 +574,11 @@ class BenchmarkServiceTest {
         // IndexPrice.tradeDate는 US 거래일 원본이라 BenchmarkService가 KST로 +1일 보정한다.
         // 투자 시리즈는 그 보정된 KST 날짜(1/6, 1/7, 2/28)에 맞춰 배치한다.
         when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.PORTFOLIO), isNull(),
-                any(), any()))
+                any(), any(), any()))
                 .thenReturn(new InvestmentPointsPort.Result(List.of(
                         point("2026-01-06", "100.00"),
                         point("2026-01-07", "102.00"),
-                        point("2026-02-28", "184.20")), FROM, TO, null));
+                        point("2026-02-28", "184.20")), FROM, TO, null, Currency.USD));
         List<IndexPrice> prices = List.of(
                 new IndexPrice("SPY", LocalDate.of(2026, 1, 5), new BigDecimal("400.00")),
                 new IndexPrice("SPY", LocalDate.of(2026, 1, 6), new BigDecimal("404.00")),
@@ -588,7 +588,7 @@ class BenchmarkServiceTest {
                 new BigDecimal("1365.20"));
 
         BenchmarkComparison result = statsService.getEtfBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, EtfBenchmarkSymbol.SPY, FROM, TO);
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, EtfBenchmarkSymbol.SPY, FROM, TO);
 
         assertThat(result.benchmark().assetType()).isEqualTo(BenchmarkAssetType.ETF);
         assertThat(result.benchmark().symbol()).isEqualTo("SPY");
@@ -624,15 +624,15 @@ class BenchmarkServiceTest {
     void ETF_비교는_to가_없으면_오늘까지_조회한다() {
         LocalDate today = LocalDate.now(FixedClockTestConfig.FIXED);
         when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.PORTFOLIO), isNull(),
-                any(), any()))
+                any(), any(), any()))
                 .thenReturn(new InvestmentPointsPort.Result(
-                        List.of(point(today.toString(), "100.00")), today, today, null));
+                        List.of(point(today.toString(), "100.00")), today, today, null, Currency.USD));
         when(indexPricePort.findBySymbolAndRange(eq("SPY"), any(), any())).thenReturn(List.of());
         when(currentExchangeRatePort.getMidRate()).thenReturn(
                 new BigDecimal("1365.20"));
 
         statsService.getEtfBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, EtfBenchmarkSymbol.SPY, null, null);
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, EtfBenchmarkSymbol.SPY, null, null);
 
         // 매일 갱신되는 데이터라 월 단위 clamp 없이 [effectiveFrom-1일, effectiveTo]를 그대로 조회한다
         verify(indexPricePort).findBySymbolAndRange("SPY", today.minusDays(1), today);
@@ -641,14 +641,14 @@ class BenchmarkServiceTest {
     @Test
     void ETF_가격_데이터가_없으면_INSUFFICIENT_COMMON_MONTHS를_반환한다() {
         when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.PORTFOLIO), isNull(),
-                any(), any()))
+                any(), any(), any()))
                 .thenReturn(new InvestmentPointsPort.Result(List.of(
                         point("2026-01-31", "100.00"),
-                        point("2026-02-28", "184.20")), FROM, TO, null));
+                        point("2026-02-28", "184.20")), FROM, TO, null, Currency.USD));
         when(indexPricePort.findBySymbolAndRange(eq("SPY"), any(), any())).thenReturn(List.of());
 
         BenchmarkComparison result = statsService.getEtfBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, EtfBenchmarkSymbol.SPY, FROM, TO);
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, EtfBenchmarkSymbol.SPY, FROM, TO);
 
         assertThat(result.points()).isEmpty();
         assertThat(result.summary()).isNull();
@@ -658,28 +658,28 @@ class BenchmarkServiceTest {
     @Test
     void ETF_비교도_소유한_개별_전략만_조회하고_전략_메타데이터를_반환한다() {
         when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.STRATEGY), eq(STRATEGY_ID),
-                any(), any()))
+                any(), any(), any()))
                 .thenReturn(new InvestmentPointsPort.Result(List.of(
                         point("2026-01-31", "100.00"),
-                        point("2026-02-28", "110.00")), FROM, TO, STRATEGY));
+                        point("2026-02-28", "110.00")), FROM, TO, STRATEGY, Currency.USD));
         when(indexPricePort.findBySymbolAndRange(eq("QQQ"), any(), any())).thenReturn(spyPrices());
 
         BenchmarkComparison result = statsService.getEtfBenchmarkComparison(
-                USER_ID, BenchmarkScope.STRATEGY, STRATEGY_ID, EtfBenchmarkSymbol.QQQ, FROM, TO);
+                USER_ID, BenchmarkScope.STRATEGY, STRATEGY_ID, Currency.USD, EtfBenchmarkSymbol.QQQ, FROM, TO);
 
         assertThat(result.strategy().id()).isEqualTo(STRATEGY_ID);
         verify(investmentPointsPort).fetch(eq(USER_ID), eq(BenchmarkScope.STRATEGY), eq(STRATEGY_ID),
-                any(), any());
+                any(), any(), any());
     }
 
     @Test
     void ETF_비교도_소유하지_않은_전략은_예외를_그대로_전파한다() {
         when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.STRATEGY), eq(STRATEGY_ID),
-                any(), any()))
+                any(), any(), any()))
                 .thenThrow(new SecurityException("소유하지 않은 계좌입니다"));
 
         assertThatThrownBy(() -> statsService.getEtfBenchmarkComparison(
-                USER_ID, BenchmarkScope.STRATEGY, STRATEGY_ID, EtfBenchmarkSymbol.SPY, FROM, TO))
+                USER_ID, BenchmarkScope.STRATEGY, STRATEGY_ID, Currency.USD, EtfBenchmarkSymbol.SPY, FROM, TO))
                 .isInstanceOf(SecurityException.class);
 
         verifyNoInteractions(indexPricePort);
@@ -688,7 +688,7 @@ class BenchmarkServiceTest {
     @Test
     void ETF_비교도_전략_scope에는_strategyId가_필요하다() {
         assertThatThrownBy(() -> statsService.getEtfBenchmarkComparison(
-                USER_ID, BenchmarkScope.STRATEGY, null, EtfBenchmarkSymbol.SPY, FROM, TO))
+                USER_ID, BenchmarkScope.STRATEGY, null, Currency.USD, EtfBenchmarkSymbol.SPY, FROM, TO))
                 .isInstanceOf(IllegalArgumentException.class);
 
         verifyNoInteractions(investmentPointsPort, housingBenchmarkPricePort, currentExchangeRatePort, indexPricePort);
@@ -704,7 +704,7 @@ class BenchmarkServiceTest {
 
         for (int invocation = 0; invocation < 3; invocation++) {
             BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
-                    USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
+                    USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000",
                     LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
             assertThat(result.currentExchangeRate()).isNull();
             assertThat(result.points()).isNotEmpty();
@@ -722,15 +722,15 @@ class BenchmarkServiceTest {
                 new BigDecimal("1365.20"));
 
         BenchmarkComparison first = statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
         BenchmarkComparison second = statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(second.points()).isEqualTo(first.points());
         // 본체(HTTP+DB) 조회는 캐시 hit이라 1회만 — investmentPointsPort/housingPriceIndexPort 둘 다 검증
-        verify(investmentPointsPort, times(1)).fetch(any(), any(), any(), any(), any());
+        verify(investmentPointsPort, times(1)).fetch(any(), any(), any(), any(), any(), any());
         verify(housingPriceIndexPort, times(1)).findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 anyString(), anyString(), any(), any());
         // 환율은 캐시 대상이 아니라 응답마다 후결합 재조회
@@ -742,16 +742,36 @@ class BenchmarkServiceTest {
         stubWeeklyPortfolioComparison("100.00", "184.20");
         when(currentExchangeRatePort.getMidRate()).thenReturn(new BigDecimal("1365.20"));
 
-        statsService.getHousingBenchmarkComparison(USER_ID, BenchmarkScope.PORTFOLIO, null,
+        statsService.getHousingBenchmarkComparison(USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD,
                 "1100000000", LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
         statsService.invalidateUserCache(UUID.randomUUID()); // 다른 사용자 무효화는 영향 없음
-        statsService.getHousingBenchmarkComparison(USER_ID, BenchmarkScope.PORTFOLIO, null,
+        statsService.getHousingBenchmarkComparison(USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD,
                 "1100000000", LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
         statsService.invalidateUserCache(USER_ID);
-        statsService.getHousingBenchmarkComparison(USER_ID, BenchmarkScope.PORTFOLIO, null,
+        statsService.getHousingBenchmarkComparison(USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD,
                 "1100000000", LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
-        verify(investmentPointsPort, times(2)).fetch(any(), any(), any(), any(), any());
+        verify(investmentPointsPort, times(2)).fetch(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void PORTFOLIO_벤치마크_캐시는_통화별로_분리된다() {
+        LocalDate from = LocalDate.of(2026, 1, 5);
+        LocalDate to = LocalDate.of(2026, 2, 23);
+        when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.PORTFOLIO), isNull(), any(), any(), any()))
+                .thenAnswer(inv -> new InvestmentPointsPort.Result(
+                        List.of(point("2026-01-05", "100.00"), point("2026-02-23", "110.00")), from, to, null, inv.getArgument(3)));
+        when(currentExchangeRatePort.getMidRate()).thenReturn(new BigDecimal("1365.20"));
+
+        BenchmarkComparison usd = statsService.getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000", from, to);
+        BenchmarkComparison usdt = statsService.getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USDT, "1100000000", from, to);
+
+        assertThat(usd.investmentCurrency()).isEqualTo(Currency.USD);
+        assertThat(usdt.investmentCurrency()).isEqualTo(Currency.USDT);
+        verify(investmentPointsPort, times(1)).fetch(any(), any(), any(), eq(Currency.USD), any(), any());
+        verify(investmentPointsPort, times(1)).fetch(any(), any(), any(), eq(Currency.USDT), any(), any());
     }
 
     @Test
@@ -760,13 +780,13 @@ class BenchmarkServiceTest {
         when(currentExchangeRatePort.getMidRate()).thenReturn(
                 new BigDecimal("1365.20"));
 
-        statsService.getHousingBenchmarkComparison(USER_ID, BenchmarkScope.PORTFOLIO, null,
+        statsService.getHousingBenchmarkComparison(USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD,
                 "1100000000", LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
-        statsService.getHousingBenchmarkComparison(USER_ID, BenchmarkScope.PORTFOLIO, null,
+        statsService.getHousingBenchmarkComparison(USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD,
                 "2600000000", LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         // regionCode가 캐시 키에 포함되므로 본체(HTTP+DB)가 각각 다시 조회된다
-        verify(investmentPointsPort, times(2)).fetch(any(), any(), any(), any(), any());
+        verify(investmentPointsPort, times(2)).fetch(any(), any(), any(), any(), any(), any());
         verify(housingPriceIndexPort, times(2)).findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 anyString(), anyString(), any(), any());
     }
@@ -781,7 +801,7 @@ class BenchmarkServiceTest {
                 anyString(), anyString(), any(), any())).thenThrow(boom);
 
         assertThatThrownBy(() -> statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23)))
                 .isSameAs(boom);
     }

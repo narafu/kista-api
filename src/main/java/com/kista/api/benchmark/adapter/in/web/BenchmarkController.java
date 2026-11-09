@@ -9,6 +9,7 @@ import com.kista.api.benchmark.domain.model.BenchmarkAssetType;
 import com.kista.api.benchmark.domain.model.BenchmarkScope;
 import com.kista.api.benchmark.domain.model.EtfBenchmarkSymbol;
 import com.kista.api.benchmark.application.usecase.BenchmarkUseCase;
+import com.kista.shared.kernel.Currency;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -33,13 +34,15 @@ public class BenchmarkController {
     private final BenchmarkUseCase userStats;
 
     @Operation(summary = "벤치마크 비교 (아파트 매매가격지수 · ETF)",
-            description = "USD 투자 성과와 벤치마크(아파트 지역 매매가격지수 또는 SPY/QQQ/QLD/IBIT/ETHA ETF)를 비교합니다. "
-                    + "benchmarkType=ETF면 symbol이 필수이며 regionCode는 무시됩니다.")
+            description = "투자 계좌 통화 기준 성과와 벤치마크(아파트 지역 매매가격지수 또는 SPY/QQQ/QLD/IBIT/ETHA ETF)를 비교합니다. "
+                    + "benchmarkType=ETF면 symbol이 필수이며 regionCode는 무시됩니다. "
+                    + "currency는 PORTFOLIO scope의 합산 통화(생략 시 USD)이며 STRATEGY scope에서는 무시됩니다.")
     @GetMapping("/housing-benchmark")
     public BenchmarkComparisonResponse getHousingBenchmarkComparison(
             @AuthenticationPrincipal UUID userId,
             @RequestParam(defaultValue = "PORTFOLIO") BenchmarkScope scope,
             @RequestParam(required = false) UUID strategyId,
+            @RequestParam(defaultValue = "USD") Currency currency,
             @RequestParam(defaultValue = "HOUSING") BenchmarkAssetType benchmarkType,
             @RequestParam(defaultValue = "1100000000") String regionCode,
             @RequestParam(required = false) EtfBenchmarkSymbol symbol,
@@ -59,14 +62,14 @@ public class BenchmarkController {
                 throw new IllegalArgumentException("ETF 비교에는 심볼이 필요합니다.");
             }
             return BenchmarkComparisonResponse.from(
-                    userStats.getEtfBenchmarkComparison(userId, scope, strategyId, symbol, from, to));
+                    userStats.getEtfBenchmarkComparison(userId, scope, strategyId, currency, symbol, from, to));
         }
         if (regionCode == null || regionCode.isBlank()) {
             throw new IllegalArgumentException("지역 코드는 비어 있을 수 없습니다.");
         }
         return BenchmarkComparisonResponse.from(
                 userStats.getHousingBenchmarkComparison(
-                        userId, scope, strategyId, regionCode, from, to));
+                        userId, scope, strategyId, currency, regionCode, from, to));
     }
 
     @Operation(summary = "KB 지역 5분위 가격 시계열",

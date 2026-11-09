@@ -26,6 +26,7 @@ class BenchmarkComparisonResponseTest {
         BenchmarkComparison comparison = new BenchmarkComparison(
                 BenchmarkScope.PORTFOLIO,
                 null,
+                Currency.USD,
                 new BenchmarkComparison.Benchmark(
                         BenchmarkAssetType.HOUSING, "1100000000", "서울",
                         null, "서울 아파트 매매가격지수", null),
@@ -43,10 +44,32 @@ class BenchmarkComparisonResponseTest {
     }
 
     @Test
+    void PORTFOLIO_USDT는_investmentCurrency를_USDT로_표기한다() {
+        BenchmarkComparison comparison = new BenchmarkComparison(
+                BenchmarkScope.PORTFOLIO,
+                null,
+                Currency.USDT,
+                new BenchmarkComparison.Benchmark(
+                        BenchmarkAssetType.ETF, null, null, "SPY",
+                        "SPY (SPDR S&P 500 ETF Trust)", null),
+                new BenchmarkComparison.Period(null, null, 0),
+                null,
+                List.of(),
+                null,
+                "NO_INVESTMENT_DATA");
+
+        BenchmarkComparisonResponse response = BenchmarkComparisonResponse.from(comparison);
+
+        assertThat(response.quality().investmentCurrency()).isEqualTo("USDT");
+        assertThat(response.quality().notice()).contains("USDT");
+    }
+
+    @Test
     void ETF_비교는_USD_통화와_전용_notice를_반환한다() {
         BenchmarkComparison comparison = new BenchmarkComparison(
                 BenchmarkScope.PORTFOLIO,
                 null,
+                Currency.USD,
                 new BenchmarkComparison.Benchmark(
                         BenchmarkAssetType.ETF, null, null, "SPY",
                         "SPY (SPDR S&P 500 ETF Trust)", null),
@@ -109,6 +132,7 @@ class BenchmarkComparisonResponseTest {
         return new BenchmarkComparison(
                 BenchmarkScope.STRATEGY,
                 new StrategyRef(UUID.randomUUID(), StrategyType.DCA, StrategyTicker.ETH, currency),
+                currency,
                 new BenchmarkComparison.Benchmark(
                         assetType, etf ? null : "1100000000", etf ? null : "서울",
                         etf ? "SPY" : null, "label", null),

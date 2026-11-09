@@ -8,18 +8,20 @@ import com.kista.api.benchmark.domain.model.HousingBenchmarkRegion;
 import com.kista.api.benchmark.domain.model.HousingPriceIndex;
 import com.kista.api.benchmark.domain.model.IndexPrice;
 
+import com.kista.shared.kernel.Currency;
+
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
 public interface BenchmarkUseCase {
     BenchmarkComparison getHousingBenchmarkComparison(
-            UUID userId, BenchmarkScope scope, UUID strategyId,
+            UUID userId, BenchmarkScope scope, UUID strategyId, Currency currency,
             String regionCode, LocalDate from, LocalDate to);
 
     // ETF(SPY/QQQ/QLD/IBIT/ETHA) 벤치마크 비교 — 계산 로직은 getHousingBenchmarkComparison과 공유
     BenchmarkComparison getEtfBenchmarkComparison(
-            UUID userId, BenchmarkScope scope, UUID strategyId,
+            UUID userId, BenchmarkScope scope, UUID strategyId, Currency currency,
             EtfBenchmarkSymbol symbol, LocalDate from, LocalDate to);
 
     // from/to null 허용 (null이면 전체 구간). regionCode null이면 서울 기본값. 투자 데이터와 무관한 원본 시계열

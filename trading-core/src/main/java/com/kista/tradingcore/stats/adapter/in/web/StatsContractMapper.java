@@ -18,8 +18,8 @@ final class StatsContractMapper {
     static InvestmentPointsResponse toResponse(InvestmentPointsResult r) {
         return new InvestmentPointsResponse(
                 r.points().stream().map(StatsContractMapper::toDto).toList(),
-                r.effectiveFrom(), r.effectiveTo(),
-                r.selectedStrategy() == null ? null : toDto(r.selectedStrategy(), r.strategyCurrency()));
+                r.effectiveFrom(), r.effectiveTo(), r.currency(),
+                r.selectedStrategy() == null ? null : toDto(r.selectedStrategy(), r.currency()));
     }
 
     private static InvestmentPointsResponse.InvestmentPointDto toDto(InvestmentPoint p) {

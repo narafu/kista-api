@@ -1,11 +1,14 @@
 package com.kista.api.benchmark.domain.model;
 
+import com.kista.shared.kernel.Currency;
+
 import java.time.LocalDate;
 import java.util.List;
 
 public record BenchmarkComparison(
         BenchmarkScope scope,
         StrategyRef strategy,
+        Currency investmentCurrency, // 투자 통화 — STRATEGY=전략 계좌 통화, PORTFOLIO=요청 통화
         Benchmark benchmark,
         Period period,
         PerformanceComparisonSummary summary,
@@ -26,6 +29,6 @@ public record BenchmarkComparison(
 
     public BenchmarkComparison withCurrentExchangeRate(CurrentExchangeRate rate) {
         return new BenchmarkComparison(
-                scope, strategy, benchmark, period, summary, points, rate, emptyReason);
+                scope, strategy, investmentCurrency, benchmark, period, summary, points, rate, emptyReason);
     }
 }

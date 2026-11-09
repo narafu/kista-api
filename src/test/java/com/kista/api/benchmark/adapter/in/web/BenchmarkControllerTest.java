@@ -1,5 +1,6 @@
 package com.kista.api.benchmark.adapter.in.web;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.api.benchmark.domain.model.*;
 import com.kista.api.benchmark.application.usecase.BenchmarkUseCase;
 import com.kista.api.admin.application.port.output.AppErrorLogPort;
@@ -42,7 +43,7 @@ class BenchmarkControllerTest {
     @Test
     void 아파트_벤치마크_비교를_기본값과_통화_기준으로_반환한다() throws Exception {
         when(userStats.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000", null, null))
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000", null, null))
                 .thenReturn(comparison(new CurrentExchangeRate(
                         new BigDecimal("1365.20"), Instant.parse("2026-07-19T01:30:00Z"), "TOSS_INVEST")));
 
@@ -71,7 +72,7 @@ class BenchmarkControllerTest {
     @Test
     void 현재_환율이_없어도_명시적_null과_함께_200을_반환한다() throws Exception {
         when(userStats.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000", null, null))
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000", null, null))
                 .thenReturn(comparison(null));
 
         mockMvc.perform(get("/api/stats/housing-benchmark").with(authentication(auth())))
@@ -107,7 +108,7 @@ class BenchmarkControllerTest {
         LocalDate from = LocalDate.of(2021, 7, 1);
         LocalDate to = LocalDate.of(2026, 7, 1);
         when(userStats.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.STRATEGY, strategyId, "2600000000", from, to))
+                USER_ID, BenchmarkScope.STRATEGY, strategyId, Currency.USD, "2600000000", from, to))
                 .thenReturn(comparison(null));
 
         mockMvc.perform(get("/api/stats/housing-benchmark")
@@ -120,13 +121,33 @@ class BenchmarkControllerTest {
                 .andExpect(status().isOk());
 
         verify(userStats).getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.STRATEGY, strategyId, "2600000000", from, to);
+                USER_ID, BenchmarkScope.STRATEGY, strategyId, Currency.USD, "2600000000", from, to);
+    }
+
+    @Test
+    void currency_생략시_USD를_전달하고_지정하면_그대로_전달한다() throws Exception {
+        when(userStats.getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000", null, null))
+                .thenReturn(comparison(null));
+        when(userStats.getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USDT, "1100000000", null, null))
+                .thenReturn(comparison(null));
+
+        mockMvc.perform(get("/api/stats/housing-benchmark").with(authentication(auth())))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/stats/housing-benchmark").param("currency", "USDT").with(authentication(auth())))
+                .andExpect(status().isOk());
+
+        verify(userStats).getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000", null, null);
+        verify(userStats).getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USDT, "1100000000", null, null);
     }
 
     @Test
     void ETF_벤치마크_비교를_반환한다() throws Exception {
         when(userStats.getEtfBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, EtfBenchmarkSymbol.QLD, null, null))
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, EtfBenchmarkSymbol.QLD, null, null))
                 .thenReturn(etfComparison());
 
         mockMvc.perform(get("/api/stats/housing-benchmark")
@@ -153,7 +174,7 @@ class BenchmarkControllerTest {
     @Test
     void benchmarkType_생략시_기존_HOUSING_동작을_그대로_따른다() throws Exception {
         when(userStats.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000", null, null))
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000", null, null))
                 .thenReturn(comparison(null));
 
         mockMvc.perform(get("/api/stats/housing-benchmark").with(authentication(auth())))
@@ -161,13 +182,14 @@ class BenchmarkControllerTest {
                 .andExpect(jsonPath("$.benchmark.assetType").value("HOUSING"));
 
         verify(userStats).getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000", null, null);
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000", null, null);
     }
 
     private static BenchmarkComparison etfComparison() {
         return new BenchmarkComparison(
                 BenchmarkScope.PORTFOLIO,
                 null,
+                Currency.USD,
                 new BenchmarkComparison.Benchmark(
                         BenchmarkAssetType.ETF, null, null, "QLD",
                         "QLD (ProShares Ultra QQQ (2x 레버리지))", LocalDate.of(2026, 7, 18)),
@@ -320,6 +342,7 @@ class BenchmarkControllerTest {
         return new BenchmarkComparison(
                 BenchmarkScope.PORTFOLIO,
                 null,
+                Currency.USD,
                 new BenchmarkComparison.Benchmark(
                         BenchmarkAssetType.HOUSING, "1100000000", "서울", null,
                         "서울 아파트 매매가격지수", LocalDate.of(2026, 6, 15)),

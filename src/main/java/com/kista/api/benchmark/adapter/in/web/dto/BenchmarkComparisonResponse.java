@@ -95,8 +95,7 @@ public record BenchmarkComparisonResponse(
         BenchmarkComparison.Period period = comparison.period();
         var rate = comparison.currentExchangeRate();
         boolean isEtf = benchmark.assetType() == BenchmarkAssetType.ETF;
-        // 투자 통화 — STRATEGY는 전략 계좌 통화, PORTFOLIO는 USD 계좌만 합산하므로 USD
-        Currency investmentCurrency = strategy == null ? Currency.USD : strategy.currency();
+        Currency investmentCurrency = comparison.investmentCurrency(); // STRATEGY=전략 계좌 통화, PORTFOLIO=요청 통화
         return new BenchmarkComparisonResponse(
                 comparison.scope().name(),
                 strategy == null ? null : new StrategyInfo(

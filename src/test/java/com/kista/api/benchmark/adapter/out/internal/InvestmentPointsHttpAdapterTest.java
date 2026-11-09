@@ -43,12 +43,12 @@ class InvestmentPointsHttpAdapterTest {
                 .code(200)
                 .addHeader("Content-Type", "application/json")
                 .body("""
-                    {"points":[],"effectiveFrom":"2026-01-01","effectiveTo":"2026-09-01","selectedStrategy":null}
+                    {"points":[],"effectiveFrom":"2026-01-01","effectiveTo":"2026-09-01","currency":"USD","selectedStrategy":null}
                     """)
                 .build());
 
         InvestmentPointsPort.Result result = adapter.fetch(
-                UUID.randomUUID(), BenchmarkScope.PORTFOLIO, null,
+                UUID.randomUUID(), BenchmarkScope.PORTFOLIO, null, com.kista.shared.kernel.Currency.USD,
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1));
 
         assertThat(result.effectiveFrom()).isEqualTo(LocalDate.of(2026, 1, 1));
@@ -66,14 +66,14 @@ class InvestmentPointsHttpAdapterTest {
                 .addHeader("Content-Type", "application/json")
                 .body("""
                     {"points":[{"baseDate":"2026-01-05","investmentIndex":100.1234567890,"periodReturn":0.0012345678}],
-                     "effectiveFrom":"2026-01-05","effectiveTo":"2026-02-23",
+                     "effectiveFrom":"2026-01-05","effectiveTo":"2026-02-23","currency":"USD",
                      "selectedStrategy":{"id":"%s","accountId":"%s","type":"INFINITE","status":"ACTIVE",
                      "ticker":"SOXL","cycleSeedType":"NONE","currency":"USD"}}
                     """.formatted(strategyId, accountId))
                 .build());
 
         InvestmentPointsPort.Result result = adapter.fetch(
-                UUID.randomUUID(), BenchmarkScope.STRATEGY, strategyId,
+                UUID.randomUUID(), BenchmarkScope.STRATEGY, strategyId, com.kista.shared.kernel.Currency.USD,
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         StrategyRef expected = new StrategyRef(strategyId,
@@ -96,20 +96,22 @@ class InvestmentPointsHttpAdapterTest {
                 .code(200)
                 .addHeader("Content-Type", "application/json")
                 .body("""
-                    {"points":[],"effectiveFrom":"2026-01-01","effectiveTo":"2026-09-01","selectedStrategy":null}
+                    {"points":[],"effectiveFrom":"2026-01-01","effectiveTo":"2026-09-01","currency":"USD","selectedStrategy":null}
                     """)
                 .build());
         UUID userId = UUID.randomUUID();
         UUID strategyId = UUID.randomUUID();
 
-        adapter.fetch(userId, BenchmarkScope.STRATEGY, strategyId,
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1));
+        InvestmentPointsPort.Result result = adapter.fetch(userId, BenchmarkScope.STRATEGY, strategyId,
+                com.kista.shared.kernel.Currency.USDT, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1));
 
         RecordedRequest recorded = server.takeRequest();
         assertThat(recorded.getTarget()).contains("/api/internal/trading/stats/investment-points");
         assertThat(recorded.getTarget()).contains("userId=" + userId);
         assertThat(recorded.getTarget()).contains("scope=STRATEGY");
         assertThat(recorded.getTarget()).contains("strategyId=" + strategyId);
+        assertThat(recorded.getTarget()).contains("currency=USDT");
+        assertThat(result.currency()).isEqualTo(com.kista.shared.kernel.Currency.USD); // 응답 currency를 그대로 매핑
         assertThat(recorded.getTarget()).doesNotContain("granularity");
     }
 
@@ -122,7 +124,7 @@ class InvestmentPointsHttpAdapterTest {
         server.enqueue(new MockResponse.Builder().code(403).build());
 
         assertThatThrownBy(() -> adapter.fetch(
-                UUID.randomUUID(), BenchmarkScope.STRATEGY, UUID.randomUUID(),
+                UUID.randomUUID(), BenchmarkScope.STRATEGY, UUID.randomUUID(), com.kista.shared.kernel.Currency.USD,
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1)))
                 .isInstanceOf(SecurityException.class);
     }
@@ -132,7 +134,7 @@ class InvestmentPointsHttpAdapterTest {
         server.enqueue(new MockResponse.Builder().code(404).build());
 
         assertThatThrownBy(() -> adapter.fetch(
-                UUID.randomUUID(), BenchmarkScope.STRATEGY, UUID.randomUUID(),
+                UUID.randomUUID(), BenchmarkScope.STRATEGY, UUID.randomUUID(), com.kista.shared.kernel.Currency.USD,
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1)))
                 .isInstanceOf(NoSuchElementException.class);
     }
@@ -142,7 +144,7 @@ class InvestmentPointsHttpAdapterTest {
         server.enqueue(new MockResponse.Builder().code(400).build());
 
         assertThatThrownBy(() -> adapter.fetch(
-                UUID.randomUUID(), BenchmarkScope.PORTFOLIO, null,
+                UUID.randomUUID(), BenchmarkScope.PORTFOLIO, null, com.kista.shared.kernel.Currency.USD,
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1)))
                 .isInstanceOf(IllegalArgumentException.class);
     }

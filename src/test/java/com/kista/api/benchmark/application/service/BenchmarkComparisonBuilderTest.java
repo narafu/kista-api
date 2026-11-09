@@ -1,5 +1,6 @@
 package com.kista.api.benchmark.application.service;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.api.benchmark.domain.model.BenchmarkAssetType;
 import com.kista.api.benchmark.domain.model.BenchmarkScope;
 import com.kista.api.benchmark.domain.model.BenchmarkComparison;
@@ -41,7 +42,7 @@ class BenchmarkComparisonBuilderTest {
         Map<LocalDate, BigDecimal> benchmarkPrices = prices(d1, "100", d2, "121");
 
         BenchmarkComparison result = builder.build(
-                BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices);
+                BenchmarkScope.PORTFOLIO, null, Currency.USD, BENCHMARK, investmentPoints, benchmarkPrices);
 
         assertThat(result.points().getLast().investmentPeriodReturn()).isEqualByComparingTo("0.1");
         assertThat(result.points().getLast().benchmarkPeriodReturn()).isEqualByComparingTo("0.21");
@@ -56,7 +57,7 @@ class BenchmarkComparisonBuilderTest {
         Map<LocalDate, BigDecimal> benchmarkPrices = prices(d1, "100", d2, "102");
 
         BenchmarkComparison result = builder.build(
-                BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices);
+                BenchmarkScope.PORTFOLIO, null, Currency.USD, BENCHMARK, investmentPoints, benchmarkPrices);
 
         assertThat(result.emptyReason()).isNull();
         assertThat(result.summary()).isNotNull();
@@ -71,7 +72,7 @@ class BenchmarkComparisonBuilderTest {
         Map<LocalDate, BigDecimal> benchmarkPrices = prices(d1, "100", d2, "102");
 
         BenchmarkComparison result = builder.build(
-                BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices);
+                BenchmarkScope.PORTFOLIO, null, Currency.USD, BENCHMARK, investmentPoints, benchmarkPrices);
 
         assertThat(result.summary().investmentAnnualizedReturn()).isNull();
         assertThat(result.summary().benchmarkAnnualizedReturn()).isNull();
@@ -86,7 +87,7 @@ class BenchmarkComparisonBuilderTest {
         Map<LocalDate, BigDecimal> benchmarkPrices = prices(d1, "100", d2, "400");
 
         BenchmarkComparison result = builder.build(
-                BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices);
+                BenchmarkScope.PORTFOLIO, null, Currency.USD, BENCHMARK, investmentPoints, benchmarkPrices);
 
         assertThat(result.summary().investmentAnnualizedReturn()).isCloseTo(
                 BigDecimal.valueOf(Math.pow(1.842, 365.0 / 365.0) - 1.0),
@@ -99,10 +100,24 @@ class BenchmarkComparisonBuilderTest {
         LocalDate d1 = LocalDate.of(2026, 1, 5);
         LocalDate d2 = LocalDate.of(2026, 5, 4);
         BenchmarkComparison result = builder.build(
-                BenchmarkScope.PORTFOLIO, null, BENCHMARK,
+                BenchmarkScope.PORTFOLIO, null, Currency.USD, BENCHMARK,
                 List.of(point(d1, "100"), point(d2, "184.2")), prices(d1, "100", d2, "400"));
 
         assertThat(result.summary().investmentAnnualizedReturn()).isNull();
         assertThat(result.summary().benchmarkAnnualizedReturn()).isNull();
+    }
+
+    @Test
+    void 빈_결과도_투자_통화를_싣는다() {
+        BenchmarkComparison noData = builder.build(
+                BenchmarkScope.PORTFOLIO, null, Currency.USDT, BENCHMARK, List.of(), Map.of());
+        LocalDate d1 = LocalDate.of(2026, 1, 5);
+        BenchmarkComparison insufficient = builder.build(
+                BenchmarkScope.PORTFOLIO, null, Currency.USDT, BENCHMARK, List.of(point(d1, "100")), prices(d1, "100", d1, "100"));
+
+        assertThat(noData.emptyReason()).isEqualTo("NO_INVESTMENT_DATA");
+        assertThat(noData.investmentCurrency()).isEqualTo(Currency.USDT);
+        assertThat(insufficient.emptyReason()).isEqualTo("INSUFFICIENT_COMMON_MONTHS");
+        assertThat(insufficient.investmentCurrency()).isEqualTo(Currency.USDT);
     }
 }

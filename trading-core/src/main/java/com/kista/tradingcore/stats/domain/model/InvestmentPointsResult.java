@@ -14,5 +14,5 @@ public record InvestmentPointsResult(
         LocalDate effectiveFrom,
         LocalDate effectiveTo,
         Strategy selectedStrategy,
-        Currency strategyCurrency    // 선택 전략 계좌 통화(Broker.getCurrency) — PORTFOLIO면 null
+        Currency currency            // STRATEGY=전략 계좌 통화(Broker.getCurrency), PORTFOLIO=요청 통화
 ) {}

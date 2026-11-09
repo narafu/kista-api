@@ -7,6 +7,8 @@ import com.kista.api.benchmark.domain.model.InvestmentPoint;
 import com.kista.api.benchmark.domain.model.PerformanceComparisonSummary;
 import com.kista.api.benchmark.domain.model.StrategyRef;
 
+import com.kista.shared.kernel.Currency;
+
 import static com.kista.shared.kernel.ReturnMetrics.annualizedReturn;
 import static com.kista.shared.kernel.ReturnMetrics.cumulativeReturn;
 import static com.kista.shared.kernel.ReturnMetrics.maxDrawdown;
@@ -33,11 +35,12 @@ final class BenchmarkComparisonBuilder {
     BenchmarkComparison build(
             BenchmarkScope scope,
             StrategyRef strategy,
+            Currency investmentCurrency,
             BenchmarkComparison.Benchmark benchmark,
             List<InvestmentPoint> investmentPoints,
             Map<LocalDate, BigDecimal> benchmarkPrices) {
         if (investmentPoints.isEmpty()) {
-            return empty(scope, strategy, benchmark, "NO_INVESTMENT_DATA");
+            return empty(scope, strategy, investmentCurrency, benchmark, "NO_INVESTMENT_DATA");
         }
 
         Map<LocalDate, InvestmentPoint> investmentByDate = investmentPoints.stream()
@@ -50,14 +53,14 @@ final class BenchmarkComparisonBuilder {
                 .collect(Collectors.toSet()));
 
         if (commonDates.size() < 2) {
-            return empty(scope, strategy, benchmark, "INSUFFICIENT_COMMON_MONTHS");
+            return empty(scope, strategy, investmentCurrency, benchmark, "INSUFFICIENT_COMMON_MONTHS");
         }
 
         LocalDate firstDate = commonDates.getFirst();
         BigDecimal firstInvestmentIndex = investmentByDate.get(firstDate).investmentIndex();
         BigDecimal firstBenchmarkPrice = benchmarkPrices.get(firstDate);
         if (firstInvestmentIndex == null || firstInvestmentIndex.signum() <= 0) {
-            return empty(scope, strategy, benchmark, "INSUFFICIENT_COMMON_MONTHS");
+            return empty(scope, strategy, investmentCurrency, benchmark, "INSUFFICIENT_COMMON_MONTHS");
         }
 
         List<BenchmarkPoint> points = new ArrayList<>();
@@ -101,6 +104,7 @@ final class BenchmarkComparisonBuilder {
         return new BenchmarkComparison(
                 scope,
                 strategy,
+                investmentCurrency,
                 benchmark,
                 new BenchmarkComparison.Period(
                         firstDate, points.getLast().baseDate(), points.size()),
@@ -113,10 +117,11 @@ final class BenchmarkComparisonBuilder {
     private static BenchmarkComparison empty(
             BenchmarkScope scope,
             StrategyRef strategy,
+            Currency investmentCurrency,
             BenchmarkComparison.Benchmark benchmark,
             String reason) {
         return new BenchmarkComparison(
-                scope, strategy, benchmark,
+                scope, strategy, investmentCurrency, benchmark,
                 new BenchmarkComparison.Period(null, null, 0),
                 null, List.of(), null, reason);
     }

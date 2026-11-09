@@ -43,21 +43,21 @@ class InvestmentPointsQueryService implements InvestmentPointsQuery {
     // 원본 BenchmarkService.buildInvestmentContext(private)를 그대로 이식 — 소유권 검증까지
     // 이 메서드가 담당하므로(authorizeIfStrategyScope 대체) api 쪽은 사전검증을 하지 않는다.
     @Override
-    public InvestmentPointsResult fetch(UUID userId, Scope scope, UUID strategyId,
+    public InvestmentPointsResult fetch(UUID userId, Scope scope, UUID strategyId, Currency currency,
                                         LocalDate from, LocalDate to) {
         LocalDate effectiveTo = to != null ? to : LocalDate.now(clock);
         Strategy selectedStrategy = null;
-        Currency strategyCurrency = null;
+        Currency resultCurrency = currency;
         List<Strategy> strategies;
         if (scope == Scope.STRATEGY) {
             selectedStrategy = strategyPort.findByIdOrThrow(strategyId);
             // 소유 검증으로 읽은 계좌의 통화 — 벤치마크가 투자 통화 표기에 쓴다
-            strategyCurrency = accountPort.requireOwnedAccount(selectedStrategy.accountId(), userId).broker().getCurrency();
+            resultCurrency = accountPort.requireOwnedAccount(selectedStrategy.accountId(), userId).broker().getCurrency();
             strategies = List.of(selectedStrategy);
         } else {
             List<UUID> accountIds = accountPort.findByUserId(userId).stream()
-                    // 포트폴리오 합산은 통화 구분이 없어 크립토(KRW) 계좌를 뺀다 — 주식 USD와 섞이면 지수가 깨진다(후속: 통화별 분리)
-                    .filter(a -> a.broker() != Broker.MOCK && a.broker().getCurrency() == Currency.USD)
+                    // 포트폴리오 합산은 통화별로 분리한다 — 요청 통화 계좌만(MOCK 제외)
+                    .filter(a -> a.broker() != Broker.MOCK && a.broker().getCurrency() == currency)
                     .map(Account::id)
                     .toList();
             strategies = accountIds.isEmpty() ? List.of() : strategyPort.findByAccountIds(accountIds).values().stream()
@@ -84,6 +84,6 @@ class InvestmentPointsQueryService implements InvestmentPointsQuery {
         List<InvestmentPoint> investmentPoints = investmentIndexCalculator.calculate(
                 cycles, positions, events, effectiveFrom, effectiveTo);
 
-        return new InvestmentPointsResult(investmentPoints, effectiveFrom, effectiveTo, selectedStrategy, strategyCurrency);
+        return new InvestmentPointsResult(investmentPoints, effectiveFrom, effectiveTo, selectedStrategy, resultCurrency);
     }
 }

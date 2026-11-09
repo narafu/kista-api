@@ -1,6 +1,7 @@
 package com.kista.api.benchmark.application.service;
 
 import com.kista.shared.platform.cache.TtlResultCache;
+import com.kista.shared.kernel.Currency;
 import com.kista.api.benchmark.domain.model.*;
 import com.kista.api.benchmark.application.usecase.BenchmarkUseCase;
 import com.kista.api.benchmark.application.port.output.*;
@@ -49,7 +50,7 @@ class BenchmarkService implements BenchmarkUseCase {
 
     // 벤치마크 비교 캐시 키 — HOUSING(regionCode 사용, symbol=null) / ETF(symbol 사용, regionCode=null) 공용
     private record BenchmarkComparisonKey(
-            UUID userId, BenchmarkAssetType assetType, BenchmarkScope scope, UUID strategyId,
+            UUID userId, BenchmarkAssetType assetType, BenchmarkScope scope, UUID strategyId, Currency currency,
             String regionCode, String symbol, LocalDate from, LocalDate to) {}
 
     @Override
@@ -59,19 +60,19 @@ class BenchmarkService implements BenchmarkUseCase {
 
     @Override
     public BenchmarkComparison getHousingBenchmarkComparison(
-            UUID userId, BenchmarkScope scope, UUID strategyId,
+            UUID userId, BenchmarkScope scope, UUID strategyId, Currency currency,
             String regionCode, LocalDate from, LocalDate to) {
         validateComparisonRequest(scope, strategyId, regionCode, from, to);
         BenchmarkComparisonKey key = new BenchmarkComparisonKey(
-                userId, BenchmarkAssetType.HOUSING, scope, strategyId, regionCode, null, from, to);
+                userId, BenchmarkAssetType.HOUSING, scope, strategyId, currency, regionCode, null, from, to);
         return comparisonWithExchangeRate(key,
-                () -> computeHousingComparisonBody(userId, scope, strategyId, regionCode, from, to));
+                () -> computeHousingComparisonBody(userId, scope, strategyId, currency, regionCode, from, to));
     }
 
     private BenchmarkComparison computeHousingComparisonBody(
-            UUID userId, BenchmarkScope scope, UUID strategyId, String regionCode, LocalDate from, LocalDate to) {
+            UUID userId, BenchmarkScope scope, UUID strategyId, Currency currency, String regionCode, LocalDate from, LocalDate to) {
         InvestmentPointsPort.Result ctx = investmentPointsPort.fetch(
-                userId, scope, strategyId, from, effectiveTo(to));
+                userId, scope, strategyId, currency, from, effectiveTo(to));
 
         List<HousingPriceIndex> indexRows = housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX, regionCode,
@@ -108,25 +109,25 @@ class BenchmarkService implements BenchmarkUseCase {
                 (regionName != null ? regionName : regionCode) + " 아파트 매매가격지수", sourceUpdatedDate);
 
         return comparisonBuilder.build(
-                scope, ctx.selectedStrategy(), benchmark, snappedPoints, indexByDate);
+                scope, ctx.selectedStrategy(), ctx.currency(), benchmark, snappedPoints, indexByDate);
     }
 
     @Override
     public BenchmarkComparison getEtfBenchmarkComparison(
-            UUID userId, BenchmarkScope scope, UUID strategyId,
+            UUID userId, BenchmarkScope scope, UUID strategyId, Currency currency,
             EtfBenchmarkSymbol symbol, LocalDate from, LocalDate to) {
         // 데이터 조회 전 fast-fail — 검증 로직·예외 타입은 HOUSING과 동일하게 재사용
         validateScopeAndRange(scope, strategyId, from, to);
         BenchmarkComparisonKey key = new BenchmarkComparisonKey(
-                userId, BenchmarkAssetType.ETF, scope, strategyId, null, symbol.name(), from, to);
+                userId, BenchmarkAssetType.ETF, scope, strategyId, currency, null, symbol.name(), from, to);
         return comparisonWithExchangeRate(key,
-                () -> computeEtfComparisonBody(userId, scope, strategyId, symbol, from, to));
+                () -> computeEtfComparisonBody(userId, scope, strategyId, currency, symbol, from, to));
     }
 
     private BenchmarkComparison computeEtfComparisonBody(
-            UUID userId, BenchmarkScope scope, UUID strategyId, EtfBenchmarkSymbol symbol, LocalDate from, LocalDate to) {
+            UUID userId, BenchmarkScope scope, UUID strategyId, Currency currency, EtfBenchmarkSymbol symbol, LocalDate from, LocalDate to) {
         InvestmentPointsPort.Result ctx = investmentPointsPort.fetch(
-                userId, scope, strategyId, from, effectiveTo(to));
+                userId, scope, strategyId, currency, from, effectiveTo(to));
 
         // ETF는 다운샘플링 없이 거래일별 종가를 그대로 벤치마크 가격으로 사용한다.
         // IndexPrice.tradeDate는 US 거래일 원본(KST 변환은 소비처 책임 — IndexPrice 문서 참고) —
@@ -145,7 +146,7 @@ class BenchmarkService implements BenchmarkUseCase {
                 BenchmarkAssetType.ETF, null, null, symbol.name(),
                 symbol.name() + " (" + symbol.description() + ")", sourceUpdatedDate);
 
-        return comparisonBuilder.build(scope, ctx.selectedStrategy(), benchmark, ctx.points(), prices);
+        return comparisonBuilder.build(scope, ctx.selectedStrategy(), ctx.currency(), benchmark, ctx.points(), prices);
     }
 
     // 본체(캐시 대상)를 먼저 구한 뒤 환율을 후결합 — 본체 실패(소유권 등) 시 환율 조회를 하지 않는다

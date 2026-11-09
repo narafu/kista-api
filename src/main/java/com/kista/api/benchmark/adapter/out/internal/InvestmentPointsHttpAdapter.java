@@ -7,6 +7,7 @@ import com.kista.api.benchmark.application.port.output.InvestmentPointsPort;
 import com.kista.api.benchmark.domain.model.BenchmarkScope;
 import com.kista.api.benchmark.domain.model.InvestmentPoint;
 import com.kista.api.benchmark.domain.model.StrategyRef;
+import com.kista.shared.kernel.Currency;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -23,11 +24,12 @@ class InvestmentPointsHttpAdapter implements InvestmentPointsPort {
     private final RestClient internalApiRestClient;
 
     @Override
-    public Result fetch(UUID userId, BenchmarkScope scope, UUID strategyId, LocalDate from, LocalDate to) {
+    public Result fetch(UUID userId, BenchmarkScope scope, UUID strategyId, Currency currency, LocalDate from, LocalDate to) {
         RestClient.ResponseSpec spec = internalApiRestClient.get()
                 .uri(uriBuilder -> uriBuilder.path("/api/internal/trading/stats/investment-points")
                         .queryParam("userId", userId)
                         .queryParam("scope", scope)
+                        .queryParam("currency", currency)
                         .queryParamIfPresent("strategyId", Optional.ofNullable(strategyId))
                         .queryParamIfPresent("from", Optional.ofNullable(from))
                         .queryParamIfPresent("to", Optional.ofNullable(to))
@@ -56,6 +58,6 @@ class InvestmentPointsHttpAdapter implements InvestmentPointsPort {
         StrategyRef strategy = r.selectedStrategy() == null ? null
                 : new StrategyRef(r.selectedStrategy().id(), r.selectedStrategy().type(), r.selectedStrategy().ticker(),
                         r.selectedStrategy().currency());
-        return new Result(points, r.effectiveFrom(), r.effectiveTo(), strategy);
+        return new Result(points, r.effectiveFrom(), r.effectiveTo(), strategy, r.currency());
     }
 }
