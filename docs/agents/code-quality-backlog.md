@@ -648,6 +648,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | stats 서비스 `to` null → today 인라인 | `AccountStatisticsService`·`TradingStatsService`·`InvestmentPointsQueryService` 등 | CQ-04에서 null 기본값을 호출부에 남기기로 했다(CQ-17 Clock 주입과 충돌 방지). |
 | stats 어댑터 빈 응답 → 빈 결과 | `BinanceMarketDataAdapter` 롱숏, `FrankfurterFxRateAdapter`, `UpbitMarketDataAdapter.getKrwPrices` | 소비처가 모두 `tryGet`이고 다음 단계(`LongShortRatio.of` 등)가 빈 값을 실패로 바꾼다. 미결제약정만 가드가 없어 CQ-43에서 고쳤다. |
 | 엔티티 저장 패턴 두 갈래(`findOrCreate` vs `new`+`setId`) | `StrategyCyclePersistenceAdapter:120`, `CyclePositionPersistenceAdapter:234`, `CycleCapitalEventPersistenceAdapter:38` vs `findOrCreate` 6곳 | 현재 호출처가 모두 id=null 신규 저장이라 merge 덮어쓰기가 일어나지 않는다. update 경로가 생기면 재검토한다(trading 감사 2026-11-08). |
+| `getStrategyOrders` 기간 기본값(컨트롤러)·size 상한 100(DCA 서비스)/200(history·dashboard·stats 컨트롤러) 불통일 | `TradingCycleController:264-269`, `DcaExecutionQueryService:43`, `DashboardController:45`, `TradingStatsController:60` | kista-ui `StrategyOrderHistory`의 '전체' 프리셋이 from/to 없이 호출해 서버 기본 30일에 의존한다(`entities/order/api/index.ts:122`, `shared/lib/date-range.ts` `resolveRange('all')={}`). 기본값을 서비스로 옮겨도 동작은 같지만 이득이 없다. size는 UI가 최대 100(`PageSizeSelector`)·history 기본 50만 쓰지만, 200은 컨트롤러 3곳의 관례라 DCA만 다른 모양이다 — 통일은 API 계약(200→100)을 바꾸고 얻는 게 없다. |
 
 ### CQ-39 PRIVACY 전략 원장 변화와 체결 주문 합이 어긋남
 - 주제: 원장 정합성 조사. 유형: 불일치(원인 미확정). 위험: 중간.
@@ -813,7 +814,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - stale 주석: `TradingExecutionUseCase.executeManually`("INFINITE 전용", 실제는 DCA만 거부), `StrategyCreationRequest`(변환 주체).
   - 문서: 스트림 컨슈머 복구 `@Scheduled`가 `adapter/in/redis`에 있다(`UserEventStreamConsumer:63`, root 2곳 동형, `RedisStreamSubscriber` 설계). `constraints.md`에 예외를 한 줄 추가한다.
 - 가드: 없음.
-- 상태: done(d6e89b7fa). 미처리: `CancelledOrderFillRecorder` 바깥 try/catch(람다 안 `OrderFill` 생성이 던질 수 있어 도달 불가 아님, 지우면 동작 변경)·`getStrategyOrders` 기간 기본값 서비스 이동·size 상한 100/200 통일·`findPlannedOrPlaced*` 포트 이름(주석만 정정).
+- 상태: done(d6e89b7fa). 미처리: `CancelledOrderFillRecorder` 바깥 try/catch(람다 안 `OrderFill` 생성이 던질 수 있어 도달 불가 아님, 지우면 동작 변경)·`findPlannedOrPlaced*` 포트 이름(주석만 정정). `getStrategyOrders` 기간 기본값·size 상한 100/200 통일은 UI가 기본 기간에 의존해 유지 목록으로 옮겼다(2026-11-09). `CloseReportScope.inReportWindow` 세 분기 단위 테스트를 추가했다.
 
 ### CQ-57 정책 설정 JSON 섹션 누락 시 NPE
 - 주제: 누락 가드. 위험: 낮음.
