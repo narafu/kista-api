@@ -51,7 +51,7 @@ class TradingStatsInternalControllerTest {
     @Test
     void 투자_성과_시리즈를_조회한다() throws Exception {
         InvestmentPointsResult response = new InvestmentPointsResult(
-                List.of(), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1), null);
+                List.of(), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1), null, null);
         given(investmentPointsQuery.fetch(eq(USER_ID), eq(InvestmentPointsQuery.Scope.PORTFOLIO),
                 isNull(), any(), any()))
                 .willReturn(response);
@@ -74,7 +74,7 @@ class TradingStatsInternalControllerTest {
         given(investmentPointsQuery.fetch(eq(USER_ID), eq(InvestmentPointsQuery.Scope.PORTFOLIO),
                 isNull(), isNull(), isNull()))
                 .willReturn(new InvestmentPointsResult(
-                        List.of(), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1), null));
+                        List.of(), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1), null, null));
 
         mockMvc.perform(get("/api/internal/trading/stats/investment-points")
                         .header("X-Internal-Token", VALID_TOKEN)

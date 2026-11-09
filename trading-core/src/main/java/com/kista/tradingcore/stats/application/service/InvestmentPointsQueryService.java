@@ -47,10 +47,12 @@ class InvestmentPointsQueryService implements InvestmentPointsQuery {
                                         LocalDate from, LocalDate to) {
         LocalDate effectiveTo = to != null ? to : LocalDate.now(clock);
         Strategy selectedStrategy = null;
+        Currency strategyCurrency = null;
         List<Strategy> strategies;
         if (scope == Scope.STRATEGY) {
             selectedStrategy = strategyPort.findByIdOrThrow(strategyId);
-            accountPort.requireOwnedAccount(selectedStrategy.accountId(), userId);
+            // 소유 검증으로 읽은 계좌의 통화 — 벤치마크가 투자 통화 표기에 쓴다
+            strategyCurrency = accountPort.requireOwnedAccount(selectedStrategy.accountId(), userId).broker().getCurrency();
             strategies = List.of(selectedStrategy);
         } else {
             List<UUID> accountIds = accountPort.findByUserId(userId).stream()
@@ -82,6 +84,6 @@ class InvestmentPointsQueryService implements InvestmentPointsQuery {
         List<InvestmentPoint> investmentPoints = investmentIndexCalculator.calculate(
                 cycles, positions, events, effectiveFrom, effectiveTo);
 
-        return new InvestmentPointsResult(investmentPoints, effectiveFrom, effectiveTo, selectedStrategy);
+        return new InvestmentPointsResult(investmentPoints, effectiveFrom, effectiveTo, selectedStrategy, strategyCurrency);
     }
 }

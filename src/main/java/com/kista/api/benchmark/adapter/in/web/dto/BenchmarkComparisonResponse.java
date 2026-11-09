@@ -6,6 +6,7 @@ import com.kista.api.benchmark.domain.model.BenchmarkComparison;
 import com.kista.api.benchmark.domain.model.BenchmarkPoint;
 import com.kista.api.benchmark.domain.model.PerformanceComparisonSummary;
 import com.kista.api.benchmark.domain.model.StrategyRef;
+import com.kista.shared.kernel.Currency;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -32,11 +33,8 @@ public record BenchmarkComparisonResponse(
         @JsonInclude(JsonInclude.Include.NON_NULL)
         @Schema(types = {"string", "null"}) String emptyReason
 ) {
-    private static final String HOUSING_NOTICE =
-            "전략 운용 기록 기반 근사치입니다. 투자 성과는 USD, 아파트 매매가격지수는 KRW 현지 통화 기준이며 현재 환율은 성과 계산에 반영하지 않습니다. "
-                    + "벤치마크 시점은 KB Land 주간 조사일(매주 월요일) 기준입니다.";
-    private static final String ETF_NOTICE =
-            "전략 운용 기록 기반 근사치입니다. 투자와 ETF 벤치마크 모두 USD 기준이며 환율 변수가 없습니다.";
+    private static final String NOTICE_PREFIX = "전략 운용 기록 기반 근사치입니다. ";
+    private static final String HOUSING_SURVEY_NOTICE = "벤치마크 시점은 KB Land 주간 조사일(매주 월요일) 기준입니다.";
 
     @Schema(name = "HousingBenchmarkStrategyInfo")
     public record StrategyInfo(UUID id, String type, String ticker) {}
@@ -73,7 +71,7 @@ public record BenchmarkComparisonResponse(
     @Schema(name = "HousingBenchmarkPoint")
     public record Point(
             LocalDate baseDate,
-            BigDecimal investmentIndexUsd,
+            BigDecimal investmentIndex,
             BigDecimal benchmarkIndex,
             @Schema(types = {"number", "null"}) BigDecimal investmentPeriodReturn,
             @Schema(types = {"number", "null"}) BigDecimal benchmarkPeriodReturn
@@ -97,6 +95,8 @@ public record BenchmarkComparisonResponse(
         BenchmarkComparison.Period period = comparison.period();
         var rate = comparison.currentExchangeRate();
         boolean isEtf = benchmark.assetType() == BenchmarkAssetType.ETF;
+        // 투자 통화 — STRATEGY는 전략 계좌 통화, PORTFOLIO는 USD 계좌만 합산하므로 USD
+        Currency investmentCurrency = strategy == null ? Currency.USD : strategy.currency();
         return new BenchmarkComparisonResponse(
                 comparison.scope().name(),
                 strategy == null ? null : new StrategyInfo(
@@ -110,9 +110,23 @@ public record BenchmarkComparisonResponse(
                 rate == null ? null : new CurrentExchangeRate(
                         rate.midRate(), rate.fetchedAt(), rate.source()),
                 isEtf
-                        ? new Quality("ESTIMATED_TIME_WEIGHTED_RETURN", "USD", "USD", ETF_NOTICE)
-                        : new Quality("ESTIMATED_TIME_WEIGHTED_RETURN", "USD", "KRW", HOUSING_NOTICE),
+                        ? new Quality("ESTIMATED_TIME_WEIGHTED_RETURN", investmentCurrency.name(), "USD",
+                                notice(investmentCurrency, Currency.USD, ""))
+                        : new Quality("ESTIMATED_TIME_WEIGHTED_RETURN", investmentCurrency.name(), "KRW",
+                                notice(investmentCurrency, Currency.KRW, HOUSING_SURVEY_NOTICE)),
                 comparison.emptyReason());
+    }
+
+    // 통화 안내 — 같은 통화면 "모두 X 기준", 다르면 각 통화를 밝히고 환율 미반영을 알린다
+    private static String notice(Currency investment, Currency benchmark, String suffix) {
+        String currencies = investment == benchmark
+                ? (benchmark == Currency.USD
+                        ? "투자와 ETF 벤치마크 모두 USD 기준이며 환율 변수가 없습니다. "
+                        : "투자 성과와 아파트 매매가격지수 모두 KRW 기준입니다. ")
+                : "투자 성과는 " + investment + ", "
+                        + (benchmark == Currency.USD ? "ETF 벤치마크는 USD" : "아파트 매매가격지수는 KRW 현지 통화")
+                        + " 기준이며 현재 환율은 성과 계산에 반영하지 않습니다. ";
+        return (NOTICE_PREFIX + currencies + suffix).strip();
     }
 
     private static Summary toSummary(PerformanceComparisonSummary summary) {
@@ -125,7 +139,7 @@ public record BenchmarkComparisonResponse(
 
     private static Point toPoint(BenchmarkPoint point) {
         return new Point(
-                point.baseDate(), point.investmentIndexUsd(), point.benchmarkIndex(),
+                point.baseDate(), point.investmentIndex(), point.benchmarkIndex(),
                 point.investmentPeriodReturn(), point.benchmarkPeriodReturn());
     }
 }

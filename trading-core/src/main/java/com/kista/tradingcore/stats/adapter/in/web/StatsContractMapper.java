@@ -3,6 +3,7 @@ package com.kista.tradingcore.stats.adapter.in.web;
 import com.kista.shared.contract.stats.InvestmentPointsResponse;
 import com.kista.shared.contract.stats.PortfolioCurrentResponse;
 import com.kista.shared.contract.stats.PortfolioOrderResponse;
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.Strategy;
@@ -18,16 +19,16 @@ final class StatsContractMapper {
         return new InvestmentPointsResponse(
                 r.points().stream().map(StatsContractMapper::toDto).toList(),
                 r.effectiveFrom(), r.effectiveTo(),
-                r.selectedStrategy() == null ? null : toDto(r.selectedStrategy()));
+                r.selectedStrategy() == null ? null : toDto(r.selectedStrategy(), r.strategyCurrency()));
     }
 
     private static InvestmentPointsResponse.InvestmentPointDto toDto(InvestmentPoint p) {
-        return new InvestmentPointsResponse.InvestmentPointDto(p.baseDate(), p.investmentIndexUsd(), p.periodReturn());
+        return new InvestmentPointsResponse.InvestmentPointDto(p.baseDate(), p.investmentIndex(), p.periodReturn());
     }
 
     // Strategy 6필드 중 벤치마크 비교 화면이 쓰는 id/type/ticker만 싣는다
-    private static InvestmentPointsResponse.StrategyRefDto toDto(Strategy s) {
-        return new InvestmentPointsResponse.StrategyRefDto(s.id(), s.type(), s.ticker());
+    private static InvestmentPointsResponse.StrategyRefDto toDto(Strategy s, Currency currency) {
+        return new InvestmentPointsResponse.StrategyRefDto(s.id(), s.type(), s.ticker(), currency);
     }
 
     static PortfolioCurrentResponse toResponse(CyclePositionHistoryEntry e) {

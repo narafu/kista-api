@@ -93,7 +93,7 @@ class BenchmarkService implements BenchmarkUseCase {
             if (!investmentByDate.isEmpty() && surveyDate.isAfter(investmentByDate.lastKey())) continue;
             var asOf = investmentByDate.floorEntry(surveyDate);
             if (asOf == null) continue; // 투자 시작 전 조사일은 스킵
-            snappedPoints.add(new InvestmentPoint(surveyDate, asOf.getValue().investmentIndexUsd(), null));
+            snappedPoints.add(new InvestmentPoint(surveyDate, asOf.getValue().investmentIndex(), null));
         }
 
         String regionName = indexRows.stream().findFirst().map(HousingPriceIndex::regionName).orElse(null);

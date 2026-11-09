@@ -51,10 +51,11 @@ class InvestmentPointsHttpAdapter implements InvestmentPointsPort {
     // contract → stats 도메인 매핑 — 벤치마크 계산(BenchmarkComparisonBuilder 등)은 root stats 도메인 타입을 쓴다
     private static Result toResult(InvestmentPointsResponse r) {
         List<InvestmentPoint> points = r.points().stream()
-                .map(p -> new InvestmentPoint(p.baseDate(), p.investmentIndexUsd(), p.periodReturn()))
+                .map(p -> new InvestmentPoint(p.baseDate(), p.investmentIndex(), p.periodReturn()))
                 .toList();
         StrategyRef strategy = r.selectedStrategy() == null ? null
-                : new StrategyRef(r.selectedStrategy().id(), r.selectedStrategy().type(), r.selectedStrategy().ticker());
+                : new StrategyRef(r.selectedStrategy().id(), r.selectedStrategy().type(), r.selectedStrategy().ticker(),
+                        r.selectedStrategy().currency());
         return new Result(points, r.effectiveFrom(), r.effectiveTo(), strategy);
     }
 }

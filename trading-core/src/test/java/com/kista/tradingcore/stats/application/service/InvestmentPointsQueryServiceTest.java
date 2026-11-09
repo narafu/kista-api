@@ -4,6 +4,7 @@ import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
@@ -99,9 +100,24 @@ class InvestmentPointsQueryServiceTest {
                 STRATEGY_ID, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(result.selectedStrategy()).isEqualTo(STRATEGY);
+        assertThat(result.strategyCurrency()).isEqualTo(Currency.USD);
         assertThat(result.points()).isNotEmpty();
         verify(cyclePositionPort).findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any());
         verify(cyclePositionPort, never()).findByUserAndRange(any(), any(), any());
+    }
+
+    @Test
+    void STRATEGY_scope는_전략_계좌_통화를_싣는다() {
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
+        Account binance = new Account(ACCOUNT_ID, USER_ID, "바이낸스", "n", "k", "s", null, Broker.BINANCE, null, null);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(binance);
+        when(strategyCyclePort.findByStrategyIds(Set.of(STRATEGY_ID))).thenReturn(List.of());
+        when(cyclePositionPort.findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any())).thenReturn(List.of());
+
+        InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsQuery.Scope.STRATEGY,
+                STRATEGY_ID, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
+
+        assertThat(result.strategyCurrency()).isEqualTo(Currency.USDT);
     }
 
     @Test
@@ -139,7 +155,8 @@ class InvestmentPointsQueryServiceTest {
                 null, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(result.selectedStrategy()).isNull();
-        assertThat(result.points().getFirst().investmentIndexUsd()).isEqualByComparingTo("100.0");
+        assertThat(result.strategyCurrency()).isNull();
+        assertThat(result.points().getFirst().investmentIndex()).isEqualByComparingTo("100.0");
         assertThat(strategyIdsCaptor.getValue()).containsExactly(STRATEGY_ID);
         verify(strategyPort, never()).findByAccountIds(argThat(ids -> ids.contains(mockAccountId)));
     }

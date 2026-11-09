@@ -41,8 +41,8 @@ class InvestmentIndexCalculatorTest {
         // 첫 완전평가일(1/31)부터 스냅샷 없는 날은 직전 평가액을 이어 매일 1포인트
         assertThat(result.getFirst().baseDate()).isEqualTo(JANUARY_31);
         assertThat(result).hasSize(29);
-        assertThat(pointOn(result, FEBRUARY_27).investmentIndexUsd()).isEqualTo(new BigDecimal("100.0000000000"));
-        assertThat(result.getLast().investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
+        assertThat(pointOn(result, FEBRUARY_27).investmentIndex()).isEqualTo(new BigDecimal("100.0000000000"));
+        assertThat(result.getLast().investmentIndex()).isEqualTo(new BigDecimal("110.0000000000"));
     }
 
     @Test
@@ -61,10 +61,10 @@ class InvestmentIndexCalculatorTest {
 
         // 장중 100 -> 110 수익 후 일말에 40을 추가 투입해 150으로 교체한다.
         assertThat(pointOn(result, FEBRUARY_1)).satisfies(point -> {
-            assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
+            assertThat(point.investmentIndex()).isEqualTo(new BigDecimal("110.0000000000"));
             assertThat(point.periodReturn()).isEqualTo(new BigDecimal("0.1000000000"));
         });
-        assertThat(result.getLast().investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
+        assertThat(result.getLast().investmentIndex()).isEqualTo(new BigDecimal("110.0000000000"));
     }
 
     @Test
@@ -82,10 +82,10 @@ class InvestmentIndexCalculatorTest {
                 JANUARY_1, FEBRUARY_28);
 
         assertThat(pointOn(result, FEBRUARY_1)).satisfies(point -> {
-            assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
+            assertThat(point.investmentIndex()).isEqualTo(new BigDecimal("110.0000000000"));
             assertThat(point.periodReturn()).isEqualTo(new BigDecimal("0.1000000000"));
         });
-        assertThat(result.getLast().investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
+        assertThat(result.getLast().investmentIndex()).isEqualTo(new BigDecimal("110.0000000000"));
     }
 
     @Test
@@ -104,10 +104,10 @@ class InvestmentIndexCalculatorTest {
 
         // 현금 50만 비교하지 않고 이전·신규 사이클의 전체 평가액 150을 비교한다.
         assertThat(pointOn(result, FEBRUARY_1)).satisfies(point -> {
-            assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("100.0000000000"));
+            assertThat(point.investmentIndex()).isEqualTo(new BigDecimal("100.0000000000"));
             assertThat(point.periodReturn()).isEqualTo(new BigDecimal("0.0000000000"));
         });
-        assertThat(result.getLast().investmentIndexUsd()).isEqualTo(new BigDecimal("100.0000000000"));
+        assertThat(result.getLast().investmentIndex()).isEqualTo(new BigDecimal("100.0000000000"));
     }
 
     @Test
@@ -124,7 +124,7 @@ class InvestmentIndexCalculatorTest {
                         position(next, FEBRUARY_28, "90")),
                 JANUARY_1, FEBRUARY_28);
 
-        assertThat(result).last().extracting(InvestmentPoint::investmentIndexUsd)
+        assertThat(result).last().extracting(InvestmentPoint::investmentIndex)
                 .isEqualTo(new BigDecimal("110.0000000000"));
     }
 
@@ -142,10 +142,10 @@ class InvestmentIndexCalculatorTest {
 
         // 신규 사이클의 실제 초기 자본은 startAmount 100이 아니라 50 + 10*10 = 150이다.
         assertThat(pointOn(result, FEBRUARY_1)).satisfies(point -> {
-            assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("100.0000000000"));
+            assertThat(point.investmentIndex()).isEqualTo(new BigDecimal("100.0000000000"));
             assertThat(point.periodReturn()).isEqualTo(new BigDecimal("0.0000000000"));
         });
-        assertThat(result.getLast().investmentIndexUsd()).isEqualTo(new BigDecimal("100.0000000000"));
+        assertThat(result.getLast().investmentIndex()).isEqualTo(new BigDecimal("100.0000000000"));
     }
 
     @Test
@@ -162,7 +162,7 @@ class InvestmentIndexCalculatorTest {
                 JANUARY_1, FEBRUARY_28);
 
         // 전략별 수익률 평균 50%가 아니라 합산 자산 1,000 -> 1,100의 10%다.
-        assertThat(result).last().extracting(InvestmentPoint::investmentIndexUsd)
+        assertThat(result).last().extracting(InvestmentPoint::investmentIndex)
                 .isEqualTo(new BigDecimal("110.0000000000"));
     }
 
@@ -177,7 +177,7 @@ class InvestmentIndexCalculatorTest {
                 List.of(position(cycle, JANUARY_31, "100"), later, earlier),
                 JANUARY_1, FEBRUARY_28);
 
-        assertThat(result).last().extracting(InvestmentPoint::investmentIndexUsd)
+        assertThat(result).last().extracting(InvestmentPoint::investmentIndex)
                 .isEqualTo(new BigDecimal("110.0000000000"));
     }
 
@@ -193,11 +193,11 @@ class InvestmentIndexCalculatorTest {
                         position(second, FEBRUARY_28, "990")),
                 JANUARY_1, MARCH_31);
 
-        assertThat(pointOn(result, JANUARY_31).investmentIndexUsd()).isEqualTo(new BigDecimal("100.0000000000"));
-        assertThat(pointOn(result, FEBRUARY_28).investmentIndexUsd()).isEqualTo(new BigDecimal("109.0000000000"));
+        assertThat(pointOn(result, JANUARY_31).investmentIndex()).isEqualTo(new BigDecimal("100.0000000000"));
+        assertThat(pointOn(result, FEBRUARY_28).investmentIndex()).isEqualTo(new BigDecimal("109.0000000000"));
         assertThat(result.getLast()).satisfies(point -> {
             assertThat(point.baseDate()).isEqualTo(MARCH_31);
-            assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("109.0000000000"));
+            assertThat(point.investmentIndex()).isEqualTo(new BigDecimal("109.0000000000"));
         });
     }
 
@@ -214,7 +214,7 @@ class InvestmentIndexCalculatorTest {
 
         assertThat(result).singleElement().satisfies(point -> {
             assertThat(point.baseDate()).isEqualTo(FEBRUARY_28);
-            assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("100.0000000000"));
+            assertThat(point.investmentIndex()).isEqualTo(new BigDecimal("100.0000000000"));
         });
     }
 
@@ -230,7 +230,7 @@ class InvestmentIndexCalculatorTest {
 
         assertThat(result).singleElement().satisfies(point -> {
             assertThat(point.baseDate()).isEqualTo(FEBRUARY_28);
-            assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("100.0000000000"));
+            assertThat(point.investmentIndex()).isEqualTo(new BigDecimal("100.0000000000"));
         });
     }
 
@@ -245,7 +245,7 @@ class InvestmentIndexCalculatorTest {
                 JANUARY_1, FEBRUARY_1);
 
         assertThat(result)
-                .extracting(InvestmentPoint::baseDate, InvestmentPoint::investmentIndexUsd)
+                .extracting(InvestmentPoint::baseDate, InvestmentPoint::investmentIndex)
                 .containsExactly(
                         org.assertj.core.groups.Tuple.tuple(JANUARY_31, new BigDecimal("100.0000000000")),
                         org.assertj.core.groups.Tuple.tuple(FEBRUARY_1, new BigDecimal("110.0000000000")));
@@ -267,10 +267,10 @@ class InvestmentIndexCalculatorTest {
 
         // 종료 전략의 현금 endAmount 100이 아닌 마지막 전체 평가액 110을 종료일에 회수한다.
         assertThat(pointOn(result, FEBRUARY_1)).satisfies(point -> {
-            assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
+            assertThat(point.investmentIndex()).isEqualTo(new BigDecimal("110.0000000000"));
             assertThat(point.periodReturn()).isEqualTo(new BigDecimal("0.1000000000"));
         });
-        assertThat(result.getLast().investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
+        assertThat(result.getLast().investmentIndex()).isEqualTo(new BigDecimal("110.0000000000"));
     }
 
     @Test
@@ -285,7 +285,7 @@ class InvestmentIndexCalculatorTest {
 
         assertThat(result).last().satisfies(point -> {
             assertThat(point.baseDate()).isEqualTo(FEBRUARY_1);
-            assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
+            assertThat(point.investmentIndex()).isEqualTo(new BigDecimal("110.0000000000"));
             assertThat(point.periodReturn()).isEqualTo(new BigDecimal("0.1000000000"));
         });
     }
@@ -309,7 +309,7 @@ class InvestmentIndexCalculatorTest {
 
         // 종료일(2/1) 회수와 재진입일(3/10) 투입이 각각 외부흐름이라 지수는 전 구간 100 유지
         assertThat(result)
-                .extracting(InvestmentPoint::investmentIndexUsd)
+                .extracting(InvestmentPoint::investmentIndex)
                 .containsOnly(new BigDecimal("100.0000000000"));
         assertThat(result.getFirst().baseDate()).isEqualTo(JANUARY_31);
         assertThat(result.getLast().baseDate()).isEqualTo(MARCH_31);
@@ -340,7 +340,7 @@ class InvestmentIndexCalculatorTest {
                 JANUARY_1, FEBRUARY_28);
 
         // 2월 1일은 직전 평가액이 0이므로 생략하고, 현재 평가액 50은 다음 비교 기준으로 갱신한다.
-        assertThat(result).last().extracting(InvestmentPoint::investmentIndexUsd)
+        assertThat(result).last().extracting(InvestmentPoint::investmentIndex)
                 .isEqualTo(new BigDecimal("110.0000000000"));
     }
 
@@ -354,11 +354,11 @@ class InvestmentIndexCalculatorTest {
                         position(cycle, LocalDate.of(2026, 1, 20), "120")),
                 JANUARY_1, JANUARY_31);
 
-        assertThat(pointOn(result, LocalDate.of(2026, 1, 19)).investmentIndexUsd())
+        assertThat(pointOn(result, LocalDate.of(2026, 1, 19)).investmentIndex())
                 .isEqualTo(new BigDecimal("100.0000000000"));
         assertThat(result.getLast()).satisfies(point -> {
             assertThat(point.baseDate()).isEqualTo(JANUARY_31);
-            assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("120.0000000000"));
+            assertThat(point.investmentIndex()).isEqualTo(new BigDecimal("120.0000000000"));
         });
     }
 
@@ -376,10 +376,10 @@ class InvestmentIndexCalculatorTest {
                 List.of(cycle), positions, JANUARY_1, MARCH_31);
 
         // MDD 자체는 BenchmarkComparisonBuilder가 계산 — 여기서는 월중 저점이 시리즈에 포함되는지 확인한다
-        assertThat(pointOn(points, LocalDate.of(2026, 1, 15)).investmentIndexUsd())
+        assertThat(pointOn(points, LocalDate.of(2026, 1, 15)).investmentIndex())
                 .isEqualTo(new BigDecimal("50.0000000000"));
-        assertThat(pointOn(points, FEBRUARY_28).investmentIndexUsd()).isEqualTo(new BigDecimal("80.0000000000"));
-        assertThat(points.getLast().investmentIndexUsd()).isEqualTo(new BigDecimal("120.0000000000"));
+        assertThat(pointOn(points, FEBRUARY_28).investmentIndex()).isEqualTo(new BigDecimal("80.0000000000"));
+        assertThat(points.getLast().investmentIndex()).isEqualTo(new BigDecimal("120.0000000000"));
     }
 
     @Test
@@ -394,7 +394,7 @@ class InvestmentIndexCalculatorTest {
                 JANUARY_31, FEBRUARY_2);
 
         assertThat(result)
-                .extracting(InvestmentPoint::baseDate, InvestmentPoint::investmentIndexUsd, InvestmentPoint::periodReturn)
+                .extracting(InvestmentPoint::baseDate, InvestmentPoint::investmentIndex, InvestmentPoint::periodReturn)
                 .containsExactly(
                         org.assertj.core.groups.Tuple.tuple(
                                 JANUARY_31, new BigDecimal("100.0000000000"), new BigDecimal("0.0000000000")),
@@ -421,7 +421,7 @@ class InvestmentIndexCalculatorTest {
 
         // 2/1은 신규 진입만 있어 0%, 2/2는 합산 2,000 -> 2,100의 +5%
         assertThat(result)
-                .extracting(InvestmentPoint::baseDate, InvestmentPoint::investmentIndexUsd)
+                .extracting(InvestmentPoint::baseDate, InvestmentPoint::investmentIndex)
                 .containsExactly(
                         org.assertj.core.groups.Tuple.tuple(JANUARY_31, new BigDecimal("100.0000000000")),
                         org.assertj.core.groups.Tuple.tuple(FEBRUARY_1, new BigDecimal("100.0000000000")),
@@ -445,7 +445,7 @@ class InvestmentIndexCalculatorTest {
 
         // 2/5 이후에도 재설정된 이전 사이클(종료)이 아닌 나중 생성 사이클이 계속 평가된다
         assertThat(result.getFirst().baseDate()).isEqualTo(FEBRUARY_1);
-        assertThat(result.getLast().investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
+        assertThat(result.getLast().investmentIndex()).isEqualTo(new BigDecimal("110.0000000000"));
     }
 
     // 이벤트 없는 기존 케이스용 오버로드
@@ -470,7 +470,7 @@ class InvestmentIndexCalculatorTest {
         // 이벤트 흐름이 없으면 +50%, -20%로 보인다
         assertThat(pointOn(result, FEBRUARY_1).periodReturn()).isEqualByComparingTo("0");
         assertThat(pointOn(result, FEBRUARY_2).periodReturn()).isEqualByComparingTo("0");
-        assertThat(result.getLast().investmentIndexUsd()).isEqualByComparingTo("100");
+        assertThat(result.getLast().investmentIndex()).isEqualByComparingTo("100");
     }
 
     @Test
