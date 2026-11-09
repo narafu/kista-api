@@ -1,6 +1,10 @@
 package com.kista.tradingcore.stats.adapter.in.web;
 
 import com.kista.tradingcore.support.StubBrokerApiException;
+import com.kista.tradingcore.broker.domain.model.DailyTransaction;
+import com.kista.tradingcore.broker.domain.model.DailyTransactionResult;
+import com.kista.shared.kernel.Currency;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.broker.domain.model.PresentBalanceResult;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.stats.application.usecase.AccountStatisticsUseCase;
@@ -98,4 +102,21 @@ class StatisticsControllerTest {
                 .andExpect(status().isServiceUnavailable());
     }
 
+
+    @Test
+    void accountDailyTrades_returns_tradeAmount_currency_without_summary() throws Exception {
+        when(accountStatistics.getDailyTransactions(eq(ACCOUNT_ID), any(), any(), any())).thenReturn(
+                new DailyTransactionResult(List.of(new DailyTransaction("2024-01-05", OrderDirection.SELL,
+                        StrategyTicker.BTC, "BTC", new BigDecimal("0.00031"), new BigDecimal("95000000"),
+                        new BigDecimal("29450"), Currency.KRW))));
+
+        mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/daily-trades")
+                        .param("from", "2024-01-01").param("to", "2024-01-31")
+                        .with(authentication(userToken(DEV_USER_UUID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].quantity").value(0.00031))
+                .andExpect(jsonPath("$.items[0].tradeAmount").value(29450))
+                .andExpect(jsonPath("$.items[0].currency").value("KRW"))
+                .andExpect(jsonPath("$.summary").doesNotExist());
+    }
 }

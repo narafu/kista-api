@@ -1,7 +1,10 @@
 package com.kista.tradingcore.stats.adapter.in.web;
 
+import com.kista.tradingcore.broker.domain.model.DailyTransaction;
 import com.kista.tradingcore.broker.domain.model.DailyTransactionResult;
-import com.kista.tradingcore.broker.domain.model.DailyTransactionSummary;
+import com.kista.shared.kernel.Currency;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.trading.domain.model.CycleHistoryPage;
 import com.kista.tradingcore.stats.application.usecase.AccountStatisticsUseCase;
 import org.junit.jupiter.api.Test;
@@ -79,14 +82,19 @@ class DashboardControllerTest {
 
     @Test
     void dailyTrades_returns_user_scoped_result_without_account_path() throws Exception {
-        var result = new DailyTransactionResult(List.of(),
-                new DailyTransactionSummary(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
+        var result = new DailyTransactionResult(List.of(new DailyTransaction("2024-01-05", OrderDirection.BUY,
+                StrategyTicker.ETH, "ETH", new BigDecimal("0.0123"), new BigDecimal("3000.56"),
+                new BigDecimal("36.91"), Currency.USDT)));
         when(accountStatistics.getDailyTransactionsForUser(any(), any(), any())).thenReturn(result);
 
         mockMvc.perform(get("/api/daily-trades")
                         .param("from", "2024-01-01").param("to", "2024-01-31")
                         .with(authentication(userToken(DEV_USER_UUID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items").isArray());
+                .andExpect(jsonPath("$.items[0].quantity").value(0.0123))
+                .andExpect(jsonPath("$.items[0].tradeAmount").value(36.91))
+                .andExpect(jsonPath("$.items[0].currency").value("USDT"))
+                .andExpect(jsonPath("$.items[0].tradeAmountUsd").doesNotExist())
+                .andExpect(jsonPath("$.summary").doesNotExist());
     }
 }

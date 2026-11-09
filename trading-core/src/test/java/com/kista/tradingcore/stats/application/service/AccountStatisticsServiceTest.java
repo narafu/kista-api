@@ -4,6 +4,11 @@ import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.Currency;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.tradingcore.trading.domain.model.Order;
+import java.time.LocalDate;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
@@ -49,7 +54,7 @@ class AccountStatisticsServiceTest {
                 accountPort, cyclePositionPort, orderPort, portfolioPort, pricePort, FixedClockTestConfig.FIXED);
         // 실제 Account record — account.toBrokerRef()가 인스턴스 메서드
         Account account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Broker.KIS, null, null);
-        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
+        lenient().when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
     }
 
     @Test
@@ -73,5 +78,67 @@ class AccountStatisticsServiceTest {
         assertThatThrownBy(() -> service.getPresentBalance(accountId, userId))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("증권사 API 조회에 실패했습니다");
+    }
+
+    @Test
+    void 일별_거래내역은_코인_소수_수량_체결을_포함한다() {
+        UUID coinAccount = UUID.randomUUID();
+        when(accountPort.findByUserId(userId)).thenReturn(List.of(account(coinAccount, Broker.BINANCE)));
+        when(orderPort.findFilledByUser(eq(userId), any(), any())).thenReturn(List.of(
+                filled(coinAccount, StrategyTicker.ETH, "0.0123", "3000.555")));
+
+        var item = service.getDailyTransactionsForUser(userId, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31))
+                .items().getFirst();
+
+        assertThat(item.quantity()).isEqualByComparingTo("0.0123");
+        assertThat(item.tradeAmount()).isEqualByComparingTo("36.91");
+        assertThat(item.currency()).isEqualTo(Currency.USDT);
+    }
+
+    @Test
+    void KRW_체결_금액은_정수로_반올림한다() {
+        UUID upbit = UUID.randomUUID();
+        when(accountPort.findByUserId(userId)).thenReturn(List.of(account(upbit, Broker.UPBIT)));
+        when(orderPort.findFilledByUser(eq(userId), any(), any())).thenReturn(List.of(
+                filled(upbit, StrategyTicker.BTC, "0.00031", "95000000")));
+
+        var item = service.getDailyTransactionsForUser(userId, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31))
+                .items().getFirst();
+
+        assertThat(item.tradeAmount()).isEqualByComparingTo("29450");
+        assertThat(item.tradeAmount().scale()).isZero();
+        assertThat(item.currency()).isEqualTo(Currency.KRW);
+    }
+
+    @Test
+    void 주식_체결은_USD로_표기한다() {
+        when(orderPort.findFilledByAccount(eq(accountId), any(), any())).thenReturn(List.of(
+                filled(accountId, StrategyTicker.SOXL, "10", "20.5")));
+
+        var item = service.getDailyTransactions(accountId, userId, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31))
+                .items().getFirst();
+
+        assertThat(item.tradeAmount()).isEqualByComparingTo("205.00");
+        assertThat(item.currency()).isEqualTo(Currency.USD);
+    }
+
+    @Test
+    void 계좌_맵에_없는_주문은_IllegalStateException() {
+        when(accountPort.findByUserId(userId)).thenReturn(List.of());
+        when(orderPort.findFilledByUser(eq(userId), any(), any())).thenReturn(List.of(
+                filled(UUID.randomUUID(), StrategyTicker.SOXL, "1", "1")));
+
+        assertThatThrownBy(() -> service.getDailyTransactionsForUser(userId, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31)))
+                .isInstanceOf(IllegalStateException.class).hasMessage("주문 계좌를 찾을 수 없습니다.");
+    }
+
+    private Account account(UUID id, Broker broker) {
+        return new Account(id, userId, "계좌", "1", "key", "secret", null, broker, null, null);
+    }
+
+    private Order filled(UUID account, StrategyTicker ticker, String qty, String price) {
+        return new Order(UUID.randomUUID(), account, UUID.randomUUID(), LocalDate.of(2026, 1, 5), ticker,
+                OrderType.LOC, null, OrderDirection.BUY, new BigDecimal(qty), new BigDecimal(price),
+                null, null, new BigDecimal(qty), new BigDecimal(price));
     }
 }

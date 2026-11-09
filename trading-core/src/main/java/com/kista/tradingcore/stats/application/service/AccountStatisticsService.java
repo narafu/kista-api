@@ -3,14 +3,13 @@ package com.kista.tradingcore.stats.application.service;
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.KstDays;
+import com.kista.shared.kernel.Quantities;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.broker.domain.model.DailyTransaction;
 import com.kista.tradingcore.broker.domain.model.DailyTransactionResult;
-import com.kista.tradingcore.broker.domain.model.DailyTransactionSummary;
 import com.kista.tradingcore.broker.domain.model.PresentBalanceResult;
 import com.kista.tradingcore.trading.domain.model.Order;
-import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.trading.domain.model.CycleHistoryPage;
 import com.kista.tradingcore.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.shared.kernel.StrategyTicker;
@@ -28,6 +27,7 @@ import java.time.Instant;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -51,24 +51,27 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     @Override
     public DailyTransactionResult getDailyTransactions(UUID accountId, UUID requesterId,
                                                         LocalDate from, LocalDate to) {
-        accountPort.requireOwnedAccount(accountId, requesterId);
-        return toDailyTransactionResult(orderPort.findFilledByAccount(accountId, from, to));
+        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
+        return toDailyTransactionResult(orderPort.findFilledByAccount(accountId, from, to),
+                Map.of(accountId, account.broker().getCurrency()));
     }
 
     @Override
     public DailyTransactionResult getDailyTransactionsForUser(UUID requesterId, LocalDate from, LocalDate to) {
-        return toDailyTransactionResult(orderPort.findFilledByUser(requesterId, from, to));
+        // accountId → 계좌 통화 (Broker 견적 통화)
+        Map<UUID, Currency> currencies = accountPort.findByUserId(requesterId).stream()
+                .collect(Collectors.toMap(Account::id, a -> a.broker().getCurrency()));
+        return toDailyTransactionResult(orderPort.findFilledByUser(requesterId, from, to), currencies);
     }
 
-    private DailyTransactionResult toDailyTransactionResult(List<Order> filled) {
+    private DailyTransactionResult toDailyTransactionResult(List<Order> filled, Map<UUID, Currency> currencies) {
         List<DailyTransaction> items = filled.stream()
-                // 일별 체결 요약(DailyTransaction)은 주식 정수 수량 계약 — 코인 체결은 1차에서 대시보드 집계 밖
-                .filter(o -> !o.ticker().isCrypto())
                 .filter(o -> o.filledQuantity() != null && o.filledQuantity().signum() > 0)
                 .map(o -> {
+                    Currency currency = o.accountId() == null ? null : currencies.get(o.accountId());
+                    if (currency == null) throw new IllegalStateException("주문 계좌를 찾을 수 없습니다.");
                     BigDecimal price = o.filledPrice() != null ? o.filledPrice() : o.price();
-                    int qty = o.filledQuantity().intValueExact();
-                    BigDecimal amount = price.multiply(BigDecimal.valueOf(qty));
+                    BigDecimal qty = Quantities.normalize(o.filledQuantity());
                     return new DailyTransaction(
                             o.tradeDate().toString(),
                             o.direction(),
@@ -76,23 +79,12 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
                             o.ticker().name(),
                             qty,
                             price,
-                            amount,
-                            Currency.USD.name()
+                            currency.round(price.multiply(qty)), // 통화별 자릿수 반올림
+                            currency
                     );
                 })
                 .toList();
-
-        BigDecimal buyTotal = items.stream()
-                .filter(t -> t.direction() == OrderDirection.BUY)
-                .map(DailyTransaction::tradeAmountUsd)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal sellTotal = items.stream()
-                .filter(t -> t.direction() == OrderDirection.SELL)
-                .map(DailyTransaction::tradeAmountUsd)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        return new DailyTransactionResult(items,
-                new DailyTransactionSummary(buyTotal, sellTotal, BigDecimal.ZERO, BigDecimal.ZERO));
+        return new DailyTransactionResult(items);
     }
 
     // 전략 생성 화면 티커 목록 가격 — 최소 시드 산정 기준(전일종가)과 동일 소스로 통일

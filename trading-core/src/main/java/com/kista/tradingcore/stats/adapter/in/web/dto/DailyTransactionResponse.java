@@ -1,10 +1,10 @@
 package com.kista.tradingcore.stats.adapter.in.web.dto;
 
-import com.kista.tradingcore.broker.domain.model.DailyTransaction;
-import com.kista.tradingcore.broker.domain.model.DailyTransactionResult;
-import com.kista.tradingcore.broker.domain.model.DailyTransactionSummary;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.StrategyTicker;
+import com.kista.tradingcore.broker.domain.model.DailyTransaction;
+import com.kista.tradingcore.broker.domain.model.DailyTransactionResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -13,9 +13,7 @@ import java.util.List;
 
 public record DailyTransactionResponse(
         @Schema(description = "일별 체결 내역 목록")
-        List<ItemDto> items,
-        @Schema(description = "기간 합계 요약")
-        SummaryDto summary
+        List<ItemDto> items
 ) {
     public record ItemDto(
             @Schema(description = "매매일 (KST 기준)")
@@ -26,44 +24,25 @@ public record DailyTransactionResponse(
             StrategyTicker ticker,
             @Schema(description = "종목명")
             String symbolName,
-            @Schema(description = "체결수량")
-            int quantity,
-            @Schema(description = "해외주식체결단가")
+            @Schema(description = "체결수량 (코인은 소수)")
+            BigDecimal quantity,
+            @Schema(description = "체결단가 (계좌 통화)")
             BigDecimal price,
-            @Schema(description = "거래외화금액")
-            BigDecimal tradeAmountUsd,
-            @Schema(description = "통화코드", example = "USD")
-            String currency
+            @Schema(description = "거래금액 (계좌 통화)")
+            BigDecimal tradeAmount,
+            @Schema(description = "계좌 통화", example = "USD")
+            Currency currency
     ) {
         static ItemDto from(DailyTransaction t) {
             return new ItemDto(
                     t.tradeDate(), t.direction(), t.ticker(),
-                    t.symbolName(), t.quantity(), t.price(), t.tradeAmountUsd(),
+                    t.symbolName(), t.quantity(), t.price(), t.tradeAmount(),
                     t.currency()
             );
         }
     }
 
-    @Schema(name = "DailyTransactionSummaryDto")
-    public record SummaryDto(
-            @Schema(description = "외화매수금액합계")
-            BigDecimal buyAmountFcr,
-            @Schema(description = "외화매도금액합계")
-            BigDecimal sellAmountFcr,
-            @Schema(description = "국내수수료합계")
-            BigDecimal domesticFee,
-            @Schema(description = "해외수수료합계")
-            BigDecimal overseasFee
-    ) {
-        static SummaryDto from(DailyTransactionSummary s) {
-            return new SummaryDto(s.buyAmountFcr(), s.sellAmountFcr(), s.domesticFee(), s.overseasFee());
-        }
-    }
-
     public static DailyTransactionResponse from(DailyTransactionResult result) {
-        return new DailyTransactionResponse(
-                result.items().stream().map(ItemDto::from).toList(),
-                SummaryDto.from(result.summary())
-        );
+        return new DailyTransactionResponse(result.items().stream().map(ItemDto::from).toList());
     }
 }
