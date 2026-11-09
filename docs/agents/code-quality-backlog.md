@@ -882,7 +882,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - `ManualTradeCorrectionService:157-162` FQN `java.util.TreeSet`·`forEach(add)` ✔.
   - 불필요한 public: `CryptoDcaRunner:38` ✔(외부 참조 0), `support/TradingBatchShutdownCoordinator:16`, `VrStrategyDetailService` 메서드.
 - 가드: 없음.
-- 상태: open.
+- 상태: done(aa8881f3f). OrderSubmitter 알림 문구 헬퍼는 접두사가 서로 달라 하지 않았다(로그 접두사만 `logTag`).
 
 ### CQ-65 서비스의 도메인 술어 직접 판정
 - 주제: 코드철학(TDA). 유형: 중복·비일관. 위험: 낮음.
