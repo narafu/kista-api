@@ -166,7 +166,7 @@ class CapitalInjectionService implements InjectCapitalUseCase {
         InfiniteMinSeedGuard.requireAtLeast(minSeed, newStartAmount); // INFINITE는 인출 후에도 0회차 교착 시드 미만이 되면 거부
 
         AccountBalance old = latest.toBalance();
-        AccountBalance newBalance = new AccountBalance(old.holdings(), old.avgPrice(), old.usdDeposit().subtract(amount));
+        AccountBalance newBalance = old.withUsdDeposit(old.usdDeposit().subtract(amount));
         // 최신 행 in-place 갱신 — append하면 리버스 판정·별점가·이력이 왜곡되고 detail은 같은 행에 유지된다
         cyclePositionPort.updateBalance(latest.id(), newBalance);
         strategyCyclePort.updateStartAmount(cycle.id(), newStartAmount);

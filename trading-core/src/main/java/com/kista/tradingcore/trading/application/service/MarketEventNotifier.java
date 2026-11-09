@@ -28,23 +28,23 @@ class MarketEventNotifier {
     private final ApplicationEventPublisher eventPublisher;
 
     void notifyMarketOpen() {
-        notify(NotificationType.MARKET_ALERT, user -> eventPublisher.publishEvent(new MarketOpenEvent(user.userId())));
+        sendToActiveUsers(user -> eventPublisher.publishEvent(new MarketOpenEvent(user.userId())));
     }
 
     void notifyMarketClose() {
-        notify(NotificationType.MARKET_ALERT, user -> eventPublisher.publishEvent(new MarketCloseEvent(user.userId())));
+        sendToActiveUsers(user -> eventPublisher.publishEvent(new MarketCloseEvent(user.userId())));
     }
 
-    private void notify(NotificationType type, Consumer<TradingUserProfile> action) {
+    private void sendToActiveUsers(Consumer<TradingUserProfile> action) {
         // 배치 조회로 N+1 제거
         var users = tradingUserProfilePort.findAllActive();
 
-        // 사용자별 알림을 virtual thread로 병렬 발송, Semaphore로 동시 발송 수 상한
+        // 장 알림(MARKET_ALERT) 수신 사용자별로 virtual thread로 병렬 발송, Semaphore로 동시 발송 수 상한
         // try-with-resources close()가 제출된 모든 작업 완료까지 대기 → 호출자 동기 semantics 유지
         Semaphore limiter = new Semaphore(MAX_CONCURRENT_SENDS);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             users.forEach(user -> {
-                if (user.isNotificationEnabled(type)) {
+                if (user.isNotificationEnabled(NotificationType.MARKET_ALERT)) {
                     executor.submit(() -> sendWithLimit(limiter, user, action));
                 }
             });

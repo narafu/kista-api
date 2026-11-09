@@ -41,7 +41,7 @@ import java.util.UUID;
 
 // VR 전략 운영 중 재설정 — 램프 파라미터 교체(새 버전 발급) + 강제 롤오버(현재 사이클 종료→새 사이클) + 선택적 투자금 추가
 // 램프 시계(경과 주수)는 전략 최초 사이클 startDate 기준으로 고정 — 재설정해도 리셋하지 않음(VrCycleRolloverService와 동일 정책)
-// package-private — application/service/trading 패키지 전용 (CycleSnapshotCreator·OrderCancelService 재사용을 위해 같은 패키지 위치)
+// package-private — application/service 패키지 전용 (CycleSnapshotCreator·OrderCancelService 재사용을 위해 같은 패키지 위치)
 @Slf4j
 @Service
 @RequiredArgsConstructor

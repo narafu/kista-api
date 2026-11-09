@@ -70,7 +70,6 @@ class StrategyService implements StrategyUseCase {
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 증권사 주문 취소 HTTP 포함 — DB 쓰기는 StrategyStateWriter 짧은 트랜잭션
     public void delete(UUID strategyId, UUID requesterId) {
         OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
-        Strategy strategy = owned.strategy();
         Account account = owned.account();
         // 먼저 PAUSED로 기록해 이후 배치가 이 전략으로 새 주문을 만들지 않게 한 뒤 미체결 주문을 정리한다
         // 일시 장애로 증권사 취소에 실패한 주문이 있으면 삭제하지 않는다(삭제된 전략의 주문이 증권사에 남지 않도록) — 전략은 PAUSED로 남는다

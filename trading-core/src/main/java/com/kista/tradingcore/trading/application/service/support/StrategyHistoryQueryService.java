@@ -19,7 +19,6 @@ import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.domain.model.CycleHistoryPage;
 import com.kista.tradingcore.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.tradingcore.trading.domain.model.Order;
-import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategySeedPreview;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -97,7 +96,7 @@ public class StrategyHistoryQueryService {
     public CycleHistoryPage getByStrategy(UUID strategyId, UUID requesterId,
                                    LocalDate from, LocalDate to,
                                    Instant cursor, int size) {
-        Strategy strategy = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId).strategy();
+        OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId); // 소유권 검증
         Instant fromInstant = resolveHistoryFrom(from);
         Instant effectiveCursor = cursor != null ? cursor : resolveHistoryTo(to);
         List<CyclePositionHistoryEntry> raw =
@@ -111,7 +110,7 @@ public class StrategyHistoryQueryService {
     // 전략(사이클) 기준 기간 내 주문 내역 조회 — 사용자 전략 상세 화면용
     @Transactional(readOnly = true)
     public List<Order> getOrdersByStrategy(UUID strategyId, UUID requesterId, LocalDate from, LocalDate to) {
-        Strategy strategy = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId).strategy();
+        OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId); // 소유권 검증
         return orderPort.findByStrategyId(strategyId, from, to);
     }
 

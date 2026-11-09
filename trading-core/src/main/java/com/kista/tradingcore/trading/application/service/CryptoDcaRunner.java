@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class CryptoDcaRunner implements CryptoDcaExecutionUseCase {
+class CryptoDcaRunner implements CryptoDcaExecutionUseCase {
 
     private final StrategyPort strategyPort;
     private final AccountPort accountPort;

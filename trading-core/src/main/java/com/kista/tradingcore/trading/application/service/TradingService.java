@@ -1,7 +1,4 @@
 package com.kista.tradingcore.trading.application.service;
-import com.kista.tradingcore.matching.domain.model.AccountBalance;
-import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
-import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.application.service.support.TradingBatchGuard;
 import com.kista.tradingcore.trading.application.service.support.TradingParallelRunner;
 import com.kista.tradingcore.trading.application.service.support.TradingBalanceLoader;
@@ -416,16 +413,12 @@ class TradingService {
             batchGuard.runSafely("개장 주문 접수", state.ctx(), () -> {
                 BigDecimal placementPrice = Optional.ofNullable(placementPrices.get(state.ctx().strategy().ticker()))
                         .orElse(state.startPrice());
-                placeAtOpenPlannedOrders(state, placementPrice, tradeDate);
+                // 개장 시점에는 AT_OPEN 슬롯의 PLANNED 주문만 즉시 증권사에 접수한다 — BUY cap 보정은 orderExecutor가 AT_OPEN 스코프로 적용
+                orderExecutor.placeAtOpenOrders(tradeDate, state.ctx().account(), state.ctx().currentCycle(),
+                        placementPrice, state.position(), state.vrPosition(), state.ctx().strategy());
                 return null;
             });
         }
-    }
-
-    // 개장 시점에는 AT_OPEN 슬롯의 PLANNED 주문만 즉시 증권사에 접수한다 — BUY cap 보정은 orderExecutor가 AT_OPEN 스코프로 적용
-    private void placeAtOpenPlannedOrders(TradingCandidatePlanner.CycleState state, BigDecimal placementPrice, LocalDate tradeDate) {
-        orderExecutor.placeAtOpenOrders(tradeDate, state.ctx().account(), state.ctx().currentCycle(),
-                placementPrice, state.position(), state.vrPosition(), state.ctx().strategy());
     }
 
     // 지정 시각까지 대기 — DST 정보 로깅 후 sleep(종료 요청 시 즉시 중단), 도달 로그
