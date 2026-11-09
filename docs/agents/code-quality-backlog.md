@@ -860,3 +860,48 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 결정(사용자, 2026-11-08): `updateSeed`·인출에도 등록과 같은 fail-open 최소 시드 검사를 넣는다(시세 조회 실패 시 건너뜀, 미달이면 400). 검사는 등록과 한 곳을 공유한다.
 - 가드: 시드 수정·인출 미달 거부 테스트.
 - 상태: done(8ece9ebdf). 전일종가 조회는 `NOT_SUPPORTED` 진입점(`StrategyService.update`·`CapitalWithdrawalService`), 쓰기는 `StrategyUpdateWriter`·`CapitalInjectionService` 트랜잭션.
+
+## 2026-11-09 tradingcore.trading application/service 코드철학 감사 (CQ-64~)
+
+- 감사 시점 HEAD `ce902ce16`. 대상은 `trading/application/service` 69파일(약 7,700줄)이다. `/api-audit --focus 코드철학`으로 저비용 서브에이전트 3개가 탐색했고 판정은 메인 세션이 했다. ✔는 메인 세션이 직접 재확인한 위치다. 경로 접두사 `trading/application/service/`는 생략한다.
+- 제외한 항목: `DcaExecutionRecorder.recordSkipped`(8인자)·`TradingPreviewService.buildPreview`(10인자)는 CQ-45~ 감사의 "8~10인자 메서드 재제안" 판정과 같다. 평단 가중평균 3곳(`AccountBalance`·`CapitalInjectionService:103`·`VrReconfigureService:190`)은 체결 vs 투입, VR은 0주일 때 null이라 의미가 다르고 공식에 닿는다. MAINTAIN 시드 규칙(`StrategyService:187`·`CycleRotationService:67`)은 2곳이다.
+
+### CQ-64 service 동작 불변 정리 묶음
+- 주제: 코드철학. 유형: 죽은 코드·보일러플레이트·stale 주석·가시성. 위험: 낮음.
+- 위치:
+  - 미사용 지역변수 `Strategy strategy = owned.strategy()`: `StrategyService:73` ✔, `support/StrategyHistoryQueryService:100,114` ✔.
+  - 헬퍼 우회: `TradingPreviewService:297` `status() == ACTIVE`(→ `isActive()`) ✔, `:79` `TradingAccount.from(account).brokerRef().broker()`(→ `account.broker()`) ✔, `CapitalInjectionService:169` 수기 `new AccountBalance`(→ `withUsdDeposit`) ✔.
+  - 도달 불가 가드: `VrStrategyDetailService:69` `vrDetail == null || cycleVr == null`(호출처 2곳 모두 `Optional.map` 람다 안) ✔, openingPool 가드 `:50-53`·`:70-72` 중복 ✔.
+  - `CyclePositionPersistor:41,57,60` `cycleOrderStrategies.of(...)` 4회 호출·`:52` 별칭 변수·`:50-51` 주석 위치 ✔.
+  - stale 주석 "application/service/trading 패키지 전용": `StrategyOrderPlanBuilder:30`, `TradingOrderSlots:16`(사용처도 틀림), `VrReconfigureService:44` ✔.
+  - 겹치는 개별 import: `TradingService:2-4` ✔, `TradingReporter`.
+  - 단순 위임 private 메서드: `TradingService:426` `placeAtOpenPlannedOrders` ✔.
+  - `MarketEventNotifier:38` private `notify(type, …)`의 상수 인자·`Object.notify` 이름 충돌 ✔.
+  - `OrderSubmitter` 로그 인자 4개 10회·알림 `.formatted` 6회 반복 ✔.
+  - `OrderCancelService:93` 로그 본문 `cycleId=`(범위에 strategyId 있음) ✔.
+  - `ManualTradeCorrectionService:157-162` FQN `java.util.TreeSet`·`forEach(add)` ✔.
+  - 불필요한 public: `CryptoDcaRunner:38` ✔(외부 참조 0), `support/TradingBatchShutdownCoordinator:16`, `VrStrategyDetailService` 메서드.
+- 가드: 없음.
+- 상태: open.
+
+### CQ-65 서비스의 도메인 술어 직접 판정
+- 주제: 코드철학(TDA). 유형: 중복·비일관. 위험: 낮음.
+- 위치:
+  - 사이클 종료 `endDate() != null`/`== null`: `CapitalInjectionService:203,211`, `CryptoDcaRunner:113`, `ManualTradeCorrectionService:74`, `TradingPreviewService:142`, `StrategyService:180`, `StrategyDetailAssembler:181`, `adapter/in/schedule/BatchContextFactory:57` ✔. stats `InvestmentIndexCalculator:155,250,262`·`CryptoPortfolioService:98`·`TradingStatsService:84`도 같은 판정이다(전역 후보).
+  - 수동 보정 행 제외 `!UNKNOWN_LEG.equals(orderLeg)`: `domain/model/Order.java:55`(`isBrokerSubmitted` 안), `CloseReportScope:37`, `ManualTradeCorrectionService:167` ✔.
+  - BUY 합계: `TradingPreviewService:298-301`이 `AccountBalance.buyTotal`(matching `:52`)과 본문이 같다 ✔.
+- 수정 방향: `StrategyCycle.isEnded()`, `Order.isStrategyOrder()`를 추가하고 호출처를 바꾼다. 미리보기는 `buyTotal`을 재사용한다.
+- 가드: 도메인 메서드 단위 테스트.
+- 상태: open.
+
+### CQ-66 서비스 시그니처·명명 정리
+- 주제: 코드철학. 유형: TDA·인접 동일 타입·명명. 위험: 낮음~중간(VR 재설정 경로).
+- 위치(서브에이전트 보고, 착수 시 재확인):
+  - Command null→0 정규화·음수 거부 반복: `CapitalInjectionService:74-85`, `VrReconfigureService:152-171,201-202`.
+  - `InsufficientBalanceEvent` 10인자 위치 생성 4곳: `CycleRotationService:78,126`, `TradingCandidatePlanner:262`, `TradingOrderExecutor:170`.
+  - `strategy.requiresPrivacyBase() ? privacyBase : null` 3곳: `TradingCandidatePlanner:176,226`, `TradingService:211`.
+  - `support/TradingParallelRunner:29` `Object groupKey`(호출처 모두 계좌 UUID).
+  - `CapitalInjectionService`가 인출도 담는다. `CapitalWithdrawalService:24` 필드명 `ledgerWriter`.
+- 수정 방향: Command 접근자·`validate()`, 이벤트 정적 팩토리, `CycleState` compact 생성자 정규화, `UUID groupKey`, `CapitalLedgerService` 개명(테스트·문서·`flows.yml` 참조 포함).
+- 가드: VR 재설정·투자금 추가 기존 테스트로 동작을 고정한 뒤 손댄다.
+- 상태: open.
