@@ -221,4 +221,100 @@ INSERT INTO trading.cycle_position_infinite (cycle_position_id, is_reverse_mode)
 SELECT id, false FROM seed_open_positions
 ON CONFLICT (cycle_position_id) DO NOTHING;
 
+-- ── 코인 계좌 통화별 합산(summary·곡선·사이클 성과) 검증용: BINANCE(USDT)·UPBIT(KRW) [시드] 계좌에 DCA 전략(PAUSED) ──
+-- DCA는 원장 예수금 기반(CryptoLedgerRecorder) — 회차마다 deposit이 매수액만큼 줄고 holdings가 늘며 avg_price는 누적 매입원가 ÷ holdings
+-- 120일 전 시작 사이클, 매일(주말 포함) 04:30 KST 스냅샷, 60일 전 INJECT 이벤트(start_amount·이후 deposit에 가산, open_amount 불변)
+-- 시드 코인 계좌의 crypto-portfolio(실 거래소 잔고) 호출은 가짜 자격증명이라 실패하는 것이 정상이다. PAUSED라 스케쥴러가 건드리지 않는다(재개 금지)
+CREATE TEMP TABLE seed_crypto (broker, ticker, currency_seed, daily_spend, base_price, inject_amount, rule_amount) ON COMMIT DROP AS
+VALUES ('BINANCE', 'ETH', 1000::numeric, 5::numeric, 3000::numeric, 500::numeric, 5::numeric),
+       ('UPBIT', 'BTC', 1500000::numeric, 7500::numeric, 95000000::numeric, 750000::numeric, 7500::numeric);
+
+INSERT INTO trading.accounts (id, user_id, nickname, broker, account_no, app_key, secret_key)
+SELECT md5('dev-seed:crypto:' || lower(k.broker) || ':account')::uuid, a.user_id,
+       CASE k.broker WHEN 'BINANCE' THEN '[시드] 바이낸스' ELSE '[시드] 업비트' END, k.broker, a.account_no, a.app_key, a.secret_key
+FROM seed_crypto k
+CROSS JOIN LATERAL (SELECT * FROM trading.accounts
+                    WHERE user_id = '00000000-0000-0000-0000-000000000001' AND broker = 'MOCK'
+                      AND nickname LIKE '[시드]%' AND deleted_at IS NULL ORDER BY created_at LIMIT 1) a
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO trading.strategy (id, account_id, type, ticker, status, cycle_seed_type)
+SELECT md5('dev-seed:crypto:' || lower(k.broker) || ':strategy')::uuid, md5('dev-seed:crypto:' || lower(k.broker) || ':account')::uuid,
+       'DCA', k.ticker, 'PAUSED', 'NONE'
+FROM seed_crypto k WHERE EXISTS (SELECT 1 FROM trading.accounts WHERE id = md5('dev-seed:crypto:' || lower(k.broker) || ':account')::uuid)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO trading.strategy_version (id, strategy_id, version_no)
+SELECT md5('dev-seed:crypto:' || lower(k.broker) || ':version')::uuid, s.id, 1
+FROM seed_crypto k JOIN trading.strategy s ON s.id = md5('dev-seed:crypto:' || lower(k.broker) || ':strategy')::uuid
+ON CONFLICT (id) DO NOTHING;
+
+-- DCA 규칙: 매일 BUY 시장가 고정 금액, 부족 시 가용만큼(PARTIAL) — 코인 실행 시각 04시(KST)
+INSERT INTO trading.strategy_dca_rule (id, strategy_version_id, rule_key, sort_order, direction, frequency, order_type,
+                                       execution_hour, sizing_type, amount, shortfall_policy)
+SELECT md5('dev-seed:crypto:' || lower(k.broker) || ':rule')::uuid, v.id,
+       md5('dev-seed:crypto:' || lower(k.broker) || ':rulekey')::uuid::text, 0, 'BUY', 'DAILY', 'MARKET',
+       4, 'AMOUNT', k.rule_amount, 'PARTIAL'
+FROM seed_crypto k JOIN trading.strategy_version v ON v.id = md5('dev-seed:crypto:' || lower(k.broker) || ':version')::uuid
+ON CONFLICT (id) DO NOTHING;
+
+-- 진행 중 사이클: start_amount = open_amount + INJECT — CapitalLedgerService.inject가 start_amount += 예수금으로 갱신한다
+INSERT INTO trading.strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, start_date, created_at)
+SELECT md5('dev-seed:crypto:' || lower(k.broker) || ':cycle')::uuid, v.strategy_id, v.id,
+       k.currency_seed + k.inject_amount, k.currency_seed, d.start_date, d.start_date::timestamp AT TIME ZONE 'Asia/Seoul'
+FROM seed_crypto k
+JOIN trading.strategy_version v ON v.id = md5('dev-seed:crypto:' || lower(k.broker) || ':version')::uuid
+CROSS JOIN LATERAL (SELECT (now() AT TIME ZONE 'Asia/Seoul')::date - 120 AS start_date) d
+ON CONFLICT (id) DO NOTHING;
+
+-- 개장 스냅샷: 예수금 = 시드, 보유 0
+INSERT INTO trading.cycle_position (id, strategy_cycle_id, deposit, closing_price, avg_price, holdings, created_at)
+SELECT md5('dev-seed:crypto:' || lower(k.broker) || ':pos:open')::uuid, c.id, k.currency_seed, k.base_price, NULL, 0, c.created_at
+FROM seed_crypto k JOIN trading.strategy_cycle c ON c.id = md5('dev-seed:crypto:' || lower(k.broker) || ':cycle')::uuid
+ON CONFLICT (id) DO NOTHING;
+
+-- 일별 스냅샷(주말 포함): 누적 매수 = 일수 × 일 매수액, deposit = 시드 − 누적 매수 (+ INJECT 이후 주입액), avg = 누적 매입원가 ÷ holdings
+CREATE TEMP TABLE seed_crypto_positions ON COMMIT DROP AS
+WITH days AS (
+    SELECT k.broker, k.currency_seed, k.daily_spend, k.inject_amount, c.id AS cycle_id, c.start_date, d::date AS day,
+           round((k.base_price * (1 + 0.12 * sin(extract(epoch FROM d) / 86400 / 11) + (d::date - c.start_date) * 0.0004))::numeric, 2) AS closing_price
+    FROM seed_crypto k
+    JOIN trading.strategy_cycle c ON c.id = md5('dev-seed:crypto:' || lower(k.broker) || ':cycle')::uuid
+    CROSS JOIN generate_series(c.start_date + 1, (now() AT TIME ZONE 'Asia/Seoul')::date - 1, interval '1 day') d
+), cum AS (
+    SELECT *, sum(daily_spend / closing_price) OVER (PARTITION BY broker ORDER BY day) AS holdings,
+           sum(daily_spend) OVER (PARTITION BY broker ORDER BY day) AS spent
+    FROM days
+)
+SELECT md5('dev-seed:crypto:' || lower(broker) || ':pos:' || day)::uuid AS id, cycle_id, broker,
+       currency_seed - spent + CASE WHEN day >= start_date + 60 THEN inject_amount ELSE 0 END AS deposit,
+       closing_price, round(spent / holdings, 2) AS avg_price, round(holdings, 8) AS holdings,
+       (day + time '04:30') AT TIME ZONE 'Asia/Seoul' AS created_at, day
+FROM cum;
+
+INSERT INTO trading.cycle_position (id, strategy_cycle_id, deposit, closing_price, avg_price, holdings, created_at)
+SELECT id, cycle_id, deposit, closing_price, avg_price, holdings, created_at FROM seed_crypto_positions
+ON CONFLICT (id) DO NOTHING;
+
+-- 60일 전 INJECT 이력(예수금만 주입 — 주식 매입원가 0): 그날 스냅샷에 연결
+INSERT INTO trading.cycle_capital_event (id, strategy_cycle_id, cycle_position_id, kind, deposit_delta, holdings_delta,
+                                         principal_delta, occurred_at)
+SELECT md5('dev-seed:crypto:' || lower(k.broker) || ':inject')::uuid, p.cycle_id, p.id, 'INJECT', k.inject_amount, 0, k.inject_amount, p.created_at
+FROM seed_crypto k
+JOIN seed_crypto_positions p ON p.broker = k.broker AND p.day = (SELECT start_date + 60 FROM trading.strategy_cycle WHERE id = p.cycle_id)
+ON CONFLICT (id) DO NOTHING;
+
+-- 체결 주문: 최근 7일 중 3일(1·3·5일 전) 소수 수량 종결 BUY — 코인 DCA 주문 leg는 DCA_{rule_key}
+INSERT INTO trading.orders (id, account_id, strategy_cycle_id, trade_date, ticker, order_type, timing, direction, order_leg,
+                            price, quantity, status, external_order_id, filled_quantity, filled_price)
+SELECT md5('dev-seed:crypto:order:' || lower(k.broker) || ':' || o.ago)::uuid,
+       md5('dev-seed:crypto:' || lower(k.broker) || ':account')::uuid, c.id,
+       (now() AT TIME ZONE 'Asia/Seoul')::date - o.ago, k.ticker, 'MARKET', 'AT_CLOSE', 'BUY',
+       'DCA_' || md5('dev-seed:crypto:' || lower(k.broker) || ':rulekey')::uuid::text,
+       k.base_price, 0.0123, 'FILLED', 'SEED-' || left(md5(k.broker || o.ago), 10), 0.0123, k.base_price
+FROM seed_crypto k
+JOIN trading.strategy_cycle c ON c.id = md5('dev-seed:crypto:' || lower(k.broker) || ':cycle')::uuid
+CROSS JOIN (VALUES (1), (3), (5)) AS o(ago)
+ON CONFLICT (id) DO NOTHING;
+
 COMMIT;
