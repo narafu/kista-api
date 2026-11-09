@@ -9,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,15 +52,47 @@ class CryptoFearGreedAdapterTest {
                         }
                         """, MediaType.APPLICATION_JSON));
 
-        var result = adapter.fetchHistory(2);
+        var history = adapter.fetchHistory(2);
+        var result = history.snapshots();
 
         // 최신순 응답을 오름차순으로 뒤집고, timestamp(UTC 자정 Unix 초)를 그대로 Instant로 쓴다
         assertThat(result).extracting(FearGreedSnapshot::snapshotDate)
                 .containsExactly(Instant.ofEpochSecond(1782691200L), Instant.ofEpochSecond(1782777600L));
         assertThat(result).extracting(FearGreedSnapshot::source).containsOnly("CRYPTO");
+        assertThat(history.untilNextUpdate()).isEqualTo(Duration.ofSeconds(3600));
         assertThat(result.getLast().value()).isEqualTo(15);
         assertThat(result.getLast().rating()).isEqualTo(FearGreedRating.EXTREME_FEAR);
         assertThat(result.getFirst().rating()).isEqualTo(FearGreedRating.NEUTRAL);
         server.verify();
+    }
+
+    @Test
+    void fetchHistory_untilNextUpdate_isNull_whenFieldAbsent() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        CryptoFearGreedAdapter adapter = new CryptoFearGreedAdapter(builder.build());
+
+        server.expect(requestTo("https://api.alternative.me/fng/?limit=1"))
+                .andRespond(withSuccess("""
+                        {"data": [{"value": "15", "value_classification": "Extreme Fear", "timestamp": "1782777600"}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThat(adapter.fetchHistory(1).untilNextUpdate()).isNull();
+    }
+
+    @Test
+    void fetchHistory_untilNextUpdate_isNull_whenBlankOrNonNumeric() {
+        for (String raw : new String[]{"", "soon"}) {
+            RestClient.Builder builder = RestClient.builder();
+            MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+            CryptoFearGreedAdapter adapter = new CryptoFearGreedAdapter(builder.build());
+
+            server.expect(requestTo("https://api.alternative.me/fng/?limit=1"))
+                    .andRespond(withSuccess("""
+                            {"data": [{"value": "15", "value_classification": "Extreme Fear", "timestamp": "1782777600", "time_until_update": "%s"}]}
+                            """.formatted(raw), MediaType.APPLICATION_JSON));
+
+            assertThat(adapter.fetchHistory(1).untilNextUpdate()).isNull();
+        }
     }
 }

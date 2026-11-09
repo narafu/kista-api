@@ -7,6 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -54,6 +55,11 @@ public class TtlResultCache {
     }
 
     public <V> V getOrCompute(Object key, Duration ttl, Supplier<V> loader) {
+        return getOrCompute(key, v -> ttl, loader);
+    }
+
+    // TTL을 적재된 값(non-null)에서 계산 — 값이 만료 시각을 알려주는 소스(예: 다음 갱신까지 남은 시간)용
+    public <V> V getOrCompute(Object key, Function<? super V, Duration> ttlOf, Supplier<V> loader) {
         V peeked = peek(key);
         if (peeked != null) {
             return peeked;
@@ -71,7 +77,7 @@ public class TtlResultCache {
                 return null; // null 결과는 캐시하지 않음 — 일시 실패가 TTL 동안 고착되는 것 방지
             }
             cleanupIfNeeded();
-            Entry entry = new Entry(fresh, clock.instant().plus(ttl));
+            Entry entry = new Entry(fresh, clock.instant().plus(ttlOf.apply(fresh)));
             cache.put(key, entry);
             // 계산 시작 뒤 무효화가 있었으면(put 직전 포함 — invalidateIf는 락 없음) 방금 넣은 항목을 되돌린다
             // ponytail: 인스턴스 전역 세대 — 무효화 순간 진행 중이던 다른 키 결과도 한 번 캐시 생략, 무효화가 잦아지면 키별 세대로

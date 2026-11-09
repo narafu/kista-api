@@ -14,6 +14,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -93,6 +94,29 @@ class TtlResultCacheTest {
         });
 
         assertThat(result).isEqualTo("value2");
+        assertThat(callCount.get()).isEqualTo(2);
+    }
+
+    @Test
+    void getOrCompute_usesTtlDerivedFromLoadedValue() {
+        AtomicInteger callCount = new AtomicInteger();
+        Function<Integer, Duration> ttlOf = Duration::ofMinutes; // 값 자체가 TTL(분)
+
+        cache.getOrCompute("key", ttlOf, () -> {
+            callCount.incrementAndGet();
+            return 5;
+        });
+        clock.advance(Duration.ofMinutes(4)); // 값이 정한 TTL 이내
+        cache.getOrCompute("key", ttlOf, () -> {
+            callCount.incrementAndGet();
+            return 5;
+        });
+        clock.advance(Duration.ofMinutes(2)); // 값이 정한 TTL 초과
+        cache.getOrCompute("key", ttlOf, () -> {
+            callCount.incrementAndGet();
+            return 5;
+        });
+
         assertThat(callCount.get()).isEqualTo(2);
     }
 
