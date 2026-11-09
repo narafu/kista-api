@@ -892,7 +892,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - BUY 합계: `TradingPreviewService:298-301`이 `AccountBalance.buyTotal`(matching `:52`)과 본문이 같다 ✔.
 - 수정 방향: `StrategyCycle.isEnded()`, `Order.isStrategyOrder()`를 추가하고 호출처를 바꾼다. 미리보기는 `buyTotal`을 재사용한다.
 - 가드: 도메인 메서드 단위 테스트.
-- 상태: open.
+- 상태: done(be153b5b4). stats 5곳도 함께 바꿨다. `Order`를 mock하는 테스트(`CloseReportScopeTest`·`ManualTradeCorrectionServiceTest`)는 `isStrategyOrder()`도 stub한다.
 
 ### CQ-66 서비스 시그니처·명명 정리
 - 주제: 코드철학. 유형: TDA·인접 동일 타입·명명. 위험: 낮음~중간(VR 재설정 경로).
