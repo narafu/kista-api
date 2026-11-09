@@ -62,8 +62,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("CapitalInjectionService 단위 테스트 (추가·인출)")
-class CapitalInjectionServiceTest {
+@DisplayName("CapitalLedgerService 단위 테스트 (추가·인출)")
+class CapitalLedgerServiceTest {
 
     @Mock StrategyPort strategyPort;
     @Mock AccountPort accountPort;
@@ -78,7 +78,7 @@ class CapitalInjectionServiceTest {
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     final CycleOrderStrategies minSeedStrategies = new CycleOrderStrategies(List.of(new InfiniteCycleOrderStrategy(null, null)));
 
-    CapitalInjectionService service;
+    CapitalLedgerService service;
     CapitalWithdrawalService withdrawal; // 인출 진입점(전일종가 선조회 후 service.withdraw 호출)
 
     private final UUID strategyId = UUID.randomUUID();
@@ -100,8 +100,8 @@ class CapitalInjectionServiceTest {
         org.mockito.Mockito.lenient().when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
     }
 
-    private CapitalInjectionService newService(Clock clock) {
-        return new CapitalInjectionService(strategyPort, accountPort, strategyCyclePort, cyclePositionPort, orderPort, batchRunPort,
+    private CapitalLedgerService newService(Clock clock) {
+        return new CapitalLedgerService(strategyPort, accountPort, strategyCyclePort, cyclePositionPort, orderPort, batchRunPort,
                 new StrategyLedgerBudget(cyclePositionPort, orderPort, batchRunPort, cycleOrderStrategies), clock, eventPublisher, cycleCapitalEventPort);
     }
 

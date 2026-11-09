@@ -869,7 +869,7 @@ flows:
         desc: >-
           POST /api/trading-cycles/{id}/capital-injection. 내 전략인지 확인하고 PRIVACY·INFINITE·DCA만 허용한다(DCA는 예수금만, 금액 자릿수는 계좌 통화 기준, 코인 계좌는 마감 리포트가 없어 리포트 창 검사를 건너뛴다). 진행 중인 사이클 행을 잠가 수동 체결 보정과 직렬화한 뒤,
           행 잠금 뒤 사이클을 다시 읽어 종료 여부를 재확인하고, 예수금을 더하고 주식은 가중평균 평단가로 합쳐 최신 포지션 행을 갱신한다(행을 늘리지 않아 INFINITE 리버스 판정·별점가·이력이 그대로다).
-        code: [TradingCycleController#injectCapital, CapitalInjectionService#inject, StrategyCyclePort#lockForUpdate, StrategyCyclePort#updateStartAmount, CyclePositionPort#updateBalance, CycleCapitalEventPort#save]
+        code: [TradingCycleController#injectCapital, CapitalLedgerService#inject, StrategyCyclePort#lockForUpdate, StrategyCyclePort#updateStartAmount, CyclePositionPort#updateBalance, CycleCapitalEventPort#save]
         state: "최신 cycle_position 갱신 · strategy_cycle.start_amount += 추가분 · cycle_capital_event(INJECT) 이력 추가"
         fail: 입력 누락·0 이하·주식 수량/단가 불일치·DCA에 주식 수량 지정·금액 자릿수 초과·PRIVACY/INFINITE/DCA 외 전략이면 400, 사이클이 이미 종료됐거나 마감 리포트 진행 중(오늘 postClose 이후·리포트 마커 전)이면 400, 내 전략이 아니면 403, 없으면 404.
       - id: withdraw
@@ -880,7 +880,7 @@ flows:
           POST /api/trading-cycles/{id}/capital-withdrawal. 추가와 같이 내 전략·PRIVACY·INFINITE·DCA·진행 중 사이클을 확인하고 사이클 행을 잠근 뒤 재조회한다.
           인출 가능액은 최신 장부 예수금에서 오늘·다음 거래일의 체결 전 매수 주문 금액과 아직 마감 리포트 전인 날짜의 장중 취소된 매수 주문의 기록된 체결분(체결량을 모르면 주문 금액 전체)을 뺀 값이며, 이를 넘거나 인출 후 시작 금액이 0 이하가 되면 거절한다.
           INFINITE는 인출 후 시작 금액이 최소 시드(전일종가×분할×2) 미만이어도 거절한다(전일종가는 트랜잭션 밖에서 조회하고, 조회 실패 시 이 검사만 건너뛴다). 통과하면 최신 포지션 행의 예수금과 사이클 시작 금액을 같은 금액만큼 줄인다(강제 매도·주문 취소 없음, 다음 주문 계산부터 반영).
-        code: [TradingCycleController#withdrawCapital, CapitalWithdrawalService#withdraw, CapitalInjectionService#withdraw, InfiniteMinSeedGuard#minSeed, StrategyCyclePort#lockForUpdate, StrategyCyclePort#updateStartAmount, CyclePositionPort#updateBalance, CycleCapitalEventPort#save]
+        code: [TradingCycleController#withdrawCapital, CapitalWithdrawalService#withdraw, CapitalLedgerService#withdraw, InfiniteMinSeedGuard#minSeed, StrategyCyclePort#lockForUpdate, StrategyCyclePort#updateStartAmount, CyclePositionPort#updateBalance, CycleCapitalEventPort#save]
         state: "최신 cycle_position.usd_deposit -= 인출액 · strategy_cycle.start_amount -= 인출액 · cycle_capital_event(WITHDRAW) 이력 추가"
         fail: 금액 0 이하·금액 자릿수 초과·PRIVACY/INFINITE/DCA 외 전략·인출 가능액 초과·인출 후 시작 금액 0 이하면 400, INFINITE 인출 후 최소 시드 미만이면 400(시세 조회 실패 시 건너뜀), 사이클이 이미 종료됐거나 마감 리포트 진행 중이면 400, 내 전략이 아니면 403, 없으면 404.
 

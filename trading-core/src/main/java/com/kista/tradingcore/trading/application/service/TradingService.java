@@ -205,7 +205,7 @@ class TradingService {
                     new TradingCandidatePlanner.CycleState(ctx,
                             balanceLoader.loadBalanceOrThrow(ctx.strategy()),
                             null, null, null,
-                            ctx.strategy().requiresPrivacyBase() ? priceCtx.privacyBase() : null),
+                            priceCtx.privacyBase()), // PRIVACY 외 전략은 CycleState가 비운다
                     // PLACED만 보면 체결 기록(markFilledOrders) 후 포지션 저장 전에 중단된 전략의 주문이 빠져
                     // 체결 없는 포지션이 저장된다 — 상태 무관 당일 접수분을 다시 넘긴다(체결 반영은 브로커 체결 내역 기준이라 재기록 무해)
                     reportableOrders(ctx.strategy().id(), today))));
@@ -289,7 +289,7 @@ class TradingService {
                         ps.state().ctx().account().id(),
                         () -> batchGuard.runSafely("체결 리포트", ps.state().ctx(), () -> {
                             // 계획 시점 잔고는 메모리에 오래 남아 그 사이 append된 스냅샷(투자금 추가·수동 보정)을 덮어쓰므로 최신 행으로 재조회
-                            // ponytail: 재조회~스냅샷 저장 사이에 브로커 호출(미체결 취소·체결 조회)로 수 초 창이 있다. 투자금 추가·인출(CapitalInjectionService)과 수동 체결 보정(ManualTradeCorrectionService)도 같은 창(postClose~리포트 마커)에 거절한다.
+                            // ponytail: 재조회~스냅샷 저장 사이에 브로커 호출(미체결 취소·체결 조회)로 수 초 창이 있다. 투자금 추가·인출(CapitalLedgerService)과 수동 체결 보정(ManualTradeCorrectionService)도 같은 창(postClose~리포트 마커)에 거절한다.
                             AccountBalance reportBalance = cyclePositionPort.findLatestOne(ps.state().ctx().currentCycle().id())
                                     .map(CyclePosition::toBalance).orElse(ps.state().balance());
                             reporter.recordAndNotify(today, ps.state().ctx(), reportBalance,

@@ -122,7 +122,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
     }
 
     // 마감 리포트 창(오늘 postClose 이후 ~ 리포트 마커 전) 거절 — 리포트는 postClose 이후 읽은 최신 포지션 잔고에 브로커 호출(수 초) 뒤 체결을 반영해 새 행을 append하므로,
-    // 그 사이 append한 보정 스냅샷은 무시된다. 같은 기준: CapitalInjectionService#requireOutsideReportWindow
+    // 그 사이 append한 보정 스냅샷은 무시된다. 같은 기준: CapitalLedgerService#requireOutsideReportWindow
     private void rejectDuringReportWindow(Account account, Strategy strategy) {
         // 코인 계좌는 마감 리포트가 없어 제외 (rejectUnidentifiedFillsBeforeReport와 같은 이유)
         if (account.broker().getMarket().isCrypto()) return;

@@ -306,7 +306,7 @@ class HexagonalArchitectureTest {
                 "com.kista.tradingcore.trading.application.service.AccountOpenOrderCanceller",   // 계좌 삭제 전 미체결 주문 취소(account 정의 포트가 Account를 넘김)
                 "com.kista.tradingcore.trading.application.service.UserTradingDataEraseService", // 탈퇴 미체결 취소(AccountUseCase.listByUser → AccountOpenOrderCancelPort가 Account를 받음)
                 "com.kista.tradingcore.trading.application.service.DcaConfigService",            // 소유권 검증 + 계좌 브로커 시장 규칙 검증
-                "com.kista.tradingcore.trading.application.service.CapitalInjectionService",     // 소유권 검증 + 계좌 통화(금액 자릿수·문구)·코인 여부
+                "com.kista.tradingcore.trading.application.service.CapitalLedgerService",     // 소유권 검증 + 계좌 통화(금액 자릿수·문구)·코인 여부
                 "com.kista.tradingcore.trading.application.service.AccountLedgerTotalsService",  // 소유권 검증 + 계좌 통화(반올림)·코인 여부(시세 소스)
                 "com.kista.tradingcore.trading.application.service.support.OwnedStrategy"       // 전략+소유 계좌 검증 결과 — 서비스가 계좌 통화·시장·브로커를 읽는 단일 통로
         );

@@ -16,6 +16,26 @@ public record InsufficientBalanceEvent(UUID userId, UUID accountId, String accou
                                         StrategyTicker ticker, StrategyType strategyType,
                                         int failedCount, boolean partiallyPlaced,
                                         OrderDirection direction) { // failedCount>0: 증권사 잔고·수량 부족 거절 건수(direction 방향), 0: 원장 상한 거절 또는 관리자 알림(BUY)
+    // 관리자 알림 — 사이클 시드가 계좌 예수금보다 커서 새 사이클을 열 수 없음(holdings 0, strategyType 미사용)
+    public static InsufficientBalanceEvent adminSeedShortage(UUID accountId, String accountNickname,
+                                                             BigDecimal targetSeed, StrategyTicker ticker) {
+        return new InsufficientBalanceEvent(null, accountId, accountNickname, 0, targetSeed, ticker, null, 0, false, OrderDirection.BUY);
+    }
+
+    // 사용자 알림 — 원장 상한 거절(BUY, 증권사 거절 건수 0)
+    public static InsufficientBalanceEvent ledgerRejected(UUID userId, UUID accountId, String accountNickname,
+                                                          StrategyTicker ticker, StrategyType strategyType) {
+        return new InsufficientBalanceEvent(userId, accountId, accountNickname, 0, null, ticker, strategyType, 0, false, OrderDirection.BUY);
+    }
+
+    // 사용자 알림 — 증권사 잔고·수량 부족 거절(failedCount건, 같은 방향 일부 접수 여부)
+    public static InsufficientBalanceEvent brokerRejected(UUID userId, UUID accountId, String accountNickname,
+                                                          StrategyTicker ticker, StrategyType strategyType,
+                                                          int failedCount, boolean partiallyPlaced, OrderDirection direction) {
+        return new InsufficientBalanceEvent(userId, accountId, accountNickname, 0, null, ticker, strategyType,
+                failedCount, partiallyPlaced, direction);
+    }
+
     // direction 필드 도입 전에 저장된 EPR 행은 null — BUY로 본다
     public OrderDirection directionOrBuy() {
         return direction == null ? OrderDirection.BUY : direction;

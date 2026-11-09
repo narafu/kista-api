@@ -149,30 +149,11 @@ class VrReconfigureService implements VrReconfigureUseCase {
     // 인출을 먼저 반영한 뒤(잔여 수량 기준) 주입의 가중평균을 계산 — 같은 요청에서 인출+주입이 함께 와도 순서가 명확하도록
     // 아무것도 없으면 holdings·avgPrice·usdDeposit 그대로 이월(순수 파라미터 수정)
     private AccountBalance applyCapitalAdjustment(ReconfigureVrCommand cmd, CyclePosition latestPosition) {
-        int injectShares = cmd.injectShares() != null ? cmd.injectShares() : 0;
-        if (injectShares < 0) {
-            throw new IllegalArgumentException("투자금 추가 주식 수는 0 이상이어야 합니다.");
-        }
-        BigDecimal injectDeposit = cmd.injectDeposit() != null ? cmd.injectDeposit() : BigDecimal.ZERO;
-        if (injectDeposit.signum() < 0) {
-            throw new IllegalArgumentException("투자금 추가 예수금은 0 이상이어야 합니다.");
-        }
-        int withdrawShares = cmd.withdrawShares() != null ? cmd.withdrawShares() : 0;
-        if (withdrawShares < 0) {
-            throw new IllegalArgumentException("투자금 인출 주식 수는 0 이상이어야 합니다.");
-        }
-        if (withdrawShares > latestPosition.toBalance().wholeShares()) {
-            throw new IllegalArgumentException(
-                    "투자금 인출 주식 수는 보유 수량(" + latestPosition.holdings() + ")을 초과할 수 없습니다.");
-        }
-        BigDecimal withdrawDeposit = cmd.withdrawDeposit() != null ? cmd.withdrawDeposit() : BigDecimal.ZERO;
-        if (withdrawDeposit.signum() < 0) {
-            throw new IllegalArgumentException("투자금 인출 예수금은 0 이상이어야 합니다.");
-        }
-        if (withdrawDeposit.compareTo(latestPosition.usdDeposit()) > 0) {
-            throw new IllegalArgumentException(
-                    "투자금 인출 예수금은 보유 예수금(" + latestPosition.usdDeposit() + ")을 초과할 수 없습니다.");
-        }
+        cmd.validateCapitalAdjustment(latestPosition.toBalance().wholeShares(), latestPosition.holdings(), latestPosition.usdDeposit());
+        int injectShares = cmd.injectSharesOrZero();
+        int withdrawShares = cmd.withdrawSharesOrZero();
+        BigDecimal injectDeposit = cmd.injectDepositOrZero();
+        BigDecimal withdrawDeposit = cmd.withdrawDepositOrZero();
 
         int holdingsAfterWithdrawal = latestPosition.toBalance().wholeShares() - withdrawShares; // VR은 주식 — 정수 수량
         int newHoldings = holdingsAfterWithdrawal + injectShares;
@@ -198,9 +179,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
 
     // V 증분 — 수량 주입 시 V += N×현재가, 없으면 V 이월(순수 파라미터 수정)
     private BigDecimal computeNewValue(ReconfigureVrCommand cmd, StrategyCycleVrDetail currentCycleVr, BigDecimal currentPrice) {
-        int injectShares = cmd.injectShares() != null ? cmd.injectShares() : 0;
-        int withdrawShares = cmd.withdrawShares() != null ? cmd.withdrawShares() : 0;
-        int netShares = injectShares - withdrawShares;
+        int netShares = cmd.netShares();
         if (netShares == 0) {
             return currentCycleVr.value();
         }

@@ -106,10 +106,10 @@ class CycleSnapshotCreator {
         strategyCyclePort.updateStrategyVersion(cycleId, newDetail.strategyVersionId());
         // 개장 금액 계약 — 개장 예수금 + 개장 보유분 시장가
         strategyCyclePort.updateStartAmount(cycleId, totalAssets(r.postBalance(), r.closingPrice()));
-        // holdings·평단도 바뀌므로 updateCycleStartSnapshot이 아닌 updateBalance — CapitalInjectionService와 같은 in-place 방식
+        // holdings·평단도 바뀌므로 updateCycleStartSnapshot이 아닌 updateBalance — CapitalLedgerService와 같은 in-place 방식
         CyclePosition latest = cyclePositionPort.findLatestOne(cycleId)
                 .orElseThrow(() -> new IllegalStateException("VR 재설정 전 포지션이 없습니다."));
-        // 포지션의 closingPrice는 의도적으로 그대로 둔다(CapitalInjectionService와 동일) — 현재가 평가는 startAmount가 담는다
+        // 포지션의 closingPrice는 의도적으로 그대로 둔다(CapitalLedgerService와 동일) — 현재가 평가는 startAmount가 담는다
         cyclePositionPort.updateBalance(latest.id(), r.postBalance());
         // 사이클 VR 상세는 PK=cycleId upsert
         strategyCycleVrPort.save(new StrategyCycleVrDetail(cycleId, r.newValue(),
