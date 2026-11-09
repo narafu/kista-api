@@ -20,7 +20,7 @@
 ## 목표 / 비목표 / 반목표
 
 - 목표: summary, equity-curve, PORTFOLIO 투자지수(벤치마크), 계좌 거래 이력, `/status`, 일별 거래내역이 코인 계좌를 포함하고 통화를 정확히 표기한다.
-- 비목표: 환율 환산, 통화 합산 총액, `/history`의 SOXL 하드코딩, KRW 묶음 금액이 scale 2로 나오는 문제(`totalAssetWithAvgPriceFallback`. UI `fmtMoney`가 KRW를 정수로 표시하므로 이번에는 그대로 둔다).
+- 비목표: 환율 환산, 통화 합산 총액, KRW 묶음 금액이 scale 2로 나오는 문제(`totalAssetWithAvgPriceFallback`. UI `fmtMoney`가 KRW를 정수로 표시하므로 이번에는 그대로 둔다).
 - 반목표: 서로 다른 통화의 금액이 한 숫자로 합쳐지는 것. 코인만을 위한 분기를 서비스에 추가하는 것.
 
 ## API 설계
@@ -79,6 +79,11 @@
     - `TelegramBotService.buildStatusMessage`는 전략마다 블록 하나를 출력한다(유형·종목 헤더, 보유·평가액·예수금·총자산). 빈 목록이면 기존 "데이터 없음" 문구를 쓴다.
     - `$` 리터럴과 `double` 계산 대신 BigDecimal + `Currency.format`을 쓴다. 수량은 `Quantities.normalize` 표기를 쓴다(코인 소수 수량).
     - 통화가 다른 전략의 총자산은 합산하지 않는다.
+- `/history`: **SOXL 하드코딩을 제거한다**(사용자 확정). 지금은 `getHistory(userId, from, to, StrategyTicker.SOXL)`가 SOXL을 뺀 모든 종목(코인과 TQQQ 등)을 거른다.
+  - 종목 파라미터를 끝까지 제거한다: root 포트·어댑터 → 내부 API `/api/internal/trading/stats/portfolio/history` → `PortfolioUseCase` → `orderPort` 호출. 사용자의 전 종목이 대상이다. 그 밖의 필터(MOCK 등)는 현재 동작을 유지한다.
+  - `PortfolioOrderResponse`에 `currency`를 추가한다(주문 계좌 통화 — accountId → 계좌 맵, 매핑이 없으면 일별 거래내역과 같은 규칙으로 처리).
+  - 텔레그램 행 포맷은 종목을 표기하고, 가격은 `Currency.format`, 수량은 `Quantities.normalize`로 바꾼다. `$%.4f`는 제거한다.
+- 배제한 항목: KRW 금액 scale 2. 원장 2자리는 constraints.md에 정한 정책이고, 표시 단계(UI `fmtMoney`, `Currency.format`)에서 KRW를 정수로 표시한다. 운영 UPBIT 전략은 0건이다.
 - **`usdDeposit`은 `deposit`으로 전면 개명한다**(아래 "6. 예수금 필드 전면 개명", 사용자 확정).
 
 ### 4. 일별 거래내역 (trading-core `AccountStatisticsService.toDailyTransactionResult`)
@@ -159,7 +164,7 @@ kista-ui 세션에서 사용자가 결정했고, 이 세션에서 다시 확인�
   - 계좌 통화 표기
   - KRW `amountScale` 반올림
 - `CyclePositionPersistenceAdapter` DB 테스트: 전략별 최신 1건(같은 전략에 여러 스냅샷이 있을 때 최신만, 삭제된 전략 제외)
-- `TelegramBotService`: `/status`가 여러 전략을 각 통화 표기로 출력하는지, 빈 목록 문구
+- `TelegramBotService`: `/status`가 여러 전략을 각 통화 표기로 출력하는지, 빈 목록 문구. `/history`가 SOXL 외 종목과 코인 행을 통화 표기로 출력하는지
 - 변이 확인: 필터를 되돌렸을 때 새 테스트가 실패하는지
 
 ## 문서 드리프트 (같은 작업에서 갱신)
