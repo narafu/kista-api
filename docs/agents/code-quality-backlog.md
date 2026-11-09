@@ -647,6 +647,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | stats 평가액 계산 2종 | `TradingStatsService`(종가 없으면 평단 대체) vs `InvestmentIndexCalculator`(종가 없으면 제외) | 곡선·요약은 연속성이, 투자지수(TWR)는 실평가가 필요해 용도가 다르다(stats 감사 2026-11-08). |
 | stats 서비스 `to` null → today 인라인 | `AccountStatisticsService`·`TradingStatsService`·`InvestmentPointsQueryService` 등 | CQ-04에서 null 기본값을 호출부에 남기기로 했다(CQ-17 Clock 주입과 충돌 방지). |
 | stats 어댑터 빈 응답 → 빈 결과 | `BinanceMarketDataAdapter` 롱숏, `FrankfurterFxRateAdapter`, `UpbitMarketDataAdapter.getKrwPrices` | 소비처가 모두 `tryGet`이고 다음 단계(`LongShortRatio.of` 등)가 빈 값을 실패로 바꾼다. 미결제약정만 가드가 없어 CQ-43에서 고쳤다. |
+| `TradingPreviewService` `TradingAccount.from(account).brokerRef().broker()` 우회 | `trading/application/service/TradingPreviewService.java:79` | 군더더기처럼 보이지만 trading `application.service`는 `Account` 애그리게이트를 직접 쓰지 못한다(`HexagonalArchitectureTest.trading_batch_path_must_not_carry_account_aggregate`, 제외 목록 밖). 투영 경유가 정답이다(CQ-64, 2026-11-09). |
 | 엔티티 저장 패턴 두 갈래(`findOrCreate` vs `new`+`setId`) | `StrategyCyclePersistenceAdapter:120`, `CyclePositionPersistenceAdapter:234`, `CycleCapitalEventPersistenceAdapter:38` vs `findOrCreate` 6곳 | 현재 호출처가 모두 id=null 신규 저장이라 merge 덮어쓰기가 일어나지 않는다. update 경로가 생기면 재검토한다(trading 감사 2026-11-08). |
 
 ### CQ-39 PRIVACY 전략 원장 변화와 체결 주문 합이 어긋남
@@ -882,7 +883,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - `ManualTradeCorrectionService:157-162` FQN `java.util.TreeSet`·`forEach(add)` ✔.
   - 불필요한 public: `CryptoDcaRunner:38` ✔(외부 참조 0), `support/TradingBatchShutdownCoordinator:16`, `VrStrategyDetailService` 메서드.
 - 가드: 없음.
-- 상태: done(aa8881f3f). OrderSubmitter 알림 문구 헬퍼는 접두사가 서로 달라 하지 않았다(로그 접두사만 `logTag`).
+- 상태: done(aa8881f3f). OrderSubmitter 알림 문구 헬퍼는 접두사가 서로 달라 하지 않았다(로그 접두사만 `logTag`). `TradingPreviewService:79`의 `account.broker()` 직접 호출은 root ArchUnit 가드 `trading_batch_path_must_not_carry_account_aggregate` 위반이라 b3e82a5f0에서 `TradingAccount` 투영 경유로 되돌렸다(유지 목록).
 
 ### CQ-65 서비스의 도메인 술어 직접 판정
 - 주제: 코드철학(TDA). 유형: 중복·비일관. 위험: 낮음.
@@ -904,4 +905,4 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - `CapitalInjectionService`가 인출도 담는다. `CapitalWithdrawalService:24` 필드명 `ledgerWriter`.
 - 수정 방향: Command 접근자·`validate()`, 이벤트 정적 팩토리, `CycleState` compact 생성자 정규화, `UUID groupKey`, `CapitalLedgerService` 개명(테스트·문서·`flows.yml` 참조 포함).
 - 가드: VR 재설정·투자금 추가 기존 테스트로 동작을 고정한 뒤 손댄다.
-- 상태: open.
+- 상태: done(1fb18a00c). `ReconfigureVrCommand.validateCapitalAdjustment`는 기존 검사 순서·문구를 그대로 옮겼다.
