@@ -906,3 +906,46 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 수정 방향: Command 접근자·`validate()`, 이벤트 정적 팩토리, `CycleState` compact 생성자 정규화, `UUID groupKey`, `CapitalLedgerService` 개명(테스트·문서·`flows.yml` 참조 포함).
 - 가드: VR 재설정·투자금 추가 기존 테스트로 동작을 고정한 뒤 손댄다.
 - 상태: done(1fb18a00c). `ReconfigureVrCommand.validateCapitalAdjustment`는 기존 검사 순서·문구를 그대로 옮겼다.
+
+## 2026-11-09 stats 실거래 성과 로직 감사 (CQ-67~)
+
+- 감사 시점 HEAD `d6a90eedb`. 대상은 summary·equity-curve·cycles·투자지수(`InvestmentIndexCalculator`)·투자 포인트(`InvestmentPointsQueryService`)와 이들이 읽는 원장이다(백테스트·시장지표 adapter 제외). 판정은 메인 세션이 했고, 운영 DB는 읽기 전용 SELECT로 대조했다. 경로 접두사 `stats/application/service/`는 생략한다.
+- 운영 전제(2026-11-09): 종료 사이클 0건, `cycle_capital_event` 3건(BINANCE DCA 2건·MOCK DCA 1건). 승률·평균 수익률·종료 사이클 실현손익은 운영 근거가 없고 `TradingStatsServiceTest`로만 확인했다.
+- 정책 결정(사용자, 2026-11-09): PRIVACY 통계 원금은 개장 시가 평가 저장, 실현 기준은 사이클 개장 시가, 진행 중 사이클 매도 확정분은 실현에 포함, 시작 후 시드 수정은 이력으로 기록, 끝난 전략 손익은 곡선에 계속 반영, 평균 수익률은 유지 + 문서화, BINANCE 700은 이력 행 백필.
+- 작업 순서: CQ-67 → CQ-69 → CQ-68 → CQ-70. CQ-68은 CQ-67의 실현 기준에 의존한다.
+
+### CQ-67 사이클 개장 시가 평가를 저장하고 통계 원금·실현 기준으로 쓴다
+- 주제: 통계 정의. 유형: 정의 충돌·잘못된 원금. 위험: 중간(마이그레이션, 저장 경로 여러 곳).
+- 위치:
+  - PRIVACY 중간 시작의 `startAmount`는 FIDA 배수 환산 명목값이다(`trading/application/service/StrategyStartAmountCalculator.java:48` ✔). 그런데 stats가 이 값을 원금으로 쓴다: `TradingStatsService.java:87-89`(`principal`), `:259`(미실현), `:164`(운용 원금), `:404-408`(사이클 수익률) ✔. 투자지수는 첫 시가 평가를 진입값으로 써서(`InvestmentIndexCalculator.java:266-272` ✔) 같은 전략인데 화면마다 손익 기준이 다르다.
+  - 실현손익의 원가가 평단이라 등록 전·이전 사이클 이익이 실현에 섞인다(`CapitalLedgerTimeline.java:64-78` ✔). 보유 0 지름길(`TradingStatsService.java:314` ✔)은 첫 장부가가 `startAmount`와 같다고 가정한다. VR 롤오버 이월 사이클(시작 금액 = 시가, 평단 = 원가)에서는 이 가정이 깨져, 전량 매도 후 종료하면 이월분 이익이 영구히 "미실현"에 남는다. 이 경로는 테스트가 없다(`TradingStatsServiceTest:923-990`은 첫 장부가 = 시작 금액인 경우만 다룬다).
+- 근거(운영 SELECT, 2026-11-09): MERITZ PRIVACY는 `start_amount` 66,156.02, 개장 시가 평가 38,289.77, 11-07 자산 27,869.33이다. summary 미실현이 −38,286.69(−57.9%)로 표시되는데 시가 기준으로는 −10,420(−27.2%)이다. 이 전략엔 CQ-39 원장 불일치도 섞여 있다. MERITZ VR은 평단 50.20, 개장 종가 62.01이라 첫 롤오버부터 실현 배분이 흔들린다.
+- 수정 방향: 사이클 개장 시가 평가금과 개장 평단(시가)을 저장한다. 저장 경로는 등록, 롤오버, VR 재설정 시작 전·후, 회전, 재개다. 기존 행은 첫 스냅샷 종가로 백필한다. 매매 계약인 `startAmount`는 그대로 둔다. stats 원금은 개장 평가에 추가·인출을 더한 값으로, 실현은 개장 시가 기준으로 바꾼다. 투자지수 진입값도 같은 값과 대조한다. kista-ui 원금 라벨도 확인한다.
+- 가드: PRIVACY 중간 시작 원금, VR 이월 사이클 전량 매도 종료, 평단 ≠ 시가 등록 사이클의 단위 테스트. 합계(실현 + 미실현 = 총손익)를 보존하는지 단언한다.
+- 상태: open.
+
+### CQ-68 진행 중 사이클의 매도 확정분을 실현손익에 포함한다
+- 주제: 통계 정의. 유형: 정의와 UI 문구 불일치. 위험: 낮음.
+- 위치: `TradingStatsService.java:270-276`(진행 중 사이클은 실현 0, 전부 미실현) ✔. kista-ui `widgets/stats-overview/StatsKpiRow.tsx:19`의 보조문구는 "매도 확정분"이다.
+- 근거: INFINITE 쿼터매도, PRIVACY 매도, DCA SELL처럼 진행 중에 판 금액이 미실현으로 집계된다. 사용자 결정은 실현에 포함하는 것이다(2026-11-09).
+- 수정 방향: CQ-67의 개장 시가 기준 장부가 실현(개장 대비 최신 스냅샷)을 진행 중 사이클에도 적용한다. 미실현은 총손익 − 실현이다. kista-ui 보조문구에서 "VR 승계분은 미실현"을 재검토한다.
+- 가드: 진행 중 사이클의 부분 매도 실현과 합계 보존 단위 테스트.
+- 상태: open(CQ-67 선행).
+
+### CQ-69 투자금 흐름을 이력 하나로 기록하고 투자지수가 읽는다
+- 주제: 통계 정확도. 유형: 누락(CQ-35 범위 밖). 위험: 중간.
+- 위치:
+  - 투자지수가 `cycle_capital_event`를 읽지 않는다. `InvestmentPointsQueryService.java:70-75`가 원본 포지션을 넘기고, `InvestmentIndexCalculator.java:29,112-143`의 외부흐름은 진입·종료·교체뿐이다 ✔. 추가·인출은 최신 포지션 행을 제자리 수정하므로(`trading/.../CapitalLedgerService`) 그날 수익률로 잡힌다. `InvestmentIndexCalculatorTest`에 추가·인출 케이스가 없다.
+  - 이력 없이 원장을 제자리 수정하는 경로 2곳이 있다. 시드 수정(`trading/.../StrategyUpdateWriter.java:101-102` ✔ — 보유 0이면 사이클 시작 후에도 허용, `updateCycleStartSnapshot`은 최신 행만 수정)과 VR 시작 전 재설정(`trading/.../CycleSnapshotCreator.java:108-113` ✔)이다. 과거 원금선과 투자지수가 함께 왜곡된다.
+- 근거: 운영 BINANCE DCA 사이클 `01a18aaf-…1750`(11-07 +100·−350). 11-06 평가 ≈1,288.55, 11-07 평가 ≈1,038.49라 일 수익률이 −19.4%로 나온다(흐름을 반영하면 ≈0%). 지금은 사용자에게 보이지 않는다(크립토는 PORTFOLIO에서 빠지고, kista-ui `useBenchmarkStrategyOptions.ts:27`도 크립토를 뺀다). USD 전략에서 첫 추가·인출이 생기면 바로 보인다. 시드 수정 왜곡은 운영 이력이 남지 않아 확인할 수 없다(미확인).
+- 수정 방향: 순서대로 한다. ① 시드 수정과 VR 시작 전 재설정도 `cycle_capital_event`에 차액을 기록한다(Kind 추가 검토, `existsByCycleId` 거절 규칙과의 관계 정리). ② 투자 포인트 조회가 이력을 읽어 `CapitalLedgerTimeline.restore`로 포지션을 복원하고, 원금 증감을 외부흐름으로 계산기에 넘긴다. ③ BINANCE DCA 11-06의 이력 없는 예수금 700(행 `01a1ae30-e606-…d900`, 투자지수 약 +134% 점프)을 INJECT 1행으로 백필한다. 운영 쓰기라 실행 전에 사용자 승인을 받고, 원인(배포 전 수동 추가로 추정, 미확인)도 함께 확인한다.
+- 가드: 계산기 단위 테스트(추가·인출일 수익률 0), 시드 수정 이력 기록 테스트.
+- 상태: open.
+
+### CQ-70 끝난 전략 손익을 곡선에 유지하고 평균 수익률 정의를 문서화한다
+- 주제: 통계 정의. 유형: 지표 간 정의 불일치. 위험: 낮음.
+- 위치: `TradingStatsService.java:366`(후속 없는 종료 사이클은 종료 다음 날 자산·원금에서 함께 빠진다) ✔, `:289-298`(평균 수익률) ✔.
+- 근거: 시드 정책 NONE으로 끝난 전략은 누적 자산추이의 손익이 사라진다. summary와 투자지수에는 남는다. 평균 수익률은 사이클별 단순수익률의 단순평균이고, 분모(현재 `startAmount`)에 후반 추가금이 들어가 희석된다. VR은 N주 구간을 사이클 하나로 센다.
+- 수정 방향: 체인 보정과 같은 방식으로, 끝난 전략의 실현손익을 곡선 원금에서 계속 뺀다. 그러면 곡선 마지막 손익이 summary 총손익과 같아진다. 평균 수익률은 정의를 그대로 두고 `modules/tradingcore/stats.md`와 kista-ui 보조문구에 고지한다. CQ-67·68에서 바뀐 정의의 UI 라벨도 이 항목에서 한 번에 맞춘다.
+- 가드: 곡선 마지막 점 손익 = summary 총손익(같은 범위) 단위 테스트.
+- 상태: open.
