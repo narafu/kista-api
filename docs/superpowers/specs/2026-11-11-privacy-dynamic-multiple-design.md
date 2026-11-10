@@ -28,7 +28,7 @@ multiple  = ourAsset ÷ fidaAsset   (scale 2, FLOOR)
 
 그대로 두는 것: BUY 가감(`target = plan.holdings × multiple`), SELL cap, 수량 버림 보정. `PrivacyStrategy`에서 배수를 소비하는 코드는 바꾸지 않는다.
 
-검증 기준(11-10, 위 계좌):
+검증 기준(11-11 주문분, 2026-11-11 운영 DB 조회로 확정):
 
 | 항목 | 값 |
 |---|---|
@@ -39,7 +39,7 @@ multiple  = ourAsset ÷ fidaAsset   (scale 2, FLOOR)
 | current_cycle_start | 14434.58 |
 | 실현손익 | −2339.37 |
 
-FIDA 현금은 661.13이 나온다. 그 결과 배수는 약 4.86~4.89, BUY 55.14의 수량은 약 50이어야 한다. 11-10 전일 종가는 구현 중에 운영 DB를 읽기 전용으로 조회해 확정한다.
+전일 종가 P = 56.20(최신 `cycle_position`). 우리 자산 33814.11, FIDA 자산 661.13 + 6294.40 = 6955.53, 배수 **4.86**. 계획 BUY 55.14×11은 53.46 → 보유 초과 −7.68 가감 → **45주**. 사용자 원래 기대치 "약 50"은 2026-11-11 사용자 확인 후 45로 확정했다(체결 후 597주 = FIDA 123주 × 4.86, 남는 예수금은 다음 날 자산에 반영).
 
 ## 평가가·예수금 출처
 
@@ -59,10 +59,10 @@ FIDA 현금은 661.13이 나온다. 그 결과 배수는 약 4.86~4.89, BUY 55.1
   - `PrivacyInputs.initialDeposit`은 평가가 `P`로 대체한다. 이름은 예컨대 `valuationPrice`로 하되 빌더에게 맡긴다.
   - `PrivacyStrategy.buildOrders(balance, P, plan)`가 위 공식으로 배수를 산출한다.
   - 자산 유효성 판정은 순수 계산이므로 커널(`PrivacyPlan` 또는 `PrivacyStrategy`)에 둔다.
-- **skip·알림**
-  - 배치 경로는 기존 PRIVACY 가드와 같은 방식으로 `TradingErrorEvent` 관리자 알림을 보내고 그 전략만 skip한다.
-  - 미리보기·수동 실행은 알림 없이 기존 `SkipReason.PRIVACY_BASE_BLOCKED`를 재사용한다. 새 enum이 없으므로 kista-ui는 변경하지 않는다.
-  - "보유 > 0인데 평단 null"은 base만으로 판정된다. 그래서 `PrivacyTradeValidation`(`PrivacyBaseGuard.screen/usable`)에 넣어도 된다. 빌더는 기존 가드 재사용을 우선한다.
+- **skip·알림** (계획 단계에서 확정)
+  - 커널은 자산 무효 시 전용 예외 `PrivacyValuationException`(`IllegalStateException` 하위)을 던진다.
+  - 배치는 기존 `TradingBatchGuard.runSafely`가 전략 단위로 격리하고 관리자 `TradingErrorEvent`를 보낸다. 새 알림 코드는 없다.
+  - 미리보기·수동 실행(`StrategyOrderPlanBuilder`)은 이 예외만 잡아 `SkipReason.PRIVACY_BASE_BLOCKED`로 바꾼다. 새 enum이 없으므로 kista-ui는 변경하지 않는다.
 - **백테스트**
   - `PrivacyState.cycleStartAmount`를 배수 계산에 쓰는 부분을 제거한다.
   - 무효 자산이 나온 날은 기존 `recordMissingBase`처럼 경고를 기록하고 그 세션은 주문하지 않는다.
@@ -104,7 +104,7 @@ FIDA 현금은 661.13이 나온다. 그 결과 배수는 약 4.86~4.89, BUY 55.1
 - **FIDA 값의 시점**
   - 주문 경로의 base는 `findTodayTrade(today)`(releaseDate = D-1)이다. 보유·평단·`current_cycle_start`·실현손익은 D-1 마감 상태이고 오늘 계획 매매만 미래다. 따라서 전일 종가 `P`와 시점이 같다.
   - 사용자는 검증 기준을 같은 필드로 정의했다.
-  - 구현 중 운영 DB로 11-10 행과 종가를 조회해 확인한다. 어긋나면 멈추고 보고한다.
+  - 2026-11-11 운영 DB 조회로 확인했다: 최신 `cycle_position`(P=56.20)과 release 11-10 기준표가 같은 미국 세션 마감 기준이다.
 - **ourAsset의 출처**
   - 배치·미리보기의 `balance`는 브로커 실조회가 아니라 `TradingBalanceLoader`가 최신 `cycle_position`에서 만든 값이다(`TradingBalanceLoader.java:25-35`).
   - `P`도 같은 최신 행의 `closing_price`를 쓴다. 이 행은 `CycleOrderComputer`가 `cyclePositionPort`로 조회한다(내 판단). 호출부 시그니처는 늘리지 않는다.
@@ -114,13 +114,13 @@ FIDA 현금은 661.13이 나온다. 그 결과 배수는 약 4.86~4.89, BUY 55.1
   - 미리보기에서 폴백이 동작하도록 PRIVACY도 `requiresPrevClose()=true`로 둔다. 배치는 이미 `PriceSnapshot.prevCloseOrNull`을 넘긴다.
 - **백테스트 이력**
   - 과거 base 행에 `avgPrice`(보유>0)·`realizedPnl`이 없으면 그 세션은 skip하고 경고를 남긴다.
-  - 구현 중 운영 `privacy_trade_base`의 null 건수를 조회해 보고에 포함한다(내 판단).
+  - 2026-11-11 조회 결과 운영 기준표 375행 중 평단 누락(보유>0)·실현손익 누락 0건.
   - 백테스트 `P` = 해당 일 `candle.close()`. PRIVACY 대상은 정수 주식이라 소수 보유 이슈는 없다.
 - **운영 중 사이클의 start_amount**: 마이그레이션하지 않는다. 결정 6은 "값은 유지"이고, 기존 bootstrap 값도 등록 당시 자산 비율 기반이라 실제 자금과 크게 다르지 않다. 새 규칙은 신규 등록부터 적용한다.
 - **가드**
   - `PrivacyPlan`의 `currentCycleStart > 0` 가드는 FIDA 데이터 무결성 가드로 유지한다.
   - `initialDeposit ≤ 0` 예외는 제거하고 `ourAsset ≤ 0` skip으로 대체한다.
-  - skip 조건은 예외가 아니라 skip 결과로 표현한다. 배치에서 전략 단위로 격리되도록 하기 위함이다.
+  - skip 조건은 `PrivacyValuationException`으로 표현한다. 배치 격리·알림은 `runSafely`가 이미 제공한다.
 - **골든 테스트**
   - PRIVACY 골든 기대값이 바뀌면 재생성에 그치지 않는다.
   - 대표 1개 세션의 배수·수량을 손 계산으로 대조하고, 근거를 커밋 메시지에 남긴다.
