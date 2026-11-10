@@ -37,6 +37,24 @@ class TradingUserNotificationAdapterWordingTest {
     }
 
     @Test
+    void estimatedBrokerAppendsEditHint() {
+        String hint = "실제 만료일과 다르면 계좌 설정에서 고칠 수 있습니다.";
+        for (int days : new int[]{7, 0}) {
+            TelegramHttpClient t = mock(TelegramHttpClient.class);
+            new TradingUserNotificationAdapter(t, mock(RedisPushNotificationPublisher.class)).notifyApiKeyExpiring(profile,
+                    new ApiKeyExpiringEvent(profile.userId(), UUID.randomUUID(), "한투", Broker.KIS, LocalDate.of(2026, 10, 25), days));
+            verify(t).sendMessage(org.mockito.ArgumentMatchers.eq("chat"),
+                    org.mockito.ArgumentMatchers.endsWith(" " + hint), org.mockito.ArgumentMatchers.eq("tok"));
+        }
+    }
+
+    @Test
+    void brokerApiSourceHasNoEditHint() {
+        adapter.notifyApiKeyExpiring(profile, event(7));
+        verify(telegram, org.mockito.Mockito.never()).sendMessage(any(), org.mockito.ArgumentMatchers.contains("고칠 수"), any());
+    }
+
+    @Test
     void cryptoTradeWording() {
         adapter.notifyCryptoTrade(profile, new com.kista.tradingcore.trading.application.event.CryptoOrderFilledEvent(
                 profile.userId(), UUID.randomUUID(), UUID.randomUUID(), "업비트", com.kista.shared.kernel.StrategyTicker.BTC,

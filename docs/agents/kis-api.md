@@ -105,3 +105,5 @@ adapter/out/kis/    ← KisHttpClient(공통 헤더 + executeWithRetry: 401 시 
 - 계좌번호는 `accounts.account_no`(AES-256 암호화) + `accounts.broker_account_code`(KIS: null, TOSS: accountSeq)에 저장한다
 - KIS API 호출은 `KisHttpClient.splitAccountNo(account.accountNo())` → `[CANO, ACNT_PRDT_CD]` — `-` 기준으로 나누고, 구분자가 없으면 `ACNT_PRDT_CD="01"` 기본값
 - `"74420614-01"` 형태로 저장돼 있으면 `["74420614","01"]`, `"74420614"` 8자리만 저장돼 있으면 기본 `"01"`을 쓴다
+
+- 키 만료일 조회 API 없음 — 등록·교체 시점 + 1년 추정, 사용자 입력 우선(`ApiKeyExpirySource.ESTIMATED`)

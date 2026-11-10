@@ -55,7 +55,7 @@ landscape:
       - {id: close-batch, title: 마감 배치, when: "화~토 04:30", flow: close-batch}
       - {id: report-notify, title: 리포트·알림, when: "마감 배치 끝", flow: close-batch}
       - {id: crypto-dca, title: 코인 DCA 실행, when: "10분마다 (업비트·바이낸스, 24/7)", flow: crypto-dca}
-      - {id: api-key-expiry, title: 업비트 API 키 만료 알림, when: "매일 10:00", flow: crypto-dca}
+      - {id: api-key-expiry, title: API 키 만료 알림, when: "매일 10:00", flow: crypto-dca}
       - {id: fida-receive, title: FIDA 기준표 수신, when: "매일 07:00 (fida 프로젝트)", flow: fida-receive}
   - group: 관리자 프로세스
     steps:
@@ -737,7 +737,7 @@ flows:
         title: 증권사 계좌 검증
         desc: >-
           저장하기 전에 증권사에서 자격증명과 계좌번호가 실제로 맞는지 확인한다. KIS는 토큰을 받아 증거금 조회로 계좌번호 소유를 확인하고,
-          Toss는 계좌 목록에서 계좌 일련번호(accountSeq)를 받아 오며, MOCK은 검증할 것이 없고 메리츠는 계좌 식별자가 없다. 이 호출은 DB 트랜잭션 밖에서 한다. 업비트는 키 검증 후 /v1/api_keys에서 그 키의 만료일(expire_at)을 받아 함께 저장하고, 바이낸스는 키 제한 검증만 하며 만료일이 없다.
+          Toss는 계좌 목록에서 계좌 일련번호(accountSeq)를 받아 오며, MOCK은 검증할 것이 없고 메리츠는 계좌 식별자가 없다. 이 호출은 DB 트랜잭션 밖에서 한다. 업비트는 키 검증 후 /v1/api_keys에서 그 키의 만료일(expire_at)을 받아 함께 저장하고, KIS·토스·메리츠는 조회 API가 없어 입력한 만료일 또는 등록 시점 + 1년 추정값을 저장하며, 바이낸스는 키 제한 검증만 하고 만료일이 없다.
         code: [KisAuthApi#verifyAccount, TossAuthApi#verifyAccount, MockAuthApi#verifyAccount, MeritzAuthApi#verifyAccount, UpbitAuthApi#verifyAccount, BinanceAuthApi#verifyAccount]
         fail: 422(BROKER_CREDENTIAL_INVALID)로 화면에 "App Key, App Secret 또는 계좌번호를 다시 확인하세요"(Toss는 Client ID·Secret 안내)가 보이고 저장되지 않는다.
 
@@ -747,7 +747,7 @@ flows:
         title: 암호화 저장
         desc: 계좌번호·앱 키·시크릿을 AES-256으로 암호화해 저장하고, 중복 확인용으로 계좌번호(메리츠·업비트·바이낸스는 앱 키·access key)의 HMAC 해시도 함께 저장한다. 저장되면 201과 마스킹된 계좌 정보를 돌려주고 화면은 계좌 상세로 이동한다.
         code: [AccountPersistenceAdapter#save]
-        state: "accounts +1 (업비트·메리츠·바이낸스: account_no NULL, 업비트만 api_key_expires_at)"
+        state: "accounts +1 (업비트·메리츠·바이낸스: account_no NULL, 업비트·KIS·토스·메리츠 api_key_expires_at)"
 
       - id: rename
         lane: ui
@@ -763,7 +763,7 @@ flows:
         title: API 키 교체
         desc: >-
           계좌 화면에서 새 키·시크릿을 입력하면 PUT /api/accounts/{id}/credentials가 소유권을 확인하고, 증권사 연결 테스트를 통과해야 저장한다.
-          KIS는 저장된 계좌번호 소유까지, Toss는 같은 계좌(accountSeq)인지까지 확인하고, 메리츠·업비트·바이낸스는 새 키가 다른 계좌에 이미 있으면 거부하며(업비트는 키 만료일도 갱신한다).
+          KIS는 저장된 계좌번호 소유까지, Toss는 같은 계좌(accountSeq)인지까지 확인하고, 메리츠·업비트·바이낸스는 새 키가 다른 계좌에 이미 있으면 거부하며(업비트는 조회값, KIS·토스·메리츠는 입력값 또는 교체 시점 + 1년 추정으로 키 만료일도 갱신한다).
           저장 후 옛 키로 발급된 토큰 캐시(KIS broker_tokens·Toss Redis canonical — 진행 중 발급은 generation 증가로 fence)를 지운다(Redis 실패는 로그만 남기고 TTL 만료에 맡긴다). 신규 등록이 꺼진 증권사도 키 교체는 할 수 있다. 모의계좌는 키가 없어 불가.
         code: [AccountController#updateCredentials, AccountService#updateCredentials, BrokerConnectionTesters#of, AccountTokenEvictionPort#evict]
         state: "accounts.app_key·secret_key·api_key_expires_at 갱신 · broker_tokens·Toss Redis 토큰 삭제"
@@ -1666,9 +1666,9 @@ flows:
         lane: trading
         to: [telegram]
         title: API 키 만료 점검·알림
-        desc: 매일 10:00 KST(락 api-key-expiry) 업비트 계좌의 키 만료까지 30·7·0일 남았을 때만 이벤트를 발행하고, 알림 설정과 무관하게 보낸다.
+        desc: 매일 10:00 KST(락 api-key-expiry) 업비트·KIS·토스·메리츠 계좌의 키 만료까지 30·7·0일 남았을 때만 이벤트를 발행하고, 알림 설정과 무관하게 보낸다.
         code: [ApiKeyExpiryScheduler#publishDue, ApiKeyExpiryNotifier#onApiKeyExpiring]
-        cond: 업비트 계좌이고 만료일이 있을 때
+        cond: 만료일 출처가 있는 계좌(업비트·KIS·토스·메리츠)이고 만료일이 있을 때
 
 lifecycles:
   user:

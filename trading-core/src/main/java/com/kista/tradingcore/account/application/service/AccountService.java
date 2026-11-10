@@ -3,7 +3,9 @@ package com.kista.tradingcore.account.application.service;
 import com.kista.tradingcore.broker.application.port.output.AccountTokenEvictionPort;
 import com.kista.tradingcore.broker.application.service.BrokerConnectionTesters;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountVerification;
+import com.kista.shared.kernel.ApiKeyExpirySource;
 import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.account.domain.model.RegisterAccountCommand;
 import com.kista.tradingcore.account.domain.model.UpdateAccountCommand;
@@ -14,11 +16,16 @@ import com.kista.tradingcore.account.application.port.output.AccountOpenOrderCan
 import com.kista.tradingcore.account.application.port.output.BrokerEnabledPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -38,6 +45,7 @@ class AccountService implements AccountUseCase {
     private final AccountTokenEvictionPort accountTokenEvictionPort; // 키 교체·탈퇴 시 증권사 토큰 캐시(KIS DB·Toss Redis) 제거
     private final AccountOpenOrderCancelPort openOrderCancelPort; // 계좌 삭제 전 미체결 주문 취소 (trading이 구현)
     private final AccountDeletionWriter deletionWriter; // 계좌 삭제 DB 쓰기 (취소 HTTP를 트랜잭션 밖에 두기 위해 분리)
+    private final Clock clock; // API 키 만료일 추정·입력 검증 기준 시각
 
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // Toss accountSeq 조회 HTTP 호출 포함 — 트랜잭션 없이 실행 (단건 저장은 JPA auto-commit)
@@ -45,6 +53,8 @@ class AccountService implements AccountUseCase {
         // broker 미지정 시 KIS 기본값 적용 후 신규 등록 정책을 확인한다.
         Broker broker = brokerOrDefault(cmd.broker());
         requireBrokerEnabled(broker);
+        // 사용자 입력 만료일은 증권사 검증 호출 전에 거른다
+        Instant manual = manualExpiry(broker, cmd.apiKeyExpiresOn());
 
         // MOCK은 서버가 합성 자격증명 생성, 키 전용 브로커(계좌번호 없음)는 키만, 그 외 브로커는 계좌번호 필수
         String accountNo = cmd.accountNo();
@@ -83,6 +93,12 @@ class AccountService implements AccountUseCase {
         // 증권사별 자격증명+계좌 검증 — KIS: 계좌번호 소유, Toss: accountSeq, 업비트: 키 만료일
         BrokerAccountVerification verified = connectionTesters.of(broker)
                 .verifyAccount(appKey, secretKey, accountNo);
+        // 만료일 결정 — 업비트는 API 값, KIS·토스·메리츠는 입력값 또는 추정(+1년), 그 외 없음
+        Instant apiKeyExpiresAt = switch (broker.getApiKeyExpirySource()) {
+            case BROKER_API -> verified.apiKeyExpiresAt();
+            case ESTIMATED -> manual != null ? manual : estimatedExpiry();
+            case NONE -> null;
+        };
 
         Account account = new Account(
                 null, userId, cmd.nickname(),
@@ -90,7 +106,7 @@ class AccountService implements AccountUseCase {
                 verified.brokerAccountCode(),
                 broker,
                 null,    // createdAt — DB에서 자동 설정
-                verified.apiKeyExpiresAt()
+                apiKeyExpiresAt
         );
         Account saved = accountPort.save(account);
         log.info("[accountId={}] [userId={}] 계좌 등록: broker={}", saved.id(), userId, broker);
@@ -106,7 +122,10 @@ class AccountService implements AccountUseCase {
         if (cmd.nickname() == null || cmd.nickname().isBlank()) {
             throw new IllegalArgumentException("계좌 별명은 필수입니다.");
         }
-        return accountPort.save(account.withNickname(cmd.nickname().strip()));
+        Instant manual = manualExpiry(account.broker(), cmd.apiKeyExpiresOn());
+        Account renamed = account.withNickname(cmd.nickname().strip());
+        // 만료일 입력이 있을 때만 교체 — null이면 기존 값 유지
+        return accountPort.save(manual != null ? renamed.withApiKeyExpiresAt(manual) : renamed);
     }
 
     @Override
@@ -116,6 +135,8 @@ class AccountService implements AccountUseCase {
         if (account.broker() == Broker.MOCK) {
             throw new IllegalArgumentException("모의계좌는 API 키를 바꿀 수 없습니다.");
         }
+        // 사용자 입력 만료일은 증권사 검증 호출 전에 거른다
+        Instant manual = manualExpiry(account.broker(), cmd.apiKeyExpiresOn());
         // 업비트·메리츠는 앱키가 곧 중복 판정 키 — 다른 계좌가 이미 쓰는 키면 거부(같은 키 재입력은 허용)
         if (account.broker().isKeyOnlyCredentials() && !cmd.appKey().equals(account.appKey())
                 && accountPort.existsByDedupeKey(cmd.appKey())) {
@@ -127,10 +148,17 @@ class AccountService implements AccountUseCase {
         if (account.broker() == Broker.TOSS && !Objects.equals(verified.brokerAccountCode(), account.brokerAccountCode())) {
             throw new IllegalArgumentException("등록된 계좌와 다른 계좌의 API 키입니다.");
         }
+        // 만료일 결정 — 업비트는 API 값, 추정 증권사는 입력값 → 새 앱키면 재추정 → 같은 키면 유지, 그 외 기존 값
+        Instant apiKeyExpiresAt = switch (account.broker().getApiKeyExpirySource()) {
+            case BROKER_API -> verified.apiKeyExpiresAt();
+            case ESTIMATED -> manual != null ? manual
+                    : !cmd.appKey().equals(account.appKey()) ? estimatedExpiry() : account.apiKeyExpiresAt();
+            case NONE -> account.apiKeyExpiresAt();
+        };
         Account saved;
         try {
             saved = accountPort.save(account.withCredentials(
-                    cmd.appKey(), cmd.secretKey(), account.brokerAccountCode(), verified.apiKeyExpiresAt()));
+                    cmd.appKey(), cmd.secretKey(), account.brokerAccountCode(), apiKeyExpiresAt));
         } catch (DataIntegrityViolationException e) {
             // 사전 중복 검사와 저장 사이 다른 계좌가 같은 키를 등록한 경합 — dedupe unique 위반만 409로, 그 외 무결성 위반은 그대로 전파
             String cause = e.getMostSpecificCause().getMessage();
@@ -186,6 +214,23 @@ class AccountService implements AccountUseCase {
         if (!brokerEnabledPort.enabled(broker)) {
             throw new IllegalArgumentException(broker.getLabel() + " 신규 계좌 등록이 비활성화되어 있습니다."); // 사용자 노출 문구 — enum 코드 대신 한국어 라벨
         }
+    }
+
+    // 사용자 입력 만료일(KST 날짜) → KST 자정 Instant — 추정 증권사만 허용, KST 오늘부터 유효
+    private @Nullable Instant manualExpiry(Broker broker, @Nullable LocalDate expiresOn) {
+        if (expiresOn == null) return null;
+        if (broker.getApiKeyExpirySource() != ApiKeyExpirySource.ESTIMATED) {
+            throw new IllegalArgumentException("이 거래소는 API 키 만료일을 직접 바꿀 수 없습니다.");
+        }
+        if (expiresOn.isBefore(LocalDate.now(clock.withZone(TimeZones.KST)))) {
+            throw new IllegalArgumentException("API 키 만료일은 오늘 이후여야 합니다.");
+        }
+        return expiresOn.atStartOfDay(TimeZones.KST).toInstant();
+    }
+
+    // 실제 발급일을 알 수 없는 증권사의 추정 만료 시각 — 지금(KST) + 1년
+    private Instant estimatedExpiry() {
+        return ZonedDateTime.now(clock).withZoneSameInstant(TimeZones.KST).plusYears(1).toInstant();
     }
 
     // MOCK 계좌 등록용 합성 계좌번호 생성 — KIS 형식(XXXXXXXX-XX)을 재사용해 기존 표시·마스킹 로직과 호환

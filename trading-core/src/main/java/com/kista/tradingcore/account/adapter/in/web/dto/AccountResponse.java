@@ -21,7 +21,7 @@ public record AccountResponse(
         String broker,
         @Schema(description = "계좌 기준 통화(증권사 파생)", example = "USD")
         String currency,
-        @Schema(description = "거래소 API 키 만료 시각 (업비트만, 그 외 null)")
+        @Schema(description = "거래소 API 키 만료 시각 (업비트는 API 조회, KIS·토스·메리츠는 추정(+1년)·사용자 입력, 그 외 null)")
         Instant apiKeyExpiresAt
 ) {
     public static AccountResponse from(Account a) {

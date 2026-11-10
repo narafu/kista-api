@@ -67,23 +67,28 @@ class ApiKeyExpirySchedulerTest {
 
     @Test
     void nonUpbitAccountIgnored() {
-        Account kis = new Account(UUID.randomUUID(), UUID.randomUUID(), "KIS", "n", "a", "s", null, Broker.KIS, now, now);
-        when(accountPort.findAll()).thenReturn(List.of(kis));
-
-        scheduler.publishDue();
-
-        verify(publisher, org.mockito.Mockito.never()).publishEvent(any(Object.class));
-    }
-
-    @Test
-    void meritzAccountWithExpiryIsIgnored() {
-        // 키 전용 브로커여도 만료 점검 대상은 업비트뿐이다
-        Account meritz = new Account(UUID.randomUUID(), UUID.randomUUID(), "메리츠", "n", "a", "s", null, Broker.MERITZ, now, now.plus(Duration.ofDays(7)));
-        when(accountPort.findAll()).thenReturn(List.of(meritz));
+        // 만료일 출처가 없는 바이낸스·MOCK은 값이 있어도 무시한다
+        Account binance = new Account(UUID.randomUUID(), UUID.randomUUID(), "바이낸스", "n", "a", "s", null, Broker.BINANCE, now, now);
+        Account mockAcc = new Account(UUID.randomUUID(), UUID.randomUUID(), "모의", "n", "a", "s", null, Broker.MOCK, now, now);
+        when(accountPort.findAll()).thenReturn(List.of(binance, mockAcc));
 
         scheduler.publishDue();
 
         org.mockito.Mockito.verifyNoInteractions(publisher);
+    }
+
+    @Test
+    void meritzAccountWithExpiryIsPublished() {
+        // 추정 만료일(ESTIMATED) 증권사도 점검 대상 — 메리츠·KIS 모두 발행
+        Account meritz = new Account(UUID.randomUUID(), UUID.randomUUID(), "메리츠", "n", "a", "s", null, Broker.MERITZ, now, now.plus(Duration.ofDays(7)));
+        Account kis = new Account(UUID.randomUUID(), UUID.randomUUID(), "KIS", "n", "a", "s", null, Broker.KIS, now, now);
+        when(accountPort.findAll()).thenReturn(List.of(meritz, kis));
+
+        scheduler.publishDue();
+
+        ArgumentCaptor<ApiKeyExpiringEvent> ev = ArgumentCaptor.forClass(ApiKeyExpiringEvent.class);
+        verify(publisher, times(2)).publishEvent(ev.capture());
+        assertThat(ev.getAllValues()).extracting(ApiKeyExpiringEvent::daysLeft).containsExactly(7, 0);
     }
 
     @Test

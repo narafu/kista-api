@@ -60,7 +60,7 @@ class AccountEntity extends BaseAuditEntity {
     private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨
 
     @Column(name = "api_key_expires_at")
-    private Instant apiKeyExpiresAt; // 거래소 API 키 만료 시각 — 업비트만 값 (V10 ADD COLUMN이라 물리 순서상 마지막)
+    private Instant apiKeyExpiresAt; // API 키 만료 시각 — 업비트는 API 조회, KIS·토스·메리츠는 추정(+1년) 또는 사용자 입력, 그 외 NULL (V10 ADD COLUMN이라 물리 순서상 마지막)
 
     // Account 도메인 모델 → Entity (accountNoHash는 HMAC 비밀키가 필요해 어댑터가 계산해 넘긴다)
     static AccountEntity fromModel(Account a, String accountNoHash) {

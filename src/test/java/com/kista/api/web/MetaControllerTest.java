@@ -126,6 +126,7 @@ class MetaControllerTest {
                 .andExpect(jsonPath("$.brokers[?(@.code=='BINANCE')].minOrderAmount").value(org.hamcrest.Matchers.contains("5")))
                 .andExpect(jsonPath("$.brokers[?(@.code=='BINANCE')].amountScale").value(org.hamcrest.Matchers.contains(2)))
                 .andExpect(jsonPath("$.brokers[?(@.code=='UPBIT')].minOrderAmount").value(org.hamcrest.Matchers.contains("5000")))
+                .andExpect(jsonPath("$.brokers[?(@.code=='UPBIT')].apiKeyExpirySource").value(org.hamcrest.Matchers.contains("BROKER_API")))
                 .andExpect(jsonPath("$.brokers[?(@.code=='UPBIT')].amountScale").value(org.hamcrest.Matchers.contains(0)))
                 .andExpect(jsonPath("$.brokers[?(@.code=='KIS')].minOrderAmount").value(org.hamcrest.Matchers.contains("0")))
                 .andExpect(jsonPath("$.brokers[?(@.code=='KIS')].market").value(org.hamcrest.Matchers.contains("US_STOCK")))

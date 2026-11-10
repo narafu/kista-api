@@ -1,7 +1,7 @@
 ## com.kista.tradingcore.account (`:trading-core`)
 
 com.kista.tradingcore.account/   ← Spring Modulith 모듈(CLOSED, `:trading-core`) — 계좌 자격증명·브로커 연결. "domain"·"usecase"·"port"·"event" 4개 NamedInterface, service·adapter internal
-  domain/model/       ← Account(`apiKeyExpiresAt` — 업비트 키 만료, `dedupeKey()` — 키 전용 브로커(`Broker.isKeyOnlyCredentials()` — 업비트·메리츠·바이낸스)는 appKey, 그 외 계좌번호 = 전역 중복 판정 키 SSOT, `withCredentials`)/RegisterAccountCommand/UpdateAccountCommand. Broker enum은 `sharedkernel.Broker`. `SellableQuantity`/브로커 자격증명 예외는 broker 소유가 SSOT
+  domain/model/       ← Account(`apiKeyExpiresAt` — API 키 만료(업비트 조회·KIS/토스/메리츠 추정 또는 입력), `dedupeKey()` — 키 전용 브로커(`Broker.isKeyOnlyCredentials()` — 업비트·메리츠·바이낸스)는 appKey, 그 외 계좌번호 = 전역 중복 판정 키 SSOT, `withCredentials`)/RegisterAccountCommand/UpdateAccountCommand. Broker enum은 `sharedkernel.Broker`. `SellableQuantity`/브로커 자격증명 예외는 broker 소유가 SSOT
   application/usecase/ ← AccountUseCase(조회/등록/수정/삭제/증권사 연결 테스트)
   application/port/output/ ← AccountPort/BrokerEnabledPort(account가 정의, 정책 소유자인 trading `TradingPolicyService`가 구현 — 포트 역전)/AccountOpenOrderCancelPort(계좌 삭제 전 미체결 주문 취소 — account 정의, 주문 소유자인 trading `AccountOpenOrderCanceller`가 구현, 실패 건수>0이면 `AccountService.delete()`가 삭제 중단)
   application/event/  ← AccountDeletedEvent(UUID accountId, UUID userId) — `AccountService.delete()`(NOT_SUPPORTED — 증권사 취소 HTTP 뒤 `AccountDeletionWriter`가 증권사 토큰 제거(broker `AccountTokenEvictionPort`)·계좌 소프트 삭제·발행을 한 트랜잭션으로)가 발행, trading `adapter.in.event.AccountCascadeListener`가 AFTER_COMMIT 구독해 cycle_position → strategy_cycle → strategy 순으로 소프트 삭제(EPR 추적)
@@ -15,8 +15,8 @@ com.kista.tradingcore.account/   ← Spring Modulith 모듈(CLOSED, `:trading-co
 ### 바이낸스 연결 테스트
 `BinanceAuthApi`(`BrokerConnectionTestPort`)가 `/sapi/v1/account/apiRestrictions` 한 번으로 판정한다 — 키 오류는 호출 실패(-2015/-1022 → `BrokerCredentialException`), 응답이 오면 ① 출금 권한 켜짐 → `BrokerWithdrawalEnabledException`(422 `BROKER_WITHDRAWAL_ENABLED`) ② IP 제한 없음 → `BrokerIpNotAllowedException` ③ 읽기·현물 거래 권한 없음 → `BrokerPermissionDeniedException` 순서다. 키 만료일이 없어 `verifyAccount`는 `BrokerAccountVerification(null, null)`이다. 상세 → `docs/agents/binance-api.md`.
 
-### 업비트 API 키 만료 점검
-`adapter/in/schedule/ApiKeyExpiryScheduler`(매일 10:00 KST, 락 `api-key-expiry` 30분, `scheduler.enabled`)가 `broker.isApiKeyExpiring() && apiKeyExpiresAt != null` 계좌만 훑어 만료까지 30·7·0일 남은 날에만 `ApiKeyExpiringEvent`(application/event, userId·accountId·nickname·broker·expiresOn·daysLeft)를 발행한다 — 알림은 notify `ApiKeyExpiryNotifier`가 소유. 키 교체(`updateCredentials`) 저장 시 사전 중복 검사와 저장 사이의 경합으로 unique 위반이 나면 `DataIntegrityViolationException`을 `Account.DuplicateAccountException`(409)으로 변환한다. 업비트 키 만료일 조회·계좌번호 없음 처리 → `docs/agents/upbit-api.md`.
+### API 키 만료 점검
+`adapter/in/schedule/ApiKeyExpiryScheduler`(매일 10:00 KST, 락 `api-key-expiry` 30분, `scheduler.enabled`)가 `broker.isApiKeyExpiring() && apiKeyExpiresAt != null` 계좌만 훑어 만료까지 30·7·0일 남은 날에만 `ApiKeyExpiringEvent`(application/event, userId·accountId·nickname·broker·expiresOn·daysLeft)를 발행한다 — 알림은 notify `ApiKeyExpiryNotifier`가 소유. 만료일 출처는 `ApiKeyExpirySource`(`Broker.getApiKeyExpirySource()`): UPBIT=`BROKER_API`(조회, 사용자 입력 거부), KIS·TOSS·MERITZ=`ESTIMATED`(사용자 입력 `apiKeyExpiresOn` 우선, 없으면 등록·교체 시점 + 1년 KST 추정 — 등록·키 교체·수정 세 경로, 수정은 입력이 있을 때만 갱신), MOCK·BINANCE=`NONE`. ESTIMATED 알림에는 "실제 만료일과 다르면 계좌 설정에서 고칠 수 있습니다." 문구가 붙는다. trading V19가 기존 KIS·토스·메리츠 계좌의 NULL 만료일을 `created_at + 1년`으로 채운다. 키 교체(`updateCredentials`) 저장 시 사전 중복 검사와 저장 사이의 경합으로 unique 위반이 나면 `DataIntegrityViolationException`을 `Account.DuplicateAccountException`(409)으로 변환한다. 업비트 키 만료일 조회·계좌번호 없음 처리 → `docs/agents/upbit-api.md`.
 
 ### 공유 요청 DTO @Valid 제약
 `AccountRequest`는 계좌 register/update 공용이다 — `@Valid`는 register(`AccountController` POST)에만 붙이고 update(nickname만 사용)는 `@Valid` 없이 둔다. 등록 전용 제약(`@Pattern` 계좌번호 형식 등)이 update에 강제되면 Breaking Change다.

@@ -231,7 +231,7 @@ class AccountControllerTest {
                 .andExpect(jsonPath("$.apiKeyExpiresAt").value("2027-10-17T00:00:00Z"))
                 .andExpect(jsonPath("$.appKey").doesNotExist());
         verify(accountUseCase).updateCredentials(id, UUID.fromString(USER_ID),
-                new com.kista.tradingcore.account.domain.model.UpdateCredentialsCommand("new-ak", "new-sk"));
+                new com.kista.tradingcore.account.domain.model.UpdateCredentialsCommand("new-ak", "new-sk", null));
     }
 
     @Test
@@ -241,5 +241,51 @@ class AccountControllerTest {
                         .content("{\"appKey\":\" \",\"secretKey\":\"sk\"}")
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void registerPassesApiKeyExpiresOn() throws Exception {
+        when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
+                .thenReturn(new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID),
+                        "KIS계좌", "74420614", "appKey", "appSecret", null, Broker.KIS, null, null));
+
+        mockMvc.perform(post("/api/accounts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"KIS계좌\",\"accountNo\":\"74420614-01\"," +
+                                "\"appKey\":\"appKey\",\"secretKey\":\"appSecret\",\"apiKeyExpiresOn\":\"2027-03-01\"}")
+                        .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
+                .andExpect(status().isCreated());
+        verify(accountUseCase).register(eq(UUID.fromString(USER_ID)), eq(new RegisterAccountCommand(
+                "KIS계좌", "74420614-01", "appKey", "appSecret", null, java.time.LocalDate.of(2027, 3, 1))));
+    }
+
+    @Test
+    void updateCredentialsPassesApiKeyExpiresOn() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(accountUseCase.updateCredentials(eq(id), eq(UUID.fromString(USER_ID)), any()))
+                .thenReturn(new Account(id, UUID.fromString(USER_ID), "KIS", null, "ak", "sk", null, Broker.KIS, null, null));
+
+        mockMvc.perform(put("/api/accounts/{id}/credentials", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"appKey\":\"ak\",\"secretKey\":\"sk\",\"apiKeyExpiresOn\":\"2027-03-01\"}")
+                        .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
+                .andExpect(status().isOk());
+        verify(accountUseCase).updateCredentials(id, UUID.fromString(USER_ID),
+                new com.kista.tradingcore.account.domain.model.UpdateCredentialsCommand("ak", "sk", java.time.LocalDate.of(2027, 3, 1)));
+    }
+
+    @Test
+    void updateWithoutExpiryKeepsExisting() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(accountUseCase.update(eq(id), eq(UUID.fromString(USER_ID)), any()))
+                .thenReturn(new Account(id, UUID.fromString(USER_ID), "새이름", null, "ak", "sk", null, Broker.KIS, null, null));
+
+        mockMvc.perform(put("/api/accounts/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"새이름\"}")
+                        .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
+                .andExpect(status().isOk());
+        verify(accountUseCase).update(id, UUID.fromString(USER_ID),
+                new com.kista.tradingcore.account.domain.model.UpdateAccountCommand("새이름", null));
     }
 }

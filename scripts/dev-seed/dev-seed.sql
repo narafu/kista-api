@@ -317,4 +317,116 @@ JOIN trading.strategy_cycle c ON c.id = md5('dev-seed:crypto:' || lower(k.broker
 CROSS JOIN (VALUES (1), (3), (5)) AS o(ago)
 ON CONFLICT (id) DO NOTHING;
 
+-- ── 코인 크립토 포트폴리오·전략 상세 검증용 확장 ──
+-- 업비트 [시드] 계좌에 ETH DCA(PAUSED) 추가(DOGE는 StrategyTicker 미지원이라 대체), 3개 전략 모두에 종료 사이클 2건·긴 값 포지션·dca_execution 이력
+-- key = 전략 식별자(기존 'binance'·'upbit' = seed_crypto 전략과 동일 id 공식, 'upbit-eth'는 신규), acct = 계좌 식별자
+CREATE TEMP TABLE seed_crypto_ext (key, acct, ticker, base_price, seed, rule_amount) ON COMMIT DROP AS
+VALUES ('binance', 'binance', 'ETH', 3000::numeric, 1000::numeric, 5::numeric),
+       ('upbit', 'upbit', 'BTC', 95000000::numeric, 1500000::numeric, 7500::numeric),
+       ('upbit-eth', 'upbit', 'ETH', 4800000::numeric, 987654321::numeric, 123456.78::numeric);
+
+INSERT INTO trading.strategy (id, account_id, type, ticker, status, cycle_seed_type)
+SELECT md5('dev-seed:crypto:' || k.key || ':strategy')::uuid, md5('dev-seed:crypto:' || k.acct || ':account')::uuid, 'DCA', k.ticker, 'PAUSED', 'NONE'
+FROM seed_crypto_ext k
+WHERE k.key = 'upbit-eth' AND EXISTS (SELECT 1 FROM trading.accounts WHERE id = md5('dev-seed:crypto:upbit:account')::uuid)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO trading.strategy_version (id, strategy_id, version_no)
+SELECT md5('dev-seed:crypto:' || k.key || ':version')::uuid, md5('dev-seed:crypto:' || k.key || ':strategy')::uuid, 1
+FROM seed_crypto_ext k WHERE k.key = 'upbit-eth' AND EXISTS (SELECT 1 FROM trading.strategy WHERE id = md5('dev-seed:crypto:upbit-eth:strategy')::uuid)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO trading.strategy_dca_rule (id, strategy_version_id, rule_key, sort_order, direction, frequency, order_type,
+                                       execution_hour, sizing_type, amount, shortfall_policy)
+SELECT md5('dev-seed:crypto:' || k.key || ':rule')::uuid, md5('dev-seed:crypto:' || k.key || ':version')::uuid,
+       md5('dev-seed:crypto:' || k.key || ':rulekey')::uuid::text, 0, 'BUY', 'DAILY', 'MARKET', 4, 'AMOUNT', k.rule_amount, 'PARTIAL'
+FROM seed_crypto_ext k WHERE k.key = 'upbit-eth' AND EXISTS (SELECT 1 FROM trading.strategy_version WHERE id = md5('dev-seed:crypto:upbit-eth:version')::uuid)
+ON CONFLICT (id) DO NOTHING;
+
+-- upbit-eth 진행 중 사이클(30일 전 시작, 시드 9.87억 원 — 큰 금액 표시 검증)
+INSERT INTO trading.strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, start_date, created_at)
+SELECT md5('dev-seed:crypto:upbit-eth:cycle')::uuid, md5('dev-seed:crypto:upbit-eth:strategy')::uuid, md5('dev-seed:crypto:upbit-eth:version')::uuid,
+       k.seed, k.seed, d.start_date, d.start_date::timestamp AT TIME ZONE 'Asia/Seoul'
+FROM seed_crypto_ext k
+CROSS JOIN LATERAL (SELECT (now() AT TIME ZONE 'Asia/Seoul')::date - 30 AS start_date) d
+WHERE k.key = 'upbit-eth' AND EXISTS (SELECT 1 FROM trading.strategy_version WHERE id = md5('dev-seed:crypto:upbit-eth:version')::uuid)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO trading.cycle_position (id, strategy_cycle_id, deposit, closing_price, avg_price, holdings, created_at)
+SELECT md5('dev-seed:crypto:upbit-eth:pos:open')::uuid, c.id, k.seed, k.base_price, NULL, 0, c.created_at
+FROM seed_crypto_ext k JOIN trading.strategy_cycle c ON c.id = md5('dev-seed:crypto:upbit-eth:cycle')::uuid
+WHERE k.key = 'upbit-eth'
+ON CONFLICT (id) DO NOTHING;
+
+-- upbit-eth 일별 스냅샷(소수 8자리 보유·긴 평단) — 누적 매수 = 일수 × 일 매수액
+INSERT INTO trading.cycle_position (id, strategy_cycle_id, deposit, closing_price, avg_price, holdings, created_at)
+SELECT md5('dev-seed:crypto:upbit-eth:pos:' || n.day)::uuid, c.id,
+       k.seed - n.i * k.rule_amount,
+       n.price,
+       round(sum(k.rule_amount) OVER w / sum(k.rule_amount / n.price) OVER w, 2),
+       round(sum(k.rule_amount / n.price) OVER w, 8),
+       (n.day + time '04:30') AT TIME ZONE 'Asia/Seoul'
+FROM seed_crypto_ext k
+JOIN trading.strategy_cycle c ON c.id = md5('dev-seed:crypto:upbit-eth:cycle')::uuid
+CROSS JOIN LATERAL (
+    SELECT i, (c.start_date + i) AS day, round((k.base_price * (1 + 0.03 * sin(i / 3.0)))::numeric, 2) AS price
+    FROM generate_series(1, 29) i
+) n
+WHERE k.key = 'upbit-eth'
+WINDOW w AS (ORDER BY n.i)
+ON CONFLICT (id) DO NOTHING;
+
+-- 종료 사이클 2건(3개 전략 공통): 300일 전·210일 전 시작, 80일 뒤 종료 — 각 개장·중간(긴 값)·종료 스냅샷
+INSERT INTO trading.strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, end_amount, start_date, end_date, created_at)
+SELECT md5('dev-seed:crypto:' || k.key || ':closed:' || g.n)::uuid, md5('dev-seed:crypto:' || k.key || ':strategy')::uuid,
+       md5('dev-seed:crypto:' || k.key || ':version')::uuid, k.seed, k.seed,
+       round(k.seed * CASE g.n WHEN 1 THEN 1.0731 ELSE 0.9412 END, 2),
+       d.start_date, d.start_date + 80, d.start_date::timestamp AT TIME ZONE 'Asia/Seoul'
+FROM seed_crypto_ext k
+CROSS JOIN (VALUES (1, 210), (2, 300)) g(n, ago)
+CROSS JOIN LATERAL (SELECT (now() AT TIME ZONE 'Asia/Seoul')::date - g.ago AS start_date) d
+WHERE EXISTS (SELECT 1 FROM trading.strategy_version WHERE id = md5('dev-seed:crypto:' || k.key || ':version')::uuid)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO trading.cycle_position (id, strategy_cycle_id, deposit, closing_price, avg_price, holdings, created_at)
+SELECT md5('dev-seed:crypto:' || k.key || ':closed:' || g.n || ':pos:' || p.kind)::uuid, c.id,
+       CASE p.kind WHEN 'open' THEN k.seed WHEN 'mid' THEN round(k.seed * 0.4137, 2) ELSE c.end_amount END,
+       round(k.base_price * p.rate, 2),
+       CASE p.kind WHEN 'mid' THEN round(k.base_price * 0.9731, 2) END,
+       CASE p.kind WHEN 'mid' THEN round(k.seed * 0.5863 / (k.base_price * 0.9731), 8) ELSE 0 END,
+       (c.start_date + p.day_offset + time '04:30') AT TIME ZONE 'Asia/Seoul'
+FROM seed_crypto_ext k
+CROSS JOIN (VALUES (1), (2)) g(n)
+JOIN trading.strategy_cycle c ON c.id = md5('dev-seed:crypto:' || k.key || ':closed:' || g.n)::uuid
+CROSS JOIN (VALUES ('open', 1.00, 0), ('mid', 1.08, 40), ('end', 1.15, 80)) p(kind, rate, day_offset)
+ON CONFLICT (id) DO NOTHING;
+
+-- upbit-eth 체결 주문 3건(1·3·5일 전) — 기존 BTC·ETH는 위 주문 블록이 담당
+INSERT INTO trading.orders (id, account_id, strategy_cycle_id, trade_date, ticker, order_type, timing, direction, order_leg,
+                            price, quantity, status, external_order_id, filled_quantity, filled_price)
+SELECT md5('dev-seed:crypto:order:upbit-eth:' || o.ago)::uuid, md5('dev-seed:crypto:upbit:account')::uuid, c.id,
+       (now() AT TIME ZONE 'Asia/Seoul')::date - o.ago, k.ticker, 'MARKET', 'AT_CLOSE', 'BUY',
+       'DCA_' || md5('dev-seed:crypto:upbit-eth:rulekey')::uuid::text,
+       k.base_price, 0.02572016, 'FILLED', 'SEED-' || left(md5('upbit-eth' || o.ago), 10), 0.02572016, k.base_price
+FROM seed_crypto_ext k
+JOIN trading.strategy_cycle c ON c.id = md5('dev-seed:crypto:upbit-eth:cycle')::uuid
+CROSS JOIN (VALUES (1), (3), (5)) AS o(ago)
+WHERE k.key = 'upbit-eth'
+ON CONFLICT (id) DO NOTHING;
+
+-- DCA 회차 이력(최근 6일): 1·3·5일 전 ORDERED(주문 연결), 2·4·6일 전 SKIPPED(사유 3종)
+INSERT INTO trading.dca_execution (id, strategy_id, trade_date, status, skip_reason, order_id, quantity, reference_price, detail, rule_key, direction)
+SELECT md5('dev-seed:crypto:exec:' || k.key || ':' || e.ago)::uuid, md5('dev-seed:crypto:' || k.key || ':strategy')::uuid,
+       (now() AT TIME ZONE 'Asia/Seoul')::date - e.ago, e.status, e.skip_reason,
+       CASE WHEN e.status = 'ORDERED' THEN md5('dev-seed:crypto:order:' || k.key || ':' || e.ago)::uuid END,
+       CASE WHEN e.status = 'ORDERED' THEN 0.0123 END,
+       k.base_price, e.detail, md5('dev-seed:crypto:' || k.key || ':rulekey')::uuid::text, 'BUY'
+FROM seed_crypto_ext k
+CROSS JOIN (VALUES (1, 'ORDERED', NULL, NULL), (2, 'SKIPPED', 'INSUFFICIENT_BALANCE', '예수금이 부족해 주문하지 않았습니다.'),
+                   (3, 'ORDERED', NULL, NULL), (4, 'SKIPPED', 'EXCHANGE_API_ERROR', '거래소 API 호출에 실패했습니다.'),
+                   (5, 'ORDERED', NULL, NULL), (6, 'SKIPPED', 'BELOW_MIN_ORDER_AMOUNT', '산정 금액이 최소 주문 금액 미만입니다.'))
+     e(ago, status, skip_reason, detail)
+WHERE EXISTS (SELECT 1 FROM trading.strategy WHERE id = md5('dev-seed:crypto:' || k.key || ':strategy')::uuid)
+ON CONFLICT (id) DO NOTHING;
+
 COMMIT;

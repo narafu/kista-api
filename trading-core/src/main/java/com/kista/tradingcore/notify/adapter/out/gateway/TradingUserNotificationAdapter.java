@@ -1,6 +1,7 @@
 package com.kista.tradingcore.notify.adapter.out.gateway;
 
 import com.kista.shared.platform.telegram.TelegramHttpClient;
+import com.kista.shared.kernel.ApiKeyExpirySource;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
@@ -152,6 +153,10 @@ class TradingUserNotificationAdapter implements TradingUserNotificationPort {
         String text = e.daysLeft() == 0
                 ? "[%s] %s API 키가 오늘 만료됩니다. 키를 새로 발급해 교체해 주세요.".formatted(nickname, label)
                 : "[%s] %s API 키가 %d일 후(%s) 만료됩니다.".formatted(nickname, label, e.daysLeft(), e.expiresOn());
+        // 증권사가 만료일을 주지 않아 추정한 값이면 사용자가 고칠 수 있음을 안내
+        if (e.broker().getApiKeyExpirySource() == ApiKeyExpirySource.ESTIMATED) {
+            text += " 실제 만료일과 다르면 계좌 설정에서 고칠 수 있습니다.";
+        }
         notify(profile, "API 키 만료", text);
     }
 
