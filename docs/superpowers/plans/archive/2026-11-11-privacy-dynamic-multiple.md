@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4, JUnit 5, AssertJ, Mockito
 
-**Spec:** `docs/superpowers/specs/2026-11-11-privacy-dynamic-multiple-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-11-11-privacy-dynamic-multiple-design.md`
 
 ## Global Constraints
 
