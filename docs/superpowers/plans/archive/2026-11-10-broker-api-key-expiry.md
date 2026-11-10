@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4, JUnit 5 + Mockito + AssertJ, Flyway(PostgreSQL)
 
-**Spec:** `docs/superpowers/specs/2026-11-10-broker-api-key-expiry-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-11-10-broker-api-key-expiry-design.md`
 
 ## Global Constraints
 
