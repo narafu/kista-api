@@ -358,7 +358,7 @@ flows:
         to: [broker, db]
         title: AT_OPEN 주문 계획·원장 상한 판정
         desc: >-
-          전략 공식으로 주문을 계산하되 오늘 아직 없는 AT_OPEN 슬롯만 후보로 남긴다(INFINITE 매도, VR 사다리 — PRIVACY는 AT_OPEN 주문이 없다).
+          전략 공식으로 주문을 계산하되 오늘 아직 없는 AT_OPEN 슬롯만 후보로 남긴다(INFINITE 지정가 매도, VR 사다리 — PRIVACY는 AT_OPEN 주문이 없다).
           전략 원장 한도 안에서 판정해 PLANNED로 저장한다. AT_CLOSE는 개장 가격으로 cap이 굳지 않도록 여기서 만들지 않는다.
         code: [TradingCandidatePlanner#collectOpenCandidates, TradingCandidatePlanner#saveAllocatedOrders, StrategyLedgerBudget#fit]
         state: "orders → PLANNED (AT_OPEN)"
@@ -548,7 +548,7 @@ flows:
         title: 첫 매매 시점
         desc: >-
           등록만으로 주문은 나가지 않는다. 배치가 "거래일 > 시작예정일"인 전략만 매매하므로, 시작예정일 D 밤 미국장(D 22:00 개장 배치 · D+1 04:30 마감 배치)부터 매매한다.
-          시작예정일이 오늘인데 그날 22:00 개장 배치가 이미 대상을 확정한 뒤 등록하면 그날 밤 장 시작 주문(INFINITE 매도·VR 사다리)은 자동으로 생기지 않는다.
+          시작예정일이 오늘인데 그날 22:00 개장 배치가 이미 대상을 확정한 뒤 등록하면 그날 밤 장 시작 주문(INFINITE 지정가 매도·VR 사다리)은 자동으로 생기지 않는다.
           동작은 그대로 두고 등록 응답(todayOpenBatchMissed)과 화면 안내로 알리며, 개장 뒤 "바로 주문"(수동 실행)으로 접수할 수 있다. 장 마감 주문은 다음 날 04:30 배치가 정상 처리한다.
         code: [TradingService#filterScheduledStart, DstInfo#openBatchMissedAt, TradingCycleResponse#forRegistration, ManualTradingService#execute]
 
@@ -1036,7 +1036,7 @@ flows:
         to: [broker, db]
         title: 개장 이후면 장 시작 주문 즉시 접수
         desc: >-
-          이미 미국장이 열린 뒤라면 PLANNED로 저장된 장 시작 주문(INFINITE 매도 선접수, VR 사다리 등)을 최신 현재가로 BUY 상한을 다시 보정한 뒤 바로 증권사에 접수한다.
+          이미 미국장이 열린 뒤라면 PLANNED로 저장된 장 시작 주문(INFINITE 지정가 매도 선접수, VR 사다리 등)을 최신 현재가로 BUY 상한을 다시 보정한 뒤 바로 증권사에 접수한다.
           개장 전이면 접수하지 않고 개장 배치가 맡는다. 장마감 주문은 어느 경우든 PLANNED로 남아 마감 배치가 접수한다(PRIVACY는 장 시작 주문이 없어 이 단계가 비어 있다).
           접수 뒤 오늘의 PLANNED·PLACED 주문 목록을 응답으로 돌려주고 화면의 "다음 주문" 카드가 접수된 주문 모드로 바뀐다.
         code: [TradingOrderExecutor#placeAtOpenOrders]

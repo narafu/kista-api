@@ -148,7 +148,7 @@ class ManualTradingService {
     }
 
     // 개장 이후 수동 실행 시 AT_OPEN 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
-    // INFINITE: AT_OPEN 매도 선접수 / VR: AT_OPEN 매수·매도 사다리 즉시 접수 (BUY cap 보정 포함)
+    // INFINITE: AT_OPEN 지정가 매도 선접수(LOC 매도는 마감 배치) / VR: AT_OPEN 매수·매도 사다리 즉시 접수 (BUY cap 보정 포함)
     // PRIVACY: AT_OPEN 주문 없으므로 자연 no-op
     // dst는 execute()에서 주입 — 단위 테스트에서 개장 전/후 분기를 결정론적으로 고정하기 위함
     private void placeAtOpenOrdersIfMarketOpen(Strategy strategy, TradingAccount account, StrategyCycle cycle, LocalDate today,

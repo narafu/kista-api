@@ -114,7 +114,7 @@ public record DstInfo(
     // 개장 배치 발화 시각 — TradingOpenScheduler cron(22:00 KST 월~금)과 동일. 이 시각에 대상 전략을 확정한다(DST 무관)
     private static final LocalTime OPEN_BATCH_FIRE_TIME = LocalTime.of(22, 0);
 
-    // 시각 주입식 판단 — 오늘 시작 전략을 그날 개장 배치(22:00 KST) 이후에 등록했는지 — 그날 밤 AT_OPEN 주문(INFINITE 매도·VR 사다리)이 자동 생성되지 않는다
+    // 시각 주입식 판단 — 오늘 시작 전략을 그날 개장 배치(22:00 KST) 이후에 등록했는지 — 그날 밤 AT_OPEN 주문(INFINITE 지정가 매도·VR 사다리)이 자동 생성되지 않는다
     public static boolean openBatchMissedAt(LocalDate scheduledStart, ZonedDateTime nowKst) {
         DayOfWeek day = nowKst.getDayOfWeek();
         return scheduledStart.equals(nowKst.toLocalDate())

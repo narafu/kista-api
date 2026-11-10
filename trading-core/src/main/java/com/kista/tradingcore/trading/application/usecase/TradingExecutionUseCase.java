@@ -13,7 +13,7 @@ import java.util.UUID;
 public interface TradingExecutionUseCase {
     // 스케쥴러 — 배치 실행
     void executeBatch(List<BatchContext> contexts) throws InterruptedException;
-    // 개장 스케쥴러 — 전략 order 생성 + INFINITE 매도 선접수 + 예수금 부족 시 사용자 알람
+    // 개장 스케쥴러 — 전략 order 생성 + INFINITE 지정가 매도 선접수 + 예수금 부족 시 사용자 알람
     void placeOpenOrders(List<BatchContext> contexts) throws InterruptedException;
     // 개장 스케쥴러 수동 트리거 — 개장 대기 없이 즉시 실행
     void placeOpenOrdersNow(List<BatchContext> contexts) throws InterruptedException;

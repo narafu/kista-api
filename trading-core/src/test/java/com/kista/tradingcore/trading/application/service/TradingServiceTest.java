@@ -1207,12 +1207,12 @@ class TradingServiceTest {
         Order correction1 = avg.withLeg("INFINITE_CORRECTION_01");
         Order correction2 = avg.withLeg("INFINITE_CORRECTION_02");
         Order correction3 = avg.withLeg("INFINITE_CORRECTION_03");
-        Order sellTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
+        Order sellTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LIMIT,
                 OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(1), new BigDecimal("25.00"),
-                OrderStatus.PLANNED, null, null, null).withLeg("INFINITE_LOC_SELL");
+                OrderStatus.PLANNED, null, null, null).withLeg("INFINITE_LIMIT_SELL");
         Order sellPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
-                StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_OPEN, OrderDirection.SELL,
-                "INFINITE_LOC_SELL", BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED,
+                StrategyTicker.SOXL, OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL,
+                "INFINITE_LIMIT_SELL", BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED,
                 null, null, null);
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
@@ -1231,7 +1231,7 @@ class TradingServiceTest {
 
         verify(infiniteStrategy).buildOrders(any(InfinitePosition.class), any(LocalDate.class));
         verify(orderPort).saveAll(argThat(saved -> saved.size() == 1
-                && saved.getFirst().orderLeg().equals("INFINITE_LOC_SELL")));
+                && saved.getFirst().orderLeg().equals("INFINITE_LIMIT_SELL")));
         verify(brokerOrderPort).place(eq(instructionOf(sellPlanned)), eq(ACCOUNT_REF));
     }
 

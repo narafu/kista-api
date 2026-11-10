@@ -181,12 +181,12 @@ public class InfiniteStrategy {
     }
 
     private void addCommonSellOrders(List<PlannedOrder> orders, InfinitePosition position, LocalDate tradeDate) {
-        // LOC 매도 (기준가 + 0.01) — 개장 시 선접수
+        // LOC 매도 (기준가 + 0.01) — 마감 배치에서 매수와 같은 position으로 접수 (장중 추가·인출로 T가 바뀌어도 매도·매수 기준가가 맞물린다)
         int locSellQuantity = position.calcLocSellQuantity();
         if (locSellQuantity >= 1) {
             BigDecimal locSellPrice = position.referencePrice().add(InfinitePosition.TICK_SIZE);
             orders.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, SELL, locSellQuantity,
-                    locSellPrice, AT_OPEN, "INFINITE_LOC_SELL"));
+                    locSellPrice, "INFINITE_LOC_SELL"));
         }
 
         // 지정가 매도 (목표가) — 개장 시 선접수

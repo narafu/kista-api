@@ -46,7 +46,7 @@ public record TradingCycleResponse(
         boolean cycleInProgress,
         @Schema(description = "최신 포지션 장부 예수금 (계좌 통화 — 주식 USD·코인 KRW/USDT, 포지션 없으면 null) — 투자금 인출 최대 기준(체결 전·장중 취소된 매수 주문 금액은 인출 시 추가로 제외)", example = "1500.00")
         BigDecimal ledgerDeposit,
-        @Schema(description = "등록 응답 전용 — 오늘 시작인데 오늘 개장 배치(22:00 KST, 월~금) 이후 등록돼 오늘 밤 장 시작 주문(INFINITE 매도·VR 사다리)이 자동 생성되지 않으면 true(PRIVACY는 항상 false, 미국 휴장일엔 거짓 양성 가능). 등록 외 응답에선 생략")
+        @Schema(description = "등록 응답 전용 — 오늘 시작인데 오늘 개장 배치(22:00 KST, 월~금) 이후 등록돼 오늘 밤 장 시작 주문(INFINITE 지정가 매도·VR 사다리)이 자동 생성되지 않으면 true(PRIVACY는 항상 false, 미국 휴장일엔 거짓 양성 가능). 등록 외 응답에선 생략")
         @JsonInclude(JsonInclude.Include.NON_NULL)
         Boolean todayOpenBatchMissed
 ) {

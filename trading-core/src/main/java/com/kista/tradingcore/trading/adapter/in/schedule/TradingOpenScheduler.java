@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.time.LocalTime;
 
-// 미 정규장 개장 시 order 전량 생성 + INFINITE 매도 선접수 + 예수금 부족 사용자 알람
+// 미 정규장 개장 시 order 전량 생성 + INFINITE 지정가 매도 선접수 + 예수금 부족 사용자 알람
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true) // local에서 끄면 운영 DB·텔레그램과 중복 알림 발생 방지

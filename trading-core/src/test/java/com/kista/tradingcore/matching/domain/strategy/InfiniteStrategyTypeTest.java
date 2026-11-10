@@ -5,6 +5,7 @@ import com.kista.tradingcore.matching.domain.strategy.InfiniteStrategy;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.matching.domain.model.InfinitePosition;
+import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -55,6 +56,20 @@ class InfiniteStrategyTypeTest {
                         "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03",
                         "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");
         assertThat(orders).allMatch(o -> o.ticker() == StrategyTicker.SOXL && o.tradeDate().equals(TODAY));
+    }
+
+    @Test
+    @DisplayName("buildOrders 일반모드: LOC 매도는 AT_CLOSE(마감 배치), 지정가 매도는 AT_OPEN(개장 선접수)")
+    void buildOrders_normalMode_locSellAtClose_limitSellAtOpen() {
+        AccountBalance balance = new AccountBalance(10, new BigDecimal("20"), new BigDecimal("1000"));
+        InfinitePosition position = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("19"), 20);
+
+        List<PlannedOrder> orders = strategy.buildOrders(position, TODAY);
+
+        assertThat(orders).filteredOn(o -> o.orderLeg().equals("INFINITE_LOC_SELL"))
+                .singleElement().extracting(PlannedOrder::timing).isEqualTo(OrderTiming.AT_CLOSE);
+        assertThat(orders).filteredOn(o -> o.orderLeg().equals("INFINITE_LIMIT_SELL"))
+                .singleElement().extracting(PlannedOrder::timing).isEqualTo(OrderTiming.AT_OPEN);
     }
 
     @Test

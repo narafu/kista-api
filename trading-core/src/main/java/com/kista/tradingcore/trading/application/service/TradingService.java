@@ -321,7 +321,7 @@ class TradingService {
             checkpoint(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.DONE);
             return;
         }
-        log.info("개장 order 생성 + INFINITE 매도 선접수 시작 — 거래일 {}", tradeDate);
+        log.info("개장 order 생성 + INFINITE 지정가 매도 선접수 시작 — 거래일 {}", tradeDate);
 
         if (!isMarketOpen(tradeDate)) {
             checkpoint(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.DONE);
@@ -360,7 +360,7 @@ class TradingService {
             checkpoint(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.PLACING);
             marketEventNotifier.notifyMarketOpen();
             planAndPlaceAtOpen(started, tradeDate, priceCtx);
-            log.info("개장 order 생성 + INFINITE 매도 선접수 완료");
+            log.info("개장 order 생성 + INFINITE 지정가 매도 선접수 완료");
             checkpoint(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.DONE);
             return null;
         });
