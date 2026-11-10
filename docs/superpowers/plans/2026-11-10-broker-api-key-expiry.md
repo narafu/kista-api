@@ -128,4 +128,16 @@ COMMENT ON COLUMN trading.accounts.api_key_expires_at IS 'API 키 만료 시각 
 
 - [ ] 전체 리뷰 1회 → 수정 → `./gradlew test 2>&1 | grep -E "FAILED|BUILD|ERROR"` 1회.
 - [ ] 커밋: `feat(account): KIS·토스·메리츠 API 키 만료일을 추정·입력받아 만료 알림을 보낸다` (author `narafu <narafu@kakao.com>`, `git diff --cached --stat` 확인).
+- [ ] 배포 직후(V19 적용 확인 후) 운영 DB 일회성 UPDATE — 사용자가 증권사 홈페이지에서 확인한 실제 만료일(KST), 사용자 승인 완료(2026-11-10). KIS는 사용자가 UI 계좌 수정으로 직접 입력.
+```sql
+UPDATE trading.accounts AS a SET api_key_expires_at = v.expires_at
+FROM (VALUES
+    ('TOSS',   '토쓰', timestamptz '2027-06-13 00:20:00+09'),
+    ('MERITZ', 'P',    timestamptz '2027-10-23 07:29:18+09'),
+    ('MERITZ', 'VR',   timestamptz '2027-10-24 13:47:25+09'),
+    ('MERITZ', 'TEMP', timestamptz '2027-10-24 13:48:32+09')
+) AS v(broker, nickname, expires_at)
+WHERE a.broker = v.broker AND a.nickname = v.nickname AND a.deleted_at IS NULL;
+-- 기대: UPDATE 4 (다르면 ROLLBACK 후 확인)
+```
 - [ ] kista-ui 후속 요청 메모 전달(설계 문서 "별도 작업: kista-ui"). 배포 후 plan·spec archive 이동은 UI 작업까지 끝난 뒤.
