@@ -12,7 +12,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 
-// KST 00:00 / 12:00 CNN 공포탐욕지수 수집 및 저장 (크립토는 조회 시 alternative.me 직접 호출)
+// CNN 공포탐욕지수 수집 및 저장 (크립토는 조회 시 alternative.me 직접 호출)
+// 07:00은 미국 정규장 마감(KST 05:00 DST / 06:00 비DST) 확정값, 12:00은 07:00 실패 대비 재수집(조회는 KST 일자별 최신 1건)
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true) // local에서 끄면 운영 DB·텔레그램과 중복 알림 발생 방지
@@ -23,7 +24,7 @@ public class FearGreedScheduler {
     private final SchedulerLockService schedulerLockService;
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
-    @Scheduled(cron = "0 0 0,12 * * *", zone = "Asia/Seoul") // KST 00:00 / 12:00
+    @Scheduled(cron = "0 0 7,12 * * *", zone = "Asia/Seoul") // KST 07:00 / 12:00
     public void run() throws InterruptedException {
         schedulerLockService.tryRun("fear-greed", Duration.ofMinutes(30), this::runLocked);
     }

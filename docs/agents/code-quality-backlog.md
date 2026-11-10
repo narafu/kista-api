@@ -554,7 +554,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 위치: `VrCycleRolloverService.java:137-145`, `CycleSnapshotCreator.java:94`(종료금액 = 예수금 + holdings × 종가), `TradingStatsService.CycleView.realizedPnl`.
 - 근거: 롤오버 때 보유분은 팔리지 않고 승계된다(avgPrice 승계, `CycleSnapshotCreator.java:67`). 그런데 endAmount가 시가 평가라 종료 사이클 realizedPnl이 미실현분을 포함하고, 승률·평균 수익률은 N주 구간 수익률이 된다. 총손익(실현 + 미실현)은 맞다.
 - 수정 방향(사용자 결정 대기): (a) UI 라벨만 "구간 손익"으로 바꾼다. (b) 근사값: Σ(SELL 체결금액 − 직전 스냅샷 avgPrice × SELL 수량)를 orders·cycle_position만으로 조회한다. (c) 정확한 값: 매도 체결 시 사이클별 `realized_pnl`을 기록한다(같은 날 매수·매도 순서, 수동 보정, 투자금 추가의 avgPrice 제자리 수정까지 반영하려면 필요).
-- 상태: (a) done(kista-ui 39e4c77e — 라벨 "종료 사이클 손익"·"종료 손익", 보조문구 "VR은 롤오버 평가액 기준"; VR 외 전략은 실제 실현값이라 "구간 손익" 대신 이 라벨 유지). (c) done(2026-11-06, 083ce5faa) — 별도 realized_pnl 기록 대신 summary 실현손익을 종료 사이클 기준으로 재정의: 마지막 holdings 0이면 end−start, holdings>0(VR 롤오버·재설정)이면 장부가 기준 실현분, 미실현 = 총손익 − 실현. 승률·평균 수익률·성과 목록은 불변.
+- 상태: (a) done(kista-ui 39e4c77e — 라벨 "종료 사이클 손익"·"종료 손익", 보조문구 "VR은 롤오버 평가액 기준"; VR 외 전략은 실제 실현값이라 "구간 손익" 대신 이 라벨 유지). (c) done(2026-11-06, 083ce5faa) — 별도 realized_pnl 기록 대신 summary 실현손익을 종료 사이클 기준으로 재정의: 마지막 holdings 0이면 end−start, holdings>0(VR 롤오버·재설정)이면 장부가 기준 실현분, 미실현 = 총손익 − 실현. 승률·평균 수익률·성과 목록은 불변. (b) 불필요 — (c)와 CQ-67·68(개장 평가 기준 실현, 진행 중 매도 포함)이 대체. (a) 라벨은 CQ-70(kista-ui 38db8d16)에서 "매도 확정분 · 진행 중 매도 포함 (VR 승계 보유분은 매도 전 미실현)"으로 재정리됨. 남은 후속 없음(2026-11-09 확인).
 
 ### CQ-37 전략 삭제 시 과거 성과가 통계에서 소급 소멸
 - 주제: 통계 정책. 유형: 기능 공백(기존 동작). 위험: 중간(스케쥴러 판정 영향).
@@ -649,6 +649,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | stats 어댑터 빈 응답 → 빈 결과 | `BinanceMarketDataAdapter` 롱숏, `FrankfurterFxRateAdapter`, `UpbitMarketDataAdapter.getKrwPrices` | 소비처가 모두 `tryGet`이고 다음 단계(`LongShortRatio.of` 등)가 빈 값을 실패로 바꾼다. 미결제약정만 가드가 없어 CQ-43에서 고쳤다. |
 | `TradingPreviewService` `TradingAccount.from(account).brokerRef().broker()` 우회 | `trading/application/service/TradingPreviewService.java:79` | 군더더기처럼 보이지만 trading `application.service`는 `Account` 애그리게이트를 직접 쓰지 못한다(`HexagonalArchitectureTest.trading_batch_path_must_not_carry_account_aggregate`, 제외 목록 밖). 투영 경유가 정답이다(CQ-64, 2026-11-09). |
 | 엔티티 저장 패턴 두 갈래(`findOrCreate` vs `new`+`setId`) | `StrategyCyclePersistenceAdapter:120`, `CyclePositionPersistenceAdapter:234`, `CycleCapitalEventPersistenceAdapter:38` vs `findOrCreate` 6곳 | 현재 호출처가 모두 id=null 신규 저장이라 merge 덮어쓰기가 일어나지 않는다. update 경로가 생기면 재검토한다(trading 감사 2026-11-08). |
+| `getStrategyOrders` 기간 기본값(컨트롤러)·size 상한 100(DCA 서비스)/200(history·dashboard·stats 컨트롤러) 불통일 | `TradingCycleController:264-269`, `DcaExecutionQueryService:43`, `DashboardController:45`, `TradingStatsController:60` | kista-ui `StrategyOrderHistory`의 '전체' 프리셋이 from/to 없이 호출해 서버 기본 30일에 의존한다(`entities/order/api/index.ts:122`, `shared/lib/date-range.ts` `resolveRange('all')={}`). 기본값을 서비스로 옮겨도 동작은 같지만 이득이 없다. size는 UI가 최대 100(`PageSizeSelector`)·history 기본 50만 쓰지만, 200은 컨트롤러 3곳의 관례라 DCA만 다른 모양이다 — 통일은 API 계약(200→100)을 바꾸고 얻는 게 없다. |
 
 ### CQ-39 PRIVACY 전략 원장 변화와 체결 주문 합이 어긋남
 - 주제: 원장 정합성 조사. 유형: 불일치(원인 미확정). 위험: 중간.
@@ -814,7 +815,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - stale 주석: `TradingExecutionUseCase.executeManually`("INFINITE 전용", 실제는 DCA만 거부), `StrategyCreationRequest`(변환 주체).
   - 문서: 스트림 컨슈머 복구 `@Scheduled`가 `adapter/in/redis`에 있다(`UserEventStreamConsumer:63`, root 2곳 동형, `RedisStreamSubscriber` 설계). `constraints.md`에 예외를 한 줄 추가한다.
 - 가드: 없음.
-- 상태: done(d6e89b7fa). 미처리: `CancelledOrderFillRecorder` 바깥 try/catch(람다 안 `OrderFill` 생성이 던질 수 있어 도달 불가 아님, 지우면 동작 변경)·`getStrategyOrders` 기간 기본값 서비스 이동·size 상한 100/200 통일·`findPlannedOrPlaced*` 포트 이름(주석만 정정).
+- 상태: done(d6e89b7fa). 미처리: `CancelledOrderFillRecorder` 바깥 try/catch(람다 안 `OrderFill` 생성이 던질 수 있어 도달 불가 아님, 지우면 동작 변경)·`findPlannedOrPlaced*` 포트 이름(주석만 정정). `getStrategyOrders` 기간 기본값·size 상한 100/200 통일은 UI가 기본 기간에 의존해 유지 목록으로 옮겼다(2026-11-09). `CloseReportScope.inReportWindow` 세 분기 단위 테스트를 추가했다.
 
 ### CQ-57 정책 설정 JSON 섹션 누락 시 NPE
 - 주제: 누락 가드. 위험: 낮음.
