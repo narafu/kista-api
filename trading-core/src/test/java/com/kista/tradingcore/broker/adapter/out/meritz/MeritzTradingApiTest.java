@@ -122,7 +122,7 @@ class MeritzTradingApiTest {
             assertThat(e.direction()).isEqualTo(OrderDirection.BUY);
             assertThat(e.quantity()).isEqualTo(36);
             assertThat(e.price()).isEqualByComparingTo("106.04440000");
-            assertThat(e.amountUsd()).isEqualByComparingTo("3817.6000");
+            assertThat(e.amount()).isEqualByComparingTo("3817.6000");
             assertThat(e.externalOrderId()).isEqualTo("1295619");
         });
     }

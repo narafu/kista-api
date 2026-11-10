@@ -80,7 +80,7 @@ class TradingReporter {
         TradingReport report = buildReport(today, strategy.type(), strategy.ticker(), executions);
         boolean reportEnabled = userProfile.isNotificationEnabled(NotificationType.TRADING_ALERT);
         List<TradeLegSummary> legs = executions.stream()
-                .map(e -> new TradeLegSummary(e.direction(), e.ticker(), e.quantity(), e.price(), e.amountUsd()))
+                .map(e -> new TradeLegSummary(e.direction(), e.ticker(), e.quantity(), e.price(), e.amount()))
                 .toList();
         eventPublisher.publishEvent(new TradingReportReadyEvent(userProfile.userId(), account.id(), strategy.id(), account.nickname(), report, legs, reportEnabled));
         log.info("[accountId={}] 매매 리포트 이벤트 발행 완료 (executions={}건)", account.id(), executions.size());
@@ -154,11 +154,11 @@ class TradingReporter {
     private TradingReport buildReport(LocalDate today, StrategyType strategyType, StrategyTicker ticker, List<Execution> executions) {
         BigDecimal totalBought = executions.stream()
                 .filter(e -> e.direction() == OrderDirection.BUY)
-                .map(Execution::amountUsd)
+                .map(Execution::amount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal totalSold = executions.stream()
                 .filter(e -> e.direction() == OrderDirection.SELL)
-                .map(Execution::amountUsd)
+                .map(Execution::amount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return new TradingReport(today, strategyType, ticker, totalBought, totalSold);
     }

@@ -40,7 +40,7 @@ public record AccountBalance(
     public interface Fill {
         OrderDirection direction();
         BigDecimal quantity();
-        BigDecimal amountUsd();
+        BigDecimal amount();
     }
 
     // 이력 없는 빈 잔고 — 보유 0·평단 없음·예수금 0
@@ -102,7 +102,7 @@ public record AccountBalance(
     private static BigDecimal sumAmount(List<? extends Fill> executions, OrderDirection direction) {
         return executions.stream()
                 .filter(e -> e.direction() == direction)
-                .map(Fill::amountUsd)
+                .map(Fill::amount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

@@ -42,8 +42,8 @@ public record PortfolioSummaryResponse(
     // 계좌 전체 요약 — PresentBalanceResult output3 필드
     @Schema(name = "PortfolioSummaryDto")
     public record SummaryDto(
-            @Schema(description = "총자산 (KRW — 필드명은 usd지만 KRW 값을 담고 있는 KIS 응답 원본 quirk 유지)")
-            BigDecimal totalAsset,           // tot_asst_amt: 총자산 (KRW — 필드명 quirk 유지)
+            @Schema(description = "총자산 (KRW — KIS tot_asst_amt 원본 값)")
+            BigDecimal totalAsset,           // tot_asst_amt: 총자산 (KRW)
             @Schema(description = "총평가손익 (KRW)")
             BigDecimal totalEvalProfit,         // tot_evlu_pfls_amt: 총평가손익 (KRW)
             @Schema(description = "총수익률 (%)")

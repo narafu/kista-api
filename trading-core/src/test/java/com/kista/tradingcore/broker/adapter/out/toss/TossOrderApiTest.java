@@ -232,7 +232,7 @@ class TossOrderApiTest {
         Execution e = executions.getFirst();
         assertThat(e.quantity()).isEqualTo(3);
         assertThat(e.price()).isEqualByComparingTo("25.50");
-        assertThat(e.amountUsd()).isEqualByComparingTo("76.50");
+        assertThat(e.amount()).isEqualByComparingTo("76.50");
         assertThat(e.direction()).isEqualTo(OrderDirection.BUY);
         assertThat(e.externalOrderId()).isEqualTo("oid-1");
         assertThat(e.ticker()).isEqualTo(StrategyTicker.SOXL);
@@ -313,9 +313,9 @@ class TossOrderApiTest {
     }
 
     @Test
-    @DisplayName("averageFilledPrice=null → price=ZERO, amountUsd는 명시값 우선")
+    @DisplayName("averageFilledPrice=null → price=ZERO, amount는 명시값 우선")
     void getExecutions_nullPrice_fallbackAmount() {
-        // amountUsd="50.00", price=null → price=BigDecimal.ZERO, amountUsd="50.00"(명시값 우선)
+        // filledAmount="50.00", price=null → price=BigDecimal.ZERO, amount="50.00"(명시값 우선)
         TossOrderApi.OrderExecutionItem exec = new TossOrderApi.OrderExecutionItem("2", null, "50.00", null);
         TossOrderApi.OrderItem item = new TossOrderApi.OrderItem("oid-5", "BUY", exec);
         TossOrderApi.OrdersResponse closedResp = new TossOrderApi.OrdersResponse(List.of(item), null, false);
@@ -329,7 +329,7 @@ class TossOrderApiTest {
             LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), StrategyTicker.SOXL, ACCOUNT);
 
         assertThat(result).hasSize(1);
-        assertThat(result.getFirst().amountUsd()).isEqualByComparingTo("50.00");
+        assertThat(result.getFirst().amount()).isEqualByComparingTo("50.00");
     }
 
     // --- helpers ---

@@ -34,13 +34,13 @@ class AccountBalanceTest {
     }
 
     // 체결금액을 직접 지정(price × qty가 아닌 값)
-    private static AccountBalance.Fill fillWithAmount(OrderDirection direction, String qty, String amountUsd) {
+    private static AccountBalance.Fill fillWithAmount(OrderDirection direction, String qty, String amountText) {
         BigDecimal quantity = new BigDecimal(qty);
-        BigDecimal amount = new BigDecimal(amountUsd);
+        BigDecimal amount = new BigDecimal(amountText);
         return new AccountBalance.Fill() {
             @Override public OrderDirection direction() { return direction; }
             @Override public BigDecimal quantity() { return quantity; }
-            @Override public BigDecimal amountUsd() { return amount; }
+            @Override public BigDecimal amount() { return amount; }
         };
     }
 
@@ -50,7 +50,7 @@ class AccountBalanceTest {
         return new AccountBalance.Fill() {
             @Override public OrderDirection direction() { return direction; }
             @Override public BigDecimal quantity() { return quantity; }
-            @Override public BigDecimal amountUsd() { return amount; }
+            @Override public BigDecimal amount() { return amount; }
         };
     }
 

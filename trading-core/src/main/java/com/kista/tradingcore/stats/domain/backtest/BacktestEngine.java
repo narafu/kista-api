@@ -470,7 +470,7 @@ public class BacktestEngine {
                     .map(e -> (AccountBalance.Fill) new AccountBalance.Fill() {
                         @Override public OrderDirection direction() { return e.direction(); }
                         @Override public BigDecimal quantity() { return BigDecimal.valueOf(e.quantity()); }
-                        @Override public BigDecimal amountUsd() { return e.amountUsd(); }
+                        @Override public BigDecimal amount() { return e.amount(); }
                     })
                     .toList();
             balance = balance.applyExecutions(fills);
@@ -503,7 +503,7 @@ public class BacktestEngine {
             super.applyFills(executions);
             poolUsed = poolUsed.add(executions.stream()
                     .filter(e -> e.direction() == OrderDirection.BUY)
-                    .map(Execution::amountUsd)
+                    .map(Execution::amount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add));
         }
 

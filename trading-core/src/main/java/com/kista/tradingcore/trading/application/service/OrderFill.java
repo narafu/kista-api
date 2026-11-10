@@ -25,7 +25,7 @@ record OrderFill(BigDecimal quantity, BigDecimal avgPrice) {
     static OrderFill of(List<Execution> matched) {
         int quantity = matched.stream().mapToInt(Execution::quantity).sum();
         BigDecimal avg = quantity <= 0 ? BigDecimal.ZERO
-                : matched.stream().map(Execution::amountUsd).reduce(BigDecimal.ZERO, BigDecimal::add)
+                : matched.stream().map(Execution::amount).reduce(BigDecimal.ZERO, BigDecimal::add)
                         .divide(BigDecimal.valueOf(quantity), Currency.USD.amountScale(), RoundingMode.HALF_UP);
         return new OrderFill(BigDecimal.valueOf(quantity), avg);
     }

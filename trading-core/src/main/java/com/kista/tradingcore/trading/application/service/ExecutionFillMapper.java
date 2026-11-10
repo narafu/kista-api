@@ -14,7 +14,7 @@ final class ExecutionFillMapper {
     }
 
     static AccountBalance.Fill toFill(Execution execution) {
-        return of(execution.direction(), BigDecimal.valueOf(execution.quantity()), execution.amountUsd());
+        return of(execution.direction(), BigDecimal.valueOf(execution.quantity()), execution.amount());
     }
 
     // 값으로 직접 만드는 체결 — 코인 체결 동기화(CryptoLedgerRecorder)처럼 broker Execution이 없는 경로용
@@ -22,7 +22,7 @@ final class ExecutionFillMapper {
         return new ExecutionFill(direction, quantity, amount);
     }
 
-    private record ExecutionFill(OrderDirection direction, BigDecimal quantity, BigDecimal amountUsd)
+    private record ExecutionFill(OrderDirection direction, BigDecimal quantity, BigDecimal amount)
             implements AccountBalance.Fill {
     }
 }

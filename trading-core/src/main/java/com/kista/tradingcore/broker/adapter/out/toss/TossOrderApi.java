@@ -142,8 +142,8 @@ class TossOrderApi {
         int filledQuantity = TossResponseParser.parseIntOrZero(order.execution().filledQuantity());
         if (filledQuantity <= 0) return Optional.empty();
 
-        BigDecimal price     = TossResponseParser.parseBdOrZero(order.execution().averageFilledPrice());
-        BigDecimal amountUsd = parseAmountUsd(order.execution().filledAmount(), price, filledQuantity);
+        BigDecimal price  = TossResponseParser.parseBdOrZero(order.execution().averageFilledPrice());
+        BigDecimal amount = parseAmount(order.execution().filledAmount(), price, filledQuantity);
 
         // filledAt 기반 KST 거래일 — 없으면 요청 from 날짜 fallback
         LocalDate tradeDate = parseTradeDate(order.execution().filledAt(), from);
@@ -153,7 +153,7 @@ class TossOrderApi {
 
         OrderDirection direction = "BUY".equals(order.side()) ? OrderDirection.BUY : OrderDirection.SELL;
 
-        return Optional.of(new Execution(tradeDate, ticker, direction, filledQuantity, price, amountUsd, order.orderId()));
+        return Optional.of(new Execution(tradeDate, ticker, direction, filledQuantity, price, amount, order.orderId()));
     }
 
     // filledAt → KST 거래일 — 체결 시각의 뉴욕 일자(US 세션일) + 1일 (KIS ord_dt·메리츠와 같은 규칙, DST·프리/애프터마켓 포함)
@@ -166,7 +166,7 @@ class TossOrderApi {
     }
 
     // filledAmount 파싱 — 명시값 우선, null·공백이면 price × quantity로 산출 (nullable 가드)
-    private BigDecimal parseAmountUsd(String amtStr, BigDecimal price, int filledQuantity) {
+    private BigDecimal parseAmount(String amtStr, BigDecimal price, int filledQuantity) {
         return (amtStr != null && !amtStr.isBlank())
                 ? new BigDecimal(amtStr)
                 : price.multiply(BigDecimal.valueOf(filledQuantity));
