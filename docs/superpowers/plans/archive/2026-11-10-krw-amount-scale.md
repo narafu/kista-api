@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4, JUnit 5 + AssertJ + Mockito (`:trading-core`)
 
-**Spec:** `docs/superpowers/specs/2026-11-10-krw-amount-scale-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-11-10-krw-amount-scale-design.md`
 
 ## Global Constraints
 
