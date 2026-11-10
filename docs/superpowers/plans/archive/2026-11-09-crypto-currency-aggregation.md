@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4, Spring Modulith, JPA(native query), Flyway(`migration-trading`), PostgreSQL, JUnit5/Mockito/AssertJ.
 
-**Spec:** `docs/superpowers/specs/2026-11-09-crypto-currency-aggregation-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-11-09-crypto-currency-aggregation-design.md`
 
 ## Global Constraints
 
