@@ -141,4 +141,20 @@ class AccountStatisticsServiceTest {
                 OrderType.LOC, null, OrderDirection.BUY, new BigDecimal(qty), new BigDecimal(price),
                 null, null, new BigDecimal(qty), new BigDecimal(price));
     }
+
+    @Test
+    void getByAccount_krwAccount_roundsDepositToScale0() {
+        UUID upbitId = UUID.randomUUID();
+        Account upbit = new Account(upbitId, userId, "업비트", null, "key", "secret", null, Broker.UPBIT, null, null);
+        when(accountPort.requireOwnedAccount(upbitId, userId)).thenReturn(upbit);
+        var entry = new com.kista.tradingcore.trading.domain.model.CyclePositionHistoryEntry(
+                UUID.randomUUID(), upbitId, StrategyTicker.BTC, com.kista.shared.kernel.StrategyType.DCA,
+                new BigDecimal("12345.67"), new BigDecimal("0.55"), new BigDecimal("0.53"), BigDecimal.TEN, java.time.Instant.now());
+        when(cyclePositionPort.findByAccountIdWithCursor(eq(upbitId), any(), any(), eq(11))).thenReturn(List.of(entry));
+
+        var page = service.getByAccount(upbitId, userId, null, null, null, 10);
+
+        assertThat(page.items().getFirst().deposit()).hasToString("12346");
+        assertThat(page.items().getFirst().closingPrice()).hasToString("0.55");
+    }
 }

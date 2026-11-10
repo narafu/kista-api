@@ -100,12 +100,12 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     public CycleHistoryPage getByAccount(UUID accountId, UUID requesterId,
                                           LocalDate from, LocalDate to,
                                           Instant cursor, int size) {
-        accountPort.requireOwnedAccount(accountId, requesterId);
+        Currency currency = accountPort.requireOwnedAccount(accountId, requesterId).broker().getCurrency();
         Instant fromInstant = resolveFrom(from);
         Instant effectiveCursor = cursor != null ? cursor : resolveTo(to);
         List<CyclePositionHistoryEntry> raw =
                 cyclePositionPort.findByAccountIdWithCursor(accountId, fromInstant, effectiveCursor, size + 1);
-        return toPage(raw, size);
+        return toPage(raw.stream().map(e -> e.roundedTo(currency)).toList(), size); // 예수금은 계좌 통화 자릿수로 반올림
     }
 
     // ── private 헬퍼 ─────────────────────────────────────────────────────────

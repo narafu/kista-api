@@ -9,6 +9,7 @@ import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
 import com.kista.tradingcore.privacy.domain.model.PrivacyCurrentBase;
 import com.kista.tradingcore.matching.domain.model.PrivacyPlan;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.KstDays;
@@ -96,13 +97,15 @@ public class StrategyHistoryQueryService {
     public CycleHistoryPage getByStrategy(UUID strategyId, UUID requesterId,
                                    LocalDate from, LocalDate to,
                                    Instant cursor, int size) {
-        OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId); // 소유권 검증
+        Currency currency = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId) // 소유권 검증
+                .account().broker().getCurrency();
         Instant fromInstant = resolveHistoryFrom(from);
         Instant effectiveCursor = cursor != null ? cursor : resolveHistoryTo(to);
         List<CyclePositionHistoryEntry> raw =
                 cyclePositionPort.findByStrategyIdWithCursor(strategyId, fromInstant, effectiveCursor, size + 1);
         boolean hasMore = raw.size() > size;
-        List<CyclePositionHistoryEntry> items = hasMore ? raw.subList(0, size) : raw;
+        List<CyclePositionHistoryEntry> items = (hasMore ? raw.subList(0, size) : raw).stream()
+                .map(e -> e.roundedTo(currency)).toList(); // 예수금은 계좌 통화 자릿수로 반올림
         Instant nextCursor = hasMore ? items.getLast().createdAt() : null;
         return new CycleHistoryPage(items, nextCursor, hasMore);
     }

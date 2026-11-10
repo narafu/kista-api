@@ -6,6 +6,7 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.UUID;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.Quantities;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
@@ -24,6 +25,12 @@ public record CyclePositionHistoryEntry(
 ) {
     public CyclePositionHistoryEntry {
         holdings = Quantities.normalize(holdings); // numeric(20,8) 꼬리 0 제거
+    }
+
+    // 응답용 — 예수금만 계좌 통화 자릿수로 반올림(가격·수량은 그대로)
+    public CyclePositionHistoryEntry roundedTo(Currency currency) {
+        return new CyclePositionHistoryEntry(id, accountId, ticker, strategyType,
+                currency.round(deposit), closingPrice, avgPrice, holdings, createdAt);
     }
 
     // 평가금액 = closingPrice × holdings (closingPrice 없으면 0)
