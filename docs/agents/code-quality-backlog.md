@@ -968,5 +968,5 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 근거: 백테스트는 4fd8a28e5(2026-10-04)에 당시 운영(잔고검증 ON)에 맞췄는데, 운영은 a3d82abe7(2026-10-25)에 원장 기준으로 바뀌었다(`CycleRotationService` MAINTAIN = min(시작 금액, 원장), 1주 미만 시드는 새 사이클 없이 정지, 매수 예산은 전략 원장만). 백테스트는 손실 뒤 MAINTAIN을 중단하고, 유휴 현금을 매수 예산에 넣었으며, 1주 미만 정지가 없었다. 예산 초과는 운영 `StrategyLedgerBudget.fit`의 축소안(`fitBuysToBudget`) 없이 BUY 전부를 거절했다(INFINITE 보정 주문은 생성 시 이미 예수금으로 잘려 실제로는 드묾). PRIVACY 중간 시작은 시장가 평가로 배수를 내 `trading-formulas.md` "PRIVACY 중간부터 시작 시작금액"과 달랐다. DCA 요청은 Alpaca 일봉 조회 뒤에야 거절됐다.
 - 처리: 재시작을 운영 원장 의미론으로 바꾸고(MAINTAIN 초과분은 평가금에만 남는 유휴 현금), 예산은 원장 예수금 + 전략 축소안 1회 → 실패 시 전체 거절로 맞췄다. 캡은 운영 `BuyOrderPriceCapper.prepareForAllocation`처럼 전략별 `capBuyOrders` 하나로 위임한다(VR·PRIVACY 복제 제거). PRIVACY 중간 시작 공식은 `PrivacyCurrentBase.bootstrapStartAmount`로 옮겨 운영 등록과 백테스트가 공유하고, 백테스트는 첫 매매 세션 이후 첫 기준표(`PrivacyTradePort.findSeedBaseFrom`, 기간 밖이면 거부)로 계산한다 — 배수에만 쓰고 원금은 시장가 평가(운영 `openAmount`와 같은 구분). DCA는 일봉 조회 전에 거절한다.
 - 가드: `BacktestEngineTest`(MAINTAIN 손실 재시작·유휴 현금 예산 제외·1주 미만 정지·축소안 우선·중간 시작 시작금액), `BacktestServiceTest`(DCA 조회 전 거절·FIDA 환산 시작금액·기간 밖 기준표 거부).
-- 남은 일: VR 적립식 수익률 지표(누적·연평균·MDD)를 벤치마크와 같은 TWR로 바꾸는 작업과 kista-ui "사이클 수" 보조문구(진행 중 사이클 포함)는 별도 작업.
-- 상태: done(커밋 예정).
+- 남은 일: VR 적립식 수익률 지표(누적·연평균·MDD)를 벤치마크와 같은 TWR로 바꾸는 작업은 별도 작업.
+- 상태: done(api 9618111c3, ui 740e3bfb — 사이클 수 보조문구). 남은 일은 VR 적립식 TWR 지표뿐.
