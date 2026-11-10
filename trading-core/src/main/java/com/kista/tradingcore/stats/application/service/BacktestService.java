@@ -25,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -48,8 +49,8 @@ class BacktestService implements BacktestUseCase {
             "수수료·세금·환전 비용과 배당금은 반영하지 않아 실제 수익보다 높거나 낮게 보일 수 있습니다.";
     private static final int MIN_CAGR_DAYS = 365; // 이보다 짧은 구간은 연환산하면 과대·과소 표시되므로 CAGR을 내지 않는다
     private static final String VR_CASH_FLOW_WARNING =
-            "적립식/인출식 설정 시 누적 수익률·연평균 수익률·최대 낙폭이 외부 입출금을 반영하지 않아 "
-                    + "실제보다 낙관적이거나 비관적으로 보일 수 있습니다.";
+            "적립식/인출식 설정 시 누적 수익률·연평균 수익률·최대 낙폭은 적립·인출 금액을 뺀 시간가중수익률이라 "
+                    + "최종 자산을 원금과 비교한 비율과 다를 수 있습니다.";
 
     private final HistoricalCandlePort candlePort;         // 과거 일봉 조달 (Alpaca)
     private final PrivacyTradePort privacyTradePort;       // PRIVACY 기준 매매표 조회
@@ -212,21 +213,44 @@ class BacktestService implements BacktestUseCase {
 
     // --- 성과 요약 ---
 
-    // 수익률 지표는 시작·끝 두 지점만으로 계산한다 — 연속 포인트 델타엔 VR 적립/인출 현금흐름이 섞여 성과로 오인된다
+    // 수익률 지표는 적립·인출을 뺀 시간가중수익률(TWR) — 벤치마크 화면(InvestmentIndexCalculator)과 같은 정의
     private BacktestSummary summarize(BacktestEngine.Output output) {
         List<BacktestPoint> points = output.points();
         if (points.isEmpty()) throw new IllegalStateException("백테스트 구간에 시뮬레이션 가능한 거래일이 없습니다.");
 
-        BigDecimal firstAsset = points.getFirst().totalAsset();
-        BigDecimal lastAsset = points.getLast().totalAsset();
-        BigDecimal lastIndex = ReturnMetrics.normalize(lastAsset, firstAsset); // 100 기준 지수
-        BigDecimal mdd = ReturnMetrics.maxDrawdown(points.stream().map(BacktestPoint::totalAsset).toList()); // scale-invariant
+        List<BigDecimal> indices = investmentIndices(points);
+        BigDecimal lastIndex = indices.getLast(); // 100 기준 지수
+        BigDecimal mdd = ReturnMetrics.maxDrawdown(indices);
 
         long days = ChronoUnit.DAYS.between(points.getFirst().date(), points.getLast().date());
         BigDecimal cagr = days < MIN_CAGR_DAYS ? null : ReturnMetrics.annualizedReturn(lastIndex, 365.0 / days);
 
-        return new BacktestSummary(lastAsset, points.getLast().principal(),
+        return new BacktestSummary(points.getLast().totalAsset(), points.getLast().principal(),
                 ReturnMetrics.cumulativeReturn(lastIndex), cagr, mdd,
                 output.tradeCount(), output.cycleCount());
+    }
+
+    // 100 기준 투자지수 — 흐름이 없으면 기준 자산(base)이 첫 자산 그대로라 단순 비율(끝 ÷ 첫)과 같다
+    // 엔진은 롤오버 날 D 포인트를 기록한 뒤 적립·인출을 반영하므로 흐름(principal 증감)은 D+1 포인트에서 처음 보인다
+    // InvestmentIndexCalculator의 장 마감 흐름 규칙대로 D 장 마감 흐름으로 보면 D+1 수익률 = 자산(D+1) ÷ (자산(D) + 흐름)
+    private static List<BigDecimal> investmentIndices(List<BacktestPoint> points) {
+        List<BigDecimal> indices = new ArrayList<>();
+        BigDecimal base = points.getFirst().totalAsset(); // 지수 100에 대응하는 자산 — 흐름마다 같은 비율로 조정
+        for (int i = 0; i < points.size(); i++) {
+            BacktestPoint point = points.get(i);
+            if (i > 0) {
+                BigDecimal previousAsset = points.get(i - 1).totalAsset();
+                BigDecimal flow = point.principal().subtract(points.get(i - 1).principal());
+                BigDecimal postFlowAsset = previousAsset.add(flow);
+                // 흐름 직전·직후 자산이 0 이하면 수익률을 정의할 수 없어 기준을 그대로 둔다(계산기의 분모 0 이하 건너뜀과 동일)
+                // ponytail: 자산 0 뒤 적립은 지수가 0에서 튄다 — 인출 보류·V′>0 판정상 무보유 전액 인출만 닿는 경로라 미처리, 실사례가 나오면 0 자산 구간 뒤 기준을 재설정
+                if (flow.signum() != 0 && previousAsset.signum() > 0 && postFlowAsset.signum() > 0) {
+                    // 흐름 직후 자산이 직전 지수를 그대로 잇도록 기준을 같은 비율로 조정한다
+                    base = base.multiply(postFlowAsset).divide(previousAsset, MathContext.DECIMAL128);
+                }
+            }
+            indices.add(ReturnMetrics.normalize(point.totalAsset(), base));
+        }
+        return indices;
     }
 }

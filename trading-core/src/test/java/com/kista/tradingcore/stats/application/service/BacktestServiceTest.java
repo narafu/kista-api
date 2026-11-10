@@ -539,16 +539,61 @@ class BacktestServiceTest {
         assertThat(result.warnings()).noneMatch(w -> w.contains("적립식/인출식"));
     }
 
+    // --- VR 적립·인출 시간가중수익률(TWR) ---
+
     @Test
-    void VR_적립식이면_외부_현금흐름_미반영_경고를_덧붙인다() {
+    void VR_적립만_하고_가격이_그대로면_누적수익률은_0이다() {
         when(cycleOrderStrategies.of(StrategyType.VR)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
+        // 1/29 = 시작일 + 4주 롤오버 → 그날 포인트 기록 뒤 +100 적립 → 1/30 포인트부터 반영
         when(candlePort.fetchDailyCandles(anyString(), any(), any()))
-                .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
+                .thenReturn(List.of(candle(1, "100"), candle(29, "100"), candle(30, "100")));
 
         BacktestResult result = service.run(vr(new BigDecimal("15"), 4, 100, "1000"));
 
-        assertThat(result.warnings()).anyMatch(w -> w.contains("적립식/인출식"));
+        assertThat(result.points()).extracting(p -> p.totalAsset().toPlainString())
+                .containsExactly("1000", "1000", "1100");
+        assertThat(result.summary().finalAsset()).isEqualByComparingTo("1100");
+        assertThat(result.summary().totalInvested()).isEqualByComparingTo("1100");
+        // 끝 ÷ 첫 비율이면 +10%지만 적립금은 성과가 아니다
+        assertThat(result.summary().totalReturnRate()).isEqualByComparingTo("0");
+        assertThat(result.summary().mdd()).isEqualByComparingTo("0");
+        assertThat(result.warnings()).anyMatch(w -> w.contains("적립식/인출식") && w.contains("시간가중수익률"));
+    }
+
+    @Test
+    void VR_인출은_최대낙폭으로_잡히지_않는다() {
+        when(cycleOrderStrategies.of(StrategyType.VR)).thenReturn(planner);
+        when(planner.plan(any())).thenReturn(Optional.empty());
+        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+                .thenReturn(List.of(candle(1, "100"), candle(29, "100"), candle(30, "100")));
+
+        // 인출 10 → 필요자산 10 × 100 × 4 ÷ 4 = 1000 = 시드 → 검증 통과
+        BacktestResult result = service.run(vr(new BigDecimal("15"), 4, -10, "1000"));
+
+        assertThat(result.points()).extracting(p -> p.totalAsset().toPlainString())
+                .containsExactly("1000", "1000", "990");
+        // 1000 → 990은 인출이지 손실이 아니다(끝 ÷ 첫이면 누적 −1%, MDD −1%)
+        assertThat(result.summary().mdd()).isEqualByComparingTo("0");
+        assertThat(result.summary().totalReturnRate()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void VR_적립_다음날_수익률은_적립_직후_자산을_기준으로_계산한다() {
+        when(cycleOrderStrategies.of(StrategyType.VR)).thenReturn(planner);
+        when(planner.plan(any())).thenReturn(Optional.empty());
+        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+                .thenReturn(List.of(candle(1, "100"), candle(29, "110"), candle(30, "121")));
+
+        // 시드 1000 + 10주: 1/1 = 1000 + 1000, 1/29 = 1000 + 1100, +100 적립, 1/30 = 1100 + 1210
+        BacktestResult result = service.run(vrWithPosition(SEED, 100, null, 10, new BigDecimal("100")));
+
+        assertThat(result.points()).extracting(p -> p.totalAsset().toPlainString())
+                .containsExactly("2000", "2100", "2310");
+        // 2100 ÷ 2000 = 1.05, 2310 ÷ (2100 + 100) = 1.05 → 1.1025 − 1
+        // 끝 ÷ 첫이면 +15.5%. 흐름을 롤오버 다음 날(1/30) 장 마감에 넣은 것으로 잘못 보면 1/30 수익률이 (2310 − 100) ÷ 2100이 돼 +10.5%로 나온다
+        assertThat(result.summary().totalReturnRate()).isEqualByComparingTo("0.1025");
+        assertThat(result.summary().mdd()).isEqualByComparingTo("0");
     }
 
     private static BigDecimal bd(String v) {
