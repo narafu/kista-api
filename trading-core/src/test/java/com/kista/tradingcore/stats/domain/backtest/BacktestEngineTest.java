@@ -750,6 +750,27 @@ class BacktestEngineTest {
     }
 
     @Test
+    @DisplayName("중간부터 시작 시작금액(FIDA 배수 환산)을 받으면 배수는 그 값으로, 원금은 시장가 평가금으로 계산한다")
+    void 중간부터_시작_시작금액을_받으면_배수에만_쓴다() {
+        RecordingPrivacy recorder = new RecordingPrivacy();
+
+        // 보유 6주 × 첫날 종가 100 = 시장가 600(배수 1.20)이지만, 운영 등록처럼 FIDA 환산 시작금액 1,000을 넘기면 배수 = 1000 ÷ 500 = 2.00
+        // 기준 보유 3주 × 2.00 = 목표 6주 = 현재 보유라 보정(diff) 없이 기준표 BUY 3주가 6주로 스케일된다(배수 1.20이면 3주)
+        BacktestEngine.Output output = privacyEngine(recorder).run(List.of(
+                flat("2024-01-01", 100),
+                flat("2024-01-02", 100)
+        ), privacyCommandWithPosition("0", 6, "70"), Map.of(LocalDate.parse("2024-01-02"), privacyBase("500", 3,
+                trade("2024-01-02", OrderType.LOC, OrderDirection.BUY, 3, "90"))), new BigDecimal("1000"));
+
+        assertThat(recorder.on("2024-01-01"))
+                .filteredOn(o -> o.direction() == OrderDirection.BUY)
+                .extracting(PlannedOrder::quantity)
+                .containsExactly(6);
+        // 원금은 시장가 평가금(6주 × 100) — 수익률 기준(첫 포인트 총자산)과 같다
+        assertThat(output.points().getFirst().principal()).isEqualByComparingTo("600");
+    }
+
+    @Test
     @DisplayName("기준 매매표가 있는 날만 주문이 생성되고, 없는 날은 주문 없이 지나가며 결측 구간이 요약된다")
     void 기준매매표가_있는_날만_주문이_생성된다() {
         RecordingPrivacy recorder = new RecordingPrivacy();
@@ -933,6 +954,13 @@ class BacktestEngineTest {
     private static BacktestEngine.Output runPrivacyExit(RecordingPrivacy recorder, StrategyCycleSeedType seedType,
                                                         double closeOnExit, String nextBuyPrice, double nextClose,
                                                         boolean observeNextDay) {
+        return runPrivacyExit(recorder, seedType, closeOnExit, nextBuyPrice, nextClose, observeNextDay, "1000");
+    }
+
+    // seed: 시작 예수금 — 첫 사이클 기준표 currentCycleStart도 seed라 배수 1.00(1주 매수)
+    private static BacktestEngine.Output runPrivacyExit(RecordingPrivacy recorder, StrategyCycleSeedType seedType,
+                                                        double closeOnExit, String nextBuyPrice, double nextClose,
+                                                        boolean observeNextDay, String seed) {
         List<DailyCandle> candles = new ArrayList<>(List.of(
                 flat("2024-01-01", 100),
                 flat("2024-01-02", 100),
@@ -940,12 +968,12 @@ class BacktestEngineTest {
                 flat("2024-01-04", nextClose)));
         if (observeNextDay) candles.add(flat("2024-01-05", nextClose));
         BacktestCommand command = new BacktestCommand(StrategyType.PRIVACY, StrategyTicker.SOXL,
-                LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), new BigDecimal("1000"),
+                LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), new BigDecimal(seed),
                 null, null, null, 0, null, null, null, null, seedType);
         return privacyEngine(recorder).run(candles, command, Map.of(
-                LocalDate.parse("2024-01-02"), privacyBase("1000", 0,
+                LocalDate.parse("2024-01-02"), privacyBase(seed, 0,
                         trade("2024-01-02", OrderType.LOC, OrderDirection.BUY, 1, "100")),
-                LocalDate.parse("2024-01-03"), privacyBase("1000", 0,
+                LocalDate.parse("2024-01-03"), privacyBase(seed, 0,
                         trade("2024-01-03", OrderType.LOC, OrderDirection.SELL, null, "50")),
                 LocalDate.parse("2024-01-04"), privacyBase("50", 0,
                         trade("2024-01-04", OrderType.LOC, OrderDirection.BUY, 1, nextBuyPrice))));
@@ -990,29 +1018,65 @@ class BacktestEngineTest {
     }
 
     @Test
-    @DisplayName("사이클 시드 MAINTAIN: 예수금이 시작 금액보다 적으면 운영처럼 재시작하지 못하고 매매를 중단한다")
-    void 시드정책_MAINTAIN인데_예수금이_시작_금액보다_적으면_중단한다() {
+    @DisplayName("사이클 시드 MAINTAIN: 손실로 예수금이 시작 금액보다 적으면 운영처럼 남은 예수금으로 새 사이클을 시작한다")
+    void 시드정책_MAINTAIN인데_예수금이_시작_금액보다_적으면_남은_돈으로_재시작한다() {
         RecordingPrivacy recorder = new RecordingPrivacy();
         BacktestEngine.Output output = runPrivacyExit(recorder, StrategyCycleSeedType.MAINTAIN, 60);
+
+        // 청산 후 예수금 900 + 60 = 960 → 시드 min(1,000, 960) = 960 → 배수 960/50 = 19.20 → 19주 (운영 CycleRotationService)
+        assertThat(recorder.on("2024-01-03")).singleElement()
+                .satisfies(o -> assertThat(o.quantity()).isEqualTo(19));
+        assertThat(output.cycleCount()).isEqualTo(2);
+        assertThat(output.warnings()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("사이클 시드 MAINTAIN: 시작 금액을 넘는 유휴 현금은 매수 예산에 쓰지 않는다(운영 원장 상한)")
+    void 시드정책_MAINTAIN_유휴_현금은_매수_예산에_쓰지_않는다() {
+        RecordingPrivacy recorder = new RecordingPrivacy();
+        // 재시작 후 전략 원장 1,000 + 유휴 50, 20주 @51 = 1,020 > 원장 1,000 → PRIVACY는 축소안이 없어 그날 BUY 전부 거절
+        BacktestEngine.Output output = runPrivacyExit(recorder, StrategyCycleSeedType.MAINTAIN, 150, "51", 51, true);
+
+        assertThat(recorder.balances.get(LocalDate.parse("2024-01-04")).deposit()).isEqualByComparingTo("1000");
+        assertThat(output.warnings()).contains(
+                "2024-01-04 ~ 2024-01-04(총 1일): 매수 주문 합계가 예수금을 넘어 그날 매수 주문을 모두 거절했습니다.");
+        // 총자산 = 전략 원장 1,000 + 유휴 50 (체결 없음)
+        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("1050");
+    }
+
+    @Test
+    @DisplayName("사이클 시드 MAINTAIN: 새 시드가 1주 가격 미만이면 운영처럼 새 사이클 없이 매매를 중단한다")
+    void 시드정책_MAINTAIN_시드가_1주_가격_미만이면_중단한다() {
+        RecordingPrivacy recorder = new RecordingPrivacy();
+        // 시드 100으로 1주 @100 매수 → 150에 청산(원장 150) → 시드 min(100, 150) = 100 < 1주 150
+        BacktestEngine.Output output = runPrivacyExit(recorder, StrategyCycleSeedType.MAINTAIN, 150, "40", 70, false, "100");
 
         assertThat(recorder.byDate).doesNotContainKey(LocalDate.parse("2024-01-03"));
         assertThat(output.cycleCount()).isEqualTo(1);
         assertThat(output.warnings()).containsExactly(
-                "2024-01-03: 예수금이 시작 금액($1,000.00)보다 적어 새 사이클을 시작하지 못하고 매매를 중단했습니다.");
+                "2024-01-03: 새 사이클 시작 금액($100.00)이 1주 가격($150.00)보다 적어 새 사이클을 시작하지 못하고 매매를 중단했습니다.");
     }
 
     @Test
-    @DisplayName("사이클 시드 MAINTAIN: 전략 잔고를 넘는 매수 체결분은 유휴 현금에서 메워 전략 예수금이 0에서 멈춘다")
-    void 시드정책_MAINTAIN_매수가_전략_잔고를_넘으면_유휴_현금에서_메운다() {
-        RecordingPrivacy recorder = new RecordingPrivacy();
-        // 재시작 후 전략 잔고 1,000 + 유휴 50, 20주 @51 = 1,020 ≤ 1,050이라 예산 통과 → 01-04 종가 51에 체결(1,020)
-        BacktestEngine.Output output = runPrivacyExit(recorder, StrategyCycleSeedType.MAINTAIN, 150, "51", 51, true);
+    @DisplayName("매수 예산 초과: 전략 축소안(fitBuysToBudget)이 예산 안에 들면 거절 대신 축소안을 접수한다(운영 StrategyLedgerBudget.fit)")
+    void 매수_예산_초과면_전략_축소안을_먼저_쓴다() {
+        // 축소안 = 첫 BUY를 예산으로 살 수 있는 수량까지 줄인다 — 엔진이 축소 훅을 호출하는지만 본다
+        PrivacyCycleOrderStrategy trimming = new PrivacyCycleOrderStrategy(new PrivacyStrategy()) {
+            @Override
+            public List<PlannedOrder> fitBuysToBudget(List<PlannedOrder> buyOrders, BigDecimal budget) {
+                PlannedOrder first = buyOrders.getFirst();
+                return List.of(first.withQuantity(budget.divide(first.price(), 0, java.math.RoundingMode.DOWN).intValue()));
+            }
+        };
+        // 기준 목표 보유 250 → 보정 매수 251주 @100 = 25,100 > 예수금 1,000 → 축소안 10주
+        BacktestEngine.Output output = new BacktestEngine(new CycleOrderStrategies(List.of(trimming))).run(List.of(
+                flat("2024-01-02", 100),
+                flat("2024-01-03", 100)
+        ), privacyCommand("1000"), Map.of(LocalDate.parse("2024-01-03"), privacyBase("1000", 250,
+                trade("2024-01-03", OrderType.LOC, OrderDirection.BUY, 1, "100"))));
 
-        // 전략 예수금 1,000 − 1,020 = −20 → 유휴 현금 50에서 20을 메워 전략 예수금 0, 유휴 30
-        assertThat(recorder.balances.get(LocalDate.parse("2024-01-04")).deposit()).isEqualByComparingTo("0");
         assertThat(output.warnings()).noneMatch(w -> w.contains("매수 주문 합계"));
-        // 총자산 = 전략 예수금 0 + 유휴 30 + 20주 × 51 = 1,050
-        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("1050");
+        assertThat(output.tradeCount()).isEqualTo(1);
     }
 
     @Test

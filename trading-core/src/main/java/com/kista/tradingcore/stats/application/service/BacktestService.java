@@ -6,6 +6,7 @@ import com.kista.tradingcore.stats.domain.backtest.BacktestPoint;
 import com.kista.tradingcore.stats.domain.backtest.BacktestResult;
 import com.kista.tradingcore.stats.domain.backtest.BacktestSummary;
 import com.kista.tradingcore.stats.domain.model.DailyCandle;
+import com.kista.tradingcore.privacy.domain.model.PrivacyCurrentBase;
 import com.kista.tradingcore.privacy.domain.model.PrivacyDates;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.shared.kernel.ReturnMetrics;
@@ -66,14 +67,16 @@ class BacktestService implements BacktestUseCase {
 
         // PRIVACY만 날짜별 기준 매매표를 미리 조달한다 — 도메인 엔진은 DB I/O를 할 수 없다
         Map<LocalDate, PrivacyTradeBase> privacyBases = Map.of();
+        BigDecimal privacyStartAmount = null;
         if (command.type().capability().requiresPrivacyBase()) {
             privacyBases = loadPrivacyBases(candles);
             addRangeClampWarning(candles, privacyBases, warnings);
+            privacyStartAmount = privacyBootstrapStartAmount(command, candles);
         }
 
         BacktestEngine engine = new BacktestEngine(cycleOrderStrategies); // 무상태 순수 클래스 — Spring 빈 아님
         BacktestEngine.Output output = command.type().capability().requiresPrivacyBase()
-                ? engine.run(candles, command, privacyBases)
+                ? engine.run(candles, command, privacyBases, privacyStartAmount)
                 : engine.run(candles, command);
 
         warnings.addAll(0, output.warnings()); // 엔진 경고를 앞, 항상 붙는 안내를 뒤로
@@ -88,6 +91,10 @@ class BacktestService implements BacktestUseCase {
     // --- 검증 (전부 IllegalArgumentException → GlobalExceptionHandler 400) ---
 
     private void validate(BacktestCommand command) {
+        // DCA는 엔진이 지원하지 않는다 — 과거 일봉(외부 API)을 조회하기 전에 거절
+        if (command.type() == StrategyType.DCA) {
+            throw new IllegalArgumentException("이 전략은 백테스트를 지원하지 않습니다.");
+        }
         if (!command.type().availableTickers().contains(command.ticker())) {
             throw new IllegalArgumentException(
                     "이 전략이 지원하지 않는 종목입니다.");
@@ -175,6 +182,19 @@ class BacktestService implements BacktestUseCase {
                     .ifPresent(base -> bases.put(candle.date(), base)); // 맵 키는 엔진이 읽는 캔들 날짜 그대로
         }
         return bases;
+    }
+
+    // 중간부터 시작(보유 있음)의 매매표 배수 기준 시작금액 — 운영 등록(StrategyStartAmountCalculator)과 같은 FIDA 배수 환산
+    // 기준표는 첫 매매 세션 이후 적용분 중 첫 장(운영 미리보기와 같은 >= 규칙), 기간 밖 기준표는 미래 데이터라 쓰지 않는다
+    // 보유 없으면 null — 엔진이 시장가 평가 시작금액(= 예수금)을 그대로 쓴다
+    private BigDecimal privacyBootstrapStartAmount(BacktestCommand command, List<DailyCandle> candles) {
+        if (command.initialHoldings() == null || command.initialHoldings() <= 0) return null;
+        LocalDate firstSession = candles.get(Math.min(1, candles.size() - 1)).date();
+        LocalDate lastTradeDate = PrivacyDates.tradeDateOf(candles.getLast().date());
+        PrivacyCurrentBase base = privacyTradePort.findSeedBaseFrom(PrivacyDates.tradeDateOf(firstSession))
+                .filter(b -> !b.tradeDate().isAfter(lastTradeDate))
+                .orElseThrow(() -> new IllegalArgumentException("PRIVACY 기준 매매표가 없어 중간부터 시작할 수 없습니다."));
+        return base.bootstrapStartAmount(command.seedOrZero(), BigDecimal.valueOf(command.initialHoldings()));
     }
 
     // 요청 구간이 실제 기준표 데이터보다 이르면 1건만 요약 경고 — 시작일은 조회 결과에서 계산(상수 하드코딩 금지)

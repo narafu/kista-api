@@ -122,11 +122,16 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
 
     @Override
     public Optional<PrivacyCurrentBase> findSeedPreviewBase() {
-        // 미리보기는 KST 오늘 거래일 이후에 적용되는 기준표만 사용 — 발행일은 거래일 전날
-        LocalDate todayKst = LocalDate.now(clock);
+        // 미리보기는 KST 오늘 거래일 이후에 적용되는 기준표만 사용
+        return findSeedBaseFrom(LocalDate.now(clock));
+    }
+
+    @Override
+    public Optional<PrivacyCurrentBase> findSeedBaseFrom(LocalDate kstTradeDate) {
+        // 발행일은 거래일 전날 — kstTradeDate 이후 거래일에 적용되는 첫 기준표
         return baseRepository
                 .findFirstByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(
-                        PrivacyDates.releaseDateFor(todayKst), StrategyTicker.SOXL)
+                        PrivacyDates.releaseDateFor(kstTradeDate), StrategyTicker.SOXL)
                 .map(e -> new PrivacyCurrentBase(e.getTicker(), e.getCurrentCycleStart(),
                         PrivacyDates.tradeDateOf(e.getReleaseDate()), // 발행일 → 적용 거래일
                         e.getCurrentCycleRealizedPnl(), e.getAvgPrice()));

@@ -4,7 +4,6 @@ import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.stats.domain.model.DailyCandle;
 import com.kista.tradingcore.broker.domain.model.Execution;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
-import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
@@ -14,7 +13,6 @@ import com.kista.tradingcore.matching.domain.model.VrPosition;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.PriceCapPolicy;
-import com.kista.tradingcore.matching.domain.strategy.VrStrategy;
 import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 
 import java.math.BigDecimal;
@@ -40,8 +38,6 @@ import com.kista.shared.kernel.StrategyDefaults;
 // domain 레이어는 Spring 빈 금지(HexagonalArchitectureTest) — 평범한 생성자 주입
 public class BacktestEngine {
 
-    // 캡 재산정(사다리 재생성) 전용 — VrStrategy는 무상태라 인스턴스 공유 가능
-    private static final VrStrategy VR_STRATEGY = new VrStrategy();
     // 리버스모드 별지점 산출에 쓰는 최근 종가 개수 — 운영 CycleOrderComputer.STAR_POINT_WINDOW와 동일
     private static final int STAR_POINT_WINDOW = 5;
 
@@ -74,9 +70,15 @@ public class BacktestEngine {
     // PRIVACY 전용 진입점 — 기준 매매표 조회는 DB I/O라 순수 도메인에서 못 하므로 날짜별 맵을 호출측(BacktestService)이 미리 조달한다
     // 맵에 키가 없는 날짜는 "기준 매매표 미수신"과 동일 취급 (그날 주문 없음)
     public Output run(List<DailyCandle> candles, BacktestCommand command, Map<LocalDate, PrivacyTradeBase> privacyBases) {
+        return run(candles, command, privacyBases, null);
+    }
+
+    // privacyStartAmount: 중간부터 시작의 FIDA 배수 환산 시작금액(운영 StrategyStartAmountCalculator와 같은 값) — null이면 원금과 같은 시장가 평가금
+    public Output run(List<DailyCandle> candles, BacktestCommand command, Map<LocalDate, PrivacyTradeBase> privacyBases,
+                      BigDecimal privacyStartAmount) {
         if (command.type() != StrategyType.PRIVACY) return run(candles, command);
         if (candles.isEmpty()) return new Output(List.of(), 0, 0, List.of(), List.of());
-        return runPrivacy(candles, command, privacyBases);
+        return runPrivacy(candles, command, privacyBases, privacyStartAmount);
     }
 
     // --- 전략 공통 일봉 루프 ---
@@ -91,7 +93,7 @@ public class BacktestEngine {
     // 전략 무관 일봉 루프 — look-ahead 불변조건(어제 주문만 오늘 체결)을 여기 한 곳에서만 관리한다
     // 캔들 D 처리 끝에 만드는 주문은 세션 D+1에 체결된다 — 운영이 세션 S 주문을 S-1 확정 종가로 만드는 것과 같게
     // 주문 기준가(전일종가·캡 기준가)는 오늘(D) 종가를 쓴다(D 종가는 D+1 주문 시점에 이미 확정된 값이라 look-ahead가 아니다)
-    private Output runDays(List<DailyCandle> candles, DayState state, List<String> warnings, DayPlanner planner) {
+    private Output runDays(List<DailyCandle> candles, DayState state, List<String> warnings, StrategyType type, DayPlanner planner) {
         List<BacktestPoint> points = new ArrayList<>();
         List<PlannedOrder> pending = List.of(); // 어제 생성한 주문 — 오늘 캔들로 체결 판정
         // 매수 예산 거절 연속구간 커서 — VR 보류·PRIVACY 결측요약과 동일 취지로 일별 경고 폭주를 막는다
@@ -104,23 +106,28 @@ public class BacktestEngine {
             LocalDate nextSession = i + 1 < candles.size() ? candles.get(i + 1).date() : null;
 
             // (1) 어제 주문을 오늘 캔들로 체결 — 오늘 만든 주문은 오늘 체결하지 않는다(look-ahead 방지 핵심 불변조건)
+            // BUY는 원장 예산 검증을 통과한 지정가 이하로만 체결되므로 전략 예수금은 음수가 될 수 없다
             state.applyFills(FillSimulator.simulate(pending, candle));
-            // 전략 잔고가 모자라 유휴 현금(MAINTAIN 초과분)까지 쓴 매수면 그만큼 유휴 현금에서 메운다
-            // BUY는 예산 검증을 통과한 지정가 이하로만 체결되므로 (전략 잔고 + 유휴 현금)은 음수가 될 수 없다
-            state.coverShortfallFromIdle();
 
-            // (2) 오늘 EOD 자산 기록 — 보유분은 평단가가 아닌 종가 시장가로 평가
+            // (2) 오늘 EOD 자산 기록 — 보유분은 평단가가 아닌 종가 시장가로 평가, 현금은 전략 밖 유휴 현금까지 포함
             points.add(new BacktestPoint(candle.date(),
-                    state.availableCash().add(marketValue(candle, state.balance.wholeShares())),
+                    state.totalCash().add(marketValue(candle, state.balance.wholeShares())),
                     state.principal));
 
             // (3) 전략별 하루 처리 — 사이클 판정 후 오늘 주문 생성 + 접수 전 BUY 가격 캡 보정
             List<PlannedOrder> planned = planner.planFor(candle, nextSession);
 
-            // (4) 접수 전 BUY 예산 검증 — 운영 StrategyLedgerBudget과 동일: BUY 지정가 합계(보정 주문 포함)가
-            // 예수금을 넘으면 그 날 BUY를 전부 거절하고 SELL만 접수한다(마지막 캔들 주문은 체결 기회가 없어 판정 생략)
-            if (nextSession != null && AccountBalance.buyTotal(planned).compareTo(state.availableCash()) > 0) {
-                planned = planned.stream().filter(o -> o.direction() != BUY).toList();
+            // (4) 접수 전 BUY 원장 예산 검증 — 운영 StrategyLedgerBudget.fit과 동일: BUY 지정가 합계(보정 주문 포함)가
+            // 전략 원장 예수금을 넘으면 전략 축소안(fitBuysToBudget)을 1회 시도하고, 그래도 넘으면 BUY를 전부 거절한다
+            // 유휴 현금(MAINTAIN 초과분)은 운영처럼 예산에 넣지 않는다(마지막 캔들 주문은 체결 기회가 없어 판정 생략)
+            boolean rejected = false;
+            BigDecimal budget = state.balance.deposit();
+            if (nextSession != null && AccountBalance.buyTotal(planned).compareTo(budget) > 0) {
+                List<PlannedOrder> fitted = strategies.of(type).fitBuysToBudget(buys(planned), budget);
+                rejected = fitted.isEmpty() || AccountBalance.buyTotal(fitted).compareTo(budget) > 0;
+                planned = PriceCapPolicy.replaceBuysPreservingOrder(planned, rejected ? List.of() : fitted);
+            }
+            if (rejected) {
                 if (rejectFrom == null) rejectFrom = nextSession;
                 rejectTo = nextSession;
                 rejectDays++;
@@ -142,6 +149,24 @@ public class BacktestEngine {
         return from + " ~ " + to + "(총 " + days + "일): 매수 주문 합계가 예수금을 넘어 그날 매수 주문을 모두 거절했습니다.";
     }
 
+    // 주문 목록 중 BUY만 — 예산 축소·가격 캡 입력
+    private static List<PlannedOrder> buys(List<PlannedOrder> orders) {
+        return orders.stream().filter(o -> o.direction() == BUY).toList();
+    }
+
+    // 접수 전 BUY 가격 캡 보정 — 운영 BuyOrderPriceCapper.prepareForAllocation과 같은 진입점(전략별 capBuyOrders 위임)
+    // 현재가 대용으로 전일 종가를 쓴다(백테스트엔 장중 재조회 현재가가 없다 — 알려진 근사). VR bootstrap·position 없음 판정은 전략 몫
+    private List<PlannedOrder> applyBuyCap(StrategyType type, List<PlannedOrder> orders, BigDecimal refClose,
+                                           Optional<CycleOrderStrategy.OrderPlan> plan, StrategyTicker ticker, LocalDate tradeDate) {
+        BigDecimal cap = PriceCapPolicy.capFor(refClose);
+        List<PlannedOrder> buyOrders = buys(orders);
+        if (buyOrders.stream().noneMatch(o -> o.price().compareTo(cap) > 0)) return orders;
+        List<PlannedOrder> capped = strategies.of(type).capBuyOrders(buyOrders, cap,
+                plan.map(CycleOrderStrategy.OrderPlan::position).orElse(null),
+                plan.map(CycleOrderStrategy.OrderPlan::vrPosition).orElse(null), ticker, tradeDate);
+        return PriceCapPolicy.replaceBuysPreservingOrder(orders, capped);
+    }
+
     // 경고 문구용 달러 금액 표기 — 천 단위 구분 + 소수 2자리
     private static String usd(BigDecimal amount) {
         return String.format(Locale.US, "$%,.2f", amount);
@@ -154,7 +179,7 @@ public class BacktestEngine {
         VrState state = new VrState(command, detail, candles.getFirst());
         List<String> warnings = new ArrayList<>();
 
-        return runDays(candles, state, warnings, (candle, nextSession) -> {
+        return runDays(candles, state, warnings, StrategyType.VR, (candle, nextSession) -> {
             // 롤오버 판정 — 오늘 체결까지 반영한 잔고 기준으로 판정해야 오늘 새 사이클의 첫 주문이 나온다
             rolloverIfDue(state, command, detail, candle, warnings);
             return planVrOrders(state, command, candle);
@@ -214,22 +239,7 @@ public class BacktestEngine {
         Optional<CycleOrderStrategy.OrderPlan> plan = strategies.of(StrategyType.VR).plan(ctx);
         List<PlannedOrder> orders = plan.map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
         // 캡 재산정에는 plan()이 이미 조립해 실어 보낸 VrPosition을 그대로 재사용한다(운영 BuyOrderPriceCapper와 동일 계약)
-        return applyVrBuyCap(orders, refClose,
-                plan.map(CycleOrderStrategy.OrderPlan::vrPosition).orElse(null), command.ticker(), candle.date());
-    }
-
-    // 접수 전 BUY 가격 캡 보정 — 운영 VrCycleOrderStrategy.capBuyOrders()와 동일 규칙, 현재가 대용으로 전일 종가 사용
-    private List<PlannedOrder> applyVrBuyCap(List<PlannedOrder> orders, BigDecimal refClose, VrPosition position,
-                                      StrategyTicker ticker, LocalDate tradeDate) {
-        if (position == null) return orders;
-        List<PlannedOrder> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
-        if (buys.isEmpty()) return orders;
-        // bootstrap 배치(LOC)는 사다리 공식과 무관한 별도 산정가라 재산정 대상이 아니다 — BuyOrderPriceCapper.isVrBootstrapShaped와 동일 판정
-        if (buys.stream().anyMatch(o -> o.orderType() == OrderType.LOC)) return orders;
-
-        BigDecimal cap = PriceCapPolicy.capFor(refClose);
-        if (buys.stream().noneMatch(o -> o.price().compareTo(cap) > 0)) return orders;
-        return PriceCapPolicy.replaceBuysPreservingOrder(orders, VR_STRATEGY.buildCappedBuyOrders(position, ticker, tradeDate, cap));
+        return applyBuyCap(StrategyType.VR, orders, refClose, plan, command.ticker(), candle.date());
     }
 
     // --- INFINITE 경로 ---
@@ -238,7 +248,7 @@ public class BacktestEngine {
         InfiniteState state = new InfiniteState(command, candles.getFirst().close());
         List<String> warnings = new ArrayList<>();
 
-        return runDays(candles, state, warnings,
+        return runDays(candles, state, warnings, StrategyType.INFINITE,
                 (candle, nextSession) -> planInfiniteDay(state, command, candle, warnings));
     }
 
@@ -254,7 +264,7 @@ public class BacktestEngine {
 
         // 청산(어제 보유>0 → 오늘 0) 판정은 반드시 주문 생성 전 — 오늘 주문은 새 사이클의 0회차 주문이어야 한다
         if (state.balance.wholeShares() == 0 && state.prevDayHoldings > 0) {
-            if (!state.restartCycle(command.cycleSeedTypeOrMax(), candle.date(), warnings)) return List.of();
+            if (!state.restartCycle(command.cycleSeedTypeOrMax(), candle, warnings)) return List.of();
             state.resetReverseMode();
         }
         // 주문 생성은 보유수량을 바꾸지 않으므로 여기서 "오늘 종료 시점 보유수량"을 확정해도 안전하다(모든 분기 공통 통과 지점)
@@ -275,31 +285,19 @@ public class BacktestEngine {
         Optional<CycleOrderStrategy.OrderPlan> plan = strategies.of(StrategyType.INFINITE).plan(ctx);
         List<PlannedOrder> orders = plan.map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
         // 리버스모드 쿼터매수도 운영과 같은 capBuyOrders 규칙으로 캡 재산정된다
-        return applyInfiniteBuyCap(orders, refClose,
-                plan.map(CycleOrderStrategy.OrderPlan::position).orElse(null), candle.date());
-    }
-
-    // 접수 전 BUY 가격 캡 보정 — 운영 InfiniteCycleOrderStrategy.capBuyOrders()와 동일 규칙, 현재가 대용으로 전일 종가 사용
-    private List<PlannedOrder> applyInfiniteBuyCap(List<PlannedOrder> orders, BigDecimal refClose, InfinitePosition position,
-                                            LocalDate tradeDate) {
-        if (position == null) return orders;
-        List<PlannedOrder> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
-        if (buys.isEmpty()) return orders;
-
-        BigDecimal cap = PriceCapPolicy.capFor(refClose);
-        if (buys.stream().noneMatch(o -> o.price().compareTo(cap) > 0)) return orders;
-        return PriceCapPolicy.replaceBuysPreservingOrder(orders,
-                strategies.of(StrategyType.INFINITE).capBuyOrders(buys, cap, position, null, position.ticker(), tradeDate));
+        return applyBuyCap(StrategyType.INFINITE, orders, refClose, plan, command.ticker(), candle.date());
     }
 
     // --- PRIVACY 경로 ---
 
     private Output runPrivacy(List<DailyCandle> candles, BacktestCommand command,
-                              Map<LocalDate, PrivacyTradeBase> privacyBases) {
+                              Map<LocalDate, PrivacyTradeBase> privacyBases, BigDecimal privacyStartAmount) {
         PrivacyState state = new PrivacyState(command, candles.getFirst().close());
+        // 중간부터 시작은 매매표 배수 기준 시작금액만 FIDA 환산값으로 — 원금(수익률 기준)은 시장가 평가금 그대로(운영 openAmount와 같은 구분)
+        if (privacyStartAmount != null) state.cycleStartAmount = privacyStartAmount;
         List<String> warnings = new ArrayList<>();
 
-        Output output = runDays(candles, state, warnings,
+        Output output = runDays(candles, state, warnings, StrategyType.PRIVACY,
                 (candle, nextSession) -> planPrivacyDay(state, command, privacyBases, candle, nextSession, warnings));
 
         // 마지막 캔들까지 이어진 결측 구간은 루프 안에서 닫힐 기회가 없다 — 여기서 flush하고 warnings를 다시 담는다
@@ -314,7 +312,7 @@ public class BacktestEngine {
         if (state.stopped) return List.of(); // 사이클 시드 정책으로 매매 중단된 뒤엔 주문 없음
         // 청산(어제 보유>0 → 오늘 0) 판정은 반드시 주문 생성 전 — 오늘 주문은 새 사이클 개장 자산(cycleStartAmount) 기준이어야 한다
         if (state.balance.wholeShares() == 0 && state.prevDayHoldings > 0
-                && !state.restartCycle(command.cycleSeedTypeOrMax(), candle.date(), warnings)) {
+                && !state.restartCycle(command.cycleSeedTypeOrMax(), candle, warnings)) {
             return List.of();
         }
         // 주문 생성은 보유수량을 바꾸지 않으므로 여기서 "오늘 종료 시점 보유수량"을 확정해도 안전하다
@@ -345,19 +343,10 @@ public class BacktestEngine {
         CycleOrderStrategy.PlanContext ctx = new CycleOrderStrategy.PlanContext(
                 state.balance, command.ticker(), candle.date(), null, null, privacyInputs, null);
 
-        List<PlannedOrder> orders = strategies.of(StrategyType.PRIVACY).plan(ctx)
-                .map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
-        return applyPrivacyBuyCap(orders, refClose);
-    }
-
-    // 접수 전 BUY 가격 캡 보정 — 운영 PrivacyCycleOrderStrategy.capBuyOrders()와 동일 규칙
-    // cap 초과 BUY만 가격을 cap으로 치환하고 수량은 건드리지 않는다 (VR/INFINITE와 달리 재산정 자체가 없다)
-    private static List<PlannedOrder> applyPrivacyBuyCap(List<PlannedOrder> orders, BigDecimal refClose) {
-        if (orders.isEmpty()) return orders;
-        BigDecimal cap = PriceCapPolicy.capFor(refClose);
-        return orders.stream()
-                .map(o -> o.direction() == BUY && o.price().compareTo(cap) > 0 ? o.withPrice(cap) : o)
-                .toList();
+        Optional<CycleOrderStrategy.OrderPlan> plan = strategies.of(StrategyType.PRIVACY).plan(ctx);
+        List<PlannedOrder> orders = plan.map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
+        // PRIVACY 캡은 cap 초과 BUY의 가격만 치환한다(수량 재산정 없음) — 운영 PrivacyCycleOrderStrategy.capBuyOrders
+        return applyBuyCap(StrategyType.PRIVACY, orders, refClose, plan, command.ticker(), candle.date());
     }
 
     // --- 전략 공통 헬퍼 ---
@@ -417,41 +406,33 @@ public class BacktestEngine {
             this.cycleStartAmount = principal;
         }
 
-        // 주문 가능 현금 = 전략 잔고 예수금 + 유휴 현금 — 운영 예산 검증이 보는 증권사 실잔고에 해당
-        BigDecimal availableCash() {
+        // 총 현금 = 전략 원장 예수금 + 유휴 현금 — 자산 평가용(매수 예산은 원장 예수금만)
+        BigDecimal totalCash() {
             return balance.deposit().add(idleCash);
         }
 
-        // 체결로 전략 잔고 예수금이 음수가 되면 유휴 현금에서 메운다 (유휴 현금이 없으면 예산 검증상 음수가 될 수 없다)
-        void coverShortfallFromIdle() {
-            if (balance.deposit().signum() >= 0) return;
-            idleCash = idleCash.add(balance.deposit());
-            balance = balance.withDeposit(BigDecimal.ZERO);
-        }
-
-        // 청산 후 사이클 재시작 — 운영 CycleRotationService의 잔고검증 ON 의미론(백테스트 현금은 실제 돈이라 원장만 믿는 OFF는 없는 돈을 만든다)
-        // false면 매매 중단: NONE은 운영처럼 전략 일시중지, MAINTAIN은 가용 현금이 시작 금액에 못 미치면 일시중지
-        boolean restartCycle(StrategyCycleSeedType seedType, LocalDate date, List<String> warnings) {
-            switch (seedType) {
-                case NONE -> {
-                    stopped = true;
-                    warnings.add(date + ": 사이클이 종료되어 이후 매매를 중단했습니다(사이클 종료 후 재시작 안 함).");
-                    return false;
-                }
-                case MAINTAIN -> {
-                    BigDecimal cash = availableCash();
-                    if (cash.compareTo(cycleStartAmount) < 0) {
-                        stopped = true;
-                        warnings.add(date + ": 예수금이 시작 금액(" + usd(cycleStartAmount)
-                                + ")보다 적어 새 사이클을 시작하지 못하고 매매를 중단했습니다.");
-                        return false;
-                    }
-                    // 시작 금액만 전략 잔고로, 나머지는 유휴 현금으로 — 다음 사이클도 같은 시작 금액을 유지한다
-                    balance = balance.withDeposit(cycleStartAmount);
-                    idleCash = cash.subtract(cycleStartAmount);
-                }
-                case MAX -> cycleStartAmount = balance.deposit(); // 청산 시점 예수금 전액 이월
+        // 청산 후 사이클 재시작 — 운영 CycleRotationService와 같은 원장 기준 의미론(증권사 잔고 조회 없음)
+        // 시드: MAX = 원장 예수금 전액, MAINTAIN = min(현재 사이클 시작 금액, 원장 예수금) — 손실 뒤엔 남은 돈, 수익 뒤엔 원래 시드
+        // false면 매매 중단: NONE은 운영처럼 전략 일시중지, 시드가 1주 가격(청산일 종가) 미만이면 운영처럼 새 사이클 없이 일시중지
+        boolean restartCycle(StrategyCycleSeedType seedType, DailyCandle candle, List<String> warnings) {
+            LocalDate date = candle.date();
+            if (seedType == StrategyCycleSeedType.NONE) {
+                stopped = true;
+                warnings.add(date + ": 사이클이 종료되어 이후 매매를 중단했습니다(사이클 종료 후 재시작 안 함).");
+                return false;
             }
+            BigDecimal ledger = balance.deposit();
+            BigDecimal seed = seedType == StrategyCycleSeedType.MAX ? ledger : cycleStartAmount.min(ledger);
+            if (seed.compareTo(candle.close()) < 0) {
+                stopped = true;
+                warnings.add(date + ": 새 사이클 시작 금액(" + usd(seed) + ")이 1주 가격(" + usd(candle.close())
+                        + ")보다 적어 새 사이클을 시작하지 못하고 매매를 중단했습니다.");
+                return false;
+            }
+            // 시드를 넘는 원장 예수금(MAINTAIN 수익분)은 전략 밖 유휴 현금으로 — 평가금엔 남고 매수 예산엔 쓰이지 않는다
+            idleCash = idleCash.add(ledger.subtract(seed));
+            balance = balance.withDeposit(seed);
+            cycleStartAmount = seed;
             startNextCycle(date);
             return true;
         }
