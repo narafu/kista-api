@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -75,7 +76,13 @@ class MarketVocabularyTest {
         assertThat(Broker.BINANCE.isKeyOnlyCredentials()).isTrue();
         assertThat(Broker.BINANCE.getCurrency()).isEqualTo(Currency.USDT);
         for (Broker b : new Broker[]{Broker.KIS, Broker.TOSS, Broker.MOCK}) assertThat(b.isKeyOnlyCredentials()).isFalse();
-        assertThat(Arrays.stream(Broker.values()).filter(Broker::isApiKeyExpiring)).containsExactly(Broker.UPBIT);
+        assertThat(Arrays.stream(Broker.values()).filter(Broker::isApiKeyExpiring))
+                .containsExactlyInAnyOrder(Broker.UPBIT, Broker.KIS, Broker.TOSS, Broker.MERITZ);
+        assertThat(Broker.UPBIT.getApiKeyExpirySource()).isEqualTo(ApiKeyExpirySource.BROKER_API);
+        assertThat(Stream.of(Broker.KIS, Broker.TOSS, Broker.MERITZ).map(Broker::getApiKeyExpirySource))
+                .containsOnly(ApiKeyExpirySource.ESTIMATED);
+        assertThat(Stream.of(Broker.MOCK, Broker.BINANCE).map(Broker::getApiKeyExpirySource))
+                .containsOnly(ApiKeyExpirySource.NONE);
         assertThat(Arrays.stream(Broker.values()).filter(Broker::isCryptoExchange)).containsExactly(Broker.UPBIT, Broker.BINANCE);
         for (Broker b : Broker.values()) assertThat(b.getCurrency()).isEqualTo(b.getMarket().quoteCurrency());
     }

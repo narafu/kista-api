@@ -80,3 +80,5 @@ SOXL 1주 매수 @현재가×0.5 → 즉시 취소를 LOC·지정가로 각 1회
 
 ### 잔고 부족 거절 분류
 - SELL 매도가능수량 부족은 `rsp_cd=1543`("매도가능수량이 없습니다. 잔고를 확인해주세요.", `rsp_sub_msg` null, 2026-10-30 22:40 KST 정규장 MeritzLiveIT 미보유 QLD 1주 지정가 매도 실측, 미접수)으로 확정 거절이며, `MeritzResponse.failure`가 `isInsufficientFunds()`로 분류해 사용자 알림(`InsufficientBalanceEvent`)만 내고 관리자 알림은 내지 않는다(KIS `APBK0988`과 동일 처리). BUY 예수금 부족은 `rsp_cd=5988`("주문가능금액이 부족합니다.", `rsp_sub_msg` null, 2026-10-30 23:06 KST 정규장 MeritzLiveIT 주문가능 USD 2배 금액 SOXL 지정가 매수 실측, 미접수)으로 같은 분류다. 두 코드는 `MeritzResponse.INSUFFICIENT_FUNDS_CODES`가 SSOT.
+
+- 키 만료일 조회 API 없음 — 등록·교체 시점 + 1년 추정, 사용자 입력 우선(`ApiKeyExpirySource.ESTIMATED`)

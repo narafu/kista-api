@@ -7,6 +7,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
+import java.time.LocalDate;
+
 public record AccountRequest(
         @Schema(description = "계좌 별명", example = "내 메인 계좌")
         @NotBlank String nickname,
@@ -18,16 +20,18 @@ public record AccountRequest(
         @Schema(description = "API 앱 시크릿 (KIS App Secret / Toss Client Secret / 업비트 Secret Key / 메리츠 App Secret / 바이낸스 Secret Key)")
         String secretKey,
         @Schema(description = "증권사 — null이면 KIS 기본값 적용", example = "KIS", allowableValues = {"KIS", "TOSS", "MOCK", "UPBIT", "MERITZ", "BINANCE"})
-        Broker broker
+        Broker broker,
+        @Schema(description = "API 키 만료일(KST, 선택) — KIS·토스·메리츠만, 비우면 등록·교체 시점 + 1년 추정", example = "2027-11-10")
+        LocalDate apiKeyExpiresOn
 ) {
     public RegisterAccountCommand toRegisterCommand() {
         // accountNo를 그대로 저장 — KIS: "74420614-01", TOSS: "131-01-001931"
         // KIS CANO/ACNT_PRDT_CD 파싱은 KIS 어댑터가 담당
         // brokerAccountCode(TOSS accountSeq)는 AccountService에서 API 호출로 채움
-        return new RegisterAccountCommand(nickname, accountNo, appKey, secretKey, broker);
+        return new RegisterAccountCommand(nickname, accountNo, appKey, secretKey, broker, apiKeyExpiresOn);
     }
 
     public UpdateAccountCommand toUpdateCommand() {
-        return new UpdateAccountCommand(nickname);
+        return new UpdateAccountCommand(nickname, apiKeyExpiresOn);
     }
 }

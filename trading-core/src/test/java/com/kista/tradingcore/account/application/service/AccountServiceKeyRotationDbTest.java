@@ -54,9 +54,10 @@ class AccountServiceKeyRotationDbTest extends DataJpaTestBase {
             when(testers.of(Broker.UPBIT)).thenReturn(tester);
             when(tester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null, null));
             AccountService service = new AccountService(racing, testers, mock(BrokerEnabledPort.class),
-                    mock(AccountTokenEvictionPort.class), mock(AccountOpenOrderCancelPort.class), mock(AccountDeletionWriter.class));
+                    mock(AccountTokenEvictionPort.class), mock(AccountOpenOrderCancelPort.class), mock(AccountDeletionWriter.class),
+                    java.time.Clock.systemUTC());
 
-            assertThatThrownBy(() -> service.updateCredentials(b.id(), userId, new UpdateCredentialsCommand(keyA, "sk2")))
+            assertThatThrownBy(() -> service.updateCredentials(b.id(), userId, new UpdateCredentialsCommand(keyA, "sk2", null)))
                     .isInstanceOf(Account.DuplicateAccountException.class);
         } finally {
             // 커밋된 행 정리(테스트 트랜잭션 롤백이 없다) — 저장 도중 실패해도 user_id로 모두 지운다

@@ -18,7 +18,7 @@ public record Account(
         String brokerAccountCode, // 증권사 API 보조 식별자 — KIS: null(accountNo에 통합), TOSS: accountSeq
         Broker broker,            // 증권사 (기본: KIS)
         Instant createdAt,        // DB created_at, 신규 등록 시 null
-        Instant apiKeyExpiresAt   // 거래소 API 키 만료 시각 — 업비트만 값
+        Instant apiKeyExpiresAt   // 거래소 API 키 만료 시각 — 업비트는 API 조회, KIS·토스·메리츠는 추정(+1년)·사용자 입력
 ) {
     // 목록 표시용 증권사 순서 — 운영 중심(메리츠·바이낸스) 먼저, 목록에 없는 증권사는 맨 뒤
     private static final List<Broker> DISPLAY_BROKER_ORDER =
@@ -48,6 +48,12 @@ public record Account(
     public Account withNickname(String newNickname) {
         return new Account(id, userId, newNickname,
                 accountNo, appKey, secretKey, brokerAccountCode, broker, createdAt, apiKeyExpiresAt);
+    }
+
+    // API 키 만료 시각만 교체 — AccountService.update의 사용자 입력 반영
+    public Account withApiKeyExpiresAt(Instant newApiKeyExpiresAt) {
+        return new Account(id, userId, nickname,
+                accountNo, appKey, secretKey, brokerAccountCode, broker, createdAt, newApiKeyExpiresAt);
     }
 
     // 자격증명 교체 — 검증 결과의 보조 식별자·만료일 반영

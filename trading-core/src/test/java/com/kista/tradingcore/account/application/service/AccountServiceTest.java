@@ -15,6 +15,7 @@ import com.kista.tradingcore.broker.application.port.output.AccountTokenEviction
 import com.kista.tradingcore.broker.domain.model.BrokerAccountVerification;
 import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.TimeZones;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,7 +24,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -45,12 +48,14 @@ class AccountServiceTest {
     @Mock AccountTokenEvictionPort accountTokenEvictionPort;
     @Mock AccountOpenOrderCancelPort openOrderCancelPort; // 삭제 전 미체결 주문 취소 (trading 구현)
     AccountService accountService;
+    // 2026-11-10T15:30Z = KST 2026-11-11 00:30 — UTC 날짜와 KST 날짜가 갈리는 시각
+    Clock clock = Clock.fixed(Instant.parse("2026-11-10T15:30:00Z"), TimeZones.KST);
 
     @BeforeEach
     void setUpService() {
         // deletionWriter는 실제 인스턴스에 mock 포트를 위임 — 삭제 DB 쓰기·이벤트 발행을 그대로 검증
         accountService = new AccountService(accountPort, connectionTesters, brokerEnabledPort, accountTokenEvictionPort,
-                openOrderCancelPort, new AccountDeletionWriter(accountPort, accountTokenEvictionPort, eventPublisher));
+                openOrderCancelPort, new AccountDeletionWriter(accountPort, accountTokenEvictionPort, eventPublisher), clock);
     }
 
     private final UUID userId = UUID.randomUUID();
@@ -65,7 +70,7 @@ class AccountServiceTest {
 
     private RegisterAccountCommand registerCmd() {
         return new RegisterAccountCommand(
-                "테스트계좌", "74420614", "appKey", "appSecret", Broker.KIS
+                "테스트계좌", "74420614", "appKey", "appSecret", Broker.KIS, null
         );
     }
 
@@ -80,7 +85,7 @@ class AccountServiceTest {
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Account saved = accountService.register(userId,
-                new RegisterAccountCommand("업비트", "74420614-01", "ak", "sk", Broker.UPBIT));
+                new RegisterAccountCommand("업비트", "74420614-01", "ak", "sk", Broker.UPBIT, null));
 
         assertThat(saved.accountNo()).isNull();
         assertThat(saved.apiKeyExpiresAt()).isEqualTo(expiresAt);
@@ -95,7 +100,7 @@ class AccountServiceTest {
         when(accountPort.existsByDedupeKey("ak")).thenReturn(true);
 
         assertThatThrownBy(() -> accountService.register(userId,
-                new RegisterAccountCommand("업비트", null, "ak", "sk", Broker.UPBIT)))
+                new RegisterAccountCommand("업비트", null, "ak", "sk", Broker.UPBIT, null)))
                 .isInstanceOf(Account.DuplicateAccountException.class);
         verifyNoInteractions(connectionTesters);
     }
@@ -106,7 +111,7 @@ class AccountServiceTest {
         when(brokerEnabledPort.enabled(Broker.UPBIT)).thenReturn(true);
 
         assertThatThrownBy(() -> accountService.register(userId,
-                new RegisterAccountCommand("업비트", null, " ", "sk", Broker.UPBIT)))
+                new RegisterAccountCommand("업비트", null, " ", "sk", Broker.UPBIT, null)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -120,13 +125,13 @@ class AccountServiceTest {
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Account saved = accountService.register(userId,
-                new RegisterAccountCommand("메리츠", "123", "ak", "sk", Broker.MERITZ));
+                new RegisterAccountCommand("메리츠", "123", "ak", "sk", Broker.MERITZ, null));
 
         assertThat(saved.accountNo()).isNull();
         verify(connectionTester).verifyAccount("ak", "sk", null);
         verify(accountPort).existsByDedupeKey("ak");
         assertThatThrownBy(() -> accountService.register(userId,
-                new RegisterAccountCommand("메리츠", null, " ", "sk", Broker.MERITZ)))
+                new RegisterAccountCommand("메리츠", null, " ", "sk", Broker.MERITZ, null)))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("API 키와 시크릿은 필수입니다.");
     }
 
@@ -140,13 +145,13 @@ class AccountServiceTest {
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Account saved = accountService.register(userId,
-                new RegisterAccountCommand("바이낸스", "123", "ak", "sk", Broker.BINANCE));
+                new RegisterAccountCommand("바이낸스", "123", "ak", "sk", Broker.BINANCE, null));
 
         assertThat(saved.accountNo()).isNull();
         verify(connectionTester).verifyAccount("ak", "sk", null);
         verify(accountPort).existsByDedupeKey("ak");
         assertThatThrownBy(() -> accountService.register(userId,
-                new RegisterAccountCommand("바이낸스", null, " ", "sk", Broker.BINANCE)))
+                new RegisterAccountCommand("바이낸스", null, " ", "sk", Broker.BINANCE, null)))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("API 키와 시크릿은 필수입니다.");
     }
 
@@ -157,7 +162,7 @@ class AccountServiceTest {
                 new Account(accountId, userId, "메리츠", null, "old", "sk", null, Broker.MERITZ, null, null));
         when(accountPort.existsByDedupeKey("taken")).thenReturn(true);
 
-        assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("taken", "sk")))
+        assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("taken", "sk", null)))
                 .isInstanceOf(Account.DuplicateAccountException.class);
     }
 
@@ -249,7 +254,7 @@ class AccountServiceTest {
         when(accountPort.requireOwnedAccount(accountId, userId))
                 .thenThrow(new SecurityException("소유자가 아닙니다"));
 
-        UpdateAccountCommand cmd = new UpdateAccountCommand("변경닉네임");
+        UpdateAccountCommand cmd = new UpdateAccountCommand("변경닉네임", null);
 
         assertThatThrownBy(() -> accountService.update(accountId, userId, cmd))
                 .isInstanceOf(SecurityException.class);
@@ -261,7 +266,7 @@ class AccountServiceTest {
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(activeAccount(userId));
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        UpdateAccountCommand cmd = new UpdateAccountCommand("변경닉네임");
+        UpdateAccountCommand cmd = new UpdateAccountCommand("변경닉네임", null);
         Account result = accountService.update(accountId, userId, cmd);
 
         assertThat(result.nickname()).isEqualTo("변경닉네임");
@@ -284,7 +289,7 @@ class AccountServiceTest {
     void update_blank_nickname_throws() {
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(activeAccount(userId));
 
-        assertThatThrownBy(() -> accountService.update(accountId, userId, new UpdateAccountCommand("  ")))
+        assertThatThrownBy(() -> accountService.update(accountId, userId, new UpdateAccountCommand("  ", null)))
                 .isInstanceOf(IllegalArgumentException.class);
 
         verify(accountPort, never()).save(any());
@@ -323,7 +328,7 @@ class AccountServiceTest {
                 .thenThrow(new NoSuchElementException("계좌를 찾을 수 없습니다: " + accountId));
 
         assertThatThrownBy(() -> accountService.update(accountId, userId,
-                new UpdateAccountCommand("닉")))
+                new UpdateAccountCommand("닉", null)))
                 .isInstanceOf(NoSuchElementException.class);
     }
 
@@ -338,7 +343,7 @@ class AccountServiceTest {
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         RegisterAccountCommand cmd = new RegisterAccountCommand(
-                "토스테스트", "12345678901", "cid", "csecret", Broker.TOSS
+                "토스테스트", "12345678901", "cid", "csecret", Broker.TOSS, null
         );
 
         Account result = accountService.register(userId, cmd);
@@ -359,7 +364,7 @@ class AccountServiceTest {
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         RegisterAccountCommand cmd = new RegisterAccountCommand(
-                "테스트계좌", "74420614-01", "appKey", "appSecret", null
+                "테스트계좌", "74420614-01", "appKey", "appSecret", null, null
         );
 
         Account result = accountService.register(userId, cmd);
@@ -389,7 +394,7 @@ class AccountServiceTest {
     void register_disabledToss_throwsValidationException() {
         when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(false);
         RegisterAccountCommand cmd = new RegisterAccountCommand(
-                "토스테스트", "12345678901", "cid", "csecret", Broker.TOSS
+                "토스테스트", "12345678901", "cid", "csecret", Broker.TOSS, null
         );
 
         assertThatThrownBy(() -> accountService.register(userId, cmd))
@@ -451,7 +456,7 @@ class AccountServiceTest {
     void register_blankAccountNo_nonMockBroker_throws() {
         when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
         RegisterAccountCommand cmd = new RegisterAccountCommand(
-                "테스트계좌", null, "appKey", "appSecret", Broker.KIS
+                "테스트계좌", null, "appKey", "appSecret", Broker.KIS, null
         );
 
         assertThatThrownBy(() -> accountService.register(userId, cmd))
@@ -473,7 +478,7 @@ class AccountServiceTest {
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         RegisterAccountCommand cmd = new RegisterAccountCommand(
-                "모의계좌", null, null, null, Broker.MOCK
+                "모의계좌", null, null, null, Broker.MOCK, null
         );
 
         Account result = accountService.register(userId, cmd);
@@ -492,7 +497,7 @@ class AccountServiceTest {
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         accountService.listByUser(userId);
-        accountService.update(accountId, userId, new UpdateAccountCommand("변경닉네임"));
+        accountService.update(accountId, userId, new UpdateAccountCommand("변경닉네임", null));
 
         verifyNoInteractions(brokerEnabledPort);
     }
@@ -523,7 +528,7 @@ class AccountServiceTest {
         when(connectionTester.verifyAccount("new-ak", "new-sk", null)).thenReturn(new BrokerAccountVerification(null, expiresAt));
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        Account saved = accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("new-ak", "new-sk"));
+        Account saved = accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("new-ak", "new-sk", null));
 
         assertThat(saved.appKey()).isEqualTo("new-ak");
         assertThat(saved.apiKeyExpiresAt()).isEqualTo(expiresAt);
@@ -542,7 +547,7 @@ class AccountServiceTest {
         when(connectionTester.verifyAccount("new-ak", "new-sk", null)).thenReturn(new BrokerAccountVerification(null, null));
         when(accountPort.save(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("x", new RuntimeException("value too long for type character varying(512)")));
 
-        assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("new-ak", "new-sk")))
+        assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("new-ak", "new-sk", null)))
                 .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
         verifyNoInteractions(accountTokenEvictionPort);
     }
@@ -556,7 +561,7 @@ class AccountServiceTest {
         when(connectionTester.verifyAccount("new-ak", "new-sk", null)).thenReturn(new BrokerAccountVerification(null, null));
         when(accountPort.save(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("dup", new RuntimeException("duplicate key value violates unique constraint \"uq_accounts_account_no_hash\"")));
 
-        assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("new-ak", "new-sk")))
+        assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("new-ak", "new-sk", null)))
                 .isInstanceOf(Account.DuplicateAccountException.class);
         verifyNoInteractions(accountTokenEvictionPort);
     }
@@ -569,7 +574,7 @@ class AccountServiceTest {
         when(connectionTester.verifyAccount("access-key", "rotated-sk", null)).thenReturn(new BrokerAccountVerification(null, null));
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("access-key", "rotated-sk"));
+        accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("access-key", "rotated-sk", null));
 
         verify(accountPort, never()).existsByDedupeKey(any());
         verify(accountPort).save(any());
@@ -583,7 +588,7 @@ class AccountServiceTest {
         when(connectionTester.verifyAccount("bad", "bad", "74420614"))
                 .thenThrow(new com.kista.tradingcore.broker.domain.model.BrokerCredentialException());
 
-        assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("bad", "bad")))
+        assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("bad", "bad", null)))
                 .isInstanceOf(com.kista.tradingcore.broker.domain.model.BrokerCredentialException.class);
         verify(accountPort, never()).save(any());
         verifyNoInteractions(accountTokenEvictionPort);
@@ -597,7 +602,7 @@ class AccountServiceTest {
         when(connectionTester.verifyAccount("cid", "cs", "123-45-678901")).thenReturn(new BrokerAccountVerification("1", null));
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("cid", "cs"));
+        accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("cid", "cs", null));
 
         InOrder order = inOrder(accountPort, accountTokenEvictionPort);
         order.verify(accountPort).save(any());
@@ -611,7 +616,7 @@ class AccountServiceTest {
         when(connectionTesters.of(Broker.TOSS)).thenReturn(connectionTester);
         when(connectionTester.verifyAccount("cid", "cs", "123-45-678901")).thenReturn(new BrokerAccountVerification("2", null));
 
-        assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("cid", "cs")))
+        assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("cid", "cs", null)))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("다른 계좌");
         verify(accountPort, never()).save(any());
     }
@@ -621,19 +626,198 @@ class AccountServiceTest {
     void updateCredentials_guards() {
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.upbitAccount(accountId, userId));
         when(accountPort.existsByDedupeKey("taken")).thenReturn(true);
-        assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("taken", "sk")))
+        assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("taken", "sk", null)))
                 .isInstanceOf(Account.DuplicateAccountException.class);
 
         UUID mockId = UUID.randomUUID();
         when(accountPort.requireOwnedAccount(mockId, userId)).thenReturn(
                 new Account(mockId, userId, "모의", "12345678-01", "MOCK", "MOCK", null, Broker.MOCK, null, null));
-        assertThatThrownBy(() -> accountService.updateCredentials(mockId, userId, new UpdateCredentialsCommand("a", "b")))
+        assertThatThrownBy(() -> accountService.updateCredentials(mockId, userId, new UpdateCredentialsCommand("a", "b", null)))
                 .isInstanceOf(IllegalArgumentException.class);
 
         UUID foreignId = UUID.randomUUID();
         when(accountPort.requireOwnedAccount(foreignId, userId)).thenThrow(new SecurityException("계좌에 대한 접근 권한이 없습니다"));
-        assertThatThrownBy(() -> accountService.updateCredentials(foreignId, userId, new UpdateCredentialsCommand("a", "b")))
+        assertThatThrownBy(() -> accountService.updateCredentials(foreignId, userId, new UpdateCredentialsCommand("a", "b", null)))
                 .isInstanceOf(SecurityException.class);
+        verify(accountPort, never()).save(any());
+    }
+
+    // ---- API 키 만료일 결정 (KIS·토스·메리츠 추정/사용자 입력, 업비트 API 값) ----
+
+    private static final String MANUAL_REJECTED = "이 거래소는 API 키 만료일을 직접 바꿀 수 없습니다.";
+    private static final String PAST_REJECTED = "API 키 만료일은 오늘 이후여야 합니다.";
+
+    // KIS 등록 공통 stub — 검증은 만료일 없이 통과
+    private void stubKisRegister() {
+        when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
+        when(connectionTesters.of(Broker.KIS)).thenReturn(connectionTester);
+        when(connectionTester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null, null));
+        when(accountPort.countByUserId(userId)).thenReturn(0);
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    private RegisterAccountCommand kisRegister(LocalDate expiresOn) {
+        return new RegisterAccountCommand("테스트계좌", "74420614", "appKey", "appSecret", Broker.KIS, expiresOn);
+    }
+
+    // 만료일이 있는 KIS 계좌 — 키 교체·수정 테스트용
+    private Account kisAccountExpiring(Instant expiresAt) {
+        return new Account(accountId, userId, "테스트계좌", "74420614", "appKey", "appSecret", null,
+                Broker.KIS, null, expiresAt);
+    }
+
+    private void stubKisRotation(Account account) {
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
+        when(connectionTesters.of(Broker.KIS)).thenReturn(connectionTester);
+        when(connectionTester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null, null));
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    @Test
+    void registerKisEstimatesOneYear() {
+        stubKisRegister();
+
+        Account saved = accountService.register(userId, kisRegister(null));
+
+        assertThat(saved.apiKeyExpiresAt()).isEqualTo(Instant.parse("2027-11-10T15:30:00Z"));
+    }
+
+    @Test
+    void registerKisWithManualExpiry() {
+        stubKisRegister();
+
+        Account saved = accountService.register(userId, kisRegister(LocalDate.of(2027, 3, 1)));
+
+        assertThat(saved.apiKeyExpiresAt()).isEqualTo(Instant.parse("2027-02-28T15:00:00Z")); // KST 자정
+    }
+
+    @Test
+    void registerUpbitUsesBrokerValueAndRejectsManual() {
+        Instant expiresAt = Instant.parse("2027-10-17T00:00:00Z");
+        when(brokerEnabledPort.enabled(Broker.UPBIT)).thenReturn(true);
+        when(connectionTesters.of(Broker.UPBIT)).thenReturn(connectionTester);
+        when(connectionTester.verifyAccount("ak", "sk", null)).thenReturn(new BrokerAccountVerification(null, expiresAt));
+        when(connectionTester.verifyAccount("ak2", "sk", null)).thenReturn(new BrokerAccountVerification(null, null));
+        when(accountPort.countByUserId(userId)).thenReturn(0);
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(accountService.register(userId,
+                new RegisterAccountCommand("업비트", null, "ak", "sk", Broker.UPBIT, null)).apiKeyExpiresAt()).isEqualTo(expiresAt);
+        assertThat(accountService.register(userId,
+                new RegisterAccountCommand("업비트", null, "ak2", "sk", Broker.UPBIT, null)).apiKeyExpiresAt()).isNull();
+        assertThatThrownBy(() -> accountService.register(userId,
+                new RegisterAccountCommand("업비트", null, "ak3", "sk", Broker.UPBIT, LocalDate.of(2027, 3, 1))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage(MANUAL_REJECTED);
+    }
+
+    @Test
+    void registerBinanceHasNoExpiry() {
+        when(brokerEnabledPort.enabled(Broker.BINANCE)).thenReturn(true);
+        when(connectionTesters.of(Broker.BINANCE)).thenReturn(connectionTester);
+        when(connectionTester.verifyAccount("ak", "sk", null)).thenReturn(new BrokerAccountVerification(null, null));
+        when(accountPort.countByUserId(userId)).thenReturn(0);
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Account saved = accountService.register(userId,
+                new RegisterAccountCommand("바이낸스", null, "ak", "sk", Broker.BINANCE, null));
+
+        assertThat(saved.apiKeyExpiresAt()).isNull();
+    }
+
+    @Test
+    void estimateFromLeapDay() {
+        clock = Clock.fixed(Instant.parse("2028-02-29T03:00:00Z"), TimeZones.KST);
+        setUpService();
+        stubKisRegister();
+
+        Account saved = accountService.register(userId, kisRegister(null));
+
+        assertThat(saved.apiKeyExpiresAt()).isEqualTo(Instant.parse("2029-02-28T03:00:00Z"));
+    }
+
+    @Test
+    void updateCredentialsNewAppKeyReestimates() {
+        stubKisRotation(kisAccountExpiring(Instant.parse("2026-12-01T00:00:00Z")));
+
+        Account saved = accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("newKey", "sk", null));
+
+        assertThat(saved.apiKeyExpiresAt()).isEqualTo(Instant.parse("2027-11-10T15:30:00Z"));
+    }
+
+    @Test
+    void updateCredentialsSameAppKeyKeepsExpiry() {
+        Instant existing = Instant.parse("2026-12-01T00:00:00Z");
+        stubKisRotation(kisAccountExpiring(existing));
+
+        Account saved = accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("appKey", "sk", null));
+
+        assertThat(saved.apiKeyExpiresAt()).isEqualTo(existing);
+    }
+
+    @Test
+    void updateCredentialsSameAppKeyWithManualExpiryReplaces() {
+        stubKisRotation(kisAccountExpiring(Instant.parse("2026-12-01T00:00:00Z")));
+
+        Account saved = accountService.updateCredentials(accountId, userId,
+                new UpdateCredentialsCommand("appKey", "sk", LocalDate.of(2027, 3, 1)));
+
+        assertThat(saved.apiKeyExpiresAt()).isEqualTo(Instant.parse("2027-02-28T15:00:00Z"));
+    }
+
+    @Test
+    void manualExpiryUsesKstToday() {
+        // 고정 시각은 UTC 11-10이지만 KST로는 11-11 — 11-10은 어제라 거부, 11-11(오늘)은 허용
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(kisAccountExpiring(null));
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThatThrownBy(() -> accountService.update(accountId, userId, new UpdateAccountCommand("닉", LocalDate.of(2026, 11, 10))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage(PAST_REJECTED);
+        Account saved = accountService.update(accountId, userId, new UpdateAccountCommand("닉", LocalDate.of(2026, 11, 11)));
+        assertThat(saved.apiKeyExpiresAt()).isEqualTo(Instant.parse("2026-11-10T15:00:00Z"));
+    }
+
+    @Test
+    void invalidExpiryRejectedBeforeBrokerCall() {
+        when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(kisAccountExpiring(null));
+        LocalDate yesterday = LocalDate.of(2026, 11, 10);
+
+        assertThatThrownBy(() -> accountService.register(userId, kisRegister(yesterday)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage(PAST_REJECTED);
+        assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("k", "s", yesterday)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage(PAST_REJECTED);
+        verify(connectionTesters, never()).of(any());
+        verify(accountPort, never()).save(any());
+    }
+
+    @Test
+    void updateSetsManualExpiry() {
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(kisAccountExpiring(Instant.parse("2026-12-01T00:00:00Z")));
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Account saved = accountService.update(accountId, userId, new UpdateAccountCommand("닉", LocalDate.of(2027, 3, 1)));
+
+        assertThat(saved.apiKeyExpiresAt()).isEqualTo(Instant.parse("2027-02-28T15:00:00Z"));
+        assertThat(saved.nickname()).isEqualTo("닉");
+    }
+
+    @Test
+    void updateWithNullExpiryKeepsExisting() {
+        Instant existing = Instant.parse("2026-12-01T00:00:00Z");
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(kisAccountExpiring(existing));
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Account saved = accountService.update(accountId, userId, new UpdateAccountCommand("닉", null));
+
+        assertThat(saved.apiKeyExpiresAt()).isEqualTo(existing);
+    }
+
+    @Test
+    void updateUpbitManualRejected() {
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.upbitAccount(accountId, userId));
+
+        assertThatThrownBy(() -> accountService.update(accountId, userId, new UpdateAccountCommand("닉", LocalDate.of(2027, 3, 1))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage(MANUAL_REJECTED);
         verify(accountPort, never()).save(any());
     }
 }

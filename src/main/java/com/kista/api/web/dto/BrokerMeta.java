@@ -18,10 +18,13 @@ public record BrokerMeta(
         @Schema(description = "시장 최소 주문 금액 (견적 통화, plain 문자열 — 0은 하한 없음)", example = "5000")
         String minOrderAmount, // Market.minOrderAmount() plain 문자열
         @Schema(description = "주문 금액 소수 자릿수 (KRW 0, USDT 2)", example = "0")
-        int amountScale     // Market.amountScale()
+        int amountScale,    // Market.amountScale()
+        @Schema(description = "API 키 만료일 출처 (NONE·BROKER_API·ESTIMATED)", example = "BROKER_API")
+        String apiKeyExpirySource // ApiKeyExpirySource name()
 ) {
     public static BrokerMeta from(Broker b) {
         return new BrokerMeta(b.name(), b.getLabel(), b.getShortLabel(), b.getMarket().name(), b.getCurrency().name(),
-                b.getMarket().minOrderAmount().toPlainString(), b.getMarket().amountScale());
+                b.getMarket().minOrderAmount().toPlainString(), b.getMarket().amountScale(),
+                b.getApiKeyExpirySource().name());
     }
 }
