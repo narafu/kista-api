@@ -4,6 +4,7 @@ import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.matching.domain.model.DcaRule;
+import com.kista.tradingcore.matching.domain.model.DcaSizing;
 import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.tradingcore.matching.domain.strategy.DcaSchedule;
 import com.kista.tradingcore.trading.domain.model.DcaExecution;
@@ -34,7 +35,8 @@ class DcaSummaryAssembler {
     }
 
     // fromKstTradeDate(포함)부터 첫 실행 예정일 — 코인은 24/7 KST 단일 기준(휴장·US 세션 변환 없음)
-    DcaSummary.RuleSummary assembleRule(DcaRule rule, DcaExecution last, LocalDate fromKstTradeDate, Market market) {
+    DcaSummary.RuleSummary assembleRule(DcaRule source, DcaExecution last, LocalDate fromKstTradeDate, Market market) {
+        DcaRule rule = withRoundedAmount(source, market); // 조회 요약 경로 — 계산용 규칙이 아니라 응답에 실리는 사본만 반올림
         if (market.isCrypto()) {
             return DcaSchedule.nextExecutionDay(fromKstTradeDate, rule, d -> true)
                     .map(kst -> new DcaSummary.RuleSummary(rule, kst, kst, last))
@@ -44,6 +46,13 @@ class DcaSummaryAssembler {
         return DcaSchedule.nextExecutionDay(fromUs, rule, marketCalendarPort::isUsSessionOpen)
                 .map(us -> new DcaSummary.RuleSummary(rule, us, marketCalendarPort.kstTradeDateOf(us), last))
                 .orElseGet(() -> new DcaSummary.RuleSummary(rule, null, null, last));
+    }
+
+    // 정액 금액을 시장 견적 통화 자릿수로 반올림 — HOLDING_PERCENT(amount null)는 그대로
+    private static DcaRule withRoundedAmount(DcaRule rule, Market market) {
+        DcaSizing sizing = rule.sizing();
+        if (sizing.amount() == null) return rule;
+        return rule.withSizing(new DcaSizing(sizing.type(), market.quoteCurrency().round(sizing.amount()), null));
     }
 
     // 배치가 판정 가능한 첫 KST 거래일 (규칙 단위)

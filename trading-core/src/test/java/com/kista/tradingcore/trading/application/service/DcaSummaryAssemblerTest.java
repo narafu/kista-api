@@ -124,4 +124,35 @@ class DcaSummaryAssemblerTest {
         DcaExecution decidedToday = DcaExecution.ordered(UUID.randomUUID(), "k", com.kista.shared.kernel.OrderDirection.BUY, today, UUID.randomUUID(), BigDecimal.valueOf(1), BigDecimal.ONE);
         assertThat(DcaSummaryAssembler.firstEligibleDate(today.minusDays(10), decidedToday, STOCK, Market.US_STOCK, NOW)).isEqualTo(today.plusDays(1));
     }
+
+    @Test
+    void cryptoKrwRule_amountScale0() {
+        DcaRule rule = rule(OrderType.MARKET, DcaFrequency.DAILY, null, null, 13, "10000.00");
+
+        DcaSummary.RuleSummary s = assembler.assembleRule(rule, null, LocalDate.of(2026, 10, 14), Market.CRYPTO_KRW);
+
+        assertThat(s.rule().sizing().amount()).hasToString("10000");
+    }
+
+    @Test
+    void holdingPercentRule_keepsPercentUntouched() {
+        DcaRule rule = new DcaRule("k", OrderDirection.SELL, DcaFrequency.DAILY, null, null, OrderType.MARKET, 13,
+                new DcaSizing(DcaSizingType.HOLDING_PERCENT, null, new BigDecimal("50.00")), DcaShortfallPolicy.PARTIAL, java.util.List.of());
+
+        DcaSummary.RuleSummary s = assembler.assembleRule(rule, null, LocalDate.of(2026, 10, 14), Market.CRYPTO_KRW);
+
+        assertThat(s.rule().sizing().amount()).isNull();
+        assertThat(s.rule().sizing().percent()).hasToString("50.00");
+    }
+
+    @Test
+    void usdRule_keepsScale2() {
+        when(calendar.usSessionDateOf(any())).thenReturn(LocalDate.of(2026, 10, 13));
+        when(calendar.isUsSessionOpen(any())).thenReturn(false);
+        DcaRule daily = rule(OrderType.MOC, DcaFrequency.DAILY, null, null, null, "100.00");
+
+        DcaSummary.RuleSummary s = assembler.assembleRule(daily, null, LocalDate.of(2026, 10, 14), Market.US_STOCK);
+
+        assertThat(s.rule().sizing().amount()).hasToString("100.00");
+    }
 }

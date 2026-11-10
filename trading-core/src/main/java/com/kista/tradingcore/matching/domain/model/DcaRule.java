@@ -102,6 +102,11 @@ public record DcaRule(
         return orderLeg.substring(DCA_LEG_PREFIX.length());
     }
 
+    // 규모만 바꾼 사본 — 응답 조립용(금액 반올림)
+    public DcaRule withSizing(DcaSizing newSizing) {
+        return new DcaRule(ruleKey, direction, frequency, dayOfWeek, dayOfMonth, orderType, executionHour, newSizing, shortfall, conditions);
+    }
+
     public DcaRule withRuleKey(String key) {
         return new DcaRule(key, direction, frequency, dayOfWeek, dayOfMonth, orderType, executionHour, sizing, shortfall, conditions);
     }

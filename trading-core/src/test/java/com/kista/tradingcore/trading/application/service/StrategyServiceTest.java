@@ -928,7 +928,7 @@ class StrategyServiceTest {
                 new UpdateStrategyCommand(StrategyCycleSeedType.MAINTAIN, null));
 
         assertThat(result.strategy().cycleSeedType()).isEqualTo(StrategyCycleSeedType.MAINTAIN);
-        assertThat(result.initialDeposit()).isEqualTo(new BigDecimal("1000"));
+        assertThat(result.initialDeposit()).isEqualTo(new BigDecimal("1000.00"));
         // 전체 save가 아니라 정책 컬럼만 조건부 갱신한다(오래된 스냅샷이 status를 덮지 않게)
         verify(strategyPort, never()).save(any());
         verify(strategyCyclePort, never()).updateStartAmount(any(), any());
@@ -3075,7 +3075,9 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
         StrategyDetail detail = strategyService.getById(STRATEGY_ID, USER_ID);
 
         assertThat(detail.dca().rules()).singleElement().satisfies(r -> {
-            assertThat(r.rule()).isEqualTo(keyed.rules().getFirst());
+            // 응답 정액 금액은 USD scale 2로 반올림된다(픽스처 "300" → 300.00)
+            assertThat(r.rule()).isEqualTo(keyed.rules().getFirst().withSizing(
+                    new DcaSizing(com.kista.shared.kernel.DcaSizingType.AMOUNT, new BigDecimal("300.00"), null)));
             assertThat(r.lastExecution()).isEqualTo(last);
             assertThat(r.nextKstTradeDate()).isNotNull();
         });

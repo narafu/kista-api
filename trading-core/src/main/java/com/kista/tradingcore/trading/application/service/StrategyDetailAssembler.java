@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.StrategyDefaults;
 import com.kista.tradingcore.matching.domain.model.*;
@@ -72,7 +73,7 @@ class StrategyDetailAssembler {
                     .map(config -> buildDcaSummary(config, last, c, market, latestPos))).orElse(null);
         }
 
-        return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary);
+        return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary, market.quoteCurrency());
     }
 
     // DCA 요약 — 규칙별 배치가 판정 가능한 첫 거래일부터 다음 실행 예정일 계산 + 원장 보유·평단
@@ -153,7 +154,8 @@ class StrategyDetailAssembler {
                         latestCycle.get(), marketByAccountId.get(strategy.accountId()), latestPos);
             }
 
-            return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary);
+            return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary,
+                    marketByAccountId.get(strategy.accountId()).quoteCurrency());
         }).toList();
     }
 
@@ -161,10 +163,11 @@ class StrategyDetailAssembler {
     private StrategyDetail assemble(Strategy strategy, Optional<StrategyCycle> latestCycle,
                                      Optional<CyclePosition> openingPosition, Optional<CyclePosition> latestPosition,
                                      Integer divisionCount, boolean isReverseMode, VrSummary vrSummary,
-                                     DcaSummary dcaSummary) {
-        BigDecimal initialDeposit = strategy.isVr()
-                ? openingPosition.map(CyclePosition::deposit).orElse(null)
-                : latestCycle.map(StrategyCycle::startAmount).orElse(null);
+                                     DcaSummary dcaSummary, Currency currency) {
+        // 응답 금액은 계좌 통화 자릿수로 반올림 — 없으면 null 유지
+        BigDecimal initialDeposit = (strategy.isVr()
+                ? openingPosition.map(CyclePosition::deposit)
+                : latestCycle.map(StrategyCycle::startAmount)).map(currency::round).orElse(null);
         LocalDate startDate = latestCycle.map(StrategyCycle::startDate).orElse(null);
 
         // 회차는 INFINITE 전용 — 그 외 타입은 null (divisionCount도 INFINITE만 채워진다)
@@ -181,6 +184,6 @@ class StrategyDetailAssembler {
         boolean cycleInProgress = latestCycle.map(cycle -> !cycle.isEnded()).orElse(false);
 
         return new StrategyDetail(strategy, initialDeposit, startDate, divisionCount, isReverseMode, currentRound, currentHoldings, vrSummary, dcaSummary, cycleInProgress,
-                latestPosition.map(CyclePosition::deposit).orElse(null));
+                latestPosition.map(CyclePosition::deposit).map(currency::round).orElse(null));
     }
 }
