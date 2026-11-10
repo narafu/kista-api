@@ -45,6 +45,21 @@ user-invocable: true
 | 7 | 테스트공백 | `--diff`일 때만 | 바뀐 분기·계산에 대응 테스트가 있는지. `docs/agents/testing.md` 패턴(`@WithMockUser` 금지, `SAME_THREAD`, UUID principal) 위반 |
 | 8 | 드리프트 | `--diff`일 때만 | `constraints.md` "아키텍처 맵 flows.yml 동기화" 절, CLAUDE.md README 드리프트 규칙, 해당 모듈 문서(`docs/agents/modules/...`)가 변경과 어긋나는지 |
 | 9 | 코드철학 | `--focus`로 지정할 때만 | CLAUDE.md "코드 철학", `constraints.md` "주석 규칙"·"도메인 Command 명명"·"application/port/output/ 네이밍" 절. setter·getter 남용, 보일러플레이트, 명명 |
+| 10 | 변경결합 | `--focus`로 지정할 때만 (모듈·패키지 대상 권장) | 아래 "10번 변경결합 절차" |
+
+### 10번 변경결합 절차
+
+질문은 하나다: **함께 바뀌어야 하는 것이 함께 있고, 따로 바뀌는 것은 묶여 있지 않은가?**
+
+1. **special case 수집**: 대상에서 다음을 grep으로 먼저 훑는다. 한 enum 상수·값 하나만을 위한 `if`/`switch` 분기, 특정 호출자 하나만 쓰는 파라미터·오버로드, `Thread.sleep`·재시도 루프, `@Disabled` 테스트. 삼키는 catch는 2번 조용한실패로 보고하고 여기서는 묶음 근거로만 쓴다
+2. **숨은 결합**: 같은 값·로직의 복사본이 있는데 서로를 가리키는 장치(공용 상수·헬퍼·테스트)가 없는 곳, 호출자가 알아서 지켜야 하는 호출 순서·관례. 추출 여부는 CLAUDE.md "추출 기준"(3곳 이상 + 같은 이유로 바뀜)으로 판정한다
+3. **co-change 근거**: `git log --since=6.months --name-only --format= -- <대상 경로>`로 함께 커밋된 파일 쌍을 센다. 다른 패키지·모듈인데 반복해서 함께 바뀌는 쌍이 후보다. 커밋 해시 2~3개를 근거로 붙인다
+4. **묶기**: special case를 하나씩 고치자고 제안하지 않는다. 같은 원인을 공유하는 항목을 수정안 하나 아래로 묶는다(아래 보고 형식)
+
+제외(재제안 금지):
+- 헥사고날 레이어 분리(domain/application/adapter 폴더가 갈라진 것)는 의도된 구조다. Modulith 경계·own-type 복제는 `own-type-ledger.md`의 게이트를 통과한 것이면 제외한다
+- `docs/agents/code-quality-backlog.md`의 "유지 목록"에 걸린 항목은 제외한다. 대상 파일명으로 grep해 확인한다
+- `trading-formulas.md`의 매매·VR 공식은 구조 변경 대상이 아니다
 
 ## 3. 보고 형식
 
@@ -56,6 +71,14 @@ user-invocable: true
 - 의도된 예외로 판단해 제외한 항목은 표 아래 "제외(사유)"로 따로 적는다 — 조용히 빼지 않는다
 - 정적 분석만 했는지, 테스트 실행(architecture 테스트 등)까지 했는지 마지막 줄에 명시한다
 - 같은 문제가 대상 밖에도 반복되는 것으로 보이면 "전역 후보"로 표시한다
+- 10번 관점은 표 대신 decision log로 따로 적는다. 수정안을 한 줄 쓰고, 그 수정안이 없애는 문제를 `file:line`과 함께 하위 목록으로 단다. 묶이지 않은 단건은 표에 "하"로 넣는다. 각 수정안에는 동작 보존용으로 먼저 추가할 테스트를 적는다
+  ```
+  - <수정안 한 줄> (co-change 근거: <해시>, <해시>)
+    - `path/A.java:30` <문제>
+    - `path/B.java:12` <문제>
+    - 선행 테스트: <동작을 고정할 테스트>
+  ```
+- 10번 관점은 표 대신 decision log로 적는다 — 수정안 한 줄 + co-change 커밋 해시, 그 아래 해소되는 문제 `file:line` 목록과 동작을 먼저 고정할 선행 테스트 한 줄. 묶이지 않은 단건은 표에 "하"로 넣는다
 - 6번 관점에서 응답 형식이 바뀌면 "UI 영향" 열거(kista-ui 파일 경로)를 표 아래에 붙인다
 
 ## 4. `--fix`일 때
