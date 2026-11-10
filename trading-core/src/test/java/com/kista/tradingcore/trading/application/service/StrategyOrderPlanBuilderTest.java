@@ -192,7 +192,7 @@ class StrategyOrderPlanBuilderTest {
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         AccountBalance balance = new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("1000.00"));
         PrivacyTradeBase base = new PrivacyTradeBase(
-                UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
+                UUID.randomUUID(), new BigDecimal("20.00"), 10, BigDecimal.ZERO, new BigDecimal("20.00"), List.of());
         when(balanceLoader.tryLoadBalance(privacy)).thenReturn(new TradingBalanceLoader.BalanceLoad(balance, null));
         when(cycleOrderStrategies.of(privacy.type())).thenReturn(orderStrategy);
         when(orderStrategy.requiresPrevClose()).thenReturn(false);
@@ -212,7 +212,7 @@ class StrategyOrderPlanBuilderTest {
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         AccountBalance balance = new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("1000.00"));
         PrivacyTradeBase base = new PrivacyTradeBase(
-                UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
+                UUID.randomUUID(), new BigDecimal("20.00"), 10, BigDecimal.ZERO, new BigDecimal("20.00"), List.of());
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of());
         when(balanceLoader.tryLoadBalance(privacy)).thenReturn(new TradingBalanceLoader.BalanceLoad(balance, null));
         when(cycleOrderStrategies.of(privacy.type())).thenReturn(orderStrategy);
@@ -225,5 +225,22 @@ class StrategyOrderPlanBuilderTest {
         StrategyOrderPlanBuilder.PlanResult result = builder.build(privacy, account, cycle, today, account.id(), Map.of());
 
         assertThat(result.plan()).isSameAs(plan);
+    }
+
+    @Test
+    void build_returnsPrivacyBaseBlocked_whenValuationInvalid() {
+        Strategy privacy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.PRIVACY,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        AccountBalance balance = new AccountBalance(0, null, new BigDecimal("1000.00"));
+        when(balanceLoader.tryLoadBalance(privacy)).thenReturn(new TradingBalanceLoader.BalanceLoad(balance, null));
+        when(cycleOrderStrategies.of(privacy.type())).thenReturn(orderStrategy);
+        when(orderStrategy.requiresPrevClose()).thenReturn(false);
+        when(orderComputer.compute(balance, privacy, null, today, cycle, null, account.id(), null, null))
+                .thenThrow(new com.kista.tradingcore.matching.domain.strategy.PrivacyValuationException("FIDA 자산이 유효하지 않습니다."));
+
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(privacy, account, cycle, today, account.id(), Map.of());
+
+        assertThat(result.plan()).isNull();
+        assertThat(result.skipReason()).isEqualTo(SkipReason.PRIVACY_BASE_BLOCKED);
     }
 }

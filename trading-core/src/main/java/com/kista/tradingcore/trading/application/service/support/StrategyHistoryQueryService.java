@@ -68,7 +68,7 @@ public class StrategyHistoryQueryService {
         }
         // PrivacyCycleOrderStrategy.minRequiredDeposit()은 currentCycleStart만 사용 — 나머지 필드는 빈 값
         PrivacyPlan privacyPlan = currentBase != null
-                ? new PrivacyPlan(0, currentBase.currentCycleStart(), List.of())
+                ? new PrivacyPlan(0, null, BigDecimal.ZERO, currentBase.currentCycleStart(), List.of())
                 : null;
 
         // 3단계: 기준가 결정 후 최소 시드 계산 — 실제 첫 주문(holdings=0)과 동일하게 전일종가 사용

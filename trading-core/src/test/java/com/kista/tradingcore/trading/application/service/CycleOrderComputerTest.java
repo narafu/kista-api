@@ -42,6 +42,8 @@ class CycleOrderComputerTest {
     @Mock InfiniteStrategy infiniteStrategy;
     @Mock VrStrategy vrStrategy;
     @Mock PrivacyStrategy privacyStrategy;
+    @Mock CycleOrderStrategies mockStrategies;
+    @Mock CycleOrderStrategy mockPrivacyOrderStrategy;
 
     CycleOrderComputer computer;
 
@@ -358,5 +360,36 @@ class CycleOrderComputerTest {
         var captor = org.mockito.ArgumentCaptor.forClass(ReverseModePosition.class);
         verify(reverseStrategy).buildOrders(captor.capture(), any(LocalDate.class));
         assertThat(captor.getValue().starPointPrice()).isEqualTo(new BigDecimal("10.00"));
+    }
+
+    private BigDecimal privacyValuationPrice(BigDecimal closingPrice, BigDecimal prevClose) {
+        Strategy privacy = new Strategy(UUID.randomUUID(), ACCOUNT_ID, StrategyType.PRIVACY,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), STRATEGY_VERSION_ID,
+                new BigDecimal("5000.00"), null, LocalDate.now(), null, null, null);
+        when(cyclePositionPort.findLatestOne(cycle.id())).thenReturn(Optional.of(
+                new CyclePosition(UUID.randomUUID(), cycle.id(), BigDecimal.ONE, closingPrice, null, BigDecimal.ZERO, null, null)));
+        when(mockStrategies.of(StrategyType.PRIVACY)).thenReturn(mockPrivacyOrderStrategy);
+        CycleOrderComputer c = new CycleOrderComputer(mockStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort,
+                strategyInfiniteDetailPort, strategyCycleVrPort, strategyVrDetailPort, orderPort);
+
+        c.compute(BALANCE, privacy, prevClose, LocalDate.now(), cycle, null, ACCOUNT_ID, null);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(CycleOrderStrategy.PlanContext.class);
+        verify(mockPrivacyOrderStrategy).plan(captor.capture());
+        return captor.getValue().privacy().valuationPrice();
+    }
+
+    @Test
+    @DisplayName("PRIVACY 평가가는 최신 cycle_position 종가")
+    void PRIVACY_평가가는_최신_cycle_position_종가() {
+        assertThat(privacyValuationPrice(new BigDecimal("56.20"), new BigDecimal("99")))
+                .isEqualByComparingTo("56.20");
+    }
+
+    @Test
+    @DisplayName("PRIVACY 종가 null이면 prevClose 폴백")
+    void PRIVACY_종가_null이면_prevClose_폴백() {
+        assertThat(privacyValuationPrice(null, new BigDecimal("55.00"))).isEqualByComparingTo("55.00");
     }
 }

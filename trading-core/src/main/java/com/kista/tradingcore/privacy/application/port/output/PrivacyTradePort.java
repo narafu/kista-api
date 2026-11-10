@@ -15,9 +15,6 @@ public interface PrivacyTradePort {
     // 전략 등록/수정 미리보기용 기준가 조회 — 현재 KST 일자 이후의 기준표만 사용
     Optional<PrivacyCurrentBase> findSeedPreviewBase();
 
-    // kstTradeDate 거래일 이후에 적용되는 첫 기준표 — 백테스트 중간부터 시작 시작금액용(findSeedPreviewBase와 같은 >= 규칙, 기준일만 지정)
-    Optional<PrivacyCurrentBase> findSeedBaseFrom(LocalDate kstTradeDate);
-
     // 당일 기준 매매표 조회 — 미수신 일자면 empty
     Optional<PrivacyTradeBase> findTodayTrade(LocalDate today);
 

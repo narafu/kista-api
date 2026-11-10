@@ -12,6 +12,7 @@ import com.kista.tradingcore.matching.domain.model.StrategyVrDetail;
 import com.kista.tradingcore.matching.domain.model.VrPosition;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
+import com.kista.tradingcore.matching.domain.strategy.PrivacyValuationException;
 import com.kista.tradingcore.matching.domain.strategy.PriceCapPolicy;
 import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 
@@ -70,15 +71,9 @@ public class BacktestEngine {
     // PRIVACY 전용 진입점 — 기준 매매표 조회는 DB I/O라 순수 도메인에서 못 하므로 날짜별 맵을 호출측(BacktestService)이 미리 조달한다
     // 맵에 키가 없는 날짜는 "기준 매매표 미수신"과 동일 취급 (그날 주문 없음)
     public Output run(List<DailyCandle> candles, BacktestCommand command, Map<LocalDate, PrivacyTradeBase> privacyBases) {
-        return run(candles, command, privacyBases, null);
-    }
-
-    // privacyStartAmount: 중간부터 시작의 FIDA 배수 환산 시작금액(운영 StrategyStartAmountCalculator와 같은 값) — null이면 원금과 같은 시장가 평가금
-    public Output run(List<DailyCandle> candles, BacktestCommand command, Map<LocalDate, PrivacyTradeBase> privacyBases,
-                      BigDecimal privacyStartAmount) {
         if (command.type() != StrategyType.PRIVACY) return run(candles, command);
         if (candles.isEmpty()) return new Output(List.of(), 0, 0, List.of(), List.of());
-        return runPrivacy(candles, command, privacyBases, privacyStartAmount);
+        return runPrivacy(candles, command, privacyBases);
     }
 
     // --- 전략 공통 일봉 루프 ---
@@ -291,10 +286,8 @@ public class BacktestEngine {
     // --- PRIVACY 경로 ---
 
     private Output runPrivacy(List<DailyCandle> candles, BacktestCommand command,
-                              Map<LocalDate, PrivacyTradeBase> privacyBases, BigDecimal privacyStartAmount) {
+                              Map<LocalDate, PrivacyTradeBase> privacyBases) {
         PrivacyState state = new PrivacyState(command, candles.getFirst().close());
-        // 중간부터 시작은 매매표 배수 기준 시작금액만 FIDA 환산값으로 — 원금(수익률 기준)은 시장가 평가금 그대로(운영 openAmount와 같은 구분)
-        if (privacyStartAmount != null) state.cycleStartAmount = privacyStartAmount;
         List<String> warnings = new ArrayList<>();
 
         Output output = runDays(candles, state, warnings, StrategyType.PRIVACY,
@@ -322,7 +315,7 @@ public class BacktestEngine {
     }
 
     // 다음 세션 주문 생성 — PlanContext 조립 후 기존 PrivacyCycleOrderStrategy.plan()에 위임
-    // 배수(multiple = initialDeposit ÷ currentCycleStart)는 PrivacyStrategy가 내부에서 산출한다 — 여기서 재계산하지 않는다
+    // 배수(multiple = 우리 자산 ÷ FIDA 자산, 전일종가 기준)는 PrivacyStrategy가 내부에서 산출한다 — 여기서 재계산하지 않는다
     // privacyBases 키는 기준표가 적용되는 세션 날짜다 — 오늘 만든 주문은 다음 세션에 체결되므로 다음 세션의 기준표를 쓴다
     // (첫 캔들 세션은 그 전날 계획 단계가 없어 매매 없음 — 운영도 등록 다음 배치부터 주문한다)
     private List<PlannedOrder> planPrivacyOrders(PrivacyState state, BacktestCommand command,
@@ -335,15 +328,22 @@ public class BacktestEngine {
         if (base == null) state.recordMissingBase(nextSession);
         else state.flushMissingBaseGap(warnings);
 
-        // currentPrice 자리의 전일종가(= 오늘 종가)는 PrivacyCycleOrderStrategy.plan()이 소비하지 않는다 — VR/INFINITE와의 조립 일관성 목적
+        // 오늘 종가 = 다음 세션 기준 전일종가라 look-ahead 아님 — 배수 평가가격(valuationPrice)으로 쓴다
         BigDecimal refClose = candle.close();
         CycleOrderStrategy.PlanContext.PrivacyInputs privacyInputs =
                 new CycleOrderStrategy.PlanContext.PrivacyInputs(
-                        state.cycleStartAmount, base == null ? null : base.toPlan(), refClose);
+                        refClose, base == null ? null : base.toPlan(), refClose);
         CycleOrderStrategy.PlanContext ctx = new CycleOrderStrategy.PlanContext(
                 state.balance, command.ticker(), candle.date(), null, null, privacyInputs, null);
 
-        Optional<CycleOrderStrategy.OrderPlan> plan = strategies.of(StrategyType.PRIVACY).plan(ctx);
+        Optional<CycleOrderStrategy.OrderPlan> plan;
+        try {
+            plan = strategies.of(StrategyType.PRIVACY).plan(ctx);
+        } catch (PrivacyValuationException e) {
+            // 자산 무효 세션은 주문 없이 경고만 남기고 다음 세션으로 진행
+            warnings.add("%s PRIVACY 배수 산출 불가 — 주문 없음: %s".formatted(nextSession, e.getMessage()));
+            return List.of();
+        }
         List<PlannedOrder> orders = plan.map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
         // PRIVACY 캡은 cap 초과 BUY의 가격만 치환한다(수량 재산정 없음) — 운영 PrivacyCycleOrderStrategy.capBuyOrders
         return applyBuyCap(StrategyType.PRIVACY, orders, refClose, plan, command.ticker(), candle.date());

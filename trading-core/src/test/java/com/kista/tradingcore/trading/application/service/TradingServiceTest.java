@@ -632,7 +632,7 @@ class TradingServiceTest {
         CyclePosition privacyHistory = new CyclePosition(null, privacyCycle.id(), new BigDecimal("177.61"),
                 PRICE, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         PrivacyTradeBase privacyBase = new PrivacyTradeBase(
-                UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
+                UUID.randomUUID(), new BigDecimal("20.00"), 10, BigDecimal.ZERO, new BigDecimal("20.00"), List.of());
         Order privacyBuy = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LIMIT,
                 OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(3), new BigDecimal("101.44"),
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_PRIVACY_BUY"); // 304.32 > 원장 177.61
@@ -1037,7 +1037,7 @@ class TradingServiceTest {
         CyclePosition history = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
                 PRICE, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         PrivacyTradeBase privacyBase = new PrivacyTradeBase(
-                UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
+                UUID.randomUUID(), new BigDecimal("20.00"), 10, BigDecimal.ZERO, new BigDecimal("20.00"), List.of());
         Order buy = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(100), new BigDecimal("500.00"),
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_PRIVACY_BUY");
@@ -1437,7 +1437,7 @@ class TradingServiceTest {
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.SELL,
                 BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null);
         PrivacyTradeBase missingSellBase = new PrivacyTradeBase(
-                UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
+                UUID.randomUUID(), new BigDecimal("20.00"), 10, BigDecimal.ZERO, new BigDecimal("20.00"), List.of());
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
@@ -1470,7 +1470,7 @@ class TradingServiceTest {
         CyclePosition history = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
                 PRICE, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         PrivacyTradeBase missingSellBase = new PrivacyTradeBase(
-                UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
+                UUID.randomUUID(), new BigDecimal("20.00"), 10, BigDecimal.ZERO, new BigDecimal("20.00"), List.of());
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
@@ -1497,7 +1497,7 @@ class TradingServiceTest {
         CyclePosition history = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
                 PRICE, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         PrivacyTradeBase missingSellBase = new PrivacyTradeBase(
-                UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
+                UUID.randomUUID(), new BigDecimal("20.00"), 10, BigDecimal.ZERO, new BigDecimal("20.00"), List.of());
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));

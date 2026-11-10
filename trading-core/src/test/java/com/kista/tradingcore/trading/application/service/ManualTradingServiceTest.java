@@ -432,7 +432,7 @@ class ManualTradingServiceTest {
         StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
                 new BigDecimal("1000.00"), null, LocalDate.now(FIXED), null, null, null);
         PrivacyTradeBase base = new PrivacyTradeBase(
-                UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
+                UUID.randomUUID(), new BigDecimal("20.00"), 10, BigDecimal.ZERO, new BigDecimal("20.00"), List.of());
         when(strategyPort.findByIdOrThrow(privacy.id())).thenReturn(privacy);
         when(strategyCyclePort.requireLatestByStrategyId(privacy.id())).thenReturn(privacyCycle);
         when(cyclePositionPort.findLatestOneByStrategyId(privacy.id())).thenReturn(Optional.of(

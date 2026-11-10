@@ -29,7 +29,7 @@ class PrivacyBaseGuardTest {
     @InjectMocks PrivacyBaseGuard guard;
 
     PrivacyTradeBase base = new PrivacyTradeBase(
-            UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
+            UUID.randomUUID(), new BigDecimal("20.00"), 10, BigDecimal.ZERO, new BigDecimal("20.00"), List.of());
     LocalDate today = LocalDate.of(2026, 10, 6);
 
     PrivacyTradeValidationReport issues() {

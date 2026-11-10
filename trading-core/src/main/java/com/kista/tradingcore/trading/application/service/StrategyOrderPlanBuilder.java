@@ -15,7 +15,9 @@ import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.domain.model.BatchContext;
+import com.kista.tradingcore.matching.domain.strategy.PrivacyValuationException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -28,6 +30,7 @@ import com.kista.shared.kernel.StrategyTicker;
 // 전략 1건의 오늘자 주문 계획 계산 오케스트레이션 — 잔고 로드 → prevClose(필요 시) → privacyBase(필요 시) → compute()
 // TradingPreviewService(대상 전략 1건)가 공유
 // package-private — application/service 패키지 전용
+@Slf4j
 @Component
 @RequiredArgsConstructor
 class StrategyOrderPlanBuilder {
@@ -82,9 +85,16 @@ class StrategyOrderPlanBuilder {
                         EnumSet.of(OrderTiming.AT_OPEN, OrderTiming.AT_CLOSE), orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today),
                         null, balance).inputs()
                 : null;
-        CycleOrderStrategy.OrderPlan plan = orderComputer.compute(
-                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, accountId, null, dcaInputs)
-                .orElse(null);
+        CycleOrderStrategy.OrderPlan plan;
+        try {
+            plan = orderComputer.compute(
+                    balance, strategy, prevClosePrice, today, currentCycle, privacyBase, accountId, null, dcaInputs)
+                    .orElse(null);
+        } catch (PrivacyValuationException e) {
+            // 자산 평가 불가 — 미리보기는 500 대신 기준표 차단으로 표시
+            log.warn("[strategyId={}] PRIVACY 자산 평가 불가: {}", strategy.id(), e.getMessage());
+            return new PlanResult(null, SkipReason.PRIVACY_BASE_BLOCKED);
+        }
         if (plan == null) {
             return new PlanResult(null, SkipReason.NO_PRIVACY_BASE);
         }

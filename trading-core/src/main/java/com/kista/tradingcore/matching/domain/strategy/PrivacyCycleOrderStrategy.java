@@ -29,6 +29,9 @@ public class PrivacyCycleOrderStrategy implements CycleOrderStrategy {
     public StrategyType cycleType() { return StrategyType.PRIVACY; }
 
     @Override
+    public boolean requiresPrevClose() { return true; }
+
+    @Override
     public Optional<OrderPlan> plan(PlanContext ctx) {
         PlanContext.PrivacyInputs inputs = ctx.privacy();
         // 기준매매표 없으면 전략 차원 skip — 서비스는 OrderPlan absent로 skip 처리
@@ -36,8 +39,8 @@ public class PrivacyCycleOrderStrategy implements CycleOrderStrategy {
             log.warn("[PRIVACY] 기준 매매표 미수신 — 매매 건너뜀: [accountId={}]", ctx.accountId());
             return Optional.empty();
         }
-        // initialDeposit은 PlanContext에서 직접 수신 (StrategyCycle에서 출처)
-        List<PlannedOrder> orders = privacyStrategy.buildOrders(ctx.balance(), inputs.initialDeposit(), inputs.privacyPlan());
+        // 배수 산출용 평가가(전일종가 등)는 PlanContext에서 수신
+        List<PlannedOrder> orders = privacyStrategy.buildOrders(ctx.balance(), inputs.valuationPrice(), inputs.privacyPlan());
         return Optional.of(new OrderPlan(null, null, orders));
     }
 

@@ -151,7 +151,7 @@ class CapitalLedgerService implements InjectCapitalUseCase {
         }
         BigDecimal newStartAmount = cycle.startAmount().subtract(amount);
         if (newStartAmount.signum() <= 0) {
-            // PRIVACY 배수 = startAmount ÷ currentCycleStart가 깨진다
+            // 시작 금액이 0 이하가 되면 이후 시드 기준 계산이 성립하지 않는다
             throw new IllegalArgumentException("투자금 인출 후 시작 금액이 0 이하가 되어 인출할 수 없습니다.");
         }
         InfiniteMinSeedGuard.requireAtLeast(minSeed, newStartAmount); // INFINITE는 인출 후에도 0회차 교착 시드 미만이 되면 거부

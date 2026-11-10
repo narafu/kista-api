@@ -135,11 +135,11 @@ public interface CycleOrderStrategy {
         ) {}
 
         // PRIVACY 전략 전용 입력 묶음
-        // initialDeposit: 현재 StrategyCycle의 시작 시드 (buildOrders 호출 시 필요)
+        // valuationPrice: 자산비 배수 산출용 평가가 (전일종가 등 — 보유가 모두 0이면 null 허용)
         // privacyPlan: 당일 기준매매표(커널 입력 변환본) (미수신 시 null → 전략 차원 skip)
         // currentPrice: 스케쥴러 시작 시점 현재가 (allocateRemainingBudget 분모 산출용 — preview/수동실행 시 null)
         public record PrivacyInputs(
-                BigDecimal initialDeposit,
+                BigDecimal valuationPrice,
                 PrivacyPlan privacyPlan,
                 BigDecimal currentPrice
         ) {}

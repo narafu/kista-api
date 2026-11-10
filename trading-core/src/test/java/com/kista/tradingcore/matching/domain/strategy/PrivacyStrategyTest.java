@@ -26,18 +26,19 @@ class PrivacyStrategyTest {
 
     private static final PrivacyStrategy strategy = new PrivacyStrategy();
     private static final BigDecimal BASE_CYCLE_START = new BigDecimal("1000"); // 기준 사이클 시작가
-    private static final BigDecimal INITIAL_USD_DEPOSIT = new BigDecimal("1000"); // 1배수: 1000/1000=1.00
+    private static final BigDecimal INITIAL_USD_DEPOSIT = new BigDecimal("1000"); // 우리 자산 1000 — 1배수: 1000/1000=1.00
+    private static final BigDecimal PRICE = BigDecimal.ONE; // 평가가 — FIDA 평단과 같아 FIDA 자산은 항상 currentCycleStart
     private static final LocalDate DATE = LocalDate.of(2026, 5, 26);
     private static final StrategyTicker TICKER = StrategyTicker.SOXL;
 
-    // 계좌잔고 헬퍼
-    private static AccountBalance balance(int holdings) {
-        return new AccountBalance(holdings, new BigDecimal("30.00"), new BigDecimal("1000"));
+    // 계좌잔고 헬퍼 — 우리 자산(예수금 + 보유 × PRICE)이 ourAsset이 되도록 예수금을 역산
+    private static AccountBalance balance(int holdings, BigDecimal ourAsset) {
+        return new AccountBalance(holdings, new BigDecimal("30.00"), ourAsset.subtract(BigDecimal.valueOf(holdings).multiply(PRICE)));
     }
 
-    // 기준 매매표 헬퍼 — currentCycleStart=1000 고정 (INITIAL_USD_DEPOSIT/BASE_CYCLE_START=1.00)
+    // 기준 매매표 헬퍼 — 평단=PRICE, 실현손익 0, currentCycleStart=1000 → FIDA 자산 1000 (우리 자산/1000 = 배수)
     private static PrivacyPlan base(int holdings, List<PrivacyPlannedTrade> trades) {
-        return new PrivacyPlan(holdings, BASE_CYCLE_START, trades);
+        return new PrivacyPlan(holdings, PRICE, BigDecimal.ZERO, BASE_CYCLE_START, trades);
     }
 
     private static PrivacyPlannedTrade buy(int quantity, String price) {
@@ -57,7 +58,7 @@ class PrivacyStrategyTest {
     void exactMatch() {
         // 기준표 holdings=240, balance=240 → diff=0
         PrivacyPlan base = base(240, List.of(buy(100, "10"), buy(80, "9"), sell(50, "12")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(240), INITIAL_USD_DEPOSIT, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(240, INITIAL_USD_DEPOSIT), PRICE, base);
 
         assertThat(orders).hasSize(3);
         assertThat(buyOrders(orders)).extracting(PlannedOrder::quantity).containsExactlyInAnyOrder(100, 80);
@@ -78,7 +79,7 @@ class PrivacyStrategyTest {
                 buy(100, "10")
         ));
 
-        List<PlannedOrder> orders = strategy.buildOrders(balance(240), INITIAL_USD_DEPOSIT, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(240, INITIAL_USD_DEPOSIT), PRICE, base);
 
         assertThat(buyOrders(orders)).extracting(PlannedOrder::price, PlannedOrder::orderLeg)
                 .containsExactly(
@@ -95,7 +96,7 @@ class PrivacyStrategyTest {
     void increaseOnShortfall() {
         // target=240, current=200, diff=+40 → 가장 싼 8$ BUY(60→100주)
         PrivacyPlan base = base(240, List.of(buy(100, "10"), buy(80, "9"), buy(60, "8"), sell(50, "12")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(200), INITIAL_USD_DEPOSIT, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(200, INITIAL_USD_DEPOSIT), PRICE, base);
 
         assertThat(buyOrders(orders)).hasSize(3);
         PlannedOrder cheapestBuy = buyOrders(orders).stream()
@@ -112,7 +113,7 @@ class PrivacyStrategyTest {
     void decreasePartialSingleEntry() {
         // target=240, current=270, diff=-30 → 가장 비싼 10$ BUY(100→70주)
         PrivacyPlan base = base(240, List.of(buy(100, "10"), buy(80, "9"), buy(60, "8"), sell(50, "12")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(270), INITIAL_USD_DEPOSIT, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(270, INITIAL_USD_DEPOSIT), PRICE, base);
 
         PlannedOrder mostExpensiveBuy = buyOrders(orders).stream()
                 .filter(o -> o.price().compareTo(new BigDecimal("10")) == 0)
@@ -127,7 +128,7 @@ class PrivacyStrategyTest {
         // target=240, current=370, diff=-130
         // 10$BUY(100주) 전량 차감 후 remaining=30 → 9$BUY(80→50주)
         PrivacyPlan base = base(240, List.of(buy(100, "10"), buy(80, "9"), buy(60, "8"), sell(50, "12")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(370), INITIAL_USD_DEPOSIT, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(370, INITIAL_USD_DEPOSIT), PRICE, base);
 
         // 10$BUY는 quantity=0이므로 결과에서 제외
         assertThat(buyOrders(orders)).noneMatch(o -> o.price().compareTo(new BigDecimal("10")) == 0);
@@ -143,7 +144,7 @@ class PrivacyStrategyTest {
     void decreaseExceedsAllBuys() {
         // target=0, current=250 → diff=-250, BUY 합=240 → 모두 0 후 잔여 10 무시
         PrivacyPlan base = base(0, List.of(buy(100, "10"), buy(80, "9"), buy(60, "8"), sell(50, "12")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(250), INITIAL_USD_DEPOSIT, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(250, INITIAL_USD_DEPOSIT), PRICE, base);
 
         assertThat(buyOrders(orders)).isEmpty();
         assertThat(sellOrders(orders)).hasSize(1);
@@ -154,7 +155,7 @@ class PrivacyStrategyTest {
     void noBuyTrades() {
         // diff != 0 이지만 BUY 후보 없음
         PrivacyPlan base = base(240, List.of(sell(50, "12"), sell(30, "13")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(100), INITIAL_USD_DEPOSIT, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(100, INITIAL_USD_DEPOSIT), PRICE, base);
 
         assertThat(buyOrders(orders)).isEmpty();
         assertThat(sellOrders(orders)).hasSize(2);
@@ -165,7 +166,7 @@ class PrivacyStrategyTest {
     void nullQuantityFiltered() {
         PrivacyPlannedTrade nullQuantity = new PrivacyPlannedTrade(DATE, TICKER, OrderType.LOC, OrderDirection.BUY, null, new BigDecimal("10"));
         PrivacyPlan base = base(100, List.of(nullQuantity, buy(80, "9"), sell(50, "12")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(100), INITIAL_USD_DEPOSIT, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(100, INITIAL_USD_DEPOSIT), PRICE, base);
 
         // null quantity BUY는 제외, 유효한 BUY(9$)와 SELL(12$)만 포함
         assertThat(orders).hasSize(2);
@@ -186,7 +187,7 @@ class PrivacyStrategyTest {
                 buy(3, "298.8"),
                 buy(3, "279.02")
         ));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(3), initialDeposit, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(3, initialDeposit), PRICE, base);
 
         List<PlannedOrder> buys = buyOrders(orders);
         assertThat(buys).hasSize(2);
@@ -204,7 +205,7 @@ class PrivacyStrategyTest {
         // 작은 매수(8$): 6.93+2=8.93 → floor=8
         BigDecimal initialDeposit = new BigDecimal("990"); // 990/1000 = 0.99
         PrivacyPlan base = base(21, List.of(buy(7, "10"), buy(7, "9"), buy(7, "8")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(21), initialDeposit, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(21, initialDeposit), PRICE, base);
 
         List<PlannedOrder> buys = buyOrders(orders);
         assertThat(buys).hasSize(3);
@@ -222,7 +223,7 @@ class PrivacyStrategyTest {
         // diff=0: base.holdings(10) × 1.1 = 11 = balance(11)
         BigDecimal initialDeposit = new BigDecimal("1100"); // 1100/1000 = 1.10
         PrivacyPlan base = base(10, List.of(buy(5, "10"), buy(3, "9")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(11), initialDeposit, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(11, initialDeposit), PRICE, base);
 
         List<PlannedOrder> buys = buyOrders(orders);
         assertThat(buys).hasSize(2);
@@ -237,7 +238,7 @@ class PrivacyStrategyTest {
         // target=0.3, balance=0 → diff=+0.3 → 0.3+0.3=0.6 → floor=0 → BUY 없음
         BigDecimal initialDeposit = new BigDecimal("300"); // 300/1000 = 0.30
         PrivacyPlan base = base(1, List.of(buy(1, "500")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(0), initialDeposit, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(0, initialDeposit), PRICE, base);
 
         assertThat(buyOrders(orders)).isEmpty();
     }
@@ -247,20 +248,20 @@ class PrivacyStrategyTest {
     void noRemainingBudgetWhenMultipleIsExact() {
         // BUY: $10×100, $9×80, multiple=1.00 → 수량 그대로
         PrivacyPlan base = base(240, List.of(buy(100, "10"), buy(80, "9"), sell(50, "12")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(240), INITIAL_USD_DEPOSIT, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(240, INITIAL_USD_DEPOSIT), PRICE, base);
 
         assertThat(buyOrders(orders)).extracting(PlannedOrder::quantity).containsExactlyInAnyOrder(100, 80);
     }
 
     @Test
-    @DisplayName("multiple 적용 — initialDeposit/currentCycleStart=1.5 → BUY/SELL 수량 1.5배 반영 (소수점 버림)")
+    @DisplayName("multiple 적용 — 우리 자산 1500 ÷ FIDA 자산 1000 = 1.5 → BUY/SELL 수량 1.5배 반영 (소수점 버림)")
     void multipleApplied() {
-        // initialDeposit=1500, currentCycleStart=1000 → multiple=1.50
+        // 우리 자산 1500 ÷ FIDA 자산 1000(평단=평가가라 currentCycleStart) → multiple=1.50
         // 100주→150주, 80주→120주, sell 50주→75주
         BigDecimal initialDeposit = new BigDecimal("1500"); // 1500/1000 = 1.50
         PrivacyPlan base = base(200, List.of(buy(100, "10"), buy(80, "9"), sell(50, "12")));
         // balance=300(=200*1.5), target=300 → diff=0
-        List<PlannedOrder> orders = strategy.buildOrders(balance(300), initialDeposit, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(300, initialDeposit), PRICE, base);
 
         assertThat(buyOrders(orders)).extracting(PlannedOrder::quantity).containsExactlyInAnyOrder(150, 120);
         assertThat(sellOrders(orders)).extracting(PlannedOrder::quantity).containsExactly(75);
@@ -276,7 +277,7 @@ class PrivacyStrategyTest {
         BigDecimal initialDeposit = new BigDecimal("100"); // 100/1000 = 0.10
         PrivacyPlan base = base(0, List.of(
                 sell(8, "98.30"), sell(10, "101.39"), sell(9, "113.94")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(91), initialDeposit, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(91, initialDeposit), PRICE, base);
 
         assertThat(sellOrders(orders)).hasSize(2);
         assertThat(sellOrders(orders)).extracting(PlannedOrder::price, PlannedOrder::quantity)
@@ -291,7 +292,7 @@ class PrivacyStrategyTest {
         // multiple=0.20 — 3주 → 0.6 → floor=0, totalFraction=0.6<1 → bonus=0 → 결과 없음
         BigDecimal initialDeposit = new BigDecimal("200"); // 200/1000 = 0.20
         PrivacyPlan base = base(0, List.of(sell(3, "10")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(0), initialDeposit, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(0, initialDeposit), PRICE, base);
 
         assertThat(sellOrders(orders)).isEmpty();
     }
@@ -303,7 +304,7 @@ class PrivacyStrategyTest {
     void nullSellWithMultipleExplicit() {
         // balance=70, SELL A=23, B=22, C=null → C = 70 - 23 - 22 = 25
         PrivacyPlan base = base(100, List.of(sell(23, "12"), sell(22, "13"), sellNull("14")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(70), INITIAL_USD_DEPOSIT, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(70, INITIAL_USD_DEPOSIT), PRICE, base);
 
         assertThat(sellOrders(orders)).hasSize(3);
         assertThat(sellOrders(orders)).extracting(PlannedOrder::quantity).containsExactlyInAnyOrder(23, 22, 25);
@@ -316,7 +317,7 @@ class PrivacyStrategyTest {
     void nullSellWithOneExplicit() {
         // balance=50, SELL A=null, B=12 → A = 50 - 12 = 38
         PrivacyPlan base = base(100, List.of(sellNull("13"), sell(12, "14")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(50), INITIAL_USD_DEPOSIT, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(50, INITIAL_USD_DEPOSIT), PRICE, base);
 
         assertThat(sellOrders(orders)).hasSize(2);
         assertThat(sellOrders(orders)).extracting(PlannedOrder::quantity).containsExactlyInAnyOrder(38, 12);
@@ -327,7 +328,7 @@ class PrivacyStrategyTest {
     void nullSellOnly() {
         // balance=100, SELL [null] → remaining = 100
         PrivacyPlan base = base(100, List.of(sellNull("12")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(100), INITIAL_USD_DEPOSIT, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(100, INITIAL_USD_DEPOSIT), PRICE, base);
 
         assertThat(sellOrders(orders)).hasSize(1);
         assertThat(sellOrders(orders).getFirst().quantity()).isEqualTo(100);
@@ -338,7 +339,7 @@ class PrivacyStrategyTest {
     void nullSellExcludedWhenRemainingZero() {
         // balance=50, SELL [50, null] → remaining=0 → null SELL 제외
         PrivacyPlan base = base(100, List.of(sell(50, "12"), sellNull("13")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(50), INITIAL_USD_DEPOSIT, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(50, INITIAL_USD_DEPOSIT), PRICE, base);
 
         assertThat(sellOrders(orders)).hasSize(1);
         assertThat(sellOrders(orders).getFirst().quantity()).isEqualTo(50);
@@ -349,7 +350,7 @@ class PrivacyStrategyTest {
     void nullSellExcludedWhenRemainingNegative() {
         // balance=50, SELL [70, null] → 명시 SELL 70이 보유수량 50으로 캡 → remaining=0 → null SELL 제외
         PrivacyPlan base = base(100, List.of(sell(70, "12"), sellNull("13")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(50), INITIAL_USD_DEPOSIT, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(50, INITIAL_USD_DEPOSIT), PRICE, base);
 
         assertThat(sellOrders(orders)).hasSize(1);
         assertThat(sellOrders(orders).getFirst().quantity()).isEqualTo(50);
@@ -359,7 +360,7 @@ class PrivacyStrategyTest {
     @DisplayName("null SELL 2개 — IllegalStateException 발생")
     void nullSellTwiceThrows() {
         PrivacyPlan base = base(100, List.of(sellNull("12"), sellNull("13")));
-        assertThatThrownBy(() -> strategy.buildOrders(balance(100), INITIAL_USD_DEPOSIT, base))
+        assertThatThrownBy(() -> strategy.buildOrders(balance(100, INITIAL_USD_DEPOSIT), PRICE, base))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("수량이 없는 매도 주문은 1개만 허용");
     }
@@ -367,11 +368,11 @@ class PrivacyStrategyTest {
     @Test
     @DisplayName("multiple 적용 — null SELL은 절대 잔량 기준, 명시 SELL은 multiple 적용")
     void nullSellMultipleApplied() {
-        // initialDeposit=1500, currentCycleStart=1000 → multiple=1.50
+        // 우리 자산 1500 ÷ FIDA 자산 1000(평단=평가가라 currentCycleStart) → multiple=1.50
         // 명시 SELL: 10 × 1.5 = 15, null SELL: 30 - 15 = 15
         BigDecimal initialDeposit = new BigDecimal("1500");
         PrivacyPlan base = base(100, List.of(sell(10, "12"), sellNull("13")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(30), initialDeposit, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(30, initialDeposit), PRICE, base);
 
         assertThat(sellOrders(orders)).hasSize(2);
         assertThat(sellOrders(orders)).extracting(PlannedOrder::quantity).containsExactlyInAnyOrder(15, 15);
@@ -385,7 +386,7 @@ class PrivacyStrategyTest {
         // SELL 합=155.28×7 + 157.52×7 + 164.38×6=20, holdings=17 → excess=3 → 가장 싼 155.28에서 3주 차감
         PrivacyPlan base = base(0, List.of(
                 sell(7, "155.28"), sell(7, "157.52"), sell(6, "164.38")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(17), INITIAL_USD_DEPOSIT, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(17, INITIAL_USD_DEPOSIT), PRICE, base);
 
         assertThat(sellOrders(orders)).hasSize(3);
         PlannedOrder cheapestSell = sellOrders(orders).stream()
@@ -402,7 +403,7 @@ class PrivacyStrategyTest {
         // 155.28(7) 전량 차감 후 remaining=8 → 157.52(7) 전량 차감 후 remaining=1 → 164.38(6→5)
         PrivacyPlan base = base(0, List.of(
                 sell(7, "155.28"), sell(7, "157.52"), sell(6, "164.38")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(5), INITIAL_USD_DEPOSIT, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(5, INITIAL_USD_DEPOSIT), PRICE, base);
 
         // 가장 싼 두 SELL은 quantity=0이 되어 결과에서 제외
         assertThat(sellOrders(orders)).noneMatch(o -> o.price().compareTo(new BigDecimal("155.28")) == 0);
@@ -418,7 +419,7 @@ class PrivacyStrategyTest {
     void sellCapExceedsAllSells() {
         // SELL 합=7+7=14, holdings=0 → excess=14 → 전부 제거
         PrivacyPlan base = base(0, List.of(sell(7, "155.28"), sell(7, "157.52")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(0), INITIAL_USD_DEPOSIT, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(0, INITIAL_USD_DEPOSIT), PRICE, base);
 
         assertThat(sellOrders(orders)).isEmpty();
     }
@@ -430,7 +431,7 @@ class PrivacyStrategyTest {
         // null SELL remaining = holdings(5) - capped 명시 SELL 합(5) = 0 → null SELL 제외
         PrivacyPlan base = base(0, List.of(
                 sell(7, "155.28"), sell(7, "157.52"), sell(6, "164.38"), sellNull("170.00")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(5), INITIAL_USD_DEPOSIT, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(5, INITIAL_USD_DEPOSIT), PRICE, base);
 
         assertThat(sellOrders(orders)).hasSize(1);
         PlannedOrder remaining = sellOrders(orders).getFirst();
@@ -442,9 +443,72 @@ class PrivacyStrategyTest {
     @DisplayName("SELL 합 = 보유수량 — 정확히 일치하면 캡 없이 그대로 반환")
     void sellCapNotAppliedWhenExactlyEqualToHoldings() {
         PrivacyPlan base = base(0, List.of(sell(7, "155.28"), sell(7, "157.52"), sell(6, "164.38")));
-        List<PlannedOrder> orders = strategy.buildOrders(balance(20), INITIAL_USD_DEPOSIT, base);
+        List<PlannedOrder> orders = strategy.buildOrders(balance(20, INITIAL_USD_DEPOSIT), PRICE, base);
 
         assertThat(sellOrders(orders)).extracting(PlannedOrder::quantity).containsExactlyInAnyOrder(7, 7, 6);
+    }
+
+    // ── 자산비 배수 산출 ────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("운영 2026-11-11 사례 — 자산비 배수 4.86, BUY 55.14 → 45주")
+    void 운영_2026_11_11_사례_자산비_배수_4_86_BUY_45() {
+        AccountBalance balance = new AccountBalance(new BigDecimal("552"), new BigDecimal("50.00"), new BigDecimal("2791.71"));
+        PrivacyPlan plan = new PrivacyPlan(112, new BigDecimal("102.09"), new BigDecimal("-2339.37"), new BigDecimal("14434.58"),
+                List.of(buy(11, "55.14"), sell(6, "57.90"), sell(6, "65.43"), sell(11, "76.96")));
+
+        assertThat(PrivacyStrategy.multiple(balance, new BigDecimal("56.20"), plan)).isEqualByComparingTo("4.86");
+        List<PlannedOrder> orders = strategy.buildOrders(balance, new BigDecimal("56.20"), plan);
+        assertThat(buyOrders(orders).stream().filter(o -> o.price().compareTo(new BigDecimal("55.14")) == 0)
+                .findFirst().orElseThrow().quantity()).isEqualTo(45);
+    }
+
+    @Test
+    @DisplayName("FIDA 자산 0 이하 — 예외")
+    void FIDA_자산_0이하면_예외() {
+        PrivacyPlan plan = new PrivacyPlan(0, null, new BigDecimal("-100"), new BigDecimal("100"), List.of());
+        assertThatThrownBy(() -> PrivacyStrategy.multiple(new AccountBalance(0, null, new BigDecimal("1000")), PRICE, plan))
+                .isInstanceOf(PrivacyValuationException.class);
+    }
+
+    @Test
+    @DisplayName("FIDA 보유 있는데 평단 없음 — 예외")
+    void FIDA_보유있는데_평단없으면_예외() {
+        PrivacyPlan plan = new PrivacyPlan(5, null, BigDecimal.ZERO, BASE_CYCLE_START, List.of());
+        assertThatThrownBy(() -> PrivacyStrategy.multiple(new AccountBalance(0, null, new BigDecimal("1000")), PRICE, plan))
+                .isInstanceOf(PrivacyValuationException.class);
+    }
+
+    @Test
+    @DisplayName("FIDA 보유 있고 평가가 null — 예외")
+    void FIDA_보유있고_평가가_null이면_예외() {
+        PrivacyPlan plan = new PrivacyPlan(5, new BigDecimal("10"), BigDecimal.ZERO, BASE_CYCLE_START, List.of());
+        assertThatThrownBy(() -> PrivacyStrategy.multiple(new AccountBalance(0, null, new BigDecimal("1000")), null, plan))
+                .isInstanceOf(PrivacyValuationException.class);
+    }
+
+    @Test
+    @DisplayName("우리 자산 0 이하 — 예외")
+    void 우리_자산_0이하면_예외() {
+        PrivacyPlan plan = new PrivacyPlan(0, null, BigDecimal.ZERO, BASE_CYCLE_START, List.of());
+        assertThatThrownBy(() -> PrivacyStrategy.multiple(new AccountBalance(0, null, BigDecimal.ZERO), PRICE, plan))
+                .isInstanceOf(PrivacyValuationException.class);
+    }
+
+    @Test
+    @DisplayName("보유 있는데 평가가 null — 예외")
+    void 보유있는데_평가가_null이면_예외() {
+        PrivacyPlan plan = new PrivacyPlan(0, null, BigDecimal.ZERO, BASE_CYCLE_START, List.of());
+        assertThatThrownBy(() -> PrivacyStrategy.multiple(new AccountBalance(5, new BigDecimal("10"), new BigDecimal("1000")), null, plan))
+                .isInstanceOf(PrivacyValuationException.class);
+    }
+
+    @Test
+    @DisplayName("FIDA 보유 0·평단 null — 평가가 없어도 정상, 배수 = 우리 자산(예수금) ÷ FIDA 자산(시작 + 실현손익)")
+    void FIDA_보유0_평단null_정상() {
+        PrivacyPlan plan = new PrivacyPlan(0, null, new BigDecimal("-200"), BASE_CYCLE_START, List.of());
+        assertThat(PrivacyStrategy.multiple(new AccountBalance(0, null, new BigDecimal("400")), null, plan))
+                .isEqualByComparingTo("0.50"); // 400 ÷ 800
     }
 
     // 헬퍼

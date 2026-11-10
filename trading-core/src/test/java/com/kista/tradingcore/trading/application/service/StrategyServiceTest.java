@@ -67,7 +67,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import com.kista.shared.kernel.StrategyDefaults;
 import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
-import com.kista.tradingcore.privacy.domain.model.PrivacyCurrentBase;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
 import com.kista.tradingcore.trading.domain.model.OrderCancelException;
 import java.math.RoundingMode;
@@ -158,7 +157,6 @@ class StrategyServiceTest {
                 new StrategyCreationPersister(strategyPort, strategyVersionPort, strategyInfiniteDetailPort,
                         vrStrategyDetailService, strategyCyclePort, cyclePositionPort, cyclePositionInfiniteDetailPort,
                         dcaDetailPort),
-                new StrategyStartAmountCalculator(privacyTradePort),
                 minSeedGuard,
                 detailAssembler, FIXED);
         var historyStrategies = new CycleOrderStrategies(List.of(
@@ -2384,10 +2382,6 @@ class StrategyServiceTest {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(brokerPricePort.getPrevClose(ticker, account.toBrokerRef())).thenReturn(new BigDecimal("100.00"));
-        // FIDA 원가 자산 = 1,000.03 + (−0.03) = 1,000.00, 사용자 원가 자산 = 200 + 20×95.05 = 2,101 → 2.10배
-        // 2.10 × 1,000.03 = 2,100.063 → CEILING 2,100.07 (HALF_UP 2,100.06이면 매매 시 FLOOR 역산이 2.09배)
-        when(privacyTradePort.findSeedPreviewBase()).thenReturn(Optional.of(new PrivacyCurrentBase(
-                StrategyTicker.SOXL, new BigDecimal("1000.03"), null, new BigDecimal("-0.03"), new BigDecimal("95.05"))));
         when(strategyPort.save(any())).thenReturn(saved);
         when(strategyCyclePort.save(any())).thenReturn(savedCycle);
         when(cyclePositionPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -2398,30 +2392,12 @@ class StrategyServiceTest {
                 p.holdings().compareTo(BigDecimal.valueOf(20)) == 0
                         && p.avgPrice().compareTo(new BigDecimal("95.00")) == 0
                         && p.closingPrice().compareTo(new BigDecimal("100.00")) == 0));
-        // 시작금액은 시장가 평가(200 + 20×100 = 2,200)가 아니라 FIDA 기준 배수 환산값
-        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("2100.07")) == 0));
-        // 개장 평가(통계 원금)는 배수 환산이 아니라 시장가 평가 = 200 + 20×100
+        // 시작금액 = 개장 평가 = 시장가 평가 200 + 20×100 = 2,200 (배수 환산 없음)
+        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("2200.00")) == 0));
         verify(strategyCyclePort).save(argThat(c -> c.openAmount().compareTo(new BigDecimal("2200.00")) == 0));
         verify(cyclePositionInfiniteDetailPort, never()).save(any());
         assertThat(result.currentHoldings()).isEqualTo(20);
         assertThat(result.divisionCount()).isNull(); // 조회 경로와 동일 — PRIVACY는 분할 수를 싣지 않는다
-    }
-
-    @Test
-    @DisplayName("PRIVACY register() 중간부터 시작 — FIDA 기준표가 없으면 IllegalArgumentException")
-    void register_privacy_bootstrap_withoutBase_throws() {
-        Account account = ownerAccount();
-        StrategyTicker ticker = defaultTicker(StrategyType.PRIVACY);
-        RegisterStrategyCommand cmd = register(StrategyType.PRIVACY).deposit("200").holdings(BigDecimal.valueOf(20)).avgPrice(new BigDecimal("95.00")).build();
-
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
-        when(brokerPricePort.getPrevClose(ticker, account.toBrokerRef())).thenReturn(new BigDecimal("100.00"));
-        when(privacyTradePort.findSeedPreviewBase()).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
-                .isInstanceOf(IllegalArgumentException.class);
-        verify(strategyPort, never()).save(any());
     }
 
     @Test

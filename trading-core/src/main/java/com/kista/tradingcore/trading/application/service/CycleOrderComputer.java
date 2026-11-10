@@ -41,7 +41,7 @@ class CycleOrderComputer {
     private final OrderPort orderPort;                       // VR poolUsed 조회용
 
     // 전략 계산 + 주문 유효성 검증을 묶어 계산만 수행 (부수효과 없음)
-    // currentCycle: PRIVACY는 initialDeposit 산출에, INFINITE은 리버스모드 판단에 사용
+    // currentCycle: INFINITE은 리버스모드 판단에 사용
     // currentPrice: VR 실주문 기준가격(PRIVACY는 소비하지 않음) — preview/수동실행 시 null
     // Optional.empty() = 전략 차원 skip (예: PRIVACY 기준매매표 미수신)
     Optional<CycleOrderStrategy.OrderPlan> compute(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
@@ -55,9 +55,6 @@ class CycleOrderComputer {
                                                    LocalDate tradeDate, StrategyCycle currentCycle,
                                                    PrivacyTradeBase privacyBase, UUID accountId, BigDecimal currentPrice,
                                                    CycleOrderStrategy.PlanContext.DcaPlanInputs dcaInputs) {
-        BigDecimal initialDeposit = strategy.isPrivacy()
-                ? currentCycle.startAmount()
-                : null;
         Integer divisionCount = resolveDivisionCount(strategy, currentCycle);
 
         // 오늘의 리버스모드 여부와 첫날 여부를 cycle_position 최근 2건으로 판단
@@ -78,9 +75,16 @@ class CycleOrderComputer {
         CycleOrderStrategy.PlanContext.InfiniteInputs infiniteInputs =
                 new CycleOrderStrategy.PlanContext.InfiniteInputs(
                         divisionCount, prevClosePrice, starPointPrice, isReverseMode, isFirstReverseDay);
+        // PRIVACY 평가가: 최신 cycle_position 종가(추가 투입 반영 행), 없으면 전일종가
+        BigDecimal valuationPrice = prevClosePrice;
+        if (strategy.isPrivacy() && currentCycle != null) {
+            valuationPrice = cyclePositionPort.findLatestOne(currentCycle.id())
+                    .map(CyclePosition::closingPrice).orElse(null);
+            if (valuationPrice == null) valuationPrice = prevClosePrice;
+        }
         CycleOrderStrategy.PlanContext.PrivacyInputs privacyInputs =
                 new CycleOrderStrategy.PlanContext.PrivacyInputs(
-                        initialDeposit, privacyBase == null ? null : privacyBase.toPlan(), currentPrice);
+                        valuationPrice, privacyBase == null ? null : privacyBase.toPlan(), currentPrice);
 
         // VR 전략 전용 입력 조립 — 사이클·버전 상세를 DB에서 조회, 미존재 시 데이터 무결성 오류로 fail-fast
         CycleOrderStrategy.PlanContext.VrInputs vrInputs = null;

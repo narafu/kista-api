@@ -714,9 +714,14 @@ class BacktestEngineTest {
                 null, null, null, 0, null, holdings, new BigDecimal(avgPrice), null, null);
     }
 
-    // 기준 매매표 픽스처 — seed ÷ currentCycleStart가 곧 PrivacyStrategy가 산출할 배수(multiple)다
+    // 기준 매매표 픽스처 — FIDA 보유가 있으면 평단 100(테스트 종가와 같아 FIDA 자산 = currentCycleStart)
     private static PrivacyTradeBase privacyBase(String currentCycleStart, int holdings, PrivacyTrade... trades) {
-        return new PrivacyTradeBase(null, null, holdings, new BigDecimal(currentCycleStart), List.of(trades));
+        return privacyBase(currentCycleStart, holdings, holdings > 0 ? "100" : null, trades);
+    }
+
+    private static PrivacyTradeBase privacyBase(String currentCycleStart, int holdings, String avgPrice, PrivacyTrade... trades) {
+        return new PrivacyTradeBase(null, avgPrice == null ? null : new BigDecimal(avgPrice), holdings, BigDecimal.ZERO,
+                new BigDecimal(currentCycleStart), List.of(trades));
     }
 
     // 가격은 문자열 생성자로 — 배수·캡 결과가 소수 자리 없이 그대로 드러나게 한다
@@ -733,7 +738,7 @@ class BacktestEngineTest {
     void 보유_포지션이_있으면_배수_산출에_반영된다() {
         RecordingPrivacy recorder = new RecordingPrivacy();
 
-        // 예수금 0 + 보유 5주 × 첫날 종가 100 = 자본 500 ÷ currentCycleStart 500 = 배수 1.00 → 기준표 BUY 3주 그대로 유지
+        // 예수금 0 + 보유 5주 × 첫날 종가 100 = 우리 500 ÷ FIDA(500 − 5×100 + 5×100 = 500) = 배수 1.00 → 기준표 BUY 3주 그대로 유지
         // (보유분 시장가를 빼먹으면 자본이 0이 되어 배수 0.00 → 주문이 통째로 사라진다)
         // 기준표 목표 보유량(5×배수1.00=5)을 현재 보유(5)와 맞춰 보유 보정(diff) 없이 배수 반영만 순수하게 검증한다
         // 01-02 세션 기준표는 그 전날(01-01) 캔들 처리 끝에 계획된다
@@ -750,24 +755,43 @@ class BacktestEngineTest {
     }
 
     @Test
-    @DisplayName("중간부터 시작 시작금액(FIDA 배수 환산)을 받으면 배수는 그 값으로, 원금은 시장가 평가금으로 계산한다")
-    void 중간부터_시작_시작금액을_받으면_배수에만_쓴다() {
+    @DisplayName("PRIVACY 배수는 전일종가 기준 우리 자산 ÷ FIDA 자산이다")
+    void PRIVACY_배수는_전일종가_자산비() {
         RecordingPrivacy recorder = new RecordingPrivacy();
 
-        // 보유 6주 × 첫날 종가 100 = 시장가 600(배수 1.20)이지만, 운영 등록처럼 FIDA 환산 시작금액 1,000을 넘기면 배수 = 1000 ÷ 500 = 2.00
-        // 기준 보유 3주 × 2.00 = 목표 6주 = 현재 보유라 보정(diff) 없이 기준표 BUY 3주가 6주로 스케일된다(배수 1.20이면 3주)
-        BacktestEngine.Output output = privacyEngine(recorder).run(List.of(
+        // 우리 10000(예수금, 보유 0) ÷ FIDA 5000(사이클 시작, 실현 0, 보유 0) = 2.00 → 기준표 BUY 3주가 FIDA 수량 × 2 = 6주
+        privacyEngine(recorder).run(List.of(
                 flat("2024-01-01", 100),
                 flat("2024-01-02", 100)
-        ), privacyCommandWithPosition("0", 6, "70"), Map.of(LocalDate.parse("2024-01-02"), privacyBase("500", 3,
-                trade("2024-01-02", OrderType.LOC, OrderDirection.BUY, 3, "90"))), new BigDecimal("1000"));
+        ), privacyCommand("10000"), Map.of(LocalDate.parse("2024-01-02"), privacyBase("5000", 0,
+                trade("2024-01-02", OrderType.LOC, OrderDirection.BUY, 3, "90"))));
 
         assertThat(recorder.on("2024-01-01"))
                 .filteredOn(o -> o.direction() == OrderDirection.BUY)
                 .extracting(PlannedOrder::quantity)
                 .containsExactly(6);
-        // 원금은 시장가 평가금(6주 × 100) — 수익률 기준(첫 포인트 총자산)과 같다
-        assertThat(output.points().getFirst().principal()).isEqualByComparingTo("600");
+    }
+
+    @Test
+    @DisplayName("PRIVACY 자산 무효 세션은 주문 없이 경고 후 다음 세션은 계속 진행한다")
+    void PRIVACY_자산_무효_세션은_주문없이_경고_후_계속() {
+        RecordingPrivacy recorder = new RecordingPrivacy();
+
+        // 01-02 세션 기준표: FIDA 보유 3주인데 평단 null → 무효. 01-03 세션 기준표는 정상(우리 1000 ÷ FIDA 500 = 2.00 → 6주)
+        BacktestEngine.Output output = privacyEngine(recorder).run(List.of(
+                flat("2024-01-01", 100),
+                flat("2024-01-02", 100),
+                flat("2024-01-03", 100)
+        ), privacyCommand("1000"), Map.of(
+                LocalDate.parse("2024-01-02"), privacyBase("500", 3, (String) null,
+                        trade("2024-01-02", OrderType.LOC, OrderDirection.BUY, 3, "90")),
+                LocalDate.parse("2024-01-03"), privacyBase("500", 0,
+                        trade("2024-01-03", OrderType.LOC, OrderDirection.BUY, 3, "90"))));
+
+        assertThat(recorder.byDate).doesNotContainKey(LocalDate.parse("2024-01-01")); // 무효 세션은 plan()이 예외로 끝나 주문 없음
+        assertThat(output.warnings()).anySatisfy(w -> assertThat(w).contains("2024-01-02", "PRIVACY 배수 산출 불가"));
+        assertThat(recorder.on("2024-01-02")).filteredOn(o -> o.direction() == OrderDirection.BUY)
+                .extracting(PlannedOrder::quantity).containsExactly(6);
     }
 
     @Test
@@ -775,7 +799,7 @@ class BacktestEngineTest {
     void 기준매매표가_있는_날만_주문이_생성된다() {
         RecordingPrivacy recorder = new RecordingPrivacy();
 
-        // seed 1000 ÷ currentCycleStart 500 = 배수 2.00 → 기준표 BUY 3주가 6주로 스케일
+        // 우리 자산 1000(예수금, 보유 0) ÷ FIDA 자산 500(사이클 시작) = 배수 2.00 → 기준표 BUY 3주가 6주로 스케일
         // 01-02 세션 기준표만 있다 — 01-01 캔들 처리 끝에 계획, 01-02에 체결 판정
         BacktestEngine.Output output = privacyEngine(recorder).run(List.of(
                 flat("2024-01-01", 100),
@@ -809,8 +833,8 @@ class BacktestEngineTest {
     @Test
     @DisplayName("배수 계약 회귀: 시드를 2배로 올리면 같은 기준표에 대해 주문 수량도 정확히 2배가 된다")
     void 시드를_2배로_올리면_주문_수량도_2배가_된다() {
-        // base.holdings=0이라 보유 보정(diff)이 0 — 순수하게 multiple = initialDeposit ÷ currentCycleStart만 검증한다
-        // currentCycleStart=500 기준: seed 1000 → 배수 2.00 → 3주×2 = 6주 / seed 2000 → 배수 4.00 → 3주×4 = 12주
+        // base.holdings=0이라 보유 보정(diff)이 0 — 순수하게 multiple = 우리 자산 ÷ FIDA 자산(currentCycleStart)만 검증한다
+        // FIDA 자산 500 기준: 우리 자산 1000 → 배수 2.00 → 3주×2 = 6주 / 우리 자산 2000 → 배수 4.00 → 3주×4 = 12주
         Map<LocalDate, PrivacyTradeBase> bases = Map.of(LocalDate.parse("2024-01-02"), privacyBase("500", 0,
                 trade("2024-01-02", OrderType.LOC, OrderDirection.BUY, 3, "90")));
         List<DailyCandle> candles = List.of(flat("2024-01-01", 100), flat("2024-01-02", 100));
@@ -944,7 +968,7 @@ class BacktestEngineTest {
     // --- 사이클 시드 정책 (PRIVACY 청산 시나리오 공용) ---
 
     // 01-02 1주 @100 매수 체결 → 01-03 잔량 매도가 종가 closeOnExit에 체결돼 청산 → 01-03 계획에서 사이클 종료 판정
-    // 01-04 기준표는 currentCycleStart=50 → 배수 = 새 사이클 시작 금액 ÷ 50, 매수 @40은 01-04 종가 70이라 체결되지 않는다
+    // 01-04 기준표는 currentCycleStart=50 → 배수 = 우리 자산 ÷ FIDA 자산(50, 보유 0), 매수 @40은 01-04 종가 70이라 체결되지 않는다
     private static BacktestEngine.Output runPrivacyExit(RecordingPrivacy recorder, StrategyCycleSeedType seedType,
                                                         double closeOnExit) {
         return runPrivacyExit(recorder, seedType, closeOnExit, "40", 70, false);

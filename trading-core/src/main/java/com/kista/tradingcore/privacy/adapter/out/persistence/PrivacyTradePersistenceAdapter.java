@@ -122,19 +122,12 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
 
     @Override
     public Optional<PrivacyCurrentBase> findSeedPreviewBase() {
-        // 미리보기는 KST 오늘 거래일 이후에 적용되는 기준표만 사용
-        return findSeedBaseFrom(LocalDate.now(clock));
-    }
-
-    @Override
-    public Optional<PrivacyCurrentBase> findSeedBaseFrom(LocalDate kstTradeDate) {
-        // 발행일은 거래일 전날 — kstTradeDate 이후 거래일에 적용되는 첫 기준표
+        // 미리보기는 KST 오늘 거래일 이후에 적용되는 기준표만 사용 — 발행일은 거래일 전날
         return baseRepository
                 .findFirstByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(
-                        PrivacyDates.releaseDateFor(kstTradeDate), StrategyTicker.SOXL)
+                        PrivacyDates.releaseDateFor(LocalDate.now(clock)), StrategyTicker.SOXL)
                 .map(e -> new PrivacyCurrentBase(e.getTicker(), e.getCurrentCycleStart(),
-                        PrivacyDates.tradeDateOf(e.getReleaseDate()), // 발행일 → 적용 거래일
-                        e.getCurrentCycleRealizedPnl(), e.getAvgPrice()));
+                        PrivacyDates.tradeDateOf(e.getReleaseDate()))); // 발행일 → 적용 거래일
     }
 
     @Override
@@ -151,7 +144,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
                                     kstTradeDate, entity.getTicker(), p.getOrderType(), p.getDirection(), p.getQuantity(), p.getPrice()))
                             .toList();
                     return new PrivacyTradeBase(entity.getId(), entity.getAvgPrice(), entity.getHoldings(),
-                            entity.getCurrentCycleStart(), trades);
+                            entity.getCurrentCycleRealizedPnl(), entity.getCurrentCycleStart(), trades);
                 });
     }
 

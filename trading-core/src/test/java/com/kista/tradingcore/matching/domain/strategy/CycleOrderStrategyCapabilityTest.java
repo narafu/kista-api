@@ -88,7 +88,7 @@ class CycleOrderStrategyCapabilityTest {
         // 1001.01 ÷ 2 = 500.505 → 500.51 (HALF_UP)
         var privacy = new PrivacyCycleOrderStrategy(null);
         var plan = new com.kista.tradingcore.matching.domain.model.PrivacyPlan(
-                0, new BigDecimal("1001.01"), java.util.List.of());
+                0, null, BigDecimal.ZERO, new BigDecimal("1001.01"), java.util.List.of());
         assertThat(privacy.minRequiredDeposit(null, plan, 0)).isEqualTo(new BigDecimal("500.51"));
     }
 }

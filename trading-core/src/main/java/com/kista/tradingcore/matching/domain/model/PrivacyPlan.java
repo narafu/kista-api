@@ -11,11 +11,16 @@ import java.util.List;
 // PRIVACY 전략 커널 입력 — privacy 모듈의 기준 매매표에서 커널이 실제로 읽는 값만 담은 커널 소유 타입
 // 변환은 데이터 소유자가 담당한다(PrivacyTradeBase.toPlan()) — matching은 privacy를 참조하지 않는다
 public record PrivacyPlan(
-        int holdings,                      // 기준표 목표 보유 수량
-        BigDecimal currentCycleStart,      // 현재 사이클 기준가 — 배수(initialDeposit ÷ currentCycleStart) 산출 기준
+        int holdings,                      // 기준표(FIDA) 보유 수량
+        BigDecimal avgPrice,               // 기준표(FIDA) 평단 (nullable — 보유 0이면 null)
+        BigDecimal realizedPnl,            // 현재 사이클 실현손익 — FIDA 자산 산출 기준
+        BigDecimal currentCycleStart,      // 현재 사이클 기준가 — FIDA 자산 산출 기준
         List<PrivacyPlannedTrade> trades   // 기준표 계획 주문 목록
 ) {
     public PrivacyPlan {
+        if (realizedPnl == null) {
+            throw new IllegalStateException("PRIVACY 기준표의 사이클 실현손익이 없습니다.");
+        }
         if (currentCycleStart == null || currentCycleStart.signum() <= 0) {
             throw new IllegalStateException("PRIVACY 기준표의 사이클 시작 금액은 0보다 커야 합니다.");
         }

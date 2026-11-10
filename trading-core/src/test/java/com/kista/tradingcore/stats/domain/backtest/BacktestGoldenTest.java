@@ -126,7 +126,8 @@ class BacktestGoldenTest {
         };
     }
 
-    // 고정 기준 매매표(currentCycleStart 10000 → 배수 1.00) — 3번째 세션마다 한 장씩(LOC 지정가는 당일 종가 ±2%라 매수·매도 모두 체결), base.holdings를 오르내려 보유 감소(매도 보정)를 포함시킨다
+    // 고정 기준 매매표(currentCycleStart 10000, FIDA 평단 = 기준 세션 종가). 손계산 대표 세션 01-05(k=0): 우리 10000 ÷ FIDA 10000(보유 0) = 배수 1.00 → BUY 3주 그대로. 비자명 세션(FIDA 보유 20): 우리 자산 10008.41 ÷ FIDA 자산 10054.54 = 배수 0.99 → 목표 보유 19.80. 보유 > 0인 세션은 전일종가 P≠평단이라 FIDA 자산이 10000에서 어긋난다(예: 01-18 세션 FIDA = 10000 − 25×98.6085 + 25×99.7234 = 10027.87)
+    // 기준 매매표 구성 — 3번째 세션마다 한 장씩(LOC 지정가는 당일 종가 ±2%라 매수·매도 모두 체결), base.holdings를 오르내려 보유 감소(매도 보정)를 포함시킨다
     private static Map<LocalDate, PrivacyTradeBase> privacyBases(List<DailyCandle> candles) {
         int[] holdings = {0, 20, 40, 25, 10, 30, 5, 35};
         Map<LocalDate, PrivacyTradeBase> bases = new LinkedHashMap<>();
@@ -137,7 +138,7 @@ class BacktestGoldenTest {
                     trade(c.date(), OrderDirection.BUY, 3 + k % 4, close.multiply(new BigDecimal("1.02"))),
                     trade(c.date(), OrderDirection.SELL, 2 + k % 3, close.multiply(new BigDecimal("0.98"))));
             bases.put(c.date(), new PrivacyTradeBase(null, close, holdings[k % holdings.length],
-                    new BigDecimal("10000"), trades));
+                    BigDecimal.ZERO, new BigDecimal("10000"), trades));
         }
         return bases;
     }

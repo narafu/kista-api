@@ -668,7 +668,7 @@ flows:
         title: 배치에서 사용
         desc: >-
           개장·마감 배치 모두 주문 계획 전에 기준표를 다시 점검해 이슈가 있으면 기준표를 쓰지 않고(신규 PRIVACY 주문 없음) 관리자에게 알린다.
-          이슈가 없으면 거래일의 기준표로 PRIVACY 주문(모두 장마감)을 계산한다. 사용자 "바로 주문"·주문 미리보기도 같은 점검으로 차단한다(알림 없이 PRIVACY_BASE_BLOCKED — 바로 주문은 409로 거부).
+          이슈가 없으면 거래일의 기준표로 PRIVACY 주문(모두 장마감)을 계산한다. 배수는 고정 시작 금액이 아니라 전일 종가 기준 우리 자산 ÷ FIDA 자산이며, 평가 불가(자산 0 이하·평단·가격 없음)면 그 전략만 격리하고 관리자에게 알린다. 사용자 "바로 주문"·주문 미리보기도 같은 점검으로 차단한다(알림 없이 PRIVACY_BASE_BLOCKED — 바로 주문은 409로 거부).
         code: [TradingPriceFetcher#loadPriceContext, PrivacyBaseGuard#screen, PrivacyBaseGuard#usable, StrategyOrderPlanBuilder#build, PrivacyTradePersistenceAdapter#findTodayTrade]
         cond: ACTIVE PRIVACY 전략이 있을 때
 
@@ -818,7 +818,7 @@ flows:
         desc: >-
           성과 화면(StatsOverview)은 서버에서 요약(GET /api/stats/summary)과 최근 3개월 누적 자산 곡선(GET /api/stats/equity-curve)을 미리 채우고,
           사이클 성과 목록(GET /api/stats/cycles)은 진행 상태(진행중/종료) 필터와 번호 페이지로 불러온다. 요약·곡선은 모의계좌(MOCK)를 뺀 실제 투자 성과이고, 사이클 목록만 모의계좌도 포함한다.
-          전략 유형 필터를 바꾸면 곡선과 목록이 같이 바뀐다. 결과는 사용자별 5분 캐시를 쓴다. DCA 전략도 내부 원장 기준으로 요약·곡선·목록에 포함되며 원금은 모든 전략에서 사이클 개장 시가 평가(open_amount — 매매 계약인 시작 금액과 달리 PRIVACY 중간 시작의 배수 환산이 없다, DCA는 초기 보유 원가)에 추가·인출을 더한 값이며 곡선의 과거 원금·자산은 투자금 이력(cycle_capital_event)으로 날짜별 복원한다. 요약 실현손익은 종료 사이클과 진행 중 사이클의 매도 확정분(쿼터매도·PRIVACY 매도·DCA SELL)을 합산하고 원가 기준은 사이클 개장 시가다(보유분이 남으면 개장 시가 기준 장부가). 미실현은 총손익에서 뺀 값이다. 곡선은 후속 없이 끝난 전략의 손익을 원금에서 계속 빼 둬 마지막 손익이 요약 총손익과 같다. 사용자 합산 경로(요약·곡선·포트폴리오 투자지수)는 요청 통화(?currency=, 기본 USD) 계좌만 합산하고 요약은 선택 가능한 통화 목록(availableCurrencies)을 함께 주며, 사이클 단위 목록은 통화와 무관하게 전부 포함한다.
+          전략 유형 필터를 바꾸면 곡선과 목록이 같이 바뀐다. 결과는 사용자별 5분 캐시를 쓴다. DCA 전략도 내부 원장 기준으로 요약·곡선·목록에 포함되며 원금은 모든 전략에서 사이클 개장 시가 평가(open_amount — 매매 계약인 시작 금액과 달리 추가·인출 이력만 더한다, DCA는 초기 보유 원가)에 추가·인출을 더한 값이며 곡선의 과거 원금·자산은 투자금 이력(cycle_capital_event)으로 날짜별 복원한다. 요약 실현손익은 종료 사이클과 진행 중 사이클의 매도 확정분(쿼터매도·PRIVACY 매도·DCA SELL)을 합산하고 원가 기준은 사이클 개장 시가다(보유분이 남으면 개장 시가 기준 장부가). 미실현은 총손익에서 뺀 값이다. 곡선은 후속 없이 끝난 전략의 손익을 원금에서 계속 빼 둬 마지막 손익이 요약 총손익과 같다. 사용자 합산 경로(요약·곡선·포트폴리오 투자지수)는 요청 통화(?currency=, 기본 USD) 계좌만 합산하고 요약은 선택 가능한 통화 목록(availableCurrencies)을 함께 주며, 사이클 단위 목록은 통화와 무관하게 전부 포함한다.
         code: [TradingStatsController#getSummary, TradingStatsController#getEquityCurve, TradingStatsController#getCycles, TradingStatsService#getSummary, TradingStatsService#getEquityCurve, TradingStatsService#getCyclePerformances]
         fail: 한 쪽 조회가 실패해도 다른 쪽은 보인다(서버 prefetch를 각각 무시). 곡선이 실패하면 필터 토글만 남는다.
 
@@ -870,7 +870,7 @@ flows:
           POST /api/trading-cycles/{id}/capital-injection. 내 전략인지 확인하고 PRIVACY·INFINITE·DCA만 허용한다(DCA는 예수금만, 금액 자릿수는 계좌 통화 기준, 코인 계좌는 마감 리포트가 없어 리포트 창 검사를 건너뛴다). 진행 중인 사이클 행을 잠가 수동 체결 보정과 직렬화한 뒤,
           행 잠금 뒤 사이클을 다시 읽어 종료 여부를 재확인하고, 예수금을 더하고 주식은 가중평균 평단가로 합쳐 최신 포지션 행을 갱신한다(행을 늘리지 않아 INFINITE 리버스 판정·별점가·이력이 그대로다).
         code: [TradingCycleController#injectCapital, CapitalLedgerService#inject, StrategyCyclePort#lockForUpdate, StrategyCyclePort#updateStartAmount, CyclePositionPort#updateBalance, CycleCapitalEventPort#save]
-        state: "최신 cycle_position 갱신 · strategy_cycle.start_amount += 추가분 · cycle_capital_event(INJECT) 이력 추가"
+        state: "최신 cycle_position 갱신(예수금 증가 → 다음 PRIVACY 배수에 반영) · strategy_cycle.start_amount += 추가분 · cycle_capital_event(INJECT) 이력 추가"
         fail: 입력 누락·0 이하·주식 수량/단가 불일치·DCA에 주식 수량 지정·금액 자릿수 초과·PRIVACY/INFINITE/DCA 외 전략이면 400, 사이클이 이미 종료됐거나 마감 리포트 진행 중(오늘 postClose 이후·리포트 마커 전)이면 400, 내 전략이 아니면 403, 없으면 404.
       - id: withdraw
         lane: trading
@@ -1013,7 +1013,7 @@ flows:
         title: 주문 계획·PRIVACY 기준표 점검
         desc: >-
           잔고·전일종가·(PRIVACY면) 오늘 기준표를 읽어 전략 공식으로 주문을 계산한다. 배치와 같은 계산 부품을 쓰므로, PRIVACY 기준표에
-          경고·차단 이슈가 있으면 배치와 똑같이 오늘 PRIVACY 주문을 내지 않는다. 배치는 조용히 관리자에게만 알리지만 수동 실행은 버튼을 누른 사용자에게 사유를 알린다.
+          경고·차단 이슈가 있거나 자산비 배수를 산출할 수 없으면 배치와 똑같이 오늘 PRIVACY 주문을 내지 않는다(PRIVACY_BASE_BLOCKED). 배치는 조용히 관리자에게만 알리지만 수동 실행은 버튼을 누른 사용자에게 사유를 알린다.
         code: [StrategyOrderPlanBuilder#build, PrivacyBaseGuard#usable]
         fail: >-
           사이클 이력이 없으면 409 "전략 실행 이력이 없어 수동 실행할 수 없습니다", 기준표 점검 차단이면 409 "P 매매표 점검에서 이상이 발견돼 오늘은 PRIVACY 주문을 낼 수 없습니다.".

@@ -13,7 +13,8 @@ public record PrivacyTradeBase(
         UUID id,
         BigDecimal avgPrice,
         int holdings,
-        BigDecimal currentCycleStart, // 현재 사이클 기준가 — PRIVACY multiple 동적 산출 기준
+        BigDecimal realizedPnl,       // 현재 사이클 실현손익 — FIDA 자산 산출 기준
+        BigDecimal currentCycleStart, // 현재 사이클 기준가 — FIDA 자산 산출 기준
         List<PrivacyTrade> trades
 ) {
     public PrivacyTradeBase {
@@ -28,7 +29,7 @@ public record PrivacyTradeBase(
                 .map(t -> new PrivacyPlan.PrivacyPlannedTrade(
                         t.tradeDate(), t.ticker(), t.orderType(), t.direction(), t.quantity(), t.price()))
                 .toList();
-        return new PrivacyPlan(holdings, currentCycleStart, planned);
+        return new PrivacyPlan(holdings, avgPrice, realizedPnl, currentCycleStart, planned);
     }
 
     public record PrivacyTrade(

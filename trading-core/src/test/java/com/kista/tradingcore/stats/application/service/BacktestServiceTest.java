@@ -9,7 +9,6 @@ import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.matching.domain.model.PrivacyPlan;
-import com.kista.tradingcore.privacy.domain.model.PrivacyCurrentBase;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.stats.application.port.output.HistoricalCandlePort;
@@ -363,47 +362,6 @@ class BacktestServiceTest {
         verify(candlePort, never()).fetchDailyCandles(anyString(), any(), any());
     }
 
-    // --- PRIVACY 중간부터 시작 ---
-
-    private static BacktestCommand privacyWithPosition(int holdings) {
-        return new BacktestCommand(StrategyType.PRIVACY, StrategyTicker.SOXL, FROM, TO, SEED,
-                null, null, null, 0, null, holdings, new BigDecimal("20"), null, null);
-    }
-
-    @Test
-    void PRIVACY_중간부터_시작은_운영_등록과_같은_FIDA_배수_환산_시작금액으로_매매한다() {
-        when(cycleOrderStrategies.of(StrategyType.PRIVACY)).thenReturn(planner);
-        when(planner.plan(any())).thenReturn(Optional.empty());
-        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
-                .thenReturn(List.of(candle(1, "100"), candle(3, "100"), candle(5, "100")));
-        when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.empty());
-        // 첫 매매 세션 1/3 → 적용 거래일 1/4 이후 첫 기준표: 시작 500 + 실현 0, FIDA 평단 15
-        when(privacyTradePort.findSeedBaseFrom(LocalDate.of(2024, 1, 4))).thenReturn(Optional.of(new PrivacyCurrentBase(
-                StrategyTicker.SOXL, new BigDecimal("500"), LocalDate.of(2024, 1, 4), BigDecimal.ZERO, new BigDecimal("15"))));
-
-        service.run(privacyWithPosition(10));
-
-        // 배수 = (1,000 + 10 × 15) ÷ 500 = 2.30 → 시작금액 1,150.00 (시장가 평가 1,000 + 10 × 100 = 2,000이 아니다)
-        ArgumentCaptor<CycleOrderStrategy.PlanContext> ctx = ArgumentCaptor.forClass(CycleOrderStrategy.PlanContext.class);
-        verify(planner, org.mockito.Mockito.atLeastOnce()).plan(ctx.capture());
-        assertThat(ctx.getAllValues()).allSatisfy(c ->
-                assertThat(c.privacy().initialDeposit()).isEqualByComparingTo("1150.00"));
-    }
-
-    @Test
-    void PRIVACY_중간부터_시작인데_기간_안에_기준표가_없으면_거부한다() {
-        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
-                .thenReturn(List.of(candle(1, "100"), candle(3, "100"), candle(5, "100")));
-        when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.empty());
-        // 기간 마지막 세션(1/5 → 적용 1/6)보다 늦게 적용되는 기준표는 미래 데이터라 쓰지 않는다
-        when(privacyTradePort.findSeedBaseFrom(any())).thenReturn(Optional.of(new PrivacyCurrentBase(
-                StrategyTicker.SOXL, new BigDecimal("500"), LocalDate.of(2024, 1, 9), BigDecimal.ZERO, new BigDecimal("15"))));
-
-        assertThatThrownBy(() -> service.run(privacyWithPosition(10)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("PRIVACY 기준 매매표가 없어 중간부터 시작할 수 없습니다.");
-    }
-
     // --- PRIVACY 기준 매매표 ---
 
     @Test
@@ -608,7 +566,7 @@ class BacktestServiceTest {
 
     // 적용 거래일이 tradeDate인 기준 매매표 (주문 명세는 비워도 tradeDate 판별에는 1건이면 충분)
     private static PrivacyTradeBase baseFor(LocalDate tradeDate) {
-        return new PrivacyTradeBase(UUID.randomUUID(), bd("100"), 0, bd("100"),
+        return new PrivacyTradeBase(UUID.randomUUID(), bd("100"), 0, BigDecimal.ZERO, bd("100"),
                 List.of(new PrivacyTradeBase.PrivacyTrade(tradeDate, StrategyTicker.SOXL,
                         OrderType.LOC, OrderDirection.BUY, 1, bd("100"))));
     }

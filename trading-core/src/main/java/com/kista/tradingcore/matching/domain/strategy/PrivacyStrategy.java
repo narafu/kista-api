@@ -24,14 +24,36 @@ import static com.kista.shared.kernel.OrderTiming.AT_CLOSE;
 @Slf4j
 public class PrivacyStrategy {
 
-    // initialDeposit ÷ plan.currentCycleStart() 로 배수를 동적 산출
-    public List<PlannedOrder> buildOrders(AccountBalance balance, BigDecimal initialDeposit, PrivacyPlan plan) {
-        if (initialDeposit == null || initialDeposit.signum() <= 0) {
-            throw new IllegalStateException("PRIVACY 초기 예수금은 0보다 커야 합니다.");
+    // 배수 = 우리 자산 ÷ FIDA 자산 (price 기준 평가, 소수 2자리 버림) — 산출 불가면 PrivacyValuationException
+    public static BigDecimal multiple(AccountBalance balance, BigDecimal price, PrivacyPlan plan) {
+        boolean priceNeeded = balance.holdings().signum() > 0 || plan.holdings() > 0;
+        if (priceNeeded && price == null) {
+            throw new PrivacyValuationException("PRIVACY 배수 산출 불가 — 평가 기준 가격이 없습니다.");
         }
-        BigDecimal start = plan.currentCycleStart();
-        BigDecimal multiple = initialDeposit.divide(start, 2, RoundingMode.FLOOR);
-        log.info("[PRIVACY] 배수 산출: initialDeposit={}, currentCycleStart={}, multiple={}", initialDeposit, start, multiple);
+        if (plan.holdings() > 0 && plan.avgPrice() == null) {
+            throw new PrivacyValuationException("PRIVACY 배수 산출 불가 — FIDA 보유가 있으나 평단이 없습니다.");
+        }
+        // 우리 자산 = 예수금 + 보유 × 평가가
+        BigDecimal ourAsset = balance.deposit().add(priceNeeded ? balance.holdings().multiply(price) : BigDecimal.ZERO);
+        // FIDA 자산 = (사이클 시작 + 실현손익 − 보유 × 평단) + 보유 × 평가가 — 보유 0이면 보유 항 생략
+        BigDecimal fidaAsset = plan.currentCycleStart().add(plan.realizedPnl());
+        if (plan.holdings() > 0) {
+            BigDecimal fidaHoldings = BigDecimal.valueOf(plan.holdings());
+            fidaAsset = fidaAsset.subtract(fidaHoldings.multiply(plan.avgPrice())).add(fidaHoldings.multiply(price));
+        }
+        if (fidaAsset.signum() <= 0) {
+            throw new PrivacyValuationException("PRIVACY 배수 산출 불가 — FIDA 자산이 0 이하입니다.");
+        }
+        if (ourAsset.signum() <= 0) {
+            throw new PrivacyValuationException("PRIVACY 배수 산출 불가 — 우리 자산이 0 이하입니다.");
+        }
+        BigDecimal multiple = ourAsset.divide(fidaAsset, 2, RoundingMode.FLOOR);
+        log.info("[PRIVACY] 배수 산출: ourAsset={}, fidaAsset={}, price={}, multiple={}", ourAsset, fidaAsset, price, multiple);
+        return multiple;
+    }
+
+    public List<PlannedOrder> buildOrders(AccountBalance balance, BigDecimal price, PrivacyPlan plan) {
+        BigDecimal multiple = multiple(balance, price, plan);
 
         List<BuyEntry> buyEntries = new ArrayList<>();
         List<PrivacyPlannedTrade> explicitSells = new ArrayList<>();

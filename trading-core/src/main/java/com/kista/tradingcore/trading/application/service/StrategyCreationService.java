@@ -64,7 +64,6 @@ class StrategyCreationService {
     private final StrategyCreationPolicyPort strategyCreationPolicyPort;
     private final StrategyCreationResolvers creationResolvers;
     private final StrategyCreationPersister creationPersister; // 저장 5단계 트랜잭션 경계 (self-invocation 회피용 별도 빈)
-    private final StrategyStartAmountCalculator startAmountCalculator; // 시작금액 산출(PRIVACY 중간부터 시작 환산 포함)
     private final InfiniteMinSeedGuard minSeedGuard;            // INFINITE 최소 시드 검사(등록·시드 수정·인출 공유)
     private final StrategyDetailAssembler detailAssembler;      // 응답 조립(조회 경로와 동일 SSOT)
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
@@ -116,14 +115,13 @@ class StrategyCreationService {
                 ? StrategyCycleSeedType.NONE  // capability.supportsCycleSeed=false는 NONE 강제
                 : (cmd.cycleSeedType() != null ? cmd.cycleSeedType() : StrategyCycleSeedType.NONE);
 
-        // 시작금액 산출 — 개장 평가(통계 원금)는 예수금 + 보유 평가(DCA는 원가)로, PRIVACY 중간 시작의 배수 환산과 분리한다
-        BigDecimal startAmount = startAmountCalculator.calculate(cmd.type(), initialDeposit, initialHoldings, initialStockValue);
+        // 시작금액 = 개장 평가(통계 원금) = 예수금 + 보유 평가(DCA는 원가)
         BigDecimal openAmount = initialDeposit.add(initialStockValue);
 
         // INFINITE 최소 시드 검증 — 폼이 먼저 막지만 API 직접 호출도 0회차 교착 시드를 만들지 못하게 서버에서도 막는다
         if (cmd.type() == StrategyType.INFINITE) {
             InfiniteMinSeedGuard.requireAtLeast(
-                    minSeedGuard.minSeed(account.toBrokerRef(), resolvedTicker, resolved.divisionCount(), marketPrice), startAmount);
+                    minSeedGuard.minSeed(account.toBrokerRef(), resolvedTicker, resolved.divisionCount(), marketPrice), openAmount);
         }
 
         // 저장 5단계(strategy·version·detail·cycle·position)는 별도 빈의 한 트랜잭션 — 중간 실패 시 부분 저장 없이 롤백
@@ -132,7 +130,7 @@ class StrategyCreationService {
         try {
             strategy = creationPersister.persist(new StrategyCreationPersister.Draft(
                     accountId, cmd.type(), seedType, resolved, vr != null ? vr.ramp() : null, initialDeposit, initialHoldings,
-                    cmd.initialAvgPrice(), marketPrice, startAmount, openAmount, vr != null ? vr.vrValue() : null, scheduledStart, dcaConfig));
+                    cmd.initialAvgPrice(), marketPrice, openAmount, openAmount, vr != null ? vr.vrValue() : null, scheduledStart, dcaConfig));
         } catch (DataIntegrityViolationException e) {
             // 선검사(validateUniqueTicker)를 동시에 통과한 경합 — 유니크 인덱스 위반만 409로 바꾸고 다른 제약 위반은 그대로 던진다
             // 커밋 시점 flush 예외도 persist 프록시 밖(여기)에서 잡힌다
