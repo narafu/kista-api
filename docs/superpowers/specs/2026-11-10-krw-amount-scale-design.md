@@ -43,10 +43,12 @@ KRW 계좌(UPBIT)의 원장 금액이 API JSON에 `15000.00`처럼 소수 2자�
 | `GET /api/stats/cycles` | 응답 `startAmount`(도메인 `principal`), `endAmount`, `pnl` | `CycleView.currency()` | `TradingStatsService.toPerformance` |
 | `GET /api/accounts/{id}/cycle-history` (stats `DashboardController`) | `deposit` | 계좌 통화 | 이력 결과를 만드는 stats 서비스 |
 | `GET /api/trading-cycles/{id}/history` (trading `TradingCycleController`, 같은 모양의 별도 `CycleHistoryResponse`) | `deposit` | 전략 계좌 통화 | 이력 결과를 만드는 trading 서비스 |
-| 다음 주문 미리보기(`/preview`, `/previews`) | 포지션 `deposit`, `totalAssets` | 전략 계좌 통화 | `TradingPreviewService` |
 | 전략 상세·사이클 목록(`TradingCycleResponse`) | `initialDeposit`, `ledgerDeposit` | 전략 계좌 통화 | `StrategyDetailAssembler` |
+| DCA 규칙 조회(`DcaRuleResponse.sizing`) | `amount`(정액 매수 금액. `percent`는 비율이라 제외) | 전략 계좌 통화 | DCA 규칙 결과를 만드는 서비스(`DcaConfigService` 등). 엔티티 `scale2`는 DB 컬럼 정규화라 그대로 둔다 |
 
 이미 처리된 응답: `AccountLedgerTotals`, `CryptoPortfolioResponse`, 일별 거래내역, 주문 가격·금액.
+
+KRW가 지나지 않는 응답: 다음 주문 미리보기(`/preview`, `/previews`)는 코인 계좌를 제외한다(`TradingPreviewService:79,106` — 코인 전략은 전부 DCA이고 미리보기 경로가 없다). 포지션 스냅샷도 INFINITE 전용(USD)이다. 변경하지 않는다.
 
 금액이 없는 응답: 벤치마크 투자지수(`BenchmarkComparisonResponse`, `InvestmentPointsResponse`)는 지수와 수익률만 싣는다. 변경하지 않는다.
 
@@ -93,9 +95,9 @@ JSON 타입(number)과 필드 이름은 그대로다. KRW 값의 소수 자릿�
 
 ## 범위 밖 발견 (언급만, 이번에 고치지 않음)
 
-- KRW 평단·종가가 `numeric(20,2)`라 1원 미만 호가 코인에서 정밀도가 모자란다. 운영 UPBIT 0건이라 보류한다.
-- `StrategyDcaRuleEntity:106`, `StrategyDcaConditionEntity:70`의 `setScale(2, HALF_UP)` 리터럴. 조건 임계값이 KRW 가격이면 constraints.md(조건 목표가 KRW 정수)와 어긋날 수 있다.
-- `CycleHistoryResponse`가 stats와 trading 두 모듈에 똑같이 있다. 이번 작업에서 둘 다 고친다. 통합은 별도 과제다.
+- KRW 평단·종가가 `numeric(20,2)`라 1원 미만 호가 코인에서 정밀도가 모자란다. 별도 과제로 둔다(사용자 확인 2026-11-10). 원장 컬럼 마이그레이션, matching 커널 평단 나눗셈(`AccountBalance:89`), 변경 금지 매매 공식의 USD 평단까지 걸린다. 운영 UPBIT 0건이라 UPBIT 전략 운영 직전에 설계한다.
+- `StrategyDcaRuleEntity:106`, `StrategyDcaConditionEntity:70`의 `setScale(2, HALF_UP)`는 DB 컬럼 `numeric(_,2)` 정규화(save 반환값과 조회값 일치)라 결함이 아니다. DCA 경로 금액 자릿수는 CQ-40(`1566604d4`)에서 정리됐다. 응답 `DcaRuleResponse.sizing.amount`만 이번 범위(위 표)에 넣었다.
+- `CycleHistoryResponse`가 stats와 trading 두 모듈에 똑같이 있다. `code-quality-backlog.md:582` 유지 목록(외부 계약 분리)이라 통합하지 않는다. 이번 작업에서 둘 다 고친다.
 
 ## builder에게 맡기는 것
 
