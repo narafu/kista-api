@@ -1302,4 +1302,114 @@ class TradingStatsServiceTest {
         assertThat(summaryTotal).isEqualByComparingTo("1520.00");
         assertThat(last.totalAsset().subtract(last.principal())).isEqualByComparingTo(summaryTotal);
     }
+
+    // ── KRW(UPBIT) 응답 금액 정수 반올림 ─────────────────────────────────────────
+
+    // UPBIT 계좌·DCA 전략을 스텁하고 전략을 돌려준다 — 사이클 스텁은 호출 측이 한다
+    private Strategy stubUpbitStrategy() {
+        Account upbit = new Account(UUID.randomUUID(), USER_ID, "업비트", "n", "k", "s", null, Broker.UPBIT, null, null);
+        Strategy s = new Strategy(UUID.randomUUID(), upbit.id(), StrategyType.DCA, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(upbit));
+        when(strategyPort.findByAccountIds(List.of(upbit.id()))).thenReturn(Map.of(upbit.id(), List.of(s)));
+        return s;
+    }
+
+    private static StrategyCycle closedKrwCycle(UUID strategyId, String start, String end) {
+        return new StrategyCycle(UUID.randomUUID(), strategyId, new BigDecimal(start), new BigDecimal(end),
+                LocalDate.parse("2026-01-01"), LocalDate.parse("2026-01-31"), Instant.parse("2026-01-01T00:00:00Z"), null);
+    }
+
+    @Test
+    void krwSummary_roundsAmountsToScale0_ratiosUnchanged() {
+        Strategy s = stubUpbitStrategy();
+        StrategyCycle closed = closedKrwCycle(s.id(), "1000.40", "1100.75"); // 실현 100.35
+        StrategyCycle open = activeCycle(s.id(), "1500.20", "2026-06-01");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(closed, open));
+        when(cyclePositionPort.findLatestByCycleIds(Set.of(open.id())))
+                .thenReturn(Map.of(open.id(), depositSnapshot(open.id(), "2000.60", "2026-06-02T01:00:00Z"))); // 미실현 500.40
+
+        StatsSummary summary = statsService.getSummary(USER_ID, Currency.KRW);
+        StrategyTypeStats dca = summary.byType().getFirst();
+
+        assertThat(dca.realizedPnl()).hasToString("100");
+        assertThat(dca.unrealizedPnl()).hasToString("501"); // 총손익 600.75 → 601 − 실현 100
+        assertThat(summary.totalRealizedPnl()).hasToString("100");
+        assertThat(summary.totalUnrealizedPnl()).hasToString("501");
+        assertThat(summary.activePrincipal()).hasToString("1500");
+        // 평균 수익률은 반올림 전 실현손익(100.35)/원금(1000.40)으로 계산된다
+        assertThat(dca.avgReturnRate()).isEqualByComparingTo(
+                new BigDecimal("100.35").divide(new BigDecimal("1000.40"), 6, java.math.RoundingMode.HALF_UP)
+                        .setScale(4, java.math.RoundingMode.HALF_UP));
+    }
+
+    @Test
+    void krwSummary_negativeUnrealized_keepsSumInvariant() {
+        Strategy s = stubUpbitStrategy();
+        StrategyCycle open = activeCycle(s.id(), "1000.20", "2026-06-01");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(open));
+        when(cyclePositionPort.findLatestByCycleIds(Set.of(open.id())))
+                .thenReturn(Map.of(open.id(), depositSnapshot(open.id(), "999.45", "2026-06-02T01:00:00Z"))); // 평가손 -0.75
+
+        StatsSummary summary = statsService.getSummary(USER_ID, Currency.KRW);
+        StrategyTypeStats dca = summary.byType().getFirst();
+
+        // 총손익 -0.75 → -1, 실현 0이라 미실현 -1
+        assertThat(dca.realizedPnl().add(dca.unrealizedPnl())).hasToString("-1");
+        assertThat(summary.totalRealizedPnl().add(summary.totalUnrealizedPnl())).hasToString("-1");
+    }
+
+    @Test
+    void krwEquityCurve_pointsScale0() {
+        Strategy s = stubUpbitStrategy();
+        StrategyCycle open = activeCycle(s.id(), "1500.20", "2026-06-01");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(open));
+        when(cyclePositionPort.findByCycleIdsAndRange(eq(Set.of(open.id())), any(), any())).thenReturn(List.of(
+                depositSnapshot(open.id(), "2000.60", "2026-06-02T01:00:00Z")));
+
+        EquityCurve c = statsService.getEquityCurve(USER_ID, Currency.KRW, null,
+                LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+
+        assertThat(c.points()).hasSize(1);
+        assertThat(c.points().getFirst().totalAsset()).hasToString("2001");
+        assertThat(c.points().getFirst().principal()).hasToString("1500");
+    }
+
+    @Test
+    void krwCycles_amountsScale0_pnlIsDifferenceOfRounded_returnRateFromRaw() {
+        Strategy s = stubUpbitStrategy();
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(closedKrwCycle(s.id(), "1000.40", "1100.75")));
+
+        CyclePerformance p = statsService.getCyclePerformances(USER_ID, null, null, null, null, 0, 10).items().getFirst();
+
+        assertThat(p.startAmount()).hasToString("1000");
+        assertThat(p.endAmount()).hasToString("1101");
+        assertThat(p.pnl()).hasToString("101"); // 반올림된 1101 − 1000
+        assertThat(p.returnRate()).isEqualByComparingTo(
+                new BigDecimal("100.35").divide(new BigDecimal("1000.40"), 4, java.math.RoundingMode.HALF_UP));
+    }
+
+    @Test
+    void krwCycles_openWithoutSnapshot_keepsNullAmounts() {
+        Strategy s = stubUpbitStrategy();
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(activeCycle(s.id(), "1500.20", "2026-06-01")));
+
+        CyclePerformance p = statsService.getCyclePerformances(USER_ID, null, null, null, null, 0, 10).items().getFirst();
+
+        assertThat(p.endAmount()).isNull();
+        assertThat(p.pnl()).isNull();
+        assertThat(p.startAmount()).hasToString("1500");
+    }
+
+    @Test
+    void usdSummary_keepsScale2() {
+        stubUserWithStrategy();
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(
+                closedCycle("1000.00", "1100.00", "2026-01-01", "2026-01-31")));
+
+        StatsSummary summary = statsService.getSummary(USER_ID, Currency.USD);
+
+        assertThat(summary.totalRealizedPnl().scale()).isEqualTo(2);
+        assertThat(summary.byType().getFirst().unrealizedPnl().scale()).isEqualTo(2);
+    }
 }

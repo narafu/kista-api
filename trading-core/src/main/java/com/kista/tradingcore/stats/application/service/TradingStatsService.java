@@ -17,7 +17,6 @@ import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.CycleCapitalEventPort;
 import com.kista.tradingcore.trading.domain.model.CycleCapitalEvent;
 import com.kista.shared.kernel.Currency;
-import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
 import com.kista.tradingcore.trading.application.event.TradingReportReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -157,13 +156,13 @@ class TradingStatsService implements TradingStatsUseCase {
                         .collect(Collectors.groupingBy(CyclePosition::strategyCycleId));
 
         List<StrategyTypeStats> typeStats = byType.entrySet().stream()
-                .map(e -> toTypeStats(e.getKey(), e.getValue(), unrealizedByCycle, positionsByCycle))
+                .map(e -> toTypeStats(e.getKey(), e.getValue(), unrealizedByCycle, positionsByCycle, currency))
                 .toList();
 
-        BigDecimal totalRealized = sum(typeStats.stream().map(StrategyTypeStats::realizedPnl));
-        BigDecimal totalUnrealized = sum(typeStats.stream().map(StrategyTypeStats::unrealizedPnl));
+        BigDecimal totalRealized = sum(typeStats.stream().map(StrategyTypeStats::realizedPnl), currency);
+        BigDecimal totalUnrealized = sum(typeStats.stream().map(StrategyTypeStats::unrealizedPnl), currency);
         BigDecimal activePrincipal = sum(cycles.stream()
-                .filter(v -> !v.closed()).map(CycleView::principal));
+                .filter(v -> !v.closed()).map(CycleView::principal), currency);
 
         return new StatsSummary(totalRealized, totalUnrealized, activePrincipal, typeStats, availableCurrencies);
     }
@@ -192,7 +191,7 @@ class TradingStatsService implements TradingStatsUseCase {
         // 투자금 추가·인출로 덮어쓴 과거 스냅샷을 이력으로 복원
         List<CyclePosition> positions = CapitalLedgerTimeline.restore(raw,
                 cycles.stream().flatMap(v -> v.events().stream()).toList());
-        List<EquityPoint> points = buildPoints(cycles, positions, from, effectiveTo);
+        List<EquityPoint> points = buildPoints(cycles, positions, from, effectiveTo, currency);
         return new EquityCurve(points);
     }
 
@@ -268,15 +267,16 @@ class TradingStatsService implements TradingStatsUseCase {
 
     private StrategyTypeStats toTypeStats(StrategyType type, List<CycleView> views,
                                           Map<UUID, BigDecimal> unrealizedByCycle,
-                                          Map<UUID, List<CyclePosition>> positionsByCycle) {
+                                          Map<UUID, List<CyclePosition>> positionsByCycle, Currency currency) {
         List<CycleView> closed = views.stream().filter(CycleView::closed).toList();
         List<CycleView> active = views.stream().filter(v -> !v.closed()).toList();
 
         // 총 손익 = 종료 구간 손익 + 진행 중 평가손익 — 실현(매도 확정분, 진행 중 사이클 포함)만 장부가로 갈라내고 나머지는 미실현으로 둬 합을 보존한다
-        BigDecimal totalPnl = sum(closed.stream().map(CycleView::realizedPnl))
-                .add(sum(active.stream().map(v -> unrealizedByCycle.getOrDefault(v.cycle().id(), BigDecimal.ZERO))));
-        BigDecimal realizedPnl = sum(views.stream().map(v -> settledPnl(v, positionsByCycle.getOrDefault(v.cycle().id(), List.of()))));
-        BigDecimal unrealizedPnl = totalPnl.subtract(realizedPnl).setScale(AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP);
+        // 응답 금액은 통화 자릿수로 반올림한다 — 총손익을 원값 합으로 한 번 반올림하고 미실현 = 총손익 − 실현이라 한 응답 안의 합이 맞는다
+        BigDecimal totalPnl = sum(Stream.concat(closed.stream().map(CycleView::realizedPnl),
+                active.stream().map(v -> unrealizedByCycle.getOrDefault(v.cycle().id(), BigDecimal.ZERO))), currency);
+        BigDecimal realizedPnl = sum(views.stream().map(v -> settledPnl(v, positionsByCycle.getOrDefault(v.cycle().id(), List.of()))), currency);
+        BigDecimal unrealizedPnl = totalPnl.subtract(realizedPnl);
 
         BigDecimal winRate = null;
         BigDecimal avgReturnRate = null;
@@ -324,7 +324,7 @@ class TradingStatsService implements TradingStatsUseCase {
     // 단 교체된 앞선 사이클의 손익이 사라지지 않도록 체인 보정(ChainAdjustment)을 최신 사이클에 더한다.
     // 체인은 latest에 들어온 같은 전략 사이클(positions는 전체 범위 조회라 과거 스냅샷이 모두 있다)이고, 사이클 메타는 cycleById(전체 사이클)에서 읽는다.
     private List<EquityPoint> buildPoints(List<CycleView> cycles, List<CyclePosition> positions,
-                                          LocalDate from, LocalDate to) {
+                                          LocalDate from, LocalDate to, Currency currency) {
         Map<UUID, CycleView> cycleById = cycles.stream()
                 .collect(Collectors.toMap(v -> v.cycle().id(), Function.identity()));
 
@@ -384,8 +384,7 @@ class TradingStatsService implements TradingStatsUseCase {
                 }
             }
             points.add(new EquityPoint(date,
-                    asset.setScale(AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP),
-                    principal.setScale(AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP)));
+                    currency.round(asset), currency.round(principal)));
         }
         return points;
     }
@@ -411,11 +410,16 @@ class TradingStatsService implements TradingStatsUseCase {
         // 종료 금액(종료 사이클) 또는 최신 스냅샷 평가액(진행 중)
         BigDecimal endAmount = v.closed() ? c.endAmount()
                 : Optional.ofNullable(latestPositions.get(c.id())).map(CyclePosition::totalAssetWithAvgPriceFallback).orElse(null);
-        BigDecimal principal = v.principal();
+        BigDecimal rawPrincipal = v.principal();
+        BigDecimal rawPnl = endAmount != null ? endAmount.subtract(rawPrincipal) : null;
+        // 원금이 0 이하인 사이클(VR 적립식 등)은 수익률이 정의되지 않는다. 수익률은 반올림 전 값으로 계산한다.
+        BigDecimal returnRate = (rawPnl != null && rawPrincipal.signum() > 0)
+                ? rawPnl.divide(rawPrincipal, 4, RoundingMode.HALF_UP) : null;
+        // 응답 금액은 사이클 통화 자릿수로 반올림하고 손익은 반올림된 값끼리 뺀다
+        Currency currency = v.currency();
+        BigDecimal principal = currency.round(rawPrincipal);
+        endAmount = endAmount != null ? currency.round(endAmount) : null;
         BigDecimal pnl = endAmount != null ? endAmount.subtract(principal) : null;
-        // 원금이 0 이하인 사이클(VR 적립식 등)은 수익률이 정의되지 않는다.
-        BigDecimal returnRate = (pnl != null && principal.signum() > 0)
-                ? pnl.divide(principal, 4, RoundingMode.HALF_UP) : null;
         LocalDate durationEnd = v.closed() ? c.endDate() : LocalDate.now(clock);
         // 시작예정일이 미래인 사이클은 아직 경과일이 없다 — 음수 대신 0
         int durationDays = (int) Math.max(0, ChronoUnit.DAYS.between(c.startDate(), durationEnd));
@@ -424,7 +428,8 @@ class TradingStatsService implements TradingStatsUseCase {
                 durationDays, v.closed());
     }
 
-    private static BigDecimal sum(Stream<BigDecimal> stream) {
-        return stream.reduce(BigDecimal.ZERO, BigDecimal::add).setScale(AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP);
+    // 금액 합계를 통화 자릿수로 반올림
+    private static BigDecimal sum(Stream<BigDecimal> stream, Currency currency) {
+        return currency.round(stream.reduce(BigDecimal.ZERO, BigDecimal::add));
     }
 }
