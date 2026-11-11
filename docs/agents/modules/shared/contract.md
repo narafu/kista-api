@@ -6,7 +6,7 @@ com.kista.shared.contract/  ← Published Language. `@ApplicationModule(Type.OPE
   trading/      ← OrderResponse/StrategyResponse/StrategySummaryResponse/TradeCorrectionRequest·Response — admin ↔ trading-core(`TradingInternalQuery/CommandController`)
   privacy/      ← PrivacyTradeBaseResponse/FidaOrderRequest·Response/PrivacyBaseUpdateRequest/PrivacyOrderUpdateRequest/PrivacyOrderAddRequest — `FidaOrderRequest`/`FidaOrderResponse`는 **외부 FIDA 프로젝트도 호출하는 `POST /api/internal/fida-orders`**의 body라 JSON 필드명·shape(`releaseDate` + `@JsonAlias("tradeDate")` 등)을 바꾸면 안 된다
   account/      ← AccountSummaryResponse(id/userId/accountNo/broker/createdAt — appKey/secretKey 등 자격증명은 의도적으로 제외한 narrowing)
-  marketcalendar/ ← MarketSessionResponse(`sharedkernel.MarketSession session`, `isDst`, `LocalDate tradeDateKst`, `boolean tradingDay`)
+  marketcalendar/ ← MarketSessionResponse(`LocalDate tradeDateKst`, `boolean tradingDay`)
   broker/       ← DailyCandleResponse(일봉 1건)
   stats/        ← InvestmentPointsResponse(+ nested InvestmentPointDto/StrategyRefDto)/PortfolioCurrentResponse/PortfolioOrderResponse. 환율(`/exchange-rate`)은 bare `BigDecimal` body(JDK 타입)라 contract 대상이 아니다
   notify/       ← TradeEventMessage(SSE 이벤트 body이자 Redis payload — kista-ui 소비)/TradeEventEnvelope(`{userId, event}` 발행 단위)

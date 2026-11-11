@@ -1,9 +1,9 @@
 package com.kista.tradingcore.marketcalendar.adapter.in.web;
 
 import com.kista.shared.contract.marketcalendar.MarketSessionResponse;
-import com.kista.shared.platform.time.KstTradeDates;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
-import com.kista.tradingcore.marketcalendar.domain.model.MarketSessionSnapshot;
+import com.kista.tradingcore.marketcalendar.domain.model.MarketSessionTimes;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -40,10 +40,10 @@ public class MarketCalendarInternalController {
 
     @GetMapping("/session")
     public MarketSessionResponse session() {
-        ZonedDateTime nowKst = ZonedDateTime.now(clock);
-        MarketSessionSnapshot snapshot = MarketSessionSnapshot.at(nowKst);
-        LocalDate tradeDateKst = KstTradeDates.nextTradeDate(nowKst); // KST 거래일
-        return new MarketSessionResponse(snapshot.session(), snapshot.isDst(),
-                tradeDateKst, marketCalendarPort.isMarketOpen(tradeDateKst));
+        // KST 거래일 — 배치·미리보기와 같은 실제 마감 30분 전 경계(조기 마감 반영)
+        ZonedDateTime nowKst = ZonedDateTime.now(clock).withZoneSameInstant(TimeZones.KST);
+        LocalDate tradeDateKst = MarketSessionTimes.nextTradeDate(nowKst,
+                marketCalendarPort.findSession(nowKst.toLocalDate()));
+        return new MarketSessionResponse(tradeDateKst, marketCalendarPort.isMarketOpen(tradeDateKst));
     }
 }

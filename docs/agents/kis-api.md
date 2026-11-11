@@ -45,7 +45,7 @@ adapter/out/kis/    ← KisHttpClient(공통 헤더 + executeWithRetry: 401 시 
 ### Alpaca Calendar API (`/v2/calendar`, AlpacaCalendarAdapter)
 - 지원 범위: 1970~2029년 — 2026년 기준 최대 3년 선제 적재 가능
 - 스케쥴러: 1월 1일 00:00 KST 3년치(`year`~`year+2`) 적재 / 매월 1일 01:00 KST 당월 최신화 (`MarketCalendarRefreshScheduler`)
-- `refreshCalendar(year)`: 연간 전체 교체(`replaceByYear`) / `refreshMonth(year, month)`: 월별 교체(`replaceByMonth`)
+- `refreshCalendar(year)`: 연간 전체 교체(`replaceSessionsByYear`) / `refreshMonth(year, month)`: 월별 교체(`replaceSessionsByMonth`) — 세션·휴장일을 한 트랜잭션에서 함께 교체
 
 ### 응답 필드명 대소문자 주의
 - **해외주식 API 응답은 lowercase** (`ovrs_pdno`, `ovrs_cblc_qty`, `frcr_evlu_amt2` 등)

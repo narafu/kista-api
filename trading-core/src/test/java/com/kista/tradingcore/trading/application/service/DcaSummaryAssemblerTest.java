@@ -6,6 +6,7 @@ import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
+import com.kista.tradingcore.marketcalendar.domain.model.MarketSessionTimes;
 import com.kista.shared.kernel.DcaShortfallPolicy;
 import com.kista.shared.kernel.DcaSizingType;
 import com.kista.tradingcore.matching.domain.model.DcaRule;
@@ -20,6 +21,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,32 +45,32 @@ class DcaSummaryAssemblerTest {
     @Test
     void cryptoNextExecutionIncludesTodayBeforeHour() {
         LocalDate today = LocalDate.of(2026, 10, 14);
-        assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(10, 0))).isEqualTo(today);
-        assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(14, 0))).isEqualTo(today.plusDays(1));
+        assertThat(assembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(10, 0))).isEqualTo(today);
+        assertThat(assembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(14, 0))).isEqualTo(today.plusDays(1));
         DcaExecution decided = DcaExecution.ordered(UUID.randomUUID(), "k", com.kista.shared.kernel.OrderDirection.BUY, today, UUID.randomUUID(), BigDecimal.ONE, BigDecimal.ONE);
-        assertThat(DcaSummaryAssembler.firstEligibleDate(today, decided, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(10, 0))).isEqualTo(today.plusDays(1));
+        assertThat(assembler.firstEligibleDate(today, decided, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(10, 0))).isEqualTo(today.plusDays(1));
     }
 
     @Test
     void cryptoNextExecutionStaysTodayWithinExecutionHourUntilDecided() {
         LocalDate today = LocalDate.of(2026, 10, 14);
         // 실행 시각대 안에서 판정 전이면 남은 틱(재시도·시각대 중 신규 등록)이 오늘 실행 — 오늘
-        assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 30))).isEqualTo(today);
-        assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(12, 59))).isEqualTo(today);
+        assertThat(assembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 30))).isEqualTo(today);
+        assertThat(assembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(12, 59))).isEqualTo(today);
         // 마지막 틱(13:50) 시작 뒤엔 남은 틱이 없어 내일
-        assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 50))).isEqualTo(today);
-        assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 55))).isEqualTo(today.plusDays(1));
+        assertThat(assembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 50))).isEqualTo(today);
+        assertThat(assembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 55))).isEqualTo(today.plusDays(1));
         // 시각대가 지나면 내일
-        assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(14, 0))).isEqualTo(today.plusDays(1));
+        assertThat(assembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(14, 0))).isEqualTo(today.plusDays(1));
     }
 
     @Test
     void cryptoExactExecutionHourIsTodayUntilDecided() {
         LocalDate today = LocalDate.of(2026, 10, 14);
         // 13:00 정각 판정 전은 오늘, 같은 시각대에 이미 판정했으면 내일
-        assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 0))).isEqualTo(today);
+        assertThat(assembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 0))).isEqualTo(today);
         DcaExecution decided = DcaExecution.ordered(UUID.randomUUID(), "k", com.kista.shared.kernel.OrderDirection.BUY, today, UUID.randomUUID(), BigDecimal.ONE, BigDecimal.ONE);
-        assertThat(DcaSummaryAssembler.firstEligibleDate(today, decided, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 10))).isEqualTo(today.plusDays(1));
+        assertThat(assembler.firstEligibleDate(today, decided, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 10))).isEqualTo(today.plusDays(1));
     }
 
     @Test
@@ -113,16 +115,25 @@ class DcaSummaryAssemblerTest {
     @Test
     void firstEligibleDate_skips_start_day_itself() {
         LocalDate today = DstInfo.nextTradeDate(NOW.atZone(TimeZones.KST));
-        assertThat(DcaSummaryAssembler.firstEligibleDate(today.plusDays(3), null, STOCK, Market.US_STOCK, NOW)).isEqualTo(today.plusDays(4));
+        assertThat(assembler.firstEligibleDate(today.plusDays(3), null, STOCK, Market.US_STOCK, NOW)).isEqualTo(today.plusDays(4));
         // 시작일이 오늘이면 시작일 당일은 판정 제외 — 다음 날부터
-        assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, STOCK, Market.US_STOCK, NOW)).isEqualTo(today.plusDays(1));
+        assertThat(assembler.firstEligibleDate(today, null, STOCK, Market.US_STOCK, NOW)).isEqualTo(today.plusDays(1));
     }
 
     @Test
     void firstEligibleDate_moves_to_next_day_when_today_already_decided() {
         LocalDate today = DstInfo.nextTradeDate(NOW.atZone(TimeZones.KST));
         DcaExecution decidedToday = DcaExecution.ordered(UUID.randomUUID(), "k", com.kista.shared.kernel.OrderDirection.BUY, today, UUID.randomUUID(), BigDecimal.valueOf(1), BigDecimal.ONE);
-        assertThat(DcaSummaryAssembler.firstEligibleDate(today.minusDays(10), decidedToday, STOCK, Market.US_STOCK, NOW)).isEqualTo(today.plusDays(1));
+        assertThat(assembler.firstEligibleDate(today.minusDays(10), decidedToday, STOCK, Market.US_STOCK, NOW)).isEqualTo(today.plusDays(1));
+    }
+
+    @Test
+    void stockFirstEligibleDateUsesEarlyCloseCutoff() {
+        LocalDate date = LocalDate.of(2026, 11, 28);
+        var close = date.atTime(3, 0).atZone(TimeZones.KST).toInstant();
+        when(calendar.findSession(date)).thenReturn(Optional.of(new MarketSessionTimes(close.minusSeconds(12600), close)));
+        assertThat(assembler.firstEligibleDate(date.minusDays(10), null, STOCK, Market.US_STOCK, date.atTime(2, 29))).isEqualTo(date);
+        assertThat(assembler.firstEligibleDate(date.minusDays(10), null, STOCK, Market.US_STOCK, date.atTime(2, 30))).isEqualTo(date.plusDays(1));
     }
 
     @Test

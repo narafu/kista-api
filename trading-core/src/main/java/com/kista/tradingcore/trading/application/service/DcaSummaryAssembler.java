@@ -9,7 +9,6 @@ import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.tradingcore.matching.domain.strategy.DcaSchedule;
 import com.kista.tradingcore.trading.domain.model.DcaExecution;
 import com.kista.tradingcore.trading.domain.model.DcaSummary;
-import com.kista.tradingcore.trading.domain.model.DstInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -58,7 +57,7 @@ class DcaSummaryAssembler {
     // 배치가 판정 가능한 첫 KST 거래일 (규칙 단위)
     // 주식: TradingService.filterScheduledStart가 시작일 당일을 제외(tradeDate.isAfter(startDate)) — 오늘 회차 판정이 끝났으면 다음 날부터
     // 코인: 시작일 제외 없음 — 실행 시각대의 마지막 틱(HH:50)까지는 판정 전이면 남은 틱이 오늘 실행하므로 오늘, 그 뒤이거나 오늘 이미 판정했으면 내일부터
-    static LocalDate firstEligibleDate(LocalDate cycleStartDate, DcaExecution last, DcaRule rule, Market market, LocalDateTime nowKst) {
+    LocalDate firstEligibleDate(LocalDate cycleStartDate, DcaExecution last, DcaRule rule, Market market, LocalDateTime nowKst) {
         if (market.isCrypto()) {
             LocalDate today = nowKst.toLocalDate();
             int hour = nowKst.getHour();
@@ -67,7 +66,7 @@ class DcaSummaryAssembler {
             boolean decidedToday = last != null && last.tradeDate().equals(today);
             return hourPassed || decidedToday ? today.plusDays(1) : today;
         }
-        LocalDate from = DstInfo.nextTradeDate(nowKst.atZone(TimeZones.KST));
+        LocalDate from = SessionTradeDates.nextTradeDate(nowKst.atZone(TimeZones.KST), marketCalendarPort);
         if (last != null && last.tradeDate().equals(from)) from = from.plusDays(1);
         LocalDate afterStart = cycleStartDate.plusDays(1);
         return from.isBefore(afterStart) ? afterStart : from;

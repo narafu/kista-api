@@ -2,7 +2,6 @@ package com.kista.api.market.adapter.out.internal;
 
 import com.kista.api.market.application.port.output.MarketCalendarQueryPort;
 import com.kista.shared.contract.marketcalendar.MarketSessionResponse;
-import com.kista.shared.kernel.MarketSession;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
 import mockwebserver3.RecordedRequest;
@@ -61,13 +60,11 @@ class MarketCalendarQueryHttpAdapterTest {
     void currentSession_내부_API_응답을_contract_type으로_역직렬화한다() {
         server.enqueue(new MockResponse.Builder()
                 .code(200).addHeader("Content-Type", "application/json")
-                .body("{\"session\":\"DIRECT\",\"isDst\":true,\"tradeDateKst\":\"2026-07-20\",\"tradingDay\":true}")
+                .body("{\"tradeDateKst\":\"2026-07-20\",\"tradingDay\":true}")
                 .build());
 
         MarketSessionResponse session = adapter.currentSession();
 
-        assertThat(session.session()).isEqualTo(MarketSession.DIRECT);
-        assertThat(session.isDst()).isTrue();
         assertThat(session.tradeDateKst()).isEqualTo(java.time.LocalDate.of(2026, 7, 20));
         assertThat(session.tradingDay()).isTrue();
     }

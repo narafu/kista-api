@@ -53,7 +53,7 @@ Java 25 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 
 
 ## 참고 문서 (필요시 Read)
 - **전체 구조 그림**: `docs/architecture-map.md`(Mermaid), 아키텍처 맵 `build/architecture-map/index.html`(`ArchitectureMapTest`가 생성, 원본 `src/test/resources/architecture/flows.yml`)
-- **매매·스케쥴러·주문 로직 작업 시**: `docs/agents/workflow.md` 인덱스를 읽고 작업 주제에 맞는 하위 문서(`workflow-batch.md` 배치·재기동·MarketSession, `workflow-ledger-price.md` 원장 상한·시세, `workflow-capper.md` BuyOrderPriceCapper 보정 주문, `workflow-orders.md` 접수·orders/cycle_position 기록 테이블)를 Read
+- **매매·스케쥴러·주문 로직 작업 시**: `docs/agents/workflow.md` 인덱스를 읽고 작업 주제에 맞는 하위 문서(`workflow-batch.md` 배치·재기동·수동 실행, `workflow-ledger-price.md` 원장 상한·시세, `workflow-capper.md` BuyOrderPriceCapper 보정 주문, `workflow-orders.md` 접수·orders/cycle_position 기록 테이블)를 Read
 - KIS API: `docs/agents/kis-api.md` — TR ID, 오류 코드, 응답 필드, 어댑터 패턴 (`broker/adapter/out/kis` 작업 시 자동 로드)
 - 토스증권 API: `docs/agents/toss-api.md` (`adapter/out/toss` 작업 시 자동 로드)
 - 메리츠 API: `docs/agents/meritz-api.md` (`adapter/out/meritz` 작업 시 자동 로드)

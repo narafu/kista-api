@@ -1,10 +1,15 @@
 package com.kista.tradingcore.marketcalendar.application.port.output;
 
+import com.kista.tradingcore.marketcalendar.domain.model.MarketSessionTimes;
+
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 // 시장 캘린더 읽기 전용 포트 — 쓰기(갱신)는 MarketHolidayStorePort 분리
 public interface MarketCalendarPort {
+    // KST 거래일의 실제 세션; 수집된 휴장일은 empty, 미적재 또는 검증 실패는 예외
+    Optional<MarketSessionTimes> findSession(LocalDate tradeDateKst);
     // 주말은 항상 false; 연도 데이터 미존재 시 false 반환 (안전 폴백 — 매매 skip)
     boolean isMarketOpen(LocalDate date);
 

@@ -175,7 +175,7 @@ public class TossPriceApi {
     // package-private — 테스트에서 시각 주입 시드로 직접 호출 (private record는 같은 패키지 테스트에서도 참조 불가)
     record MarketSessionInfo(boolean regularSessionActive, Instant lastSessionOpenInstant) {}
 
-    // 주어진 KST 시각 기준 정규장 진행 여부 + 가장 최근 개장 시각 계산 — DstInfo의 currentSessionAt()/lastSessionOpenInstantAt() 패턴과 동일
+    // 주어진 KST 시각 기준 정규장 진행 여부 + 가장 최근 개장 시각 계산 — DstInfo의 isRegularSessionActiveAt()/lastSessionOpenInstantAt() 패턴과 동일
     static MarketSessionInfo resolveMarketSessionAt(ZonedDateTime nowKst) {
         boolean isDst = TimeZones.NY.getRules().isDaylightSavings(nowKst.toInstant());
         DayOfWeek day = nowKst.getDayOfWeek();

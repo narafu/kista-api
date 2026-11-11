@@ -25,6 +25,20 @@ class DstInfoTest {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     @Test
+    void 조기_마감_세션의_주문과_리포트_시각을_사용한다() {
+        Instant open = Instant.parse("2026-11-27T14:30:00Z");
+        Instant close = Instant.parse("2026-11-27T18:00:00Z");
+
+        DstInfo info = DstInfo.forCloseSession(open, close);
+
+        assertThat(info.isDst()).isFalse();
+        assertThat(info.orderAt()).isEqualTo(Instant.parse("2026-11-27T17:30:00Z"));
+        assertThat(info.postClose()).isEqualTo(Instant.parse("2026-11-27T18:10:00Z"));
+        assertThat(info.marketOpen()).isEqualTo(open);
+        assertThat(info.withImmediateOrder(open).postClose()).isEqualTo(info.postClose());
+    }
+
+    @Test
     @DisplayName("EDT(서머타임): orderAt=04:30 KST, postClose=05:10 KST, marketOpen=22:30 KST")
     void summer_dst() {
         // 2024-06-15 04:00 KST = 2024-06-14 19:00 UTC → NY=EDT(UTC-4) → isDst=true

@@ -10,9 +10,11 @@ import org.mockito.ArgumentCaptor;
 
 import java.time.Duration;
 import java.time.LocalDate;
+import java.util.List;
 
-import static com.kista.shared.kernel.TimeZones.KST;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -31,6 +33,7 @@ class MarketCalendarRefreshSchedulerTest {
 
         int year = LocalDate.now(FixedClockTestConfig.FIXED).getYear();
         when(storePort.countByYear(year)).thenReturn(10L); // 당해 연도는 이미 적재됨
+        when(storePort.hasCompleteSessionsForYear(year)).thenReturn(true);
         when(storePort.countByYear(year + 1)).thenReturn(0L);
         when(storePort.countByYear(year + 2)).thenReturn(0L);
 
@@ -62,6 +65,9 @@ class MarketCalendarRefreshSchedulerTest {
         when(storePort.countByYear(year)).thenReturn(10L);
         when(storePort.countByYear(year + 1)).thenReturn(5L);
         when(storePort.countByYear(year + 2)).thenReturn(1L);
+        when(storePort.hasCompleteSessionsForYear(year)).thenReturn(true);
+        when(storePort.hasCompleteSessionsForYear(year + 1)).thenReturn(true);
+        when(storePort.hasCompleteSessionsForYear(year + 2)).thenReturn(true);
 
         scheduler.onStartup();
 
@@ -72,6 +78,61 @@ class MarketCalendarRefreshSchedulerTest {
         // 3년치 모두 존재 — jobRunner 자체를 호출하지 않아 텔레그램 알림도 발생하지 않음
         verify(jobRunner, never()).run(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(Runnable.class));
         verify(refreshPort, never()).refreshCalendar(org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    @Test
+    void onStartup_backfillsHistoricalAndPartiallyLoadedYears() throws Exception {
+        MarketCalendarRefreshPort refreshPort = mock(MarketCalendarRefreshPort.class);
+        MarketHolidayStorePort storePort = mock(MarketHolidayStorePort.class);
+        SchedulerJobRunner jobRunner = mock(SchedulerJobRunner.class);
+        SchedulerLockService lockService = mock(SchedulerLockService.class);
+        MarketCalendarRefreshScheduler scheduler =
+                new MarketCalendarRefreshScheduler(refreshPort, storePort, jobRunner, lockService, FixedClockTestConfig.FIXED);
+        int year = LocalDate.now(FixedClockTestConfig.FIXED).getYear();
+        when(storePort.findYearsWithHolidays()).thenReturn(List.of(year - 1, year));
+        when(storePort.countByYear(year - 1)).thenReturn(10L);
+        when(storePort.countByYear(year)).thenReturn(10L);
+        when(storePort.countByYear(year + 1)).thenReturn(10L);
+        when(storePort.countByYear(year + 2)).thenReturn(10L);
+        when(storePort.hasCompleteSessionsForYear(year + 1)).thenReturn(true);
+        when(storePort.hasCompleteSessionsForYear(year + 2)).thenReturn(true);
+
+        scheduler.onStartup();
+        ArgumentCaptor<SchedulerLockService.LockedTask> lockCaptor = ArgumentCaptor.forClass(SchedulerLockService.LockedTask.class);
+        verify(lockService).tryRun(eq("market-calendar-startup"), eq(Duration.ofHours(1)), lockCaptor.capture());
+        lockCaptor.getValue().run();
+        ArgumentCaptor<Runnable> jobCaptor = ArgumentCaptor.forClass(Runnable.class);
+        verify(jobRunner).run(eq("기동 시 캘린더 초기 적재"), jobCaptor.capture());
+        jobCaptor.getValue().run();
+
+        verify(refreshPort).refreshCalendar(year - 1);
+        verify(refreshPort).refreshCalendar(year);
+        verify(refreshPort, never()).refreshCalendar(year + 1);
+        verify(refreshPort, never()).refreshCalendar(year + 2);
+    }
+
+    @Test
+    void onStartup_attemptsRemainingYearsAfterBackfillFailure() throws Exception {
+        MarketCalendarRefreshPort refreshPort = mock(MarketCalendarRefreshPort.class);
+        MarketHolidayStorePort storePort = mock(MarketHolidayStorePort.class);
+        SchedulerJobRunner jobRunner = mock(SchedulerJobRunner.class);
+        SchedulerLockService lockService = mock(SchedulerLockService.class);
+        MarketCalendarRefreshScheduler scheduler =
+                new MarketCalendarRefreshScheduler(refreshPort, storePort, jobRunner, lockService, FixedClockTestConfig.FIXED);
+        int year = LocalDate.now(FixedClockTestConfig.FIXED).getYear();
+        when(storePort.findYearsWithHolidays()).thenReturn(List.of(year - 1));
+        doThrow(new IllegalStateException("provider failure")).when(refreshPort).refreshCalendar(year - 1);
+
+        scheduler.onStartup();
+        ArgumentCaptor<SchedulerLockService.LockedTask> lockCaptor = ArgumentCaptor.forClass(SchedulerLockService.LockedTask.class);
+        verify(lockService).tryRun(eq("market-calendar-startup"), eq(Duration.ofHours(1)), lockCaptor.capture());
+        lockCaptor.getValue().run();
+        ArgumentCaptor<Runnable> jobCaptor = ArgumentCaptor.forClass(Runnable.class);
+        verify(jobRunner).run(eq("기동 시 캘린더 초기 적재"), jobCaptor.capture());
+        assertThatThrownBy(() -> jobCaptor.getValue().run()).isInstanceOf(IllegalStateException.class);
+        verify(refreshPort).refreshCalendar(year);
+        verify(refreshPort).refreshCalendar(year + 1);
+        verify(refreshPort).refreshCalendar(year + 2);
     }
 
     @Test

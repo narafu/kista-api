@@ -43,15 +43,12 @@ public class MarketHolidayController {
         return ResponseEntity.ok().cacheControl(HOLIDAYS_CACHE).body(holidays);
     }
 
-    // 현재 시장 세션 조회 — UI 수동 실행 버튼 활성화 판단에 사용
+    // 현재 KST 거래일·휴장 여부 조회 — UI 휴장일 안내 판단에 사용
     @Operation(
-            summary = "현재 시장 세션 조회",
+            summary = "현재 거래일 조회",
             description = """
-                    현재 KST 기준 미국 시장 세션을 반환합니다.
-                    DIRECT: 프리마켓+정규장 (주문 가능) — DST: 17:00~05:00 / 비DST: 18:00~06:00 KST
-                    BLOCKED: 장마감~프리마켓 전 (주문 불가) — DST: 05:00~17:00 / 비DST: 06:00~18:00 KST
-                    session은 시간대 기준이라 주말 KST는 항상 BLOCKED이며, 거래일 휴장 여부는 알려주지 않습니다.
-                    tradeDateKst: 현재 시각 기준 KST 거래일 (04:30 KST 이후면 익일)
+                    현재 KST 기준 거래일과 그 거래일의 미국 장 개장 여부를 반환합니다.
+                    tradeDateKst: 현재 시각 기준 KST 거래일 (그 날짜 실제 마감 30분 전부터 익일, 휴장일은 04:30 KST 기준)
                     tradingDay: tradeDateKst에 미국 장이 열리는지 (휴장일·주말이면 false)
                     """
     )
@@ -59,8 +56,7 @@ public class MarketHolidayController {
     @GetMapping("/session")
     public MarketSessionResponse getSession() {
         var session = marketCalendarQueryPort.currentSession();
-        return new MarketSessionResponse(session.session().name(), session.isDst(),
-                session.tradeDateKst(), session.tradingDay());
+        return new MarketSessionResponse(session.tradeDateKst(), session.tradingDay());
     }
 
     @Operation(summary = "종목 일봉 캔들 조회 (계좌 무관 공용 시세)",

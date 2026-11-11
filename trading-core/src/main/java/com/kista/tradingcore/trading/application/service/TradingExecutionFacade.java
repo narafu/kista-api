@@ -44,12 +44,12 @@ class TradingExecutionFacade implements TradingExecutionUseCase {
 
     @Override
     public void executeBatchNow(List<BatchContext> contexts) throws InterruptedException {
-        tradingService.executeBatch(contexts, DstInfo.immediateClose(ZonedDateTime.now(clock)));
+        tradingService.executeBatch(contexts, tradingService.closeSession().withImmediateOrder(clock.instant()));
     }
 
     @Override
     public void resumeCloseReport(List<BatchContext> contexts) throws InterruptedException {
-        tradingService.resumeCloseReport(contexts, DstInfo.calculate(ZonedDateTime.now(clock)));
+        tradingService.resumeCloseReport(contexts, tradingService.closeSession());
     }
 
     @Override

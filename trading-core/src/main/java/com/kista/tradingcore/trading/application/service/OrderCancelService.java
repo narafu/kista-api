@@ -79,7 +79,8 @@ class OrderCancelService {
 
         // 오늘(KST)과 다음 거래일(수동 실행 tradeDate) 둘 다 — 04:00~장마감 리포트 사이 마감 배치가 접수한 오늘 주문도 포함
         ZonedDateTime now = ZonedDateTime.now(clock);
-        List<LocalDate> tradeDates = DstInfo.tradeDateCandidates(now);
+        List<LocalDate> tradeDates = account.broker().isCryptoExchange() ? DstInfo.tradeDateCandidates(now)
+                : SessionTradeDates.tradeDateCandidates(now);
 
         // PLANNED 주문 먼저 삭제 — 증권사 미접수이므로 DB만 처리
         int cancelledCount = 0;

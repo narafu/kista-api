@@ -12,6 +12,9 @@ import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
+import com.kista.tradingcore.marketcalendar.domain.model.MarketSessionTimes;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
@@ -74,6 +77,7 @@ class CapitalLedgerServiceTest {
     @Mock TradingBatchRunPort batchRunPort;
     @Mock CycleOrderStrategies cycleOrderStrategies;
     @Mock CycleCapitalEventPort cycleCapitalEventPort;
+    @Mock MarketCalendarPort marketCalendarPort;
     @Mock BrokerPricePort brokerPricePort;
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     final CycleOrderStrategies minSeedStrategies = new CycleOrderStrategies(List.of(new InfiniteCycleOrderStrategy(null, null)));
@@ -102,7 +106,7 @@ class CapitalLedgerServiceTest {
 
     private CapitalLedgerService newService(Clock clock) {
         return new CapitalLedgerService(strategyPort, accountPort, strategyCyclePort, cyclePositionPort, orderPort, batchRunPort,
-                new StrategyLedgerBudget(cyclePositionPort, orderPort, batchRunPort, cycleOrderStrategies), clock, eventPublisher, cycleCapitalEventPort);
+                new StrategyLedgerBudget(cyclePositionPort, orderPort, batchRunPort, cycleOrderStrategies), marketCalendarPort, clock, eventPublisher, cycleCapitalEventPort);
     }
 
     private void stub(StrategyType type, BigDecimal holdings, BigDecimal avg, LocalDate endDate) {
@@ -672,6 +676,36 @@ class CapitalLedgerServiceTest {
 
         service.inject(strategyId, userId, new InjectCapitalCommand(BigDecimal.ONE, null, null));
         verify(cyclePositionPort).updateBalance(eq(latestId), any());
+    }
+
+    @Test
+    void earlyCloseReportWindowRejectsInjectionBeforeRegularPostClose() {
+        LocalDate date = LocalDate.of(2026, 1, 6);
+        Instant close = date.atTime(3, 0).atZone(TimeZones.KST).toInstant();
+        service = newService(Clock.fixed(close.plusSeconds(600), TimeZones.KST));
+        when(marketCalendarPort.findSession(date)).thenReturn(Optional.of(new MarketSessionTimes(close.minusSeconds(12600), close)));
+        stub(StrategyType.PRIVACY, BigDecimal.TEN, new BigDecimal("20.0000"), null);
+        stubTodayOrder("LOC_BUY");
+
+        assertThatThrownBy(() -> service.inject(strategyId, userId, new InjectCapitalCommand(BigDecimal.ONE, null, null)))
+                .isInstanceOf(IllegalStateException.class).hasMessage(WINDOW_ADD);
+        verify(cyclePositionPort, never()).updateBalance(any(), any());
+    }
+
+    @Test
+    void withdrawalIncludesNextTradeDateAfterEarlyCloseCutoff() {
+        LocalDate date = LocalDate.of(2026, 1, 6);
+        Instant close = date.atTime(3, 0).atZone(TimeZones.KST).toInstant();
+        service = newService(Clock.fixed(close.minusSeconds(900), TimeZones.KST));
+        when(marketCalendarPort.findSession(date)).thenReturn(Optional.of(new MarketSessionTimes(close.minusSeconds(12600), close)));
+        stub(StrategyType.PRIVACY, BigDecimal.TEN, new BigDecimal("20.0000"), null);
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(cycleId, date)).thenReturn(List.of()); // 오늘 후보는 주문 없음
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(cycleId, date.plusDays(1))).thenReturn(List.of(
+                order(date.plusDays(1), OrderDirection.BUY, "100.00", "1").withLeg("LOC_BUY")));
+
+        assertThatThrownBy(() -> service.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("401.00")), BigDecimal.ZERO))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("인출 가능액");
+        verify(cyclePositionPort, never()).updateBalance(any(), any());
     }
 
     @Test

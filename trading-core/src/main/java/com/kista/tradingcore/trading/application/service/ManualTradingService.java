@@ -49,11 +49,6 @@ class ManualTradingService {
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     List<Order> execute(UUID strategyId, UUID requesterId) {
-        return execute(strategyId, requesterId, DstInfo.calculate(ZonedDateTime.now(clock)));
-    }
-
-    // package-private: DstInfo 주입으로 단위 테스트에서 개장 여부를 결정론적으로 고정
-    List<Order> execute(UUID strategyId, UUID requesterId, DstInfo dst) {
         // 동기 검증: 소유권·상태
         OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
         Strategy strategy = owned.strategy();
@@ -66,12 +61,12 @@ class ManualTradingService {
         // 현재 StrategyCycle 조회 — initialDeposit 필요
         StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
 
-        // 스케쥴러와 동일 today 계산: KST 04:00 이후면 +1일(= 다음 US 거래일)
-        LocalDate today = DstInfo.nextTradeDate(ZonedDateTime.now(clock));
+        // 실제 마감 주문 시각부터 다음 거래일을 대상으로 한다
+        LocalDate today = SessionTradeDates.nextTradeDate(ZonedDateTime.now(clock), marketCalendarPort);
 
         // 휴장 거래일 차단 — 배치(TradingService)와 같은 기준으로 판정
-        if (!marketCalendarPort.isMarketOpen(today))
-            throw new ManualTradingException("휴장일에는 수동 실행할 수 없습니다.");
+        var session = marketCalendarPort.findSession(today)
+                .orElseThrow(() -> new ManualTradingException("휴장일에는 수동 실행할 수 없습니다."));
 
         // 이중 실행 방지 — PLANNED 또는 PLACED 중 하나라도 있으면 거부
         if (!orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today).isEmpty())
@@ -135,7 +130,10 @@ class ManualTradingService {
 
         // 개장 이후 수동 실행 시 AT_OPEN 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
         // plan.position()/plan.vrPosition() — BUY cap 보정(orderExecutor.placeAtOpenOrders)에 필요
-        placeAtOpenOrdersIfMarketOpen(strategy, account, currentCycle, today, plan.position(), plan.vrPosition(), dst);
+        Instant now = Instant.now(clock);
+        if (!now.isBefore(session.openAt()) && now.isBefore(session.closeAt())) {
+            placeAtOpenOrdersIfMarketOpen(strategy, account, currentCycle, today, plan.position(), plan.vrPosition());
+        }
 
         // 저장된 주문 반환 (UI에서 예약 확인용)
         return orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
@@ -150,18 +148,14 @@ class ManualTradingService {
     // 개장 이후 수동 실행 시 AT_OPEN 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
     // INFINITE: AT_OPEN 지정가 매도 선접수(LOC 매도는 마감 배치) / VR: AT_OPEN 매수·매도 사다리 즉시 접수 (BUY cap 보정 포함)
     // PRIVACY: AT_OPEN 주문 없으므로 자연 no-op
-    // dst는 execute()에서 주입 — 단위 테스트에서 개장 전/후 분기를 결정론적으로 고정하기 위함
     private void placeAtOpenOrdersIfMarketOpen(Strategy strategy, TradingAccount account, StrategyCycle cycle, LocalDate today,
-                                               InfinitePosition position, VrPosition vrPosition, DstInfo dst) {
-        if (Instant.now(clock).isAfter(dst.marketOpen())) {
-            // AT_OPEN 주문이 없으면(PRIVACY는 항상, INFINITE도 흔함) 불필요한 라이브 시세 조회를 건너뛴다
-            if (orderPort.findAtOpenPlannedByCycleAndDate(cycle.id(), today).isEmpty()) return;
-            // BUY cap 판단용 최신 현재가 재조회 — 단일 전략 수동 실행이라 ticker 1개(배치 불필요)
-            // 조회 실패해도 PLANNED는 이미 저장됐으므로 예외 대신 캡 미적용(null)으로 접수한다
-            BigDecimal currentPrice = fetchStartPriceOrNull(strategy, account);
-            log.info("[accountId={}] 개장 후 수동 실행 — AT_OPEN 주문 접수", account.id());
-            orderExecutor.placeAtOpenOrders(today, account, cycle, currentPrice, position, vrPosition, strategy);
-        }
+                                               InfinitePosition position, VrPosition vrPosition) {
+        // AT_OPEN 주문이 없으면 불필요한 라이브 시세 조회를 건너뛴다
+        if (orderPort.findAtOpenPlannedByCycleAndDate(cycle.id(), today).isEmpty()) return;
+        // 조회 실패해도 PLANNED는 이미 저장됐으므로 캡 미적용으로 접수한다
+        BigDecimal currentPrice = fetchStartPriceOrNull(strategy, account);
+        log.info("[accountId={}] 개장 후 수동 실행 — AT_OPEN 주문 접수", account.id());
+        orderExecutor.placeAtOpenOrders(today, account, cycle, currentPrice, position, vrPosition, strategy);
     }
 
     // 바로주문 조회 실패 응답 변환 — 증권사 타입 예외는 다른 화면과 동일하게 503/422/429로 그대로 전파

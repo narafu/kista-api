@@ -2,7 +2,10 @@ package com.kista.tradingcore.marketcalendar.adapter.out.alpaca;
 
 import tools.jackson.databind.ObjectMapper;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketHolidayStorePort;
+import com.kista.tradingcore.marketcalendar.domain.model.MarketCalendarTradingDay;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -11,14 +14,17 @@ import org.springframework.web.client.RestClient;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -28,7 +34,7 @@ class AlpacaCalendarAdapterTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void refreshMonth_거래일_목록에_없는_평일을_휴장일로_저장한다() throws Exception {
+    void refreshMonth_거래일과_실제_시각을_저장한다() throws Exception {
         // baseUrl은 이제 RestClient(=AlpacaConfig 빈)에 고정 — 테스트도 동일하게 builder에 설정
         RestClient.Builder builder = RestClient.builder()
                 .baseUrl("https://paper-api.alpaca.markets");
@@ -56,16 +62,28 @@ class AlpacaCalendarAdapterTest {
 
         adapter.refreshMonth(2026, 1);
 
-        // 평일 중 거래일 응답에 없는 날짜만 휴장일로 저장 위임되는지 캡처 검증
-        ArgumentCaptor<List<LocalDate>> captor = ArgumentCaptor.forClass(List.class);
-        verify(holidayStorePort).replaceByMonth(eq(2026), eq(1), captor.capture());
-        assertThat(captor.getValue()).containsExactlyInAnyOrderElementsOf(expectedHolidays);
+        ArgumentCaptor<List<MarketCalendarTradingDay>> captor = ArgumentCaptor.forClass(List.class);
+        verify(holidayStorePort).replaceSessionsByMonth(eq(2026), eq(1), captor.capture());
+        assertThat(captor.getValue()).hasSize(tradingDays.size())
+                .contains(new MarketCalendarTradingDay(LocalDate.of(2026, 1, 2), LocalTime.of(9, 30), LocalTime.of(16, 0)))
+                .extracting(MarketCalendarTradingDay::date)
+                .doesNotContainAnyElementsOf(expectedHolidays);
         server.verify();
     }
 
-    @Test
-    @SuppressWarnings("unchecked")
-    void 거래일_응답이_비어있으면_해당_월_평일_전체를_휴장일로_처리한다() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "[]",
+            "[null]",
+            "[{\"date\":\"2026-02-02\",\"open\":\"09:30\"}]",
+            "[{\"date\":\"2026-02-30\",\"open\":\"09:30\",\"close\":\"16:00\"}]",
+            "[{\"date\":\"2026-03-02\",\"open\":\"09:30\",\"close\":\"16:00\"}]",
+            "[{\"date\":\"2026-02-01\",\"open\":\"09:30\",\"close\":\"16:00\"}]",
+            "[{\"date\":\"2026-02-02\",\"open\":\"25:00\",\"close\":\"16:00\"}]",
+            "[{\"date\":\"2026-02-02\",\"open\":\"16:00\",\"close\":\"09:30\"}]",
+            "[{\"date\":\"2026-02-02\",\"open\":\"09:30\",\"close\":\"16:00\"},{\"date\":\"2026-02-02\",\"open\":\"09:30\",\"close\":\"16:00\"}]"
+    })
+    void 잘못된_응답은_저장하지_않는다(String body) {
         RestClient.Builder builder = RestClient.builder()
                 .baseUrl("https://paper-api.alpaca.markets");
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
@@ -73,20 +91,12 @@ class AlpacaCalendarAdapterTest {
         MarketHolidayStorePort holidayStorePort = mock(MarketHolidayStorePort.class);
         AlpacaCalendarAdapter adapter = new AlpacaCalendarAdapter(builder.build(), properties, holidayStorePort);
 
-        // 거래일 응답 자체가 빈 배열인 엣지 케이스 — null 대신 빈 리스트로 파싱되어야 함
         server.expect(requestTo("https://paper-api.alpaca.markets/v2/calendar?start=2026-02-01&end=2026-02-28"))
                 .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
 
-        adapter.refreshMonth(2026, 2);
-
-        long expectedWeekdayCount = LocalDate.of(2026, 2, 1).datesUntil(LocalDate.of(2026, 3, 1))
-                .filter(d -> d.getDayOfWeek() != DayOfWeek.SATURDAY && d.getDayOfWeek() != DayOfWeek.SUNDAY)
-                .count();
-
-        ArgumentCaptor<List<LocalDate>> captor = ArgumentCaptor.forClass(List.class);
-        verify(holidayStorePort).replaceByMonth(eq(2026), eq(2), captor.capture());
-        assertThat(captor.getValue()).hasSize((int) expectedWeekdayCount);
+        assertThatThrownBy(() -> adapter.refreshMonth(2026, 2)).isInstanceOf(IllegalStateException.class);
+        verifyNoInteractions(holidayStorePort);
         server.verify();
     }
 }

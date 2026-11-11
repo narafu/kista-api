@@ -10,12 +10,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.Set;
+import java.util.TreeSet;
 
 @Slf4j
 @Component
@@ -29,8 +33,9 @@ public class MarketCalendarRefreshScheduler {
     private final SchedulerLockService schedulerLockService;
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
-    // 앱 기동 시 당해 연도 캘린더 데이터 없으면 3년치 자동 적재
+    // 앱 기동 시 기존 연도와 향후 3년의 누락된 캘린더 자동 적재
     @EventListener(ApplicationReadyEvent.class)
+    @Order(Ordered.HIGHEST_PRECEDENCE) // 마감 예약 복구(TradingBatchResumer)보다 먼저 세션을 적재 — 동기 실행
     public void onStartup() throws InterruptedException {
         schedulerLockService.tryRun("market-calendar-startup", Duration.ofHours(1), () -> {
             int year = LocalDate.now(clock).getYear();
@@ -77,8 +82,8 @@ public class MarketCalendarRefreshScheduler {
     // jobRunner 보호망 밖에서 실행되므로 DB 조회 실패 시 false로 fail-open해 jobRunner.run 경로(오류 알림 담당)로 넘긴다
     private boolean allYearsPresentSafely(int startYear, int count) {
         try {
-            for (int i = 0; i < count; i++) {
-                if (marketHolidayStorePort.countByYear(startYear + i) == 0) {
+            for (int year : yearsToCheck(startYear, count)) {
+                if (!yearPresent(year)) {
                     return false;
                 }
             }
@@ -91,11 +96,36 @@ public class MarketCalendarRefreshScheduler {
 
     // 연도별 데이터가 이미 있으면 스킵 — 재기동마다 불필요한 외부 API 재조회 방지
     private void refreshYearsIfMissing(int startYear, int count) {
-        for (int i = 0; i < count; i++) {
-            int year = startYear + i;
-            if (marketHolidayStorePort.countByYear(year) == 0) {
-                marketCalendarRefreshPort.refreshCalendar(year);
+        RuntimeException failure = null;
+        for (int year : yearsToCheck(startYear, count)) {
+            try {
+                if (!yearPresent(year)) {
+                    marketCalendarRefreshPort.refreshCalendar(year);
+                }
+            } catch (RuntimeException e) {
+                // 과거 연도 실패가 나머지 연도의 백필을 막지 않도록 모아서 보고한다
+                if (failure == null) {
+                    failure = new IllegalStateException("일부 시장 캘린더 백필 실패", e);
+                } else {
+                    failure.addSuppressed(e);
+                }
             }
         }
+        if (failure != null) {
+            throw failure;
+        }
+    }
+
+    private Set<Integer> yearsToCheck(int startYear, int count) {
+        Set<Integer> years = new TreeSet<>(marketHolidayStorePort.findYearsWithHolidays());
+        for (int i = 0; i < count; i++) {
+            years.add(startYear + i);
+        }
+        return years;
+    }
+
+    private boolean yearPresent(int year) {
+        return marketHolidayStorePort.countByYear(year) > 0
+                && marketHolidayStorePort.hasCompleteSessionsForYear(year);
     }
 }

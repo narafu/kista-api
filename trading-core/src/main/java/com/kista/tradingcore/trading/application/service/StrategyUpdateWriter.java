@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
@@ -47,6 +48,7 @@ class StrategyUpdateWriter {
     private final Clock clock;                                 // 이력 발생 시각·마감 리포트 창 판정 기준
     private final TradingBatchRunPort batchRunPort;            // 마감 리포트 마커 조회(리포트 창 거절)
     private final OrderPort orderPort;                         // 오늘 주문 조회(리포트 대상 판정)
+    private final MarketCalendarPort marketCalendarPort;       // 실제 마감 리포트 시각
 
     private static final String ENDED_CYCLE = "종료된 사이클은 예수금을 수정할 수 없습니다. 재개한 뒤 수정해야 합니다.";
 
@@ -107,7 +109,7 @@ class StrategyUpdateWriter {
             throw new IllegalStateException("진행 중인 사이클이 바뀌어 예수금을 수정할 수 없습니다.");
         }
         // 마감 리포트 창에는 in-place 예수금 변경이 리포트 append에 덮어써진다(코인은 리포트 없음)
-        if (!owned.crypto() && CloseReportScope.inReportWindow(owned.strategy(), clock, batchRunPort, orderPort)) {
+        if (!owned.crypto() && CloseReportScope.inReportWindow(owned.strategy(), clock, batchRunPort, orderPort, marketCalendarPort)) {
             throw new IllegalStateException("오늘 마감 리포트가 끝나기 전에는 예수금을 수정할 수 없습니다.");
         }
         CyclePosition latest = cyclePositionPort.findLatestOne(cycle.id())

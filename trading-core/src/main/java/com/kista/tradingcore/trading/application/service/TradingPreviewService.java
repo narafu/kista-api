@@ -18,7 +18,6 @@ import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.matching.domain.strategy.InfiniteStrategy;
-import com.kista.tradingcore.trading.domain.model.DstInfo;
 import com.kista.tradingcore.trading.domain.model.DcaManualExecutionUnsupportedException;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
@@ -99,7 +98,8 @@ class TradingPreviewService {
         // 소유권 검증은 Account 애그리게이트로 끝내고, 이후 프리뷰 경로는 투영(TradingAccount)만 사용
         Account ownedAccount = accountPort.requireOwnedAccount(accountId, requesterId);
         TradingAccount account = TradingAccount.from(ownedAccount);
-        LocalDate today = DstInfo.nextTradeDate(ZonedDateTime.now(clock));
+        LocalDate today = account.brokerRef().broker().isCryptoExchange() ? LocalDate.now(clock)
+                : SessionTradeDates.nextTradeDate(ZonedDateTime.now(clock), marketCalendarPort);
         // 휴장 거래일이면 계획 계산·브로커 호출 없이 전 전략을 MARKET_CLOSED로 skip — today 기준 1회만 판정
         boolean marketClosed = !marketCalendarPort.isMarketOpen(today);
         // 코인 전략(전부 DCA)은 미리보기 대상이 아니다 — 결과 맵에서 빠진다. 주식 DCA는 포함

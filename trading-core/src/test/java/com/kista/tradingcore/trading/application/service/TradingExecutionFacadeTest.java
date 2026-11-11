@@ -72,6 +72,8 @@ class TradingExecutionFacadeTest {
     @DisplayName("executeBatchNow는 immediateClose DstInfo로 tradingService.executeBatch에 위임한다")
     void executeBatchNow_delegatesWithImmediateClose() throws InterruptedException {
         List<BatchContext> contexts = List.of();
+        DstInfo session = DstInfo.forCloseSession(Instant.parse("2026-11-27T14:30:00Z"), Instant.parse("2026-11-27T18:00:00Z"));
+        when(tradingService.closeSession()).thenReturn(session);
 
         facade.executeBatchNow(contexts);
 
@@ -80,7 +82,7 @@ class TradingExecutionFacadeTest {
         verify(tradingService, never()).placeOpenOrders(any(), any());
         DstInfo captured = dstCaptor.getValue();
         // immediateClose(nowKst)는 주문 시각 대기만 스킵(orderAt=과거) — 체결 확인은 실제 마감 후 시각(postClose)까지 기다린다
-        assertThat(captured.postClose()).isEqualTo(DstInfo.calculate(ZonedDateTime.now(FIXED)).postClose());
+        assertThat(captured.postClose()).isEqualTo(session.postClose());
         assertThat(captured.orderAt()).isEqualTo(Instant.now(FIXED).minusMillis(1));
     }
 

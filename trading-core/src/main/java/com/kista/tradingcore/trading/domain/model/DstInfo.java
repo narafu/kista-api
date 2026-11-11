@@ -38,12 +38,7 @@ public record DstInfo(
         return date.atTime(time).atZone(KST).toInstant();
     }
 
-    // 주어진 KST 시각 기준 주문 가능 시간대 판단
-    public MarketSession currentSessionAt(ZonedDateTime nowKst) {
-        return sessionAt(nowKst.getDayOfWeek(), nowKst.toLocalTime());
-    }
-
-    // 시각 주입식 판단 — currentSessionAt 공용
+    // 시각 주입식 판단 — 프리마켓+정규장(DIRECT)인지, 장마감~프리마켓 전(BLOCKED)인지
     MarketSession sessionAt(DayOfWeek day, LocalTime time) {
         if (day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY) return MarketSession.BLOCKED;
         // blocked: [marketClose, premarketStart)
@@ -94,6 +89,17 @@ public record DstInfo(
                 atKst(date, orderTime(isDst)),
                 atKst(date, postCloseTime(isDst)),
                 atKst(date, marketOpenTime(isDst)));
+    }
+
+    // 실제 거래 세션의 마감 30분 전 주문과 마감 10분 후 리포트 시각
+    public static DstInfo forCloseSession(Instant marketOpen, Instant marketClose) {
+        return new DstInfo(resolveDst(marketOpen), marketClose.minus(Duration.ofMinutes(30)),
+                marketClose.plus(Duration.ofMinutes(10)), marketOpen);
+    }
+
+    // 수동 마감은 주문 대기만 생략하고 실제 세션의 리포트 시각을 유지한다
+    public DstInfo withImmediateOrder(Instant now) {
+        return new DstInfo(isDst, now.minusMillis(1), postClose, marketOpen);
     }
 
     // 주어진 KST 시각 기준 거래일 — 재기동 재개 등 시각을 이미 들고 있는 호출부용 (계산은 KstTradeDates SSOT)

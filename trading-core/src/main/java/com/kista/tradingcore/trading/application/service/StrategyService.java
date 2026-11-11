@@ -142,7 +142,7 @@ class StrategyService implements StrategyUseCase {
     private void requireTodayOrdersReported(UUID strategyId, Account account) {
         if (account.broker().getMarket().isCrypto()) return;
         ZonedDateTime now = ZonedDateTime.now(clock);
-        for (LocalDate date : DstInfo.tradeDateCandidates(now)) {
+        for (LocalDate date : SessionTradeDates.tradeDateCandidates(now)) {
             boolean hasPlaced = orderPort.findByStrategyId(strategyId, date, date).stream()
                     .anyMatch(Order::isBrokerSubmitted);
             if (hasPlaced && !batchRunPort.isReported(date, strategyId)) {
