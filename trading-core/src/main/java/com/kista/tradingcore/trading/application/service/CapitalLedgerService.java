@@ -130,7 +130,7 @@ class CapitalLedgerService implements InjectCapitalUseCase {
                     .toList();
             cancelledOrders = List.of();
         } else {
-            List<LocalDate> dates = SessionTradeDates.tradeDateCandidates(ZonedDateTime.now(clock), marketCalendarPort);
+            List<LocalDate> dates = SessionTradeDates.tradeDateCandidates(ZonedDateTime.now(clock));
             committedOrders = dates.stream()
                     .flatMap(date -> orderPort.findPlannedOrPlacedByCycleAndDate(cycle.id(), date).stream())
                     .toList();

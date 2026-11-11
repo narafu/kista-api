@@ -183,7 +183,7 @@ class StrategyServiceTest {
                 orderPort, batchRunPort, minSeedGuard,
                 new StrategyUpdateWriter(strategyPort, accountPort, strategyCyclePort, cyclePositionPort, cycleCapitalEventPort,
                         detailAssembler, eventPublisher, FIXED, batchRunPort, orderPort, marketCalendarPort),
-                marketCalendarPort, FIXED);
+                FIXED);
         lenient().when(orderCancelService.cancelOpenOrders(any(), any())).thenReturn(new CancelResult(0, 0));
         for (StrategyType type : StrategyType.values()) {
             lenient().when(strategyCreationPolicyPort.find(type)).thenReturn(Optional.of(defaultTradingSettings(type)));

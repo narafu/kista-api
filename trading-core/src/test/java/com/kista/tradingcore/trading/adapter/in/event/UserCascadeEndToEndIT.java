@@ -2,7 +2,6 @@ package com.kista.tradingcore.trading.adapter.in.event;
 
 import com.kista.shared.kernel.NotificationChannel;
 import com.kista.shared.kernel.TimeZones;
-import com.kista.shared.platform.time.UsTradeDates;
 import com.kista.shared.kernel.UserDeletedEvent;
 import com.kista.shared.kernel.UserNotifyProfileChangedEvent;
 import com.kista.shared.platform.crypto.AesCryptoService;
@@ -65,13 +64,9 @@ class UserCascadeEndToEndIT {
     private final UUID strategyId = UUID.randomUUID();
     private final UUID versionId = UUID.randomUUID();
     private final UUID cycleId = UUID.randomUUID();
-    private boolean seededSession; // 이 테스트가 넣은 세션 행만 정리한다(로컬 DB에 적재된 캘린더는 보존)
 
     @BeforeEach
     void setUp() {
-        // 취소 경로의 거래일 판정(findSession)은 캘린더 미적재면 fail-closed — 운영처럼 오늘 US 세션(휴장 행)이 적재된 상태로 만든다
-        seededSession = jdbcTemplate.update("INSERT INTO trading_ref.us_market_sessions (trade_date, open_at, close_at) VALUES (?, NULL, NULL) ON CONFLICT DO NOTHING",
-                UsTradeDates.toUsTradeDate(LocalDate.now(TimeZones.KST))) > 0;
         // 계좌(암호화 컬럼) → 전략 ACTIVE → 버전 → 사이클 → 오늘 PLANNED 주문(증권사 호출 없이 DB 삭제로 취소됨) → 활성 프로필 복제본
         jdbcTemplate.update("INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) "
                         + "VALUES (?, ?, ?, 'KIS', ?, '01', ?, ?, now(), now())",
@@ -90,9 +85,6 @@ class UserCascadeEndToEndIT {
 
     @AfterEach
     void tearDown() {
-        if (seededSession) {
-            jdbcTemplate.update("DELETE FROM trading_ref.us_market_sessions WHERE trade_date = ?", UsTradeDates.toUsTradeDate(LocalDate.now(TimeZones.KST)));
-        }
         jdbcTemplate.update("DELETE FROM orders WHERE account_id = ?", accountId);
         jdbcTemplate.update("DELETE FROM strategy_cycle WHERE id = ?", cycleId);
         jdbcTemplate.update("DELETE FROM strategy_version WHERE id = ?", versionId);

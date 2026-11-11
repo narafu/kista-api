@@ -17,7 +17,6 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.trading.application.event.OrderCancelFailedEvent;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
-import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
@@ -66,7 +65,6 @@ class OrderCancelServiceTest {
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock CancelledOrderFillRecorder fillRecorder;
     @Mock SubmittingOrderAwaiter awaiter; // 기본 mock은 잔류 없음(빈 목록)
-    @Mock MarketCalendarPort marketCalendarPort;
     OrderCancelService service;
 
     private final UUID requesterId = UUID.randomUUID();
@@ -89,7 +87,7 @@ class OrderCancelServiceTest {
                 null, LocalDate.now(FIXED), null, null, null);
         // @InjectMocks 대신 수동 생성 — stateWriter는 실제 인스턴스에 mock orderPort를 위임해 기존 verify(orderPort) 검증 유지
         service = new OrderCancelService(orderPort, brokerPort, accountPort, cyclePort, strategyCyclePort,
-                eventPublisher, new OrderCancelStateWriter(orderPort), awaiter, fillRecorder, marketCalendarPort, FIXED);
+                eventPublisher, new OrderCancelStateWriter(orderPort), awaiter, fillRecorder, FIXED);
         // 취소 범위는 오늘(KST)·다음 거래일 둘 다 — 기본은 오늘 주문 없음, 각 테스트가 다음 거래일(또는 오늘)을 따로 stub
         LocalDate today = LocalDate.now(FIXED);
         lenient().when(orderPort.deletePlannedByCycleAndDate(any(), eq(today))).thenReturn(0);
