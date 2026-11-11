@@ -143,3 +143,143 @@
 | GET `/api/trading-cycles/{id}/orders` | 주문 행만(합계·평균 체결가 없음) |
 | GET `/api/admin/trades` | 행만 |
 | GET `/api/trading-cycles` | 전략 목록 행. 합산(총 원금 등)은 `/stats/summary` 사용 가능 |
+
+---
+
+## C. `/api/meta` 내용
+
+`GET /api/meta` → `MetaBundle`(`api/web/dto/MetaBundle.java`, 컨트롤러 `api/web/MetaController.java`). 응답 헤더 `Cache-Control: max-age=1h`. 인증 없이 호출 가능한지는 `RootSecurityPolicy` 소관(이 조사 범위 밖).
+
+### C-1. MetaBundle 필드 전체 (18개)
+
+| 필드 | 원소 타입 | 소스 enum | 싣는 속성 |
+|---|---|---|---|
+| `strategyTypes` | `StrategyTypeMeta` | `StrategyType` | code, label, description(**label과 동일 값** — 둘 다 `getDescription()`), availableTickers, requiresPrivacyBase, tickerFixed, supportsReverseMode, divisionCounts(분할 수 옵션 목록), orderTypes, directions, frequencies, conditionIndicators |
+| `tickers` | `TickerMeta` | `StrategyTicker` | code, description, targetProfitRate, markets. **label 없음**(description이 표시명 역할) |
+| `brokers` | `BrokerMeta` | `Broker` | code, label, description(=모바일 약칭), market, currency, minOrderAmount, amountScale, apiKeyExpirySource |
+| `strategyStatuses` | `EnumMeta` | `StrategyStatus` | code, label, description(**항상 null**) |
+| `cycleSeedTypes` | EnumMeta | `StrategyCycleSeedType` | 동일 |
+| `assetClasses` | EnumMeta | finance `AssetClass` | 동일 |
+| `markets` | EnumMeta | **finance `Market`** (`api/finance/domain/model/Market.java`, kernel `Market`과 별개) | 동일 |
+| `financeAccountTypes` | EnumMeta | `FinanceAccount.Type` | 동일 |
+| `financeCategoryTypes` | EnumMeta | `FinanceCategory.Type` | 동일 |
+| `orderTypes` | EnumMeta | `OrderType` | 동일 |
+| `orderDirections` | EnumMeta | `OrderDirection` | 동일 |
+| `orderStatuses` | EnumMeta | `OrderStatus` | 동일 |
+| `orderTimings` | EnumMeta | `OrderTiming` | 동일 |
+| `dcaFrequencies` | EnumMeta | `DcaFrequency` | 동일 |
+| `dcaOperators` | EnumMeta | `DcaOperator` | 동일 |
+| `dcaSkipReasons` | EnumMeta | `DcaSkipReason` | 동일 |
+| `dcaExecutionStatuses` | EnumMeta | `DcaExecutionStatus` | 동일 |
+| `dcaSizingTypes` | EnumMeta | `DcaSizingType` | 동일 |
+| `dcaShortfallPolicies` | EnumMeta | `DcaShortfallPolicy` | 동일 |
+| `dcaIndicators` | `DcaIndicatorMeta` | `DcaIndicator` | code, label, description, smaPeriods(SMA만 값) |
+
+`EnumMeta`는 `{code, label, description}`이지만 `toEnumMeta(...)`가 description에 `null`을 고정으로 넣어 **EnumMeta 경로 15개 enum 모두 description이 비어 있다**(MetaController `toEnumMeta`). 즉 라벨은 있으나 설명·기본값·범위는 EnumMeta로는 못 나간다.
+
+### C-2. main의 public enum 대조 (53개 enum 선언 중 비-Entity)
+
+**메타에 실려 있음(20)**: StrategyType, StrategyTicker, Broker, StrategyStatus, StrategyCycleSeedType, AssetClass(finance), Market(finance), FinanceAccount.Type, FinanceCategory.Type, OrderType, OrderDirection, OrderStatus, OrderTiming, DcaFrequency, DcaOperator, DcaSkipReason, DcaExecutionStatus, DcaSizingType, DcaShortfallPolicy, DcaIndicator.
+
+**API 요청·응답 계층(Controller/Response/Request/Command)에 쓰이는데 메타에 없음**:
+
+| enum | 위치 | 참조 | 라벨 getter | 비고 |
+|---|---|---|---|---|
+| `UserRole` | shared/kernel | 4파일 | 없음 | 응답 `role` |
+| `UserStatus` | shared/kernel | 5파일 | 없음 | 관리자 필터·사용자 상태 |
+| `NotificationChannel` | shared/kernel | 2파일 | 없음 | 사용자 설정 |
+| `NotificationType` | shared/kernel | 1파일 | 없음 | |
+| `Currency` | shared/kernel | 8파일 | 없음 | `currency` 응답(BrokerMeta에는 name 문자열로만) |
+| `Market`(kernel) | shared/kernel | 4파일 | 없음 | BrokerMeta.market 문자열로만 |
+| `RecurringMode` | shared/kernel | 1파일 | 없음 | VR 입출금 방향. 허용값은 `/api/runtime-config`로 나감 |
+| `BenchmarkScope`, `BenchmarkAssetType`, `EtfBenchmarkSymbol` | api/benchmark | 1/2/2파일 | 없음 | `/api/runtime-config`의 benchmarks에 허용값(문자열)만 |
+| `CycleStatusFilter` | tradingcore/stats | 1파일 | 없음 | `/api/stats/cycles?status=` |
+| `NextOrdersPreview.SkipReason` | tradingcore/trading | 1파일 | 없음 | 주문 미리보기 skip 사유 → UI가 코드→문구 매핑 필요 |
+| `CryptoOrderResult.State` | tradingcore/broker | 1파일 | 없음 | |
+| `MarketSession` | shared/kernel | 0 (market/session 응답 문자열 확인 필요) | 없음 | |
+| `FearGreedRating` | api/market | 0 | **있음(label 3건)** | 응답에 문자열/라벨 포함 가능 |
+| `FinanceGroup.MemberRole`, `FinanceGroupInvitation.Status` | api/finance | 0 | 없음 | 응답 DTO에서 String일 가능성 |
+| `ApiKeyExpirySource` | shared/kernel | 0 | 없음 | BrokerMeta로만 노출 |
+
+**메타에 라벨이 없는(=getter 자체가 없는) enum**: 위 표의 "라벨 getter 없음" 전부. 메타에 들어 있는 enum은 모두 `getLabel()` 보유.
+
+### C-3. 전략 등록 기본값·허용 범위가 나가는 경로
+
+| 항목 | 메타(`/api/meta`)로 나감? | 다른 경로 |
+|---|---|---|
+| 분할 수 옵션(`divisionCounts`) | 예(`StrategyTypeMeta`) | |
+| 분할 수 **기본값**(`StrategyDefaults.DEFAULT_DIVISION_COUNT=20`) | 아니오 | `/api/runtime-config`의 `strategies.<type>.fields.divisionCount.defaultValue`(운영 설정값) |
+| 티커 허용·기본값, VR `recurringMode`/`bandWidth`/`intervalWeeks` | 아니오 | `/api/runtime-config`(`StrategyFieldSettings{customizable, allowedValues, defaultValue}`) — 공개 API, `GET /api/runtime-config`(RuntimeConfigController:23) |
+| 티커 익절 목표 수익률 | 예(`TickerMeta.targetProfitRate`) | |
+| 브로커별 최소 주문액·소수 자릿수 | 예(`BrokerMeta`) | |
+| **VR 램프 기본값표**(적립 gradient10/gMax20/rate1.0/floor0.5, 거치 …/0.75/…, 인출 gradient40/gMax50/rate0.1/floor0.1, grace·step 52/26주) | **아니오** | `VrRampInput.withDefaults`(trading-core) 하드코딩. 주석이 "kista-ui `RAMP_DEFAULTS_BY_MODE`와 동기화"라고 명시 → **UI가 같은 표를 복제 보유**, API에서 받을 경로 없음 |
+| VR/기타 입력 범위(`@Min`/`@Positive` 등) | 아니오 | Request DTO 검증 어노테이션(OpenAPI에 min/max로 나가는지는 D 절) |
+| DCA 규칙 상한(`DcaStrategyConfig.MAX_RULES`, `DcaRule.MAX_CONDITIONS`) | 아니오 | 도메인 상수 |
+| DCA SMA 기간 옵션 | 예(`DcaIndicatorMeta.smaPeriods`) | |
+| 전략 시드 미리보기 | - | `GET /api/accounts/{id}/strategy-seed-preview`(서버 계산) |
+
+관찰: `StrategyTypeMeta.label`과 `description`이 같은 값이다(`getDescription()` 중복). 기본값·범위가 `/api/meta`(enum 메타)와 `/api/runtime-config`(운영 설정) 두 곳으로 갈라져 있고 VR 램프표만 어느 쪽에도 없다.
+
+---
+
+## D. OpenAPI required·nullable 표기 현황
+
+| 항목 | 현황 |
+|---|---|
+| Response record(`*Response.java`, adapter/in/web 하위) | 59개(web `dto` 디렉터리 record 파일 전체 103개 중). 중첩 record는 별도 집계 안 함 |
+| `@Schema(requiredMode=...)` 사용 | **Response 2개 파일에서만**: `CryptoMarketIndicatorsResponse`(61회), `BenchmarkComparisonResponse`(1회, `currentExchangeRate`). Request는 `DcaConfigRequest` 1회. 나머지 57개 Response는 required 표기 없음 |
+| `@Schema(description=...)` 사용 Response | 54개 / 59개 |
+| jakarta `@NotNull` 사용 Response | 0개 |
+| nullable을 명시하는 방식 | `@Schema(types = {"string","null"})` 계열 35회(`BenchmarkComparisonResponse`에 집중), `@JsonInclude(NON_NULL/ALWAYS)`, 그리고 `@Schema(description="…null")` 문장 서술. 즉 null 가능 여부의 대부분이 **description 문장에만** 있고 스키마 속성이 아님 |
+| jspecify `@NullMarked` | **0개**(어느 패키지에도 없음, `package-info`에도 없음) |
+| jspecify `@Nullable` | 13개 파일(대부분 domain·application: `RegisterAccountCommand`, `AccountLedgerTotals`, `CryptoFearGreedHistory` 등). **Response DTO에는 0개** |
+| `springdoc.*` 설정 | root `src/main/resources/application.yml:78`(`api-docs.path=/api-docs`, `swagger-ui.path`, `operations-sorter: method`), trading-core `trading-core/src/main/resources/application.yml:52`(동일 + `paths-to-exclude: /api/internal/**`). `springdoc.default-*`·`use-fqn` 등 required 관련 전역 옵션은 **없음** |
+| OpenAPI 커스터마이저 | root `api/user/adapter/in/web/security/OpenApiConfig.java`(`OpenAPI` 빈: info·bearerAuth·태그 순서), `api/web/ErrorCodeOpenApiCustomizer.java`(`ErrorCode` enum 스키마 등록), `api/benchmark/adapter/in/web/openapi/HousingBenchmarkOpenApiCustomizer.java`, trading-core `tradingcore/stats/adapter/in/web/openapi/CryptoMarketIndicatorsOpenApiCustomizer.java`(주석: OAS 3.1에서 springdoc이 `$ref` 속성의 nullable을 버려 `oneOf [$ref, null]`로 수기 보정). `PropertyCustomizer`·`ModelConverter`는 없음 |
+| BigDecimal 필드를 가진 Response | 약 30~31개(`*Response.java` 30개, dto 전체 non-Request 31개). 숫자 형식(`number`/`string`, `format`) 지정은 별도 어노테이션으로 하지 않음 — springdoc 기본(number) |
+| 관찰 | required를 스키마로 내보내는 일반 규칙이 없고 `@NullMarked` 도입도 없어 springdoc은 record 컴포넌트를 전부 optional로 낼 가능성이 높다(springdoc 기본: `@NotNull`/`@Schema(required)` 없으면 required 아님. **생성 스펙 파일 미확인 — 빌드·기동 금지로 실측하지 않음**). 벤치마크·코인지표 두 곳만 수기 customizer로 보정한 상태 |
+
+## E. 상태 플래그·서버 판정 필드
+
+### E-1. 응답에 이미 있는 판정성 필드
+
+| 응답 | 필드 | 의미 |
+|---|---|---|
+| `TradingCycleResponse`(trading-core) | `cycleInProgress`(boolean) | 진행 중 사이클 존재 — 투자금 추가 가능 여부 근거(NO_ACTIVE_CYCLE과 동일 기준) |
+| 〃 | `isReverseMode`(boolean) | 리버스모드 |
+| 〃 | `todayOpenBatchMissed`(Boolean, 등록 응답만) | 오늘 개장 배치 누락 경고 |
+| 〃 | `ledgerDeposit` | 투자금 인출 최대 기준(서버가 계산해 내려줌) |
+| `NextOrdersResponse` | `skipReason`(enum, 정상이면 null), `ledgerCheck`, `accountCashCheck`, `accountHoldingsCheck`(각 `sufficient`, `trimmed`) | 주문 미리보기 경고. 서버 판정 |
+| `DcaExecutionPageResponse.Item` / `DcaRuleResponse.LastExecution` | `status`, `skipReason`, `detail` | DCA 회차 판정 사유 |
+| `StrategySeedPreviewResponse` | `skipReason` | 시드 미리보기 불가 사유 |
+| `UserResponse` | `hasTelegram`, `rejectReason`(REJECTED에서만 노출) | |
+| `MarketSessionResponse` | `isDst` | 서머타임 |
+| `FinanceCategoryResponse` | `system` | 시스템 카테고리(수정 불가 판단 근거) |
+| `MonthlyClosingResponse` | `completed`, `closedAt`, `groupId` | 마감 여부(쓰기 가드의 근거는 서버 `MONTH_CLOSED`) |
+| `AdminTradeCorrectionResponse` | `cycleEnded`, `strategyStatus` | |
+| 페이지 응답 | `hasMore`, `nextCursor`, `totalElements`, `totalPages` | |
+
+**`can*` 접두 플래그는 전체 Response에 0개**, `*Allowed`·`*Editable`·`*Blocked` 류도 0개. 사유 코드형은 `skipReason`(3곳)·`rejectReason`뿐.
+
+### E-2. UI가 여러 필드로 추론해야 할 것으로 보이는 대표 응답
+
+| 응답 | UI가 추론하는 것으로 보이는 판정 | 근거 필드 |
+|---|---|---|
+| `TradingCycleResponse`(전략 상세) | 일시중지/재개/종료/투자금 추가·인출/삭제 가능 여부, "시작 예정" 여부 | `status`(String), `startDate`(미래면 시작예정, 설명문에만 규칙 기술), `cycleInProgress`, `type`. 허용 액션 목록·`canXxx`가 없다. `status`가 enum이 아닌 `String`이라 OpenAPI 상 열거형이 아님 |
+| 〃 `vr`(VrSummary) | VR 램프 현재 단계·다음 변화 시점 | 램프 파라미터 8개만 주고 현재 유효값(경과주 기반 현재 G·poolLimitRate)은 `gradient`/`poolLimitRate`로 일부만 제공. 경과 계산 필요 여부는 미확인 |
+| `AccountResponse` | API 키 만료 임박·만료 여부 | `apiKeyExpiresAt`(Instant)만. `expired`/남은 일수/상태 플래그 없음 → UI가 현재 시각과 비교(원칙의 "상태 판정" 항목에 해당) |
+| `NextOrdersResponse`(주문 미리보기) | 주문 가능 여부·경고 수준 | `skipReason`·세 개의 `*Check`(null 여부와 `sufficient`/`trimmed`의 조합으로 해석). 단일 상태 코드나 "주문 가능" 플래그 없음. `position`·`orders`가 skip 시 null/빈 목록인 규칙도 필드 조합으로 알아야 함 |
+| `MonthlyClosingResponse` | 현재 스코프의 활성 마감 행 | 같은 month에 개인·그룹 2건 반환, UI가 `groupId`로 선택(응답 주석에 명시) |
+| `AssetSnapshotResponse` | 순자산·부채 판정 | `rootCategoryId == FinanceCategory.SYSTEM_LOAN_ID` 비교를 UI가 수행(응답 주석에 명시) |
+| `DailyTransactionResponse.ItemDto` | 매수/매도 부호별 합계 | `direction` + `tradeAmount`(부호 없음) |
+| 거래/주문 응답 전반 | 코드→문구 | `status`·`direction`·`orderType`이 String인 응답이 다수(`StrategyOrdersResponse.Item`, `TradingCycleResponse`, `DcaExecutionPageResponse`), enum 타입인 응답도 있어 혼재 |
+
+## F. 오류 응답
+
+| 항목 | 현황 |
+|---|---|
+| `ErrorCode` 상수 | **13개**(`shared/.../platform/web/ErrorCode.java`): BROKER_UNAVAILABLE, BROKER_CREDENTIAL_INVALID, BROKER_IP_NOT_ALLOWED, BROKER_PERMISSION_DENIED, BROKER_RATE_LIMITED, DUPLICATE_ACCOUNT, ALREADY_ORDERED_TODAY, DCA_MANUAL_EXECUTION_UNSUPPORTED, ORDER_NOT_CANCELLABLE, MONTH_CLOSED, ACCESS_DENIED, COOLDOWN_ACTIVE, TRADING_CORE_UNAVAILABLE. OpenAPI `components.schemas.ErrorCode`로 노출(`ErrorCodeOpenApiCustomizer`) |
+| ProblemDetail에 실리는 필드 | RFC 7807 기본(`status`, `title`, `detail`; `type`·`instance`는 설정 안 함) + 확장 `code`(ErrorCode 이름, **code 있는 예외에만**, 없으면 키 자체 생략 `ProblemDetailMappings:120`) + 429 쿨다운 한정 `retryAfter`(+ `Retry-After` 헤더, `GlobalExceptionHandler:75-79`). `title`은 영어 고정 문구("Invalid Request", "Conflict" 등) |
+| `code` 없이 나가는 오류 | 대부분. GENERIC 매핑(IAE→400 "Invalid Request", ISE→400 "Invalid State", NoSuchElement→404, SecurityException→403만 `ACCESS_DENIED`)과 도메인 409 충돌 다수(`Conflict`, `MONTH_CLOSED`만 code 보유). UI가 필드 강조·동작 분기를 하려면 title/status로 추론해야 함 |
+| `detail` 한국어 사용자 문장 보장 범위 | **보장되는 것**: ① 고정 문구로 대체되는 예외(NoSuchElement, MissingServletRequestParameter, MethodArgumentTypeMismatch, DateTimeParse, HttpMessageNotReadable, NoResourceFound, HttpRequestMethodNotSupported, catch-all 500 "예기치 않은 오류가 발생했습니다.") ② application·domain 패키지의 `new IllegalArgumentException/IllegalStateException("…")` 리터럴은 `ExceptionMessageFormatTest`가 "~니다."로 끝나는 한국어 완전문장을 소스 스캔으로 강제(동결 허용목록 `exception-message-allowlist.txt`는 현재 헤더 주석 1줄뿐 = 위반 0) |
+| **보장되지 않는 것** | ① **Bean Validation 오류**(`MethodArgumentNotValidException`)는 `validationMessage()`가 `"[필드명: 기본메시지, ...]"`을 그대로 내보냄(`ProblemDetailMappings:125-130`, root `GlobalExceptionHandler:84`·trading `TradingExceptionHandler:92` 공통). 필드명은 영어 camelCase, 기본 메시지는 Hibernate Validator 로케일 의존(Request의 검증 어노테이션 65개 중 `message=` 지정 4개뿐) → 한국어 문장 아님·대부분 영어 가능성. ② IAE/ISE를 application·domain 밖(adapter·web)에서 던지는 경우는 스캔 비대상(`LAYER_PATH = /(application|domain)/`). ③ 동적 값을 이어 붙이는 `"…입니다: " + id` 형태는 스캔이 위반으로 잡도록 되어 있으나 동결 목록이 비어 있으므로 현재는 없음. ④ 브로커 예외 `detail`(BrokerApiException 계열)이 고정 문구인지는 이 조사에서 개별 확인하지 못함 |
+| 두 프로세스 | root `GlobalExceptionHandler`(`api/web`)와 trading-core `TradingExceptionHandler`(`tradingcore/web`)가 공용 `ProblemDetailMappings`(shared)를 공유. 엔트리 테이블 `MAPPINGS`가 SSOT |

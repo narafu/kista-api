@@ -46,9 +46,9 @@
 | 05 | 프로세스·스키마 전제 재검토 | findings 01 경계 집계, 05 S항목 | 미착수. 결론을 fable-ui에 알려야 한다(ui 주제 02가 의존) |
 | 06 | 배치 오케스트레이션 | findings 03 C·D | 미착수 |
 | 07 | 테스트 전략 | findings 04 | 01~03 뒤 |
-| 08 | 매매 공식 대조 | docs/reference/quantstack(49파일 완료), findings/08-formula-diff.md(서브에이전트 진행 중) | 대조 결과 대기 |
+| 08 | 매매 공식 대조 | docs/reference/quantstack(49파일), findings/08-formula-diff.md(완료, 차이 약 40행. PRIVACY·DCA·재시작 금액·리버스 테스트는 미대조) | Fable이 코드 직접 확인 후 판정 필요. 최우선: 별% 1%p 반올림(`InfinitePositionTest.java:52`) |
 | 09 | 문서 구조 개편과 불필요 파일 삭제 | findings 06(완료), cross-repo A5·A6·결정 2·6 | 미착수 |
-| 10 | UI 계약: T1 응답 required 표기, T2 BigDecimal plain number 전역 통일(이 둘은 ui 01의 차단 조건이라 맨 앞), 메타 보강, 상태 플래그, 목록 전량형·페이지형 선언, 가계부 집계 API | cross-repo B, ui-api-principles.md, findings/07-list-endpoints.md(서브에이전트 진행 중) | 측정 대기 |
+| 10 | UI 계약: 스펙 required·BigDecimal(T1·T2 최우선), 목록 규약(객체 봉투, 커서 1종), 메타 통합, 상태 플래그, 오류 문구, 가계부 집계 | cross-repo B, ui-api-principles.md, findings 07 | **작성 완료** `guides/10-ui-contract.md`. T8(가계부 집계)은 fable-ui 명세 대기 |
 
 재심은 주제별로 한다: findings 05에서 그 주제에 걸리는 결정만 꺼내 지침서에 재심 결과를 적는다.
 
@@ -56,7 +56,7 @@
 
 1. (완료) 지침서 04. DCA 실행 파이프라인 이원화는 06으로 옮겼다.
 2. 지침서 02 작성.
-3. 서브에이전트 완료 알림 처리: 08 공식 대조(`afec9a7b4fa95ad35`), 07 목록 엔드포인트. 죽으면 SendMessage로 재개.
+3. (완료) 서브에이전트 측정 전부 종료. 진행 중인 서브에이전트 없음.
 4. fable-ui가 보낼 "원칙 위반 전수 목록"을 받아 지침서 10에 반영.
 5. findings 06에서 확인할 것: 레포 밖 `/Users/phs/workspace/kista/ARCHITECTURE.md`가 Java 21·Boot 3·Fly.io로 적혀 현재와 완전히 어긋남, `modules/tradingcore/dca.md` 미로드, `code-quality-backlog.md` 약 800줄 삭제 후보, plans/specs archive 179개 약 5.6MB.
 
