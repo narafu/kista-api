@@ -43,7 +43,7 @@
 | 02 | 영속·DTO 삼중 구조 축소(목록 페이징 형식 통일 포함) | findings 02 A, 01 패턴 1·2 | 다음 작성 |
 | 03 | 전략 축 재설계 | findings 03 A·E | 미착수 |
 | 04 | 브로커 축: 업비트·KIS 삭제, 시세 분리, HTTP·토큰 공통 골격, facade 제거. **가장 먼저 실행** | findings 03 B | **작성 완료** `guides/04-broker.md`. 토스 주문 삭제는 사용자 확인 대기 |
-| 05 | 프로세스·스키마 전제 재검토 | findings 01 경계 집계, 05 S항목 | 미착수. 결론을 fable-ui에 알려야 한다(ui 주제 02가 의존) |
+| 05 | Modulith 모듈 구성과 프로세스 분리 재검토 | findings 01·02 E·05, history, Modulith 2.1 문서 | **작성 완료** `guides/05-modules-and-processes.md`. **사용자 결정 D1~D4 대기**(D1: 한 코드베이스 + web/worker role 권고). 결정 뒤 단계 0 조사(`findings/09-process-local-state.md`)부터 |
 | 06 | 배치 오케스트레이션 | findings 03 C·D | 미착수 |
 | 07 | 테스트 전략 | findings 04 | 01~03 뒤 |
 | 08 | 매매 공식 대조 | docs/reference/quantstack(49파일), findings/08-formula-diff.md(완료, 차이 약 40행. PRIVACY·DCA·재시작 금액·리버스 테스트는 미대조) | Fable이 코드 직접 확인 후 판정 필요. 최우선: 별% 1%p 반올림(`InfinitePositionTest.java:52`) |
@@ -51,6 +51,12 @@
 | 10 | UI 계약: 스펙 required·BigDecimal(T1·T2 최우선), 목록 규약(객체 봉투, 커서 1종), 메타 통합, 상태 플래그, 오류 문구, 가계부 집계 | cross-repo B, ui-api-principles.md, findings 07 | **작성 완료** `guides/10-ui-contract.md`. T8(가계부 집계)은 fable-ui 명세 대기 |
 
 재심은 주제별로 한다: findings 05에서 그 주제에 걸리는 결정만 꺼내 지침서에 재심 결과를 적는다.
+
+## 새 코드 반영 (2026-11-11 조기 마감 커밋 9e542baf7~d3d78b0b3)
+
+- main 37파일 변경. 거래일·세션 개념이 trading 22·broker 7·marketcalendar 4·shared 5·root 2 파일에 흩어져 있음을 지침서 05의 3-3절에 반영.
+- 의심: `TossPriceApi:163-199`의 정규장 판정 복제본이 조기 마감을 반영하지 않는다(미확인).
+- `TradingCloseScheduler` 239줄에 스케줄 판단 로직이 있다. 지침서 06에서 다룬다.
 
 ## 다음 할 일
 
