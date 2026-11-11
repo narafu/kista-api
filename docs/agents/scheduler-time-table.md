@@ -63,7 +63,7 @@
 
 ## 거래일 경계: 실제 마감 30분 전 (2026-11-11 변경)
 
-거래일 경계는 "그날 거래일 주문을 마감 배치가 넘겨받는 시각"이다. 조기 마감일(13:00 ET 마감, KST 02:00/03:00)을 맞추려고 고정 04:30에서 **그 거래일 실제 마감 30분 전**으로 바꿨다(`SessionTradeDates.nextTradeDate` — 미리보기·수동 실행·취소·인출·VR 재설정·DCA 다음 실행일 공용). 휴장일은 기존 `KstTradeDates`(04:30) 경계로 폴백한다.
+거래일 경계는 "그날 거래일 주문을 마감 배치가 넘겨받는 시각"이다. 조기 마감일(13:00 ET 마감, KST 02:00/03:00)을 맞추려고 고정 04:30에서 **그 거래일 실제 마감 30분 전**으로 바꿨다(`SessionTradeDates.nextTradeDate` — 미리보기·수동 실행·취소·인출·VR 재설정·DCA 다음 실행일 공용, 계산 본체는 `MarketSessionTimes.nextTradeDate`라 시장 세션 API `tradeDateKst`도 같은 경계). 휴장일은 기존 `KstTradeDates`(04:30) 경계로 폴백한다.
 
 - 예외: 개장 배치 재개 판정(`TradingOpenScheduler.resume`·`TradingBatchResumer.resumeOpen`)과 `TradingService.placeOpenOrders`는 04:30 경계를 유지한다 — 대신 실제 마감 30분 전을 넘기면 개장 재개를 건너뛴다.
 - 기존 결정의 손해(마감 30분 전~마감 동안 다음 거래일 계획 표시)는 그대로다. 일시정지 취소는 오늘·다음 거래일을 모두 처리해 영향이 없다.

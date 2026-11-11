@@ -48,7 +48,7 @@ public class MarketHolidayController {
             summary = "현재 거래일 조회",
             description = """
                     현재 KST 기준 거래일과 그 거래일의 미국 장 개장 여부를 반환합니다.
-                    tradeDateKst: 현재 시각 기준 KST 거래일 (04:30 KST 이후면 익일)
+                    tradeDateKst: 현재 시각 기준 KST 거래일 (그 날짜 실제 마감 30분 전부터 익일, 휴장일은 04:30 KST 기준)
                     tradingDay: tradeDateKst에 미국 장이 열리는지 (휴장일·주말이면 false)
                     """
     )

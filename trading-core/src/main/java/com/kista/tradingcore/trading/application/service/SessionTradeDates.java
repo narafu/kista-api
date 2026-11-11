@@ -1,10 +1,9 @@
 package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.TimeZones;
-import com.kista.shared.platform.time.KstTradeDates;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
+import com.kista.tradingcore.marketcalendar.domain.model.MarketSessionTimes;
 
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -16,12 +15,8 @@ final class SessionTradeDates {
     private SessionTradeDates() {}
 
     static LocalDate nextTradeDate(ZonedDateTime now, MarketCalendarPort calendar) {
-        ZonedDateTime nowKst = now.withZoneSameInstant(TimeZones.KST);
-        LocalDate today = nowKst.toLocalDate();
-        return calendar.findSession(today)
-                .map(session -> nowKst.toInstant().isBefore(session.closeAt().minus(Duration.ofMinutes(30)))
-                        ? today : today.plusDays(1))
-                .orElseGet(() -> KstTradeDates.nextTradeDate(nowKst));
+        LocalDate today = now.withZoneSameInstant(TimeZones.KST).toLocalDate();
+        return MarketSessionTimes.nextTradeDate(now, calendar.findSession(today));
     }
 
     // 마감 전 주문과 다음 세션에 예약된 주문을 함께 보호한다

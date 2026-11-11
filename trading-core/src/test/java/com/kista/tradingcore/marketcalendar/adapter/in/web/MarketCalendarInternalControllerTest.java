@@ -2,6 +2,7 @@ package com.kista.tradingcore.marketcalendar.adapter.in.web;
 
 import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
+import com.kista.tradingcore.marketcalendar.domain.model.MarketSessionTimes;
 import com.kista.shared.platform.security.InternalTokenAuthFilter;
 import com.kista.shared.platform.security.JwtAuthFilter;
 import com.kista.shared.platform.security.SecurityConfig;
@@ -17,8 +18,10 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
@@ -70,13 +73,19 @@ class MarketCalendarInternalControllerTest {
     }
 
     @Test
-    void session_현재_세션을_반환한다() throws Exception {
+    void session_거래일을_실제_마감_30분_전_경계로_판정한다() throws Exception {
+        // 고정 시각 KST 01-06 12:00 — 세션 마감을 13:00으로 두면 전환 경계(12:30) 전이라 오늘(04:30 고정 경계였다면 01-07)
+        LocalDate today = LocalDate.of(2026, 1, 6);
+        given(marketCalendarPort.findSession(today)).willReturn(Optional.of(new MarketSessionTimes(
+                Instant.parse("2026-01-06T00:00:00Z"), Instant.parse("2026-01-06T04:00:00Z"))));
+        given(marketCalendarPort.isMarketOpen(today)).willReturn(true);
+
         mockMvc.perform(get("/api/internal/marketcalendar/session")
                         .header("X-Internal-Token", VALID_TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.session").doesNotExist())
-                .andExpect(jsonPath("$.tradeDateKst").exists())
-                .andExpect(jsonPath("$.tradingDay").exists());
+                .andExpect(jsonPath("$.tradeDateKst").value("2026-01-06"))
+                .andExpect(jsonPath("$.tradingDay").value(true));
     }
 
     @Test
