@@ -34,6 +34,9 @@
 - 2026-11-11 UI·API 책임 분담을 원칙으로 통일: `ui-api-principles.md`. 기본값은 API.
 - 2026-11-11 문서 정리, 불필요 파일 삭제를 범위에 추가.
 - infra 쪽 결정 6건은 `cross-repo.md` A절.
+- 2026-11-12 지침서 05: **D1~D4 전부 권고대로**(한 코드베이스 + web/worker role, 스키마 5개 유지·물리 DB 분리 폐기, trading 스키마 expand/contract, admin·web 셸 해체). 합칠 때 생기는 문제의 대안을 Fable이 한 번 더 검토하고, Opus/Sonnet이 Fable 없이 실행할 수 있게 지침서를 상세화한다.
+- 2026-11-12 지침서 08: F1~F6 권고대로 진행. **F7 KISTA 유지(실력공식 — 근거: 사용자 글 https://velog.io/@narafu/VR , 원저작자 라오어 카페 글 인용)**, F8 KISTA 유지.
+- 2026-11-12 지침서 04: **토스 주문 유지**(대중적인 증권사라 연결을 남긴다. 메리츠를 우선하는 이유는 환율·매매 수수료). 메리츠·토스·바이낸스 API 문서를 다시 확인해 KISTA 필요 기능에 맞춰 리팩토링. 문서 원본: `/Users/phs/Downloads/meritz_openapi_spec_20261112.json`, `/Users/phs/Downloads/toss/`, https://developers.binance.com/en/docs/catalog
 
 ## 지침서 주제
 
