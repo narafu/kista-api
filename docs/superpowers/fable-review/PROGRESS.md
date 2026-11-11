@@ -40,7 +40,7 @@
 | # | 주제 | 주 근거 | 상태 |
 |---|---|---|---|
 | 01 | 헥사고날 다이어트 | findings 02 B·C | **작성 완료** `guides/01-hexagonal-diet.md` |
-| 02 | 영속·DTO 삼중 구조 축소(목록 페이징 형식 통일 포함) | findings 02 A, 01 패턴 1·2 | 다음 작성 |
+| 02 | 영속·DTO 삼중 구조 축소: 조회는 View 직행, Command 직접 바인딩, 애그리게이트당 Store. JPA 유지(JDBC 전환 기각) | findings 02 A·D, JPA 사용 집계 | **작성 완료** `guides/02-persistence-and-dto.md` |
 | 03 | 전략 축 재설계 | findings 03 A·E | 미착수 |
 | 04 | 브로커 축: 업비트·KIS 삭제, 시세 분리, HTTP·토큰 공통 골격, facade 제거. **가장 먼저 실행** | findings 03 B | **작성 완료** `guides/04-broker.md`. 토스 주문 삭제는 사용자 확인 대기 |
 | 05 | Modulith 모듈 구성과 프로세스 분리 재검토 | findings 01·02 E·05, history, Modulith 2.1 문서 | **작성 완료** `guides/05-modules-and-processes.md`. **사용자 결정 D1~D4 대기**(D1: 한 코드베이스 + web/worker role 권고). 결정 뒤 단계 0 조사(`findings/09-process-local-state.md`)부터 |
