@@ -28,29 +28,39 @@
 - root↔trading-core 경계 코드 약 89파일 3,430줄(6.2%) + 사용자 복제 동기화 약 730줄. ui는 trading-core를 직접 호출한다.
 - 테스트만 줄여서는 5~8%가 한계. 보호군 약 22k줄.
 
-## 지침서 주제 (작성 순서)
+## 사용자 결정 기록
+
+- 2026-11-11 브로커: **업비트·KIS 삭제, 토스는 시세·환율·캔들·대시보드만 남기고 축소.** KIS 활성 전략 1건의 이전이 선행 조건.
+- 2026-11-11 UI·API 책임 분담을 원칙으로 통일: `ui-api-principles.md`. 기본값은 API.
+- 2026-11-11 문서 정리, 불필요 파일 삭제를 범위에 추가.
+- infra 쪽 결정 6건은 `cross-repo.md` A절.
+
+## 지침서 주제
 
 | # | 주제 | 주 근거 | 상태 |
 |---|---|---|---|
-| 01 | 헥사고날 다이어트: UseCase 인터페이스·단일 구현 포트·순수 위임층 제거, ArchUnit 규칙 개정 | findings 02 B·C, 01 패턴 3 | 미착수 |
-| 02 | 영속·DTO 삼중 구조 축소: 테이블당 5파일 스택, domain↔Entity↔Response 재선언 | findings 02 A, 01 패턴 1·2 | 미착수 |
-| 03 | 전략 축 재설계: 타입 분기 63곳, PlanContext nullable, 전략별 상세 영속 스택, BacktestEngine 3벌, DetailAssembler 이중 구현 | findings 03 A·E | 미착수 |
-| 04 | 브로커 축: 비주력 제거 범위 + 공통 골격(HTTP·토큰·rate limit), facade 제거, DCA 실행 파이프라인 이원화 | findings 03 B | 사용자 결정 대기(KIS 활성 전략 1건) |
-| 05 | 프로세스·스키마 전제 재검토: 2-프로세스, 5스키마, 사용자 복제, contract | findings 01 경계 집계, 05 S항목 | 미착수 |
-| 06 | 배치 오케스트레이션: 마감 배치 서비스 약 20개, 의존 8개 이상 서비스 19개 | findings 03 C·D | 미착수 |
-| 07 | 테스트 전략: 등록 규칙을 도메인 테스트로 이전, WebMvc 오류 매트릭스, fixture | findings 04 | 01~03 뒤 |
-| 08 | 매매 공식 대조: quantstack 정리본 ↔ trading-formulas.md·matching 커널, cap 1.05 모순 | docs/reference/quantstack, findings 05 모순 | 정리본 대기 |
-| 09 | 문서 구조 개편과 불필요 파일 삭제 | findings 06, cross-repo A5·A6 | 측정 대기 |
+| 01 | 헥사고날 다이어트 | findings 02 B·C | **작성 완료** `guides/01-hexagonal-diet.md` |
+| 02 | 영속·DTO 삼중 구조 축소(목록 페이징 형식 통일 포함) | findings 02 A, 01 패턴 1·2 | 다음 작성 |
+| 03 | 전략 축 재설계 | findings 03 A·E | 미착수 |
+| 04 | 브로커 축: 업비트·KIS 삭제, 토스 축소, 공통 골격, DCA 파이프라인 이원화 | findings 03 B | 결정 완료, 미착수 |
+| 05 | 프로세스·스키마 전제 재검토 | findings 01 경계 집계, 05 S항목 | 미착수. 결론을 fable-ui에 알려야 한다(ui 주제 02가 의존) |
+| 06 | 배치 오케스트레이션 | findings 03 C·D | 미착수 |
+| 07 | 테스트 전략 | findings 04 | 01~03 뒤 |
+| 08 | 매매 공식 대조 | docs/reference/quantstack(49파일 완료), findings/08-formula-diff.md(서브에이전트 진행 중) | 대조 결과 대기 |
+| 09 | 문서 구조 개편과 불필요 파일 삭제 | findings 06(완료), cross-repo A5·A6·결정 2·6 | 미착수 |
+| 10 | UI 계약: T1 응답 required 표기, T2 BigDecimal plain number 전역 통일(이 둘은 ui 01의 차단 조건이라 맨 앞), 메타 보강, 상태 플래그, 목록 전량형·페이지형 선언, 가계부 집계 API | cross-repo B, ui-api-principles.md, findings/07-list-endpoints.md(서브에이전트 진행 중) | 측정 대기 |
 
 재심은 주제별로 한다: findings 05에서 그 주제에 걸리는 결정만 꺼내 지침서에 재심 결과를 적는다.
 
 ## 다음 할 일
 
-1. 지침서 01 작성: findings 02의 B·C 절과 `HexagonalArchitectureTest` 규칙을 읽고 "남길 포트의 기준"을 정한다.
-2. quantstack 에이전트(재개됨)와 06 에이전트 완료 알림을 받으면 README 누락 여부 확인.
-3. cross-repo A3(readiness healthcheck) 판단을 fable-infra에 회신.
-4. 사용자 결정 대기: 비주력 브로커 제거 범위.
+1. 지침서 04(브로커) 작성: 결정이 났고 다른 주제의 표면을 줄이므로 먼저. findings 03 B절과 broker 모듈 핵심 파일을 읽는다.
+2. 지침서 02 작성.
+3. 서브에이전트 완료 알림 처리: 08 공식 대조(`afec9a7b4fa95ad35`), 07 목록 엔드포인트. 죽으면 SendMessage로 재개.
+4. fable-ui가 보낼 "원칙 위반 전수 목록"을 받아 지침서 10에 반영.
+5. findings 06에서 확인할 것: 레포 밖 `/Users/phs/workspace/kista/ARCHITECTURE.md`가 Java 21·Boot 3·Fly.io로 적혀 현재와 완전히 어긋남, `modules/tradingcore/dca.md` 미로드, `code-quality-backlog.md` 약 800줄 삭제 후보, plans/specs archive 179개 약 5.6MB.
 
 ## 다른 세션
 
-- fable-ui, fable-infra에 착수·범위 추가(문서 정리, 불필요 파일) 전달 완료. fable-infra는 측정 완료, 지침서 2개 작성 중.
+- fable-infra: 검토 완료(지침서 2개, 사용자 결정 반영).
+- fable-ui: 측정 완료, 주제 9개 선정. 원칙 문서 전달함, 위반 전수 목록 회신 대기.
