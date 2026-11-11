@@ -12,6 +12,7 @@
 | 장 개시 스케쥴러 | 월~금 22:00 KST | 2h | 개장용 주문 생성 및 선접수 (KIS DCA MOO는 개장 전 접수, 비DST는 개장 23:30까지 대기) |
 | 마감 매매 스케쥴러 | 실제 마감 30분 전 1회 예약 (정규장 DST 04:30·비DST 05:30, 조기 마감일 02:30/03:30 등) | 3h | 마감용 주문 생성 및 실행. cron이 아니라 `TaskScheduler` 1회 예약 — 개장 스케쥴러(22:00)가 다음 거래일분을 등록하고 기동 시 `TradingBatchResumer`가 재등록. 마감 시각은 `trading_ref.us_market_sessions`(Alpaca `close`). 휴장일은 22:00 개장 스케쥴러가 개장·마감 heartbeat를 대신 핑 |
 | 마감 예약 보정 (`TradingCloseScheduler#reconcile`) | 매시 05분 KST | — | 오늘·내일 마감 예약 누락 재등록, 캘린더 갱신으로 마감 시각이 바뀐 예약 취소 후 재등록 (지난 예약 시각은 조용히 건너뜀) |
+| 마감 하트비트 슬롯 (`TradingCloseScheduler#pingHeartbeatSlot`) | 화~토 04:30 KST | — | healthchecks.io 마감 체크(cron `30 4 * * 2-6`, grace 2h)용. 오늘이 휴장일(세션 없음)이거나 마감 배치가 이미 `DONE`(조기 마감일 — 02:30대 핑 뒤 04:30을 기대)일 때만 `pingClose`. 정상 거래일은 배치 완료 핑에 맡기고, 세션 조회 실패는 핑을 생략해 알림으로 드러낸다 |
 | 코인 DCA 스케쥴러 (`kista-trading`) | 10분마다(`0 */10 * * * *`) KST | 9m | 업비트 코인 DCA 주문 동기화·회차 실행 (24/7) |
 | 업비트 API 키 만료 점검 (`kista-trading`) | 매일 10:00 KST | 30m | 만료 30·7·0일 전 알림 이벤트 발행 |
 

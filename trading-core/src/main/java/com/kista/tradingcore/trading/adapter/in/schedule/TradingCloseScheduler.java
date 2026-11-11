@@ -74,6 +74,20 @@ public class TradingCloseScheduler {
         register(today.plusDays(1), false);
     }
 
+    // healthchecks.io 마감 체크는 cron(화~토 04:30 KST)이라 그 시각에 배치가 없는 날 핑이 끊긴다 — 휴장일(예약 없음)과 조기 마감일(02:30대 핑 뒤에도 04:30을 기대)에 대신 보낸다
+    // 정상 거래일은 배치 완료 핑이 이 시각 이후(비DST 05:30)에 오므로 여기서는 건너뛰고, 세션 조회 실패(캘린더 미적재)도 핑을 보내지 않아 알림으로 드러낸다
+    @Scheduled(cron = "0 30 4 * * TUE-SAT", zone = TimeZones.KST_ID)
+    public void pingHeartbeatSlot() {
+        try {
+            LocalDate today = LocalDate.now(clock.withZone(TimeZones.KST));
+            boolean noBatchPending = marketCalendarPort.findSession(today).isEmpty()
+                    || batchRunPort.findPhase(TradingBatchJob.CLOSE, today).orElse(null) == TradingBatchPhase.DONE;
+            if (noBatchPending) heartbeatPort.pingClose();
+        } catch (RuntimeException e) {
+            log.warn("마감 하트비트 판정 실패 — 핑 생략: {}", e.getMessage());
+        }
+    }
+
     private synchronized void register(LocalDate tradeDate, boolean alertIfPast) {
         try {
             var session = marketCalendarPort.findSession(tradeDate);

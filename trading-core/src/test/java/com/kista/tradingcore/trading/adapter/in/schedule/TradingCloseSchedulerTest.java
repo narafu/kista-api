@@ -417,4 +417,43 @@ class TradingCloseSchedulerTest {
 
         verify(errorReportPort).reportError(any(IllegalStateException.class));
     }
+
+    // 04:30 하트비트 슬롯 — now는 KST DATE 04:30
+
+    @Test
+    void heartbeatSlot_holidayWithoutSession_pings() {
+        doReturn(Optional.empty()).when(calendar).findSession(DATE);
+
+        scheduler.pingHeartbeatSlot();
+
+        verify(heartbeatPort).pingClose();
+    }
+
+    @Test
+    void heartbeatSlot_earlyCloseBatchAlreadyDone_pings() {
+        when(batchRunPort.findPhase(any(), eq(DATE))).thenReturn(Optional.of(TradingBatchPhase.DONE));
+
+        scheduler.pingHeartbeatSlot();
+
+        verify(heartbeatPort).pingClose();
+    }
+
+    @Test
+    void heartbeatSlot_regularDayBatchStillPending_doesNotPing() {
+        // 비DST 05:30 배치 전 — 배치 완료 핑이 대신 간다
+        when(batchRunPort.findPhase(any(), eq(DATE))).thenReturn(Optional.of(TradingBatchPhase.PLACED));
+
+        scheduler.pingHeartbeatSlot();
+
+        verify(heartbeatPort, never()).pingClose();
+    }
+
+    @Test
+    void heartbeatSlot_calendarNotLoaded_doesNotPingOrThrow() {
+        doThrow(new IllegalStateException("시장 세션 미적재")).when(calendar).findSession(DATE);
+
+        scheduler.pingHeartbeatSlot();
+
+        verify(heartbeatPort, never()).pingClose();
+    }
 }
