@@ -261,8 +261,8 @@ flows:
         lane: trading
         to: [db]
         title: 배치 완료
-        desc: 체크포인트를 DONE으로 기록하고, 외부 감시 서비스 URL로 heartbeat를 보낸다(dead-man's switch). heartbeat가 오지 않으면 배치가 끝까지 돌지 않았거나 예외로 실패했다는 뜻이다(실패 시에는 보내지 않는다).
-        code: [HeartbeatPort#pingClose]
+        desc: 체크포인트를 DONE으로 기록하고, 외부 감시 서비스 URL로 heartbeat를 보낸다(dead-man's switch). heartbeat가 오지 않으면 배치가 끝까지 돌지 않았거나 예외로 실패했다는 뜻이다(실패 시에는 보내지 않는다). 휴장일·조기 마감일처럼 그 시각에 배치 핑이 없는 날은 04:30 하트비트 슬롯이 대신 보낸다.
+        code: [HeartbeatPort#pingClose, TradingCloseScheduler#pingHeartbeatSlot]
         state: "trading_batch_run → DONE"
 
   open-batch:
