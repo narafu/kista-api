@@ -93,31 +93,6 @@ public class MarketCalendarPersistenceAdapter implements MarketCalendarPort, Mar
 
     @Override
     @Transactional
-    public void replaceByYear(int year, List<LocalDate> holidays) {
-        sessionRepository.deleteByTradeDateBetween(LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31));
-        holidayRepository.deleteByYear(year);
-        List<UsMarketHolidayEntity> entities = holidays.stream()
-                .map(UsMarketHolidayEntity::of)
-                .toList();
-        holidayRepository.saveAll(entities);
-        log.info("{}년 휴장일 {}건 적재 완료", year, entities.size());
-    }
-
-    @Override
-    @Transactional
-    public void replaceByMonth(int year, int month, List<LocalDate> holidays) {
-        LocalDate start = LocalDate.of(year, month, 1);
-        sessionRepository.deleteByTradeDateBetween(start, start.withDayOfMonth(start.lengthOfMonth()));
-        holidayRepository.deleteByMonth(year, month);
-        List<UsMarketHolidayEntity> entities = holidays.stream()
-                .map(UsMarketHolidayEntity::of)
-                .toList();
-        holidayRepository.saveAll(entities);
-        log.info("{}년 {}월 휴장일 {}건 적재 완료", year, month, entities.size());
-    }
-
-    @Override
-    @Transactional
     public void replaceSessionsByYear(int year, List<MarketCalendarTradingDay> tradingDays) {
         LocalDate start = LocalDate.of(year, 1, 1);
         replaceSessions(start, LocalDate.of(year, 12, 31), tradingDays);

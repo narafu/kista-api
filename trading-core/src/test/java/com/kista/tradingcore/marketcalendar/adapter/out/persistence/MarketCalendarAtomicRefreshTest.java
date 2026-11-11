@@ -7,6 +7,7 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,7 @@ import static org.mockito.Mockito.reset;
 class MarketCalendarAtomicRefreshTest extends DataJpaTestBase {
 
     @Autowired MarketCalendarPersistenceAdapter calendarAdapter;
+    @Autowired JdbcTemplate jdbcTemplate; // 테스트 데이터 정리
     @MockitoSpyBean UsMarketSessionJpaRepository sessionRepository; // 세션 저장 실패 주입
 
     @Test
@@ -53,7 +55,9 @@ class MarketCalendarAtomicRefreshTest extends DataJpaTestBase {
             assertThat(calendarAdapter.findHolidaysForMonth(year, 8)).containsExactlyInAnyOrderElementsOf(originalHolidays);
         } finally {
             reset(sessionRepository);
-            calendarAdapter.replaceByMonth(year, 8, List.of());
+            // 테스트 전용 연도(8800) 행을 직접 지운다
+            jdbcTemplate.update("DELETE FROM trading_ref.us_market_sessions WHERE trade_date BETWEEN ? AND ?", start, end);
+            jdbcTemplate.update("DELETE FROM trading_ref.us_market_holidays WHERE trade_date BETWEEN ? AND ?", start, end);
         }
     }
 }
