@@ -16,6 +16,9 @@ kista-api·kista-ui·kista-infra 세 레포 공통 기준이다. 각 레포의 F
 2. 모든 전제가 재검토 대상이다: 2-프로세스 분리, DB 5스키마, Spring Modulith, 헥사고날 포트 구조, 매매 공식까지. 매매 공식은 https://quantstack.app 을 기준 문헌으로 삼는다(KISTA 무한매수법은 4.0). 정리본은 `kista-api/docs/reference/quantstack/`.
 3. 테스트 코드 감량도 목표에 포함하되 별도 주제로 다룬다(동작 보존 근거가 줄어드는 위험 때문).
 4. 산출물 위치는 각 레포의 `docs/superpowers/fable-review/`.
+5. 문서 정리도 범위다: CLAUDE.md·docs·README·memory를 과감히 걷어내고 필요하면 구조를 개편한다(자동 로드 토큰 비용 포함).
+6. 불필요한 파일 삭제도 범위다: 참조 없는 소스·스크립트·설정·잔재를 근거와 함께 목록화한다. 삭제·대량 개편의 실행은 사용자 승인 후.
+7. 서브에이전트는 한도로 죽을 수 있으니 항목 단위로 findings 파일에 바로 기록하게 하고, 죽으면 새로 띄우지 말고 SendMessage로 재개한다.
 
 ## 역할 분담
 
@@ -46,4 +49,4 @@ kista-api·kista-ui·kista-infra 세 레포 공통 기준이다. 각 레포의 F
 
 ## 세션 간 연락
 
-세션 이름이 모두 `fable`이라 `ListAgents`의 `[ref]`로 구분한다. 다른 레포에 영향 주는 발견은 해당 세션에 SendMessage로 알리고 `cross-repo.md`에도 적는다.
+세션 이름은 `fable-api`·`fable-ui`·`fable-infra`다. 각 세션이 자기 레포의 PROGRESS·findings·지침서를 관장하고, 공통 기준(이 헌장)과 `cross-repo.md`만 fable-api가 쥔다. 다른 레포에 영향 주는 발견은 해당 세션에 SendMessage로 알리고 `cross-repo.md`에도 적는다.
