@@ -74,8 +74,7 @@ class MarketCalendarInternalControllerTest {
         mockMvc.perform(get("/api/internal/marketcalendar/session")
                         .header("X-Internal-Token", VALID_TOKEN))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.session").exists())
-                .andExpect(jsonPath("$.isDst").exists())
+                .andExpect(jsonPath("$.session").doesNotExist())
                 .andExpect(jsonPath("$.tradeDateKst").exists())
                 .andExpect(jsonPath("$.tradingDay").exists());
     }

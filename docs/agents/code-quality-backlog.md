@@ -42,7 +42,6 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 주제: 날짜·시간대. 유형: 중복·비일관성.
 - 위치 ✔:
   - `broker/adapter/out/toss/TossPriceApi.java:166`
-  - `marketcalendar/domain/model/MarketSessionSnapshot.java:16`
   - `trading/domain/model/DstInfo.java:15`
   - `stats/adapter/out/alpaca/AlpacaCandleAdapter.java:30` (이름은 `NEW_YORK`)
   - 루트 `api/benchmark/adapter/out/alpaca/AlpacaIndexPriceAdapter.java:23` (`NEW_YORK`, 착수 시 추가 발견)
@@ -582,7 +581,6 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | `CycleHistoryResponse`/`CycleHistoryPageResponse` trading·stats 완전 복제 | `trading/adapter/in/web/dto/`, `stats/adapter/in/web/dto/` (package 줄 외 diff 없음 ✔) | `own-type-ledger.md`가 (b) 외부 계약 분리로 허용한 항목이다. 엔드포인트별 응답 스키마. |
 | `TossPriceApi`의 DstInfo 세션 계산 복제 | `broker/adapter/out/toss/TossPriceApi.java:161-199` ✔ | broker는 trading 도메인을 참조할 수 없다. 주석이 이유와 "common 승격 대상 아님"을 명시한다. NY 상수만 CQ-01에서 처리한다. |
 | `TradingBatchResumer` 04:30 경계 주석 | `trading/adapter/in/schedule/TradingBatchResumer.java:84` ✔ | 요일 조합 판정이라 `nextTradeDate(ZonedDateTime)`와 계산이 다르다. 경계값 문서화 주석이다. |
-| `MarketSessionSnapshot` 세션 계산 | `marketcalendar/domain/model/MarketSessionSnapshot.java:11,16` | marketcalendar는 trading을 참조하지 않는다. NY 상수만 CQ-01. |
 | `TradingService` 배치 `LocalDate.now(KST)` | `TradingService.java:79,158` ✔ | 체크포인트 키(같은 날짜 수동 실행 DONE과 비교)라 거래일 값이 아니다. 주석에 명시돼 있다. |
 | `CycleSnapshotCreator` `LocalDate.now(KST)` | `CycleSnapshotCreator.java:97` | 주석에 "r.today()(다음 거래일)와 다르다"고 명시돼 있다. |
 | `DcaSummaryAssembler` `plusDays(1)` | `DcaSummaryAssembler.java:58-62` ✔ | KST 안에서 다음 실행 후보일을 계산한다. 기준 변환(KST↔US, 발행일↔거래일)이 아니다. |

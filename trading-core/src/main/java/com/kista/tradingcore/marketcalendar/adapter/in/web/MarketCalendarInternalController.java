@@ -3,7 +3,6 @@ package com.kista.tradingcore.marketcalendar.adapter.in.web;
 import com.kista.shared.contract.marketcalendar.MarketSessionResponse;
 import com.kista.shared.platform.time.KstTradeDates;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
-import com.kista.tradingcore.marketcalendar.domain.model.MarketSessionSnapshot;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -40,10 +39,7 @@ public class MarketCalendarInternalController {
 
     @GetMapping("/session")
     public MarketSessionResponse session() {
-        ZonedDateTime nowKst = ZonedDateTime.now(clock);
-        MarketSessionSnapshot snapshot = MarketSessionSnapshot.at(nowKst);
-        LocalDate tradeDateKst = KstTradeDates.nextTradeDate(nowKst); // KST 거래일
-        return new MarketSessionResponse(snapshot.session(), snapshot.isDst(),
-                tradeDateKst, marketCalendarPort.isMarketOpen(tradeDateKst));
+        LocalDate tradeDateKst = KstTradeDates.nextTradeDate(ZonedDateTime.now(clock)); // KST 거래일
+        return new MarketSessionResponse(tradeDateKst, marketCalendarPort.isMarketOpen(tradeDateKst));
     }
 }

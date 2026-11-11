@@ -38,12 +38,7 @@ public record DstInfo(
         return date.atTime(time).atZone(KST).toInstant();
     }
 
-    // 주어진 KST 시각 기준 주문 가능 시간대 판단
-    public MarketSession currentSessionAt(ZonedDateTime nowKst) {
-        return sessionAt(nowKst.getDayOfWeek(), nowKst.toLocalTime());
-    }
-
-    // 시각 주입식 판단 — currentSessionAt 공용
+    // 시각 주입식 판단 — 프리마켓+정규장(DIRECT)인지, 장마감~프리마켓 전(BLOCKED)인지
     MarketSession sessionAt(DayOfWeek day, LocalTime time) {
         if (day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY) return MarketSession.BLOCKED;
         // blocked: [marketClose, premarketStart)
