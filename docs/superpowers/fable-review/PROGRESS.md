@@ -46,7 +46,7 @@
 | 05 | Modulith 모듈 구성과 프로세스 분리 재검토 | findings 01·02 E·05, history, Modulith 2.1 문서 | **작성 완료** `guides/05-modules-and-processes.md`. **사용자 결정 D1~D4 대기**(D1: 한 코드베이스 + web/worker role 권고). 결정 뒤 단계 0 조사(`findings/09-process-local-state.md`)부터 |
 | 06 | 배치 오케스트레이션 | findings 03 C·D | 미착수 |
 | 07 | 테스트 전략 | findings 04 | 01~03 뒤 |
-| 08 | 매매 공식 대조 | docs/reference/quantstack(49파일), findings/08-formula-diff.md(완료, 차이 약 40행. PRIVACY·DCA·재시작 금액·리버스 테스트는 미대조) | Fable이 코드 직접 확인 후 판정 필요. 최우선: 별% 1%p 반올림(`InfinitePositionTest.java:52`) |
+| 08 | 매매 공식 대조 판정 | docs/reference/quantstack, findings 08, 커널 코드 직접 확인 | **작성 완료** `guides/08-formulas.md`. **사용자 결정 F1·F3·F4·F6·F7·F8 대기**. F1(별%를 금액 자릿수로 반올림)은 결함 판정 |
 | 09 | 문서 구조 개편과 불필요 파일 삭제 | findings 06(완료), cross-repo A5·A6·결정 2·6 | 미착수 |
 | 10 | UI 계약: 스펙 required·BigDecimal(T1·T2 최우선), 목록 규약(객체 봉투, 커서 1종), 메타 통합, 상태 플래그, 오류 문구, 가계부 집계 | cross-repo B, ui-api-principles.md, findings 07 | **작성 완료** `guides/10-ui-contract.md`. T8(가계부 집계)은 fable-ui 명세 대기 |
 
