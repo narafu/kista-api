@@ -73,7 +73,7 @@
 
 ### 2-6. 가계부 집계
 
-월별·카테고리별 합계, 순자산 추이, 예산 소진율을 서버가 계산한다. 엔드포인트 명세는 fable-ui가 보낼 "현재 UI 계산 목록"(화면별 입력·출력)을 받아 T8에서 확정한다. 금액 반올림은 `Currency.round`를 쓴다.
+월별·카테고리별 합계, 순자산 추이, 예산 소진율을 서버가 계산한다. 엔드포인트 명세의 재료는 `kista-ui/docs/superpowers/fable-review/findings/j-ui-api-principle-violations.md` 2-1절이다(자산 스냅샷 7가지 결과 / 거래·예산 요약·추이·예산 진행 / 일괄 등록 미리보기). UI 계산 약 925줄이 대상이다. 금액 반올림은 `Currency.round`를 쓴다.
 
 ## 3. 재심한 과거 결정
 
@@ -106,6 +106,14 @@
 | T7 | 오류 문구: Bean Validation 한국어화, `fieldErrors` 확장, `ExceptionMessageFormatTest` 범위 확대 | Sonnet | 테스트 통과 |
 | T8 | 가계부 집계 엔드포인트(fable-ui 명세 수신 후) | Opus(명세), Sonnet(구현) | 서비스·web 테스트 |
 | T9 | `ui-api-principles.md`를 `docs/agents/ui-api-contract.md`로 옮겨 상시 규칙화, `constraints.md`에서 가리킨다. 가드: 컬렉션을 반환하는 컨트롤러 메서드는 `Items`/`CursorPage`만 반환(ArchUnit) | Sonnet | 가드 통과 |
+
+| T10 | **검증 전용 엔드포인트.** `POST /api/accounts/{accountId}/trading-cycle-validations`(등록과 같은 body), 수정·VR 재설정도 같은 형태. 응답 `{fieldErrors[], warnings[], derived{...}}`. `derived`는 서버가 채울 기본값·파생값(램프 실효값, 필요 인출 자산, 시드 미리보기 등). 등록 서비스와 **같은 resolver 경로**를 저장 없이 태운다(검증 로직을 한 벌 더 만들지 않는다). 기존 `GET .../strategy-seed-preview`는 `derived`로 흡수 | Opus | resolver 단위 테스트 + web 테스트. 등록이 거절하는 입력은 검증도 같은 `fieldErrors`를 낸다는 대칭 테스트 |
+| T11 | 단건 조회 `GET /api/accounts/{id}`, `GET /api/trading-cycles/{id}`. 지금은 UI가 목록을 받아 찾는다 | Sonnet | web 테스트(소유권 포함) |
+| T12 | 차트 지표를 시계열 응답에 싣는다(이동평균·RSI). DCA 조건 판정이 쓰는 계산과 같은 코드를 쓴다. 사용자 상태 응답에 `reapplyAvailableAt` 추가 | Sonnet | 지표 값이 판정용 계산과 같다는 테스트 |
+
+UI가 요청한 변경과의 대응(`kista-ui/.../findings/j-ui-api-principle-violations.md` 11-3절): A1·A4·A6·A8·A9 → T4, A2·A3·A5 → T8(명세는 같은 문서 2-1절 A·B·C 묶음의 입출력을 그대로 쓴다), A7 → T4(정렬 키 보정), A10·A17·A18·A19 → T8에 "기존 응답의 집계 필드 추가" 묶음으로, A11·A12·A13·A14·A15 → T6, A16 → T5, A20 → T7·T10.
+
+확인된 불일치: `AdminPrivacyTradeController.java:44`의 파라미터는 `range`인데 UI는 `days`를 보낸다. 기간이 서버에 전달되지 않고 UI가 전량을 받아 거른다. T4의 관리자 묶음에서 파라미터 이름을 정리한다.
 
 T1·T2는 다른 태스크와 독립이고 UI 01의 차단 조건이라 **가장 먼저** 실행한다. T3 → T4, T5·T6·T7은 서로 독립이다.
 
