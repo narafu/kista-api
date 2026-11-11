@@ -22,6 +22,8 @@ import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy;
 import com.kista.tradingcore.support.StubBrokerApiException;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
+import com.kista.tradingcore.marketcalendar.domain.model.MarketSessionTimes;
 import org.mockito.InOrder;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
@@ -40,8 +42,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -64,6 +70,7 @@ class TradingOrderExecutorTest {
     @Mock StrategyLedgerBudget ledgerBudget;
     @Mock OrderSubmissionReconciler reconciler;
     @Mock DcaExecutionRecorder dcaRecorder;
+    @Mock MarketCalendarPort marketCalendarPort;
 
     static final LocalDate TODAY = LocalDate.now();
 
@@ -104,9 +111,12 @@ class TradingOrderExecutorTest {
 
     private TradingOrderExecutor executor() {
         // 실제 OrderSubmitter로 선점→접수→기록 경로까지 끝까지 검증
+        Instant now = Instant.parse("2026-11-27T17:30:00Z");
+        lenient().when(marketCalendarPort.findSession(any())).thenReturn(Optional.of(
+                new MarketSessionTimes(now.minusSeconds(3600), now.plusSeconds(1800))));
         return new TradingOrderExecutor(orderPort, buyOrderPriceCapper, CYCLE_STRATEGIES, ledgerBudget,
                 new AccountBudgetLock(), new OrderSubmitter(orderPort, brokerPort, eventPublisher), reconciler,
-                eventPublisher, dcaRecorder);
+                eventPublisher, dcaRecorder, marketCalendarPort, Clock.fixed(now, ZoneOffset.UTC));
     }
 
     private Order planned(UUID id, OrderDirection direction, String price, int quantity) {

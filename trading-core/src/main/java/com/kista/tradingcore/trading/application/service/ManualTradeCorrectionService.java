@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 import java.util.NoSuchElementException;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.trading.application.service.support.CycleCloser;
 import com.kista.tradingcore.trading.application.service.support.SelectionChain;
 
@@ -53,6 +54,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
     private final CyclePositionPort cyclePositionPort;
     private final OrderPort orderPort;
     private final TradingBatchRunPort batchRunPort; // 마감 리포트 완료 여부
+    private final MarketCalendarPort marketCalendarPort; // 실제 마감 리포트 시각
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher; // 사이클 종료 시 사용자 알림 — 커밋 후 이벤트로 위임
     private static final int CRYPTO_SCALE = 8; // 코인 수량 소수 자릿수 상한 (업비트)
@@ -127,7 +129,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
         // 코인 계좌는 마감 리포트가 없어 제외 (rejectUnidentifiedFillsBeforeReport와 같은 이유)
         if (account.broker().getMarket().isCrypto()) return;
         // 창 판정과 리포트 대상 판정은 마감 배치와 같은 기준(CloseReportScope)
-        if (CloseReportScope.inReportWindow(strategy, clock, batchRunPort, orderPort)) {
+        if (CloseReportScope.inReportWindow(strategy, clock, batchRunPort, orderPort, marketCalendarPort)) {
             throw new IllegalStateException("오늘 마감 리포트가 끝나기 전에는 수동 체결 보정을 할 수 없습니다.");
         }
     }

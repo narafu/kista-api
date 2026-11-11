@@ -21,6 +21,8 @@ import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort; i
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
+import com.kista.tradingcore.marketcalendar.domain.model.MarketSessionTimes;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.trading.application.port.output.StrategyCycleVrPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyVrDetailPort;
 import com.kista.tradingcore.trading.domain.creation.*;
@@ -35,8 +37,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
-import java.time.ZonedDateTime;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -75,6 +77,11 @@ class ManualTradingServiceTest {
     @Mock ApplicationEventPublisher eventPublisher; // 4xx 예외라 GlobalExceptionHandler가 저장 안 하는 외부 API 실패를 직접 기록
 
     ManualTradingService service;
+    TradingPriceFetcher priceFetcher;
+    StrategyOrderPlanBuilder planBuilder;
+    BuyOrderPriceCapper priceCapper;
+    StrategyLedgerBudget ledgerBudget;
+    TradingOrderPlanner orderPlanner;
 
     static final UUID REQUESTER_ID = UUID.randomUUID();
     static final Account ACCOUNT = TradingFixtures.kisAccount(UUID.randomUUID(), REQUESTER_ID);
@@ -109,21 +116,22 @@ class ManualTradingServiceTest {
         CycleOrderComputer orderComputer = new CycleOrderComputer(
                 cycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
                 strategyCycleVrPort, strategyVrDetailPort, orderPort);
-        TradingOrderPlanner orderPlanner = new TradingOrderPlanner(orderPort);
-        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort, eventPublisher, privacyTradePort);
-        StrategyOrderPlanBuilder planBuilder = new StrategyOrderPlanBuilder(
+        orderPlanner = new TradingOrderPlanner(orderPort);
+        priceFetcher = new TradingPriceFetcher(kisPricePort, eventPublisher, privacyTradePort);
+        planBuilder = new StrategyOrderPlanBuilder(
                 balanceLoader, kisPricePort, privacyTradePort, orderComputer, cycleStrategies, privacyBaseGuard, orderPort, null);
-        BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(
+        priceCapper = new BuyOrderPriceCapper(
                 orderPort, orderPlanner, cycleStrategies, strategyCyclePort);
-        StrategyLedgerBudget ledgerBudget = new StrategyLedgerBudget(cyclePositionPort, orderPort, mock(TradingBatchRunPort.class), cycleStrategies);
+        ledgerBudget = new StrategyLedgerBudget(cyclePositionPort, orderPort, mock(TradingBatchRunPort.class), cycleStrategies);
 
         // ManualTradingService 필드 목록에 orderPlanner가 포함돼 있다(배치 TradingCandidatePlanner와 동일하게
         // 원장 통과 결과를 저장하는 데 필요 — 브리핑 원안 생성자 호출에는 누락돼 있어 여기서 보정한다)
-        service = new ManualTradingService(
-                strategyPort, strategyCyclePort, accountPort, orderPort,
-                priceFetcher, planBuilder, priceCapper, ledgerBudget,
-                orderPlanner, orderExecutor, budgetLock, eventPublisher, marketCalendarPort, FIXED);
-        lenient().when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        service = serviceAt(FIXED);
+        lenient().when(marketCalendarPort.findSession(any())).thenAnswer(inv -> {
+            LocalDate date = inv.getArgument(0);
+            return Optional.of(new MarketSessionTimes(date.minusDays(1).atTime(23, 30).atZone(TimeZones.KST).toInstant(),
+                    date.atTime(6, 0).atZone(TimeZones.KST).toInstant()));
+        });
 
         lenient().when(strategyPort.findByIdOrThrow(STRATEGY.id())).thenReturn(STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT.id(), REQUESTER_ID)).thenReturn(ACCOUNT);
@@ -143,6 +151,12 @@ class ManualTradingServiceTest {
         // 캡 판단용 현재가 — 기존 주문 픽스처 가격(22.00)에 캡(×1.05=23.10)이 걸리지 않는 기본값(개별 테스트가 필요 시 override)
         lenient().when(kisPricePort.getPrices(anyList(), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("22.00")));
+    }
+
+    private ManualTradingService serviceAt(Clock clock) {
+        return new ManualTradingService(strategyPort, strategyCyclePort, accountPort, orderPort,
+                priceFetcher, planBuilder, priceCapper, ledgerBudget, orderPlanner, orderExecutor,
+                budgetLock, eventPublisher, marketCalendarPort, clock);
     }
 
     private void stubLedger(BigDecimal deposit) {
@@ -221,7 +235,7 @@ class ManualTradingServiceTest {
     @Test
     void execute_marketClosedTradeDate_rejectedBeforeAnyOrder() {
         // 휴장 거래일 — 배치가 접수하지 않는 PLANNED를 남기거나 휴장일 밤에 AT_OPEN을 즉시 접수하지 않는다
-        when(marketCalendarPort.isMarketOpen(any())).thenReturn(false);
+        doReturn(Optional.empty()).when(marketCalendarPort).findSession(any());
 
         assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
                 .isInstanceOf(ManualTradingException.class)
@@ -531,16 +545,16 @@ class ManualTradingServiceTest {
 
     @Test
     void execute_vrStrategy_marketOpen_placesAtOpenOrdersWithCorrectArguments() {
-        // 개장 후 수동 실행 — DstInfo.immediateOpen(ZonedDateTime.now(FIXED))으로 marketOpen을 과거로 고정해
-        // placeAtOpenOrdersIfMarketOpen의 개장 분기를 결정론적으로 강제한다 (실시간 시각 의존 제거)
+        // 선택된 거래일 세션이 현재 진행 중이다
         VrFixture fx = setUpVrManualExecution();
+        stubSelectedSession(Instant.now(FIXED).minusSeconds(3600), Instant.now(FIXED).plusSeconds(3600));
         when(orderPort.findAtOpenPlannedByCycleAndDate(eq(fx.vrCycle().id()), any()))
                 .thenReturn(List.of(fx.vrBuyPlanned(), fx.vrSellPlanned()));
         // BUY cap 판단용 최신 현재가 재조회 — placeAtOpenOrdersIfMarketOpen 내부에서 fetchPrices 호출
         when(kisPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("21.00")));
 
-        List<Order> result = service.execute(fx.vrStrat().id(), REQUESTER_ID, DstInfo.immediateOpen(ZonedDateTime.now(FIXED)));
+        List<Order> result = service.execute(fx.vrStrat().id(), REQUESTER_ID);
 
         assertThat(result).hasSize(2);
         // VR 수동실행 plan.position()은 항상 null(VrCycleOrderStrategy.plan()), vrPosition은 non-null,
@@ -554,6 +568,7 @@ class ManualTradingServiceTest {
     void execute_vrStrategy_marketOpen_priceFetchFails_placesAtOpenOrdersWithNullPrice() {
         // PLANNED가 이미 저장된 뒤 시세 조회가 실패해도 예외로 끝내지 않고 캡 미적용(null 가격)으로 접수한다
         VrFixture fx = setUpVrManualExecution();
+        stubSelectedSession(Instant.now(FIXED).minusSeconds(3600), Instant.now(FIXED).plusSeconds(3600));
         when(orderPort.findAtOpenPlannedByCycleAndDate(eq(fx.vrCycle().id()), any()))
                 .thenReturn(List.of(fx.vrBuyPlanned(), fx.vrSellPlanned()));
         when(kisPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
@@ -561,7 +576,7 @@ class ManualTradingServiceTest {
         // TradingPriceFetcher가 포트 실패를 삼키고 발행하는 알림마저 실패해 fetchPrices가 던지는 경로
         doThrow(new RuntimeException("알림 발행 실패")).when(eventPublisher).publishEvent(any(Object.class));
 
-        List<Order> result = service.execute(fx.vrStrat().id(), REQUESTER_ID, DstInfo.immediateOpen(ZonedDateTime.now(FIXED)));
+        List<Order> result = service.execute(fx.vrStrat().id(), REQUESTER_ID);
 
         assertThat(result).hasSize(2);
         verify(orderExecutor).placeAtOpenOrders(
@@ -573,14 +588,68 @@ class ManualTradingServiceTest {
     void execute_vrStrategy_marketClosed_doesNotPlaceAtOpenOrders() {
         // 개장 전 수동 실행 — marketOpen을 미래로 설정해 개장 분기를 결정론적으로 회피한다
         VrFixture fx = setUpVrManualExecution();
-        Instant future = Instant.now(FIXED).plusSeconds(3600);
-        DstInfo marketClosed = new DstInfo(false, future, future, future);
-
-        List<Order> result = service.execute(fx.vrStrat().id(), REQUESTER_ID, marketClosed);
+        List<Order> result = service.execute(fx.vrStrat().id(), REQUESTER_ID);
 
         assertThat(result).hasSize(2);
         // 개장 전이므로 AT_OPEN 즉시 접수가 호출되지 않아야 함 — 개장 스케쥴러가 담당
         verify(orderExecutor, never()).placeAtOpenOrders(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    private void stubSelectedSession(Instant open, Instant close) {
+        when(marketCalendarPort.findSession(LocalDate.now(FIXED).plusDays(1)))
+                .thenReturn(Optional.of(new MarketSessionTimes(open, close)));
+    }
+
+    @Test
+    void afterMidnightBeforeCutoffPlacesCurrentSessionOrders() {
+        VrFixture fx = setUpVrManualExecution();
+        LocalDate date = LocalDate.of(2026, 1, 6);
+        Clock clock = Clock.fixed(date.atTime(1, 0).atZone(TimeZones.KST).toInstant(), TimeZones.KST);
+        service = serviceAt(clock);
+        when(orderPort.findAtOpenPlannedByCycleAndDate(fx.vrCycle().id(), date))
+                .thenReturn(List.of(fx.vrBuyPlanned()));
+
+        service.execute(fx.vrStrat().id(), REQUESTER_ID);
+
+        verify(orderExecutor).placeAtOpenOrders(eq(date), any(), eq(fx.vrCycle()), any(), isNull(), any(), eq(fx.vrStrat()));
+    }
+
+    @Test
+    void beforeMidnightPlacesOnlyNextTradeDateSessionOrders() {
+        VrFixture fx = setUpVrManualExecution();
+        LocalDate date = LocalDate.of(2026, 1, 5);
+        Clock clock = Clock.fixed(date.atTime(23, 45).atZone(TimeZones.KST).toInstant(), TimeZones.KST);
+        service = serviceAt(clock);
+        when(orderPort.findAtOpenPlannedByCycleAndDate(fx.vrCycle().id(), date.plusDays(1)))
+                .thenReturn(List.of(fx.vrBuyPlanned()));
+
+        service.execute(fx.vrStrat().id(), REQUESTER_ID);
+
+        verify(orderExecutor).placeAtOpenOrders(eq(date.plusDays(1)), any(), eq(fx.vrCycle()), any(), isNull(), any(), eq(fx.vrStrat()));
+    }
+
+    @Test
+    void afterEarlyCloseCutoffDoesNotSubmitNextSessionUsingOldOpenTime() {
+        VrFixture fx = setUpVrManualExecution();
+        LocalDate date = LocalDate.of(2026, 1, 6);
+        Clock clock = Clock.fixed(date.atTime(2, 45).atZone(TimeZones.KST).toInstant(), TimeZones.KST);
+        service = serviceAt(clock);
+        when(marketCalendarPort.findSession(date)).thenReturn(Optional.of(new MarketSessionTimes(
+                date.minusDays(1).atTime(23, 30).atZone(TimeZones.KST).toInstant(),
+                date.atTime(3, 0).atZone(TimeZones.KST).toInstant())));
+
+        service.execute(fx.vrStrat().id(), REQUESTER_ID);
+
+        verify(orderPort, atLeastOnce()).findPlannedOrPlacedByCycleAndDate(fx.vrCycle().id(), date.plusDays(1));
+        verify(orderExecutor, never()).placeAtOpenOrders(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void unknownSessionPreventsOrderCreation() {
+        doThrow(new IllegalStateException("캘린더가 없습니다.")).when(marketCalendarPort).findSession(any());
+        assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID)).isInstanceOf(IllegalStateException.class);
+        verify(orderPort, never()).saveAll(anyList());
+        verifyNoInteractions(orderExecutor);
     }
 
     // 계좌 예산 락 구간 안에서만 true — 승인분 PLANNED 저장이 락 안에서 커밋되는지 검증용

@@ -27,13 +27,13 @@ class ArchitectureMapTest {
 
         assertThat(ArchitectureMapExporter.violations(map, classes)).isEmpty();
 
-        // 프로세스 판별·KST 시각 계산 회귀 가드 — 마감 배치는 kista-trading에서 04:30
+        // 프로세스 판별·KST 시각 계산 회귀 가드 — 개장 배치는 kista-trading에서 22:00 (마감 배치는 cron이 아니라 실제 마감 기준 1회 예약)
         var jobs = ArchitectureMapExporter.jobs(classes);
-        assertThat(jobs).filteredOn(j -> j.name().equals("TradingCloseScheduler#run"))
+        assertThat(jobs).filteredOn(j -> j.name().equals("TradingOpenScheduler#run"))
                 .singleElement()
                 .satisfies(j -> {
                     assertThat(j.process()).isEqualTo("kista-trading");
-                    assertThat(j.times()).containsExactly("04:30");
+                    assertThat(j.times()).containsExactly("22:00");
                 });
 
         var modules = ModuleGraphExporter.graph(

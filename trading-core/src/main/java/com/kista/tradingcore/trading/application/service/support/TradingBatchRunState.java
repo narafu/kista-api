@@ -19,7 +19,7 @@ public class TradingBatchRunState {
     private volatile boolean stopping; // 종료 요청 수신 — 이후 대기는 즉시 중단
 
     // 배치 전체를 추적 대상으로 실행
-    // ponytail: 단일 슬롯 — 개장(22:30~)·마감(04:30~) 배치는 시간상 겹치지 않음. 겹치면 뒤 배치는 추적 없이 실행(종료 시 보호 안 됨)
+    // ponytail: 단일 슬롯 — 스케쥴러 경로는 TradingBatchSerialExecutor가 개장·마감을 직렬화한다. 그 밖에서 겹치면 뒤 배치는 추적 없이 실행(종료 시 보호 안 됨)
     public void track(BatchTask task) throws InterruptedException {
         boolean owner = register();
         try {

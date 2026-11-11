@@ -10,7 +10,7 @@ import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
-import com.kista.tradingcore.trading.domain.model.DstInfo;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.trading.domain.model.ReconfigureVrCommand;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
@@ -57,6 +57,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
     private final CycleSnapshotCreator cycleSnapshotCreator; // 버전 교체 + 사이클 종료 + 새 사이클 원자 저장
     private final OrderCancelService orderCancelService;     // 재설정 전 미체결 주문 정리
     private final ApplicationEventPublisher eventPublisher;   // 새 사이클 시작 이벤트 발행 + 사용자 알림 실패 시 관리자 알림 이벤트
+    private final MarketCalendarPort marketCalendarPort; // 주식 거래일 경계
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
@@ -72,7 +73,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
         // 현재 사이클·버전 상세·사이클 상세·최신 포지션 조회 (모두 조회 전용 — 검증을 외부 호출보다 먼저 끝내기 위해 앞으로 이동)
         StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategyId);
         // 다음 거래일 기준 매매 시작 여부 — 시작 전이면 새 사이클 없이 첫 사이클을 in-place 갱신한다
-        LocalDate today = DstInfo.nextTradeDate(ZonedDateTime.now(clock));
+        LocalDate today = SessionTradeDates.nextTradeDate(ZonedDateTime.now(clock), marketCalendarPort);
         boolean beforeStart = !currentCycle.hasStartedBy(today);
         StrategyVrDetail currentDetail = strategyVrDetailPort.findByStrategyVersionId(currentCycle.strategyVersionId())
                 .orElseThrow(() -> new NoSuchElementException("VR 전략 버전 상세 없음: strategyId=" + strategyId));

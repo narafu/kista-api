@@ -16,6 +16,7 @@ import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.InfiniteStrategy;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -23,6 +24,9 @@ import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -43,6 +47,8 @@ class TradingOrderExecutor {
     private final OrderSubmissionReconciler reconciler;         // 접수 전 잔류 SUBMITTING 대사(Toss 멱등 재요청·알림)
     private final ApplicationEventPublisher eventPublisher;     // 잔고 부족 거절 사용자 알림(InsufficientBalanceEvent)
     private final DcaExecutionRecorder dcaRecorder;             // 회차 판정 전략(DCA)은 알림 대신 회차 skip 기록
+    private final MarketCalendarPort marketCalendarPort;       // 거래일의 실제 마감 시각
+    private final Clock clock;                                 // 주문별 접수 마감 확인
 
     // AT_OPEN PLANNED 주문 접수 — 개장 스케쥴러 선접수 + 개장 후 수동실행 공용
     // BUY cap 보정을 AT_OPEN 스코프(BuyOrderPriceCapper.capIfNeeded(mode, atOpen=true, ...))로 적용한 뒤
@@ -57,7 +63,7 @@ class TradingOrderExecutor {
             log.info("[accountId={}] 개장 선접수할 주문 없음", account.id());
             return List.of();
         }
-        PlaceResult result = placeEach(atOpenOrders, account);
+        PlaceResult result = placeEach(atOpenOrders, account, null);
         reportInsufficient(result, tradeDate, account, strategy);
         List<Order> placed = result.placed();
         log.info("[accountId={}] 개장 주문 {}건 선접수 (성공/{} 시도)", account.id(), placed.size(), atOpenOrders.size());
@@ -68,10 +74,20 @@ class TradingOrderExecutor {
     // null 가드는 applyCap에 있다 (capIfNeeded는 @Transactional이라 내부에 두면 skip 케이스마다 빈 트랜잭션이 열림)
     List<Order> placeOrders(LocalDate today, TradingAccount account, StrategyCycle cycle,
                             BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, Strategy strategy) {
+        // 조회 실패나 휴장 시 마감 시각을 추정하지 않고 신규 접수를 중단한다
+        Instant cutoff = marketCalendarPort.findSession(today)
+                .orElseThrow(() -> new IllegalStateException("휴장일에는 마감 주문을 접수할 수 없습니다."))
+                .closeAt().minus(Duration.ofMinutes(10));
+        if (!clock.instant().isBefore(cutoff)) {
+            String message = "[마감 접수 중단] 접수 마감 경과 — 계좌 " + account.nickname();
+            log.warn("[accountId={}] {}", account.id(), message);
+            eventPublisher.publishEvent(new TradingErrorEvent(null, message));
+            return List.of();
+        }
         reconciler.reconcile(cycle.id(), today, account);
         applyCap(false, today, account, cycle, currentPrice, position, vrPosition, strategy);
         List<Order> planned = orderPort.findPlannedByCycleAndDate(cycle.id(), today);
-        PlaceResult result = placeEach(planned, account);
+        PlaceResult result = placeEach(planned, account, cutoff);
         reportInsufficient(result, today, account, strategy);
         List<Order> placed = result.placed();
         log.info("[accountId={}] 주문 {}건 접수 (성공/{} 시도)", account.id(), placed.size(), planned.size());
@@ -114,7 +130,7 @@ class TradingOrderExecutor {
 
     // 주문 목록을 개별 접수 — 건별로 선점(SUBMITTING) 후 접수, 실패·선점 경합 주문은 건너뛰고 다음 주문 계속
     // 계좌(앱키) 단위 호출 간격 게이트는 KisHttpClient.executeWithRetry가 전담(경로: place() → KisOrderApi → KisHttpClient.post()) — 여기서 별도 페이싱 불필요
-    private PlaceResult placeEach(List<Order> unordered, TradingAccount account) {
+    private PlaceResult placeEach(List<Order> unordered, TradingAccount account, Instant cutoff) {
         // INFINITE 보정 주문은 마지막에 접수 — 증권사는 접수 시 지정가 전체를 묶으므로 예수금이 모자라면 거절이 보정에만 생기고 base는 접수된다
         // (조회 순서가 비결정적이라 명시 정렬, 정렬은 안정적이라 나머지 순서는 유지)
         List<Order> orders = unordered.stream()
@@ -123,6 +139,13 @@ class TradingOrderExecutor {
         List<Order> placed = new ArrayList<>();
         List<Order> insufficient = new ArrayList<>();
         for (int i = 0; i < orders.size(); i++) {
+            // 대기나 앞선 주문 처리 중 접수 마감을 넘으면 남은 주문은 전송하지 않는다
+            if (cutoff != null && !clock.instant().isBefore(cutoff)) {
+                String message = "[마감 접수 중단] 접수 마감 경과 — 남은 주문 " + (orders.size() - i) + "건";
+                log.warn("[accountId={}] {}", account.id(), message);
+                eventPublisher.publishEvent(new TradingErrorEvent(null, message));
+                break;
+            }
             // 주문 간격이 이미 충분히 벌어져(정상적인 왕복 지연) 게이트가 대기 없이 즉시 반환하는 경우
             // 아래 체크만으로는 놓친다 — 매 주문 시도 전에 별도로 확인한다
             if (Thread.currentThread().isInterrupted()) {

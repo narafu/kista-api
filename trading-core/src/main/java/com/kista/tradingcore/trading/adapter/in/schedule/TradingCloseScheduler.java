@@ -3,29 +3,34 @@ package com.kista.tradingcore.trading.adapter.in.schedule;
 import com.kista.shared.platform.scheduling.SchedulerJobRunner;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.shared.kernel.TimeZones;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.tradingcore.trading.application.port.output.HeartbeatPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
+import com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort;
 import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
-import com.kista.tradingcore.trading.domain.model.DstInfo;
 import com.kista.tradingcore.trading.domain.model.TradingBatchJob;
+import com.kista.tradingcore.trading.domain.model.TradingBatchPhase;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ScheduledFuture;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.time.Duration;
-import java.time.LocalTime;
-import java.time.ZonedDateTime;
 
 @Slf4j
 @Component
@@ -41,56 +46,105 @@ public class TradingCloseScheduler {
     private final HeartbeatPort heartbeatPort; // dead-man's switch 핑
     private final TradingErrorReportPort errorReportPort; // 수동 트리거 거부 관리자 알림
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
+    private final MarketCalendarPort marketCalendarPort;
+    private final TradingBatchRunPort batchRunPort;
+    private final TaskScheduler taskScheduler;
+    private final TradingBatchSerialExecutor serialExecutor;
+    private final Map<LocalDate, Reservation> reservations = new HashMap<>(); // 거래일별 메모리 예약 — 재기동 시 TradingBatchResumer·reconcile이 재등록
 
-    static final LocalTime CRON_TIME = LocalTime.of(4, 30);                // cron 발화 시각 — 당일 마감 접수 창 시작
     private static final Duration LOCK_TTL = Duration.ofHours(3); // 마감 배치 락 보유시간
-    static final Duration PLACEMENT_MARGIN = Duration.ofMinutes(10);       // 장마감 10분 전까지만 마감 접수
+    static final Duration ORDER_MARGIN = Duration.ofMinutes(30);     // 실제 마감 30분 전 접수
+    static final Duration PLACEMENT_MARGIN = Duration.ofMinutes(10); // 실제 마감 10분 전까지만 접수
+    private static final Duration EARLY_FIRE_TOLERANCE = Duration.ofMinutes(1); // 예약 지연은 단조 시계라 벽시계보다 조금 일찍 발화할 수 있음
+    private static final Duration AUTOMATIC_WINDOW = ORDER_MARGIN.plus(EARLY_FIRE_TOLERANCE); // 자동 실행 접수 창 시작
+    private static final Duration MANUAL_WINDOW = Duration.ofMinutes(90);       // 수동 마감 허용 시작 — 기존 비DST 04:30(마감 90분 전)과 같은 폭
 
-    // 장마감 10분 전 이전인지 — 수동 트리거·재기동 재개 공용 접수 마감 판정
-    static boolean beforePlacementCutoff(ZonedDateTime nowKst) {
-        return nowKst.toInstant().isBefore(DstInfo.calculate(nowKst).marketCloseAt().minus(PLACEMENT_MARGIN));
+    private record Reservation(Instant orderAt, ScheduledFuture<?> future) {}
+
+    // 정시 개장 및 기동 복구가 같은 거래일을 예약해도 콜백은 하나만 등록한다 — 예약 시각이 이미 지났으면 관리자 알림
+    void schedule(LocalDate tradeDate) {
+        register(tradeDate, true);
     }
 
-    @Scheduled(cron = "0 30 4 * * TUE-SAT", zone = TimeZones.KST_ID) // 화~토 04:30 KST (DST 장마감 30분 전, 비DST는 waitUntilOrderTime 60분 대기)
-    public void run() throws InterruptedException {
-        schedulerLockService.tryRun(TradingBatchJob.CLOSE.lockName(), LOCK_TTL, this::runLocked);
+    // 예약 누락·마감 시각 변경 보정 — 매시 오늘·내일 예약을 다시 맞춘다(이미 지난 예약 시각은 조용히 건너뜀)
+    @Scheduled(cron = "0 5 * * * *", zone = TimeZones.KST_ID)
+    public void reconcile() {
+        LocalDate today = LocalDate.now(clock.withZone(TimeZones.KST));
+        register(today, false);
+        register(today.plusDays(1), false);
+    }
+
+    private synchronized void register(LocalDate tradeDate, boolean alertIfPast) {
+        try {
+            var session = marketCalendarPort.findSession(tradeDate);
+            Reservation existing = reservations.get(tradeDate);
+            Instant orderAt = session.map(s -> s.closeAt().minus(ORDER_MARGIN)).orElse(null);
+            if (existing != null) {
+                // 같은 시각이거나 이미 발화(실행 중 포함)한 예약은 건드리지 않는다 — 실행 중 취소·재등록하면 이중 실행된다
+                if (existing.orderAt().equals(orderAt) || existing.future().isDone()
+                        || !clock.instant().isBefore(existing.orderAt())) return;
+                // 캘린더 갱신으로 마감 시각이 바뀌었거나 휴장이 됐으면 기존 예약을 취소하고 다시 등록한다
+                existing.future().cancel(false);
+                reservations.remove(tradeDate);
+                log.warn("마감 예약 변경 — 거래일 {}: {} → {}", tradeDate, existing.orderAt(), orderAt);
+            }
+            if (orderAt == null || batchRunPort.findPhase(TradingBatchJob.CLOSE, tradeDate)
+                    .orElse(null) == TradingBatchPhase.DONE) return;
+            if (!clock.instant().isBefore(orderAt)) {
+                if (alertIfPast) alert("[마감 예약 누락] 예약 시각 경과 — 거래일 " + tradeDate);
+                return;
+            }
+            ScheduledFuture<?> future = taskScheduler.schedule(() -> scheduledCallback(tradeDate), orderAt);
+            if (future == null) throw new IllegalStateException("마감 예약이 등록되지 않았습니다: " + tradeDate);
+            reservations.put(tradeDate, new Reservation(orderAt, future));
+            reservations.entrySet().removeIf(entry -> entry.getKey().isBefore(tradeDate) && entry.getValue().future().isDone());
+        } catch (Exception e) {
+            report("마감 예약 실패 (거래일 " + tradeDate + ")", e);
+        }
+    }
+
+    private void scheduledCallback(LocalDate tradeDate) {
+        try {
+            serialExecutor.run(() -> {
+                if (!schedulerLockService.tryRun(TradingBatchJob.CLOSE.lockName(), LOCK_TTL,
+                        () -> runAutomatic(tradeDate))
+                        && batchRunPort.findPhase(TradingBatchJob.CLOSE, tradeDate).orElse(null) != TradingBatchPhase.DONE) {
+                    alert("[마감 예약 누락] 락 획득 실패 — 거래일 " + tradeDate);
+                }
+            });
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            report("마감 예약 실행 인터럽트 (거래일 " + tradeDate + ")", e);
+        } catch (Exception e) {
+            report("마감 예약 실행 실패 (거래일 " + tradeDate + ")", e);
+        }
     }
 
     // 수동 트리거 — 주문 대기 없이 즉시 접수, 리포트는 장마감 후
     public void runNow() throws InterruptedException {
-        runNow(ZonedDateTime.now(clock));
-    }
-
-    // package-private: 시각 주입으로 접수 창 판정 테스트
-    void runNow(ZonedDateTime nowKst) throws InterruptedException {
-        // 개장 runNow는 창 판정이 없고 마감만 창 밖을 거부한다
-        // 컨트롤러는 202를 먼저 돌려주므로 거부는 호출 응답이 아닌 관리자 알림으로만 알린다(CQ-60 현행 유지 결정)
-        // 당일 마감 접수 창(04:30~장마감 10분 전) 밖이면 거부 — LOC가 다음 세션으로 넘어가 거래일(KST 당일)·리포트가 어긋난다
-        if (nowKst.toLocalTime().isBefore(CRON_TIME) || !beforePlacementCutoff(nowKst)) {
-            String message = "[수동 마감 거부] 마감 접수 창(04:30~장마감 10분 전 KST) 밖 — 요청 시각 " + nowKst.toLocalTime().withNano(0);
-            log.warn(message);
-            errorReportPort.reportError(new IllegalStateException(message));
-            return;
-        }
-        schedulerLockService.tryRun(TradingBatchJob.CLOSE.lockName(), LOCK_TTL, () ->
-                jobRunner.run("마감 매매 스케쥴러 수동",
-                        () -> contextFactory.buildAll(closeBatchStrategies()),
-                        useCase::executeBatchNow));
+        LocalDate tradeDate = LocalDate.now(clock.withZone(TimeZones.KST));
+        if (!canPlace(tradeDate, MANUAL_WINDOW)) return;
+        serialExecutor.run(() -> {
+            if (!canPlace(tradeDate, MANUAL_WINDOW)) return;
+            schedulerLockService.tryRun(TradingBatchJob.CLOSE.lockName(), LOCK_TTL, () -> {
+                if (!canPlace(tradeDate, MANUAL_WINDOW)) return;
+                runBatch("마감 매매 스케쥴러 수동", tradeDate, MANUAL_WINDOW);
+            });
+        });
     }
 
     // 재기동 재개 — 이전 프로세스 락을 인수해 마감 배치 전체 재실행 (slot 멱등 재계획, 남은 시간만 대기)
     public void resume() throws InterruptedException {
-        schedulerLockService.takeOver(TradingBatchJob.CLOSE.lockName(), LOCK_TTL, this::runLocked);
+        LocalDate tradeDate = LocalDate.now(clock.withZone(TimeZones.KST));
+        serialExecutor.run(() -> schedulerLockService.takeOver(TradingBatchJob.CLOSE.lockName(), LOCK_TTL,
+                () -> runAutomatic(tradeDate)));
     }
 
     // 재기동 재개 — 접수 완료(PLACED) 이후 중단분: 리포트 미완료 전략만 리포트
     public void resumeReport() throws InterruptedException {
-        schedulerLockService.takeOver(TradingBatchJob.CLOSE.lockName(), LOCK_TTL, () -> {
-            boolean completed = jobRunner.run("마감 리포트 재개",
-                    () -> contextFactory.buildAll(closeBatchStrategies()),
-                    useCase::resumeCloseReport);
-            if (completed) heartbeatPort.pingClose(); // 실패·인터럽트 시 미발송 — dead-man's switch가 실패도 감지
-        });
+        LocalDate tradeDate = LocalDate.now(clock.withZone(TimeZones.KST));
+        serialExecutor.run(() -> schedulerLockService.takeOver(TradingBatchJob.CLOSE.lockName(), LOCK_TTL,
+                () -> runReportIfPlaced(tradeDate)));
     }
 
     // 마감 배치 대상 = ACTIVE + 정지·보관됐지만 당일 접수 주문이 있는 전략(체결 리포트 전용) — 중복은 ACTIVE 우선
@@ -98,16 +152,74 @@ public class TradingCloseScheduler {
         List<Strategy> active = strategyPort.findAllActive();
         Set<UUID> activeIds = active.stream().map(Strategy::id).collect(Collectors.toSet());
         return Stream.concat(active.stream(),
-                        strategyPort.findNotActiveWithReportableOrders(LocalDate.now(clock)).stream()
+                        strategyPort.findNotActiveWithReportableOrders(LocalDate.now(clock.withZone(TimeZones.KST))).stream()
                                 .filter(s -> !activeIds.contains(s.id())))
                 .toList();
     }
 
-    private void runLocked() throws InterruptedException {
-        // 복수종목 현재가 1회 일괄 조회 후 사이클별 순차 실행
-        boolean completed = jobRunner.run("마감 매매 스케쥴러",
+    private void runAutomatic(LocalDate tradeDate) throws InterruptedException {
+        TradingBatchPhase phase = batchRunPort.findPhase(TradingBatchJob.CLOSE, tradeDate).orElse(null);
+        if (phase == TradingBatchPhase.DONE) return;
+        if (phase == TradingBatchPhase.PLACED) {
+            runReportIfPlaced(tradeDate);
+            return;
+        }
+        if (phase == TradingBatchPhase.PLACING) alert("[재개 경고] 마감 접수 도중 중단 — 이중 접수 확인 필요 (거래일 " + tradeDate + ")");
+        if (!canPlace(tradeDate, AUTOMATIC_WINDOW)) return;
+        runBatch("마감 매매 스케쥴러", tradeDate, AUTOMATIC_WINDOW);
+    }
+
+    private void runBatch(String name, LocalDate tradeDate, Duration earliest) throws InterruptedException {
+        boolean completed = jobRunner.run(name,
                 () -> contextFactory.buildAll(closeBatchStrategies()),
-                useCase::executeBatch);
+                contexts -> {
+                    if (!canPlace(tradeDate, earliest)) throw new IllegalStateException("마감 접수 창 경과: " + tradeDate);
+                    useCase.executeBatchNow(contexts);
+                });
         if (completed) heartbeatPort.pingClose(); // 실패·인터럽트 시 미발송 — dead-man's switch가 실패도 감지
+    }
+
+    private void runReportIfPlaced(LocalDate tradeDate) throws InterruptedException {
+        if (!tradeDate.equals(LocalDate.now(clock.withZone(TimeZones.KST)))) {
+            alert("[마감 리포트 누락] 거래일 경과 — " + tradeDate);
+            return;
+        }
+        if (batchRunPort.findPhase(TradingBatchJob.CLOSE, tradeDate).orElse(null) != TradingBatchPhase.PLACED) return;
+        if (marketCalendarPort.findSession(tradeDate).isEmpty()) return;
+        boolean completed = jobRunner.run("마감 리포트 재개",
+                () -> contextFactory.buildAll(closeBatchStrategies()), useCase::resumeCloseReport);
+        if (completed) heartbeatPort.pingClose();
+    }
+
+    // 접수 창: 마감 earliest 전 ~ 마감 10분 전, KST 당일 거래일만
+    private boolean canPlace(LocalDate tradeDate, Duration earliest) {
+        try {
+            var session = marketCalendarPort.findSession(tradeDate);
+            if (session.isEmpty()) return false;
+            Instant now = clock.instant();
+            if (!tradeDate.equals(LocalDate.now(clock.withZone(TimeZones.KST)))
+                    || now.isBefore(session.get().closeAt().minus(earliest))
+                    || !now.isBefore(session.get().closeAt().minus(PLACEMENT_MARGIN))) {
+                alert("[마감 접수 불가] 접수 창 밖 또는 거래일 경과 — " + tradeDate + ", 시각 " + now);
+                return false;
+            }
+            return true;
+        } catch (Exception e) {
+            report("마감 세션 조회 실패 (거래일 " + tradeDate + ")", e);
+            return false;
+        }
+    }
+
+    private void alert(String message) {
+        report(message, new IllegalStateException(message));
+    }
+
+    private void report(String message, Exception e) {
+        log.error(message, e);
+        try {
+            errorReportPort.reportError(new IllegalStateException(message, e));
+        } catch (Exception notificationFailure) {
+            log.error("관리자 알림 실패", notificationFailure);
+        }
     }
 }

@@ -2,6 +2,9 @@ package com.kista.tradingcore.trading.adapter.in.schedule;
 
 import com.kista.shared.platform.scheduling.SchedulerJobRunner;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
+import com.kista.shared.kernel.TimeZones;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
+import com.kista.tradingcore.marketcalendar.domain.model.MarketSessionTimes;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.trading.domain.model.BatchContext;
 import com.kista.tradingcore.trading.domain.model.Strategy;
@@ -23,6 +26,7 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -48,6 +52,9 @@ class TradingOpenSchedulerTest {
     @Mock BatchContextFactory contextFactory;
     @Mock ApplicationEventPublisher events;
     @Mock HeartbeatPort heartbeatPort;
+    @Mock TradingCloseScheduler closeScheduler;
+    @Mock MarketCalendarPort calendar;
+    @Mock TradingErrorReportPort errors;
 
     TradingOpenScheduler scheduler;
 
@@ -76,8 +83,12 @@ class TradingOpenSchedulerTest {
     void setUp() throws InterruptedException {
         // SchedulerJobRunner는 실제 인스턴스로 생성 — 실행 골격(인터럽트/예외 처리)까지 검증
         SchedulerJobRunner jobRunner = new SchedulerJobRunner(events);
+        Clock clock = Clock.fixed(Instant.parse("2026-10-05T13:00:00Z"), TimeZones.KST);
         scheduler = new TradingOpenScheduler(useCase, strategyPort, schedulerLockService,
-                contextFactory, jobRunner, heartbeatPort);
+                contextFactory, jobRunner, heartbeatPort, closeScheduler,
+                new TradingBatchSerialExecutor(), clock, calendar, errors);
+        lenient().when(calendar.findSession(any())).thenReturn(Optional.of(new MarketSessionTimes(
+                Instant.parse("2026-10-05T13:30:00Z"), Instant.parse("2026-10-05T20:00:00Z"))));
 
         lenient().doAnswer((Answer<Boolean>) invocation -> {
             SchedulerLockService.LockedTask task = invocation.getArgument(2);
@@ -98,6 +109,17 @@ class TradingOpenSchedulerTest {
     }
 
     @Test
+    void run_holiday_pingsBothHeartbeatsWithoutBatch() throws InterruptedException {
+        when(calendar.findSession(any())).thenReturn(Optional.empty());
+
+        scheduler.run();
+
+        verify(heartbeatPort).pingOpen();
+        verify(heartbeatPort).pingClose();
+        verifyNoInteractions(useCase);
+    }
+
+    @Test
     void run_includesBothInfiniteAndPrivacyStrategies() throws InterruptedException {
         // INFINITE + PRIVACY 모두 포함 — 장 개시 스케쥴러 전략 타입 불문 모두 처리
         Strategy infinite = mockStrategy(ACCOUNT_ID, StrategyType.INFINITE);
@@ -114,6 +136,7 @@ class TradingOpenSchedulerTest {
 
         verify(useCase).placeOpenOrders(List.of(infiniteCtx, privacyCtx));
         verify(heartbeatPort).pingOpen();
+        verify(closeScheduler).schedule(LocalDate.of(2026, 10, 6));
     }
 
     @Test
@@ -125,6 +148,7 @@ class TradingOpenSchedulerTest {
 
         verify(useCase).placeOpenOrders(List.of());
         verify(heartbeatPort).pingOpen();
+        verify(closeScheduler).schedule(LocalDate.of(2026, 10, 6));
     }
 
     @Test
@@ -168,6 +192,7 @@ class TradingOpenSchedulerTest {
         assertThat(captor.getAllValues().get(1).phase()).isEqualTo(SchedulerLifecycleEvent.Phase.FAILED);
         assertThat(captor.getAllValues().get(1).errorMessage()).isEqualTo("KIS API 오류");
         verify(heartbeatPort, never()).pingOpen(); // 실패한 배치는 완료 신호를 보내지 않는다 — dead-man's switch가 감지
+        verify(closeScheduler).schedule(LocalDate.of(2026, 10, 6));
     }
 
     @Test
@@ -177,6 +202,7 @@ class TradingOpenSchedulerTest {
         scheduler.run();
 
         verifyNoInteractions(strategyPort, contextFactory, useCase, events, heartbeatPort);
+        verify(closeScheduler).schedule(LocalDate.of(2026, 10, 6));
     }
 
     @Test
@@ -188,5 +214,15 @@ class TradingOpenSchedulerTest {
 
         verify(schedulerLockService).takeOver(eq("trading-open"), eq(Duration.ofHours(2)), any());
         verify(useCase).placeOpenOrders(List.of());
+    }
+
+    @Test
+    void holiday_stillRequestsCloseReservationButSkipsOpenBatch() throws InterruptedException {
+        when(calendar.findSession(any())).thenReturn(Optional.empty());
+
+        scheduler.run();
+
+        verify(closeScheduler).schedule(LocalDate.of(2026, 10, 6));
+        verifyNoInteractions(useCase, schedulerLockService);
     }
 }

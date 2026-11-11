@@ -7,6 +7,7 @@ import com.kista.tradingcore.trading.application.service.support.StrategyHistory
 
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.trading.domain.model.*;
 import com.kista.tradingcore.matching.domain.model.*;
 import com.kista.tradingcore.trading.application.usecase.StrategyUseCase;
@@ -56,6 +57,7 @@ class StrategyService implements StrategyUseCase {
     private final TradingBatchRunPort batchRunPort;                // 보관 전 당일 마감 리포트 반영 여부
     private final InfiniteMinSeedGuard minSeedGuard;               // 시드 수정 시 INFINITE 최소 시드 검사
     private final StrategyUpdateWriter updateWriter;               // update DB 쓰기 (전일종가 HTTP를 트랜잭션 밖에 두기 위해 분리)
+    private final MarketCalendarPort marketCalendarPort;           // 주식 거래일 경계
     private final Clock clock;                                     // 당일(KST) 기준
 
     @Override
@@ -142,7 +144,7 @@ class StrategyService implements StrategyUseCase {
     private void requireTodayOrdersReported(UUID strategyId, Account account) {
         if (account.broker().getMarket().isCrypto()) return;
         ZonedDateTime now = ZonedDateTime.now(clock);
-        for (LocalDate date : DstInfo.tradeDateCandidates(now)) {
+        for (LocalDate date : SessionTradeDates.tradeDateCandidates(now, marketCalendarPort)) {
             boolean hasPlaced = orderPort.findByStrategyId(strategyId, date, date).stream()
                     .anyMatch(Order::isBrokerSubmitted);
             if (hasPlaced && !batchRunPort.isReported(date, strategyId)) {

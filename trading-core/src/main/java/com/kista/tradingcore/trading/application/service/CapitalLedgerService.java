@@ -2,6 +2,7 @@ package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.trading.application.port.output.CycleCapitalEventPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
@@ -14,7 +15,6 @@ import com.kista.tradingcore.trading.application.usecase.InjectCapitalUseCase;
 import com.kista.tradingcore.trading.domain.model.CycleCapitalEvent;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.DepositAmounts;
-import com.kista.tradingcore.trading.domain.model.DstInfo;
 import com.kista.tradingcore.trading.domain.model.InjectCapitalCommand;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.Strategy;
@@ -62,6 +62,7 @@ class CapitalLedgerService implements InjectCapitalUseCase {
     private final OrderPort orderPort;
     private final TradingBatchRunPort batchRunPort;
     private final StrategyLedgerBudget ledgerBudget;
+    private final MarketCalendarPort marketCalendarPort; // 거래일과 마감 리포트 시각
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher; // stats 캐시 무효화 이벤트 발행
     private final CycleCapitalEventPort cycleCapitalEventPort; // 투자금 추가·인출 이력 기록
@@ -129,7 +130,7 @@ class CapitalLedgerService implements InjectCapitalUseCase {
                     .toList();
             cancelledOrders = List.of();
         } else {
-            List<LocalDate> dates = DstInfo.tradeDateCandidates(ZonedDateTime.now(clock));
+            List<LocalDate> dates = SessionTradeDates.tradeDateCandidates(ZonedDateTime.now(clock), marketCalendarPort);
             committedOrders = dates.stream()
                     .flatMap(date -> orderPort.findPlannedOrPlacedByCycleAndDate(cycle.id(), date).stream())
                     .toList();
@@ -214,7 +215,7 @@ class CapitalLedgerService implements InjectCapitalUseCase {
     // 그 사이 커밋된 in-place 변경(예수금)은 덮어써지고 startAmount 변경만 남는다. postClose 이전 변경은 리포트가 재조회하므로 안전하다.
     // 리포트가 실패해 마커가 안 찍히면 그날은 계속 거절된다(다음 날 해제). 리포트 대상이 아닌 전략(주문 없음, 정지 전략의 미접수 주문)은 제외(CloseReportScope)
     private void requireOutsideReportWindow(Strategy strategy, String message) {
-        if (CloseReportScope.inReportWindow(strategy, clock, batchRunPort, orderPort)) {
+        if (CloseReportScope.inReportWindow(strategy, clock, batchRunPort, orderPort, marketCalendarPort)) {
             throw new IllegalStateException(message);
         }
     }

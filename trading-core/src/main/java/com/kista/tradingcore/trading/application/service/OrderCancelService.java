@@ -10,6 +10,7 @@ import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
@@ -45,6 +46,7 @@ class OrderCancelService {
     private final OrderCancelStateWriter stateWriter; // self-invocation 프록시 미경유 문제 회피 — DB 쓰기 전용 별도 빈
     private final SubmittingOrderAwaiter awaiter;     // 접수 중(SUBMITTING) 주문의 결과 확정 대기
     private final CancelledOrderFillRecorder fillRecorder; // 취소 직후 체결량 기록 — 실패해도 취소 결과 불변
+    private final MarketCalendarPort marketCalendarPort; // 주식 거래일 경계
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     CancelResult cancelByCycle(UUID strategyId, UUID requesterId) {
@@ -79,7 +81,8 @@ class OrderCancelService {
 
         // 오늘(KST)과 다음 거래일(수동 실행 tradeDate) 둘 다 — 04:00~장마감 리포트 사이 마감 배치가 접수한 오늘 주문도 포함
         ZonedDateTime now = ZonedDateTime.now(clock);
-        List<LocalDate> tradeDates = DstInfo.tradeDateCandidates(now);
+        List<LocalDate> tradeDates = account.broker().isCryptoExchange() ? DstInfo.tradeDateCandidates(now)
+                : SessionTradeDates.tradeDateCandidates(now, marketCalendarPort);
 
         // PLANNED 주문 먼저 삭제 — 증권사 미접수이므로 DB만 처리
         int cancelledCount = 0;

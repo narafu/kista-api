@@ -61,7 +61,14 @@ class TradingService {
     private record CyclePlacedState(TradingCandidatePlanner.CycleState state, List<Order> mainOrders) {}
 
     void executeBatch(List<BatchContext> contexts) throws InterruptedException {
-        executeBatch(contexts, DstInfo.calculate(ZonedDateTime.now(clock)));
+        executeBatch(contexts, closeSession());
+    }
+
+    // 배치와 리포트 재개는 같은 거래일의 실제 세션을 사용한다
+    DstInfo closeSession() {
+        var session = marketCalendarPort.findSession(LocalDate.now(clock))
+                .orElseThrow(() -> new IllegalStateException("휴장일에는 마감 배치를 실행할 수 없습니다."));
+        return DstInfo.forCloseSession(session.openAt(), session.closeAt());
     }
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회

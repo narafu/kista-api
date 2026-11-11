@@ -53,6 +53,8 @@ import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
+import com.kista.tradingcore.marketcalendar.domain.model.MarketSessionTimes;
 
 @ExtendWith(MockitoExtension.class)
 class ManualTradeCorrectionServiceTest {
@@ -64,6 +66,7 @@ class ManualTradeCorrectionServiceTest {
     @Mock OrderPort orderPort;
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock TradingBatchRunPort batchRunPort;
+    @Mock MarketCalendarPort marketCalendarPort;
     @Spy Clock clock = FixedClockTestConfig.FIXED; // 2026-01-06 12:00 KST
 
     @Spy CycleOrderStrategies cycleOrderStrategies = new CycleOrderStrategies(List.of(
@@ -151,6 +154,9 @@ class ManualTradeCorrectionServiceTest {
         when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(cycle);
         lenient().when(cyclePositionPort.findLatestOne(CYCLE_ID)).thenReturn(Optional.of(latest));
         lenient().when(orderPort.findByStrategyId(any(), any(), any())).thenReturn(ordersOnDate);
+        // KST 1/6 거래일 = 미국 1/5 정규장(23:30~06:00 KST) → postClose 06:10 KST
+        lenient().when(marketCalendarPort.findSession(TODAY)).thenReturn(Optional.of(new MarketSessionTimes(
+                Instant.parse("2026-01-05T14:30:00Z"), Instant.parse("2026-01-05T21:00:00Z"))));
     }
 
     private static Order orderWithLeg(String leg) {

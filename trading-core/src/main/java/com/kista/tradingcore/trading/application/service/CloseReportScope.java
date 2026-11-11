@@ -2,11 +2,13 @@ package com.kista.tradingcore.trading.application.service;
 
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort;
-import com.kista.tradingcore.trading.domain.model.DstInfo;
+import com.kista.shared.kernel.TimeZones;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
@@ -17,13 +19,19 @@ final class CloseReportScope {
 
     private CloseReportScope() {}
 
-    // 마감 리포트 창(오늘 postClose 이후 ~ 리포트 마커 전)에 이 전략이 리포트 대기 중인지 — 창 거절 로직(CapitalLedgerService·ManualTradeCorrectionService)의 공통 판정
-    // postClose 이전이면 리포트가 최신 상태를 재조회하므로 안전. 리포트 마커가 이미 찍혔거나 리포트 대상 주문이 없으면 창 밖
-    static boolean inReportWindow(Strategy strategy, Clock clock, TradingBatchRunPort batchRunPort, OrderPort orderPort) {
-        if (DstInfo.calculate(ZonedDateTime.now(clock)).waitUntilPostClose(Instant.now(clock)).isPositive()) {
+    // 창 거절 로직(CapitalLedgerService·ManualTradeCorrectionService·StrategyUpdateWriter)의 공통 판정 — 실제 postClose 이전에는 리포트가 최신 상태를 재조회한다. 휴장은 보수적으로 종일 보호하고 미적재 예외는 전파한다
+    static boolean inReportWindow(Strategy strategy, Clock clock, TradingBatchRunPort batchRunPort, OrderPort orderPort,
+                                  MarketCalendarPort calendar) {
+        ZonedDateTime now = ZonedDateTime.now(clock).withZoneSameInstant(TimeZones.KST);
+        var session = calendar.findSession(now.toLocalDate());
+        if (session.isPresent() && now.toInstant().isBefore(session.get().closeAt().plus(Duration.ofMinutes(10)))) {
             return false;
         }
-        LocalDate today = LocalDate.now(clock);
+        return awaitsReportToday(strategy, clock, batchRunPort, orderPort);
+    }
+
+    private static boolean awaitsReportToday(Strategy strategy, Clock clock, TradingBatchRunPort batchRunPort, OrderPort orderPort) {
+        LocalDate today = Instant.now(clock).atZone(TimeZones.KST).toLocalDate();
         if (batchRunPort.isReported(today, strategy.id())) {
             return false;
         }

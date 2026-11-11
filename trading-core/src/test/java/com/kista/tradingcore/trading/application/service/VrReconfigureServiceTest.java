@@ -16,6 +16,8 @@ import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.trading.domain.model.StrategyCycleVrDetail;
 import com.kista.tradingcore.matching.domain.model.StrategyVrDetail;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
+import com.kista.tradingcore.marketcalendar.domain.model.MarketSessionTimes;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
@@ -72,6 +74,7 @@ class VrReconfigureServiceTest {
     @Mock OrderCancelService orderCancelService;
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock BrokerPricePort pricePort;
+    @Mock MarketCalendarPort marketCalendarPort;
 
     VrReconfigureService service;
 
@@ -94,7 +97,7 @@ class VrReconfigureServiceTest {
     @BeforeEach
     void setUp() {
         service = new VrReconfigureService(strategyPort, accountPort, strategyCyclePort, strategyVrDetailPort, strategyCycleVrPort,
-                cyclePositionPort, pricePort, cycleSnapshotCreator, orderCancelService, eventPublisher, FIXED);
+                cyclePositionPort, pricePort, cycleSnapshotCreator, orderCancelService, eventPublisher, marketCalendarPort, FIXED);
         account = TradingFixtures.kisAccount(accountId, requesterId);
         vrStrategy = new Strategy(strategyId, accountId, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
@@ -441,22 +444,24 @@ class VrReconfigureServiceTest {
         assertThat(captor.getValue().weeks()).isEqualTo(10L);
     }
 
-    // 시작예정일 당일 04:30 KST(DstInfo.nextTradeDate 경계) 전후 — 04:29는 다음 거래일=당일이라 시작 전, 04:31은 다음 거래일=내일이라 시작 후
+    // 조기 마감 03:00의 주문 경계 전후 — 02:29는 시작 전, 02:30은 시작 후
     @Test
-    @DisplayName("경계: 시작예정일 당일 04:29 KST는 시작 전 경로, 04:31 KST는 시작 후 경로")
+    @DisplayName("조기 마감 경계: 02:29는 시작 전 경로, 02:30은 시작 후 경로")
     void reconfigure_boundaryAtStartDate_switchesPathAround0430Kst() {
         stubHappyPathChain();
         LocalDate startDate = LocalDate.of(2026, 1, 6); // 화요일
         currentCycle = new StrategyCycle(cycleId, strategyId, strategyVersionId,
                 BigDecimal.valueOf(1000), null, startDate, null, null, null);
         when(strategyCyclePort.requireLatestByStrategyId(strategyId)).thenReturn(currentCycle);
+        var close = startDate.atTime(3, 0).atZone(TimeZones.KST).toInstant();
+        when(marketCalendarPort.findSession(startDate)).thenReturn(Optional.of(new MarketSessionTimes(close.minusSeconds(12600), close)));
 
         for (boolean before : new boolean[]{true, false}) {
             Clock clock = Clock.fixed(
-                    startDate.atTime(4, before ? 29 : 31).atZone(TimeZones.KST).toInstant(), TimeZones.KST);
+                    startDate.atTime(2, before ? 29 : 30).atZone(TimeZones.KST).toInstant(), TimeZones.KST);
             VrReconfigureService boundaryService = new VrReconfigureService(strategyPort, accountPort, strategyCyclePort,
                     strategyVrDetailPort, strategyCycleVrPort, cyclePositionPort, pricePort, cycleSnapshotCreator,
-                    orderCancelService, eventPublisher, clock);
+                    orderCancelService, eventPublisher, marketCalendarPort, clock);
 
             boundaryService.reconfigure(strategyId, requesterId, reconfigureVr().bandWidth("20.00").build());
 

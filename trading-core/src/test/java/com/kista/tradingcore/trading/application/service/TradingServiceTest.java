@@ -182,7 +182,10 @@ class TradingServiceTest {
         TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, priceCapper, cycleStrategies, ledgerBudget,
                 new AccountBudgetLock(), new OrderSubmitter(orderPort, brokerOrderPort, eventPublisher),
                 new OrderSubmissionReconciler(orderPort, brokerOrderPort, eventPublisher, FIXED),
-                eventPublisher, mock(DcaExecutionRecorder.class));
+                eventPublisher, mock(DcaExecutionRecorder.class), marketCalendarPort, FIXED);
+        lenient().when(marketCalendarPort.findSession(any())).thenReturn(Optional.of(
+                new com.kista.tradingcore.marketcalendar.domain.model.MarketSessionTimes(
+                        Instant.now(FIXED).minusSeconds(3600), Instant.now(FIXED).plusSeconds(1800))));
         // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)
         CyclePositionPersistor positionPersistor = new CyclePositionPersistor(
                 cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,

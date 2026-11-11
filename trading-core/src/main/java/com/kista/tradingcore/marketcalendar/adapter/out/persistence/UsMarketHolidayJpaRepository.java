@@ -19,11 +19,14 @@ interface UsMarketHolidayJpaRepository extends JpaRepository<UsMarketHolidayEnti
     @Query("SELECT COUNT(e) FROM UsMarketHolidayEntity e WHERE YEAR(e.tradeDate) = :year")
     long countByYear(@Param("year") int year);
 
-    @Modifying
+    @Query("SELECT DISTINCT YEAR(e.tradeDate) FROM UsMarketHolidayEntity e ORDER BY YEAR(e.tradeDate)")
+    List<Integer> findYearsWithHolidays();
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM UsMarketHolidayEntity e WHERE YEAR(e.tradeDate) = :year")
     void deleteByYear(@Param("year") int year);
 
-    @Modifying
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM UsMarketHolidayEntity e WHERE YEAR(e.tradeDate) = :year AND MONTH(e.tradeDate) = :month")
     void deleteByMonth(@Param("year") int year, @Param("month") int month);
 }
