@@ -80,7 +80,7 @@ simple name이 겹치는 것은 5종. 이 중 둘은 이미 `@Configuration("...
 | `scheduler.enabled` | `${SCHEDULER_ENABLED:true}`, local/prod에서 `false` | **키 없음** — 코드는 `matchIfMissing=true`로 읽는다(`@ConditionalOnProperty(prefix="scheduler", name="enabled", matchIfMissing=true)`), compose가 `SCHEDULER_ENABLED=true` 주입. T local은 키가 없어 로컬 T는 스케줄러가 **켜진 채** 기동 | 합병 시 role 플래그로 교체. R local이 `false`이고 T local은 `true`(암묵)라 로컬 동작이 서로 다르다. 합병 후 로컬은 둘 다 켜되 텔레그램 봇 분리 원칙(`commands.md`)을 확인 |
 | `telegram.*`, `crypto.aes-key`, `jwt.signing-key`, `internal.api.token`, `alpaca.api-key/api-secret/data-base-url` | 동일 env 이름(`TELEGRAM_BOT_TOKEN` 등) | 동일 | 충돌 없음. 합쳐서 1회만 선언 |
 | `alpaca.base-url` | 없음 | `https://paper-api.alpaca.markets` | T 값 추가(A-4) |
-| `internal.api.base-url` | `${INTERNAL_API_BASE_URL:http://localhost:8081}` | 없음 | 단계 1에서는 자기 자신(`http://localhost:8080`)을 가리킨다. T local yml `internal.api.base-url: http://localhost:8080`(`application-local.yml:19`)는 trading이 root를 가리키던 옛 흔적이고 읽는 코드 없음(T는 `InternalApiClientConfig` 조건 미충족) — 확인: `InternalApiClientConfig`는 base-url이 있으면 켜진다. **T local에는 base-url이 있어 로컬에서는 T도 이 빈을 만든다**(GradleModuleBoundaryTest가 참조만 금지) |
+| `internal.api.base-url` | `${INTERNAL_API_BASE_URL:http://localhost:8081}` | 없음(단, T local yml `application-local.yml:19`에 `http://localhost:8080`이 있어 로컬 T에서는 `InternalApiClientConfig`가 조건부로 켜진다 — 읽는 코드 없는 옛 잔재) | 단계 1에서는 자기 자신(`http://localhost:8080`)을 가리킨다. 단계 2에서 삭제 |
 
 ### B-2. 한쪽에만 있는 키
 
@@ -568,3 +568,48 @@ R 호출 어댑터 11개: admin 7(`AccountQuery`, `PortfolioQuery`, `PrivacyQuer
 ## L. kista-ui 연계
 
 (조사 대상 `/Users/phs/workspace/kista/kista-ui`, 읽기만)
+
+### L-1. `TRADING_API_BASE_URL` · `API_BASE_URL`을 쓰는 곳 (kista-ui, 파일 목록)
+
+- 정의·해석: `shared/lib/env.ts`(`getApiBaseUrl`, `getApiBaseUrlOrNull`, `getTradingApiBaseUrl`).
+- 선택 로직 2곳(합병 시 단일화 대상): `shared/lib/proxy/createProxyRoute.ts:35`(`target === 'trading'`이면 trading base), `shared/lib/api-client/index.ts:5-13`(`TRADING_PREFIXES` + `/api/stats` 분기, Server Component 직결 fetch).
+- `getApiBaseUrl*` 직접 호출(전부 root 대상, 변경 불필요): `proxy.ts`, `app/auth/callback/route.ts`, `app/api/auth/{status-stream,logout,reapply-done,me}/route.ts`, `app/api/trades/stream/route.ts`, `app/api/fcm/tokens/route.ts`, `app/api/fcm/tokens/[token]/route.ts`, `shared/lib/auth/refresh.ts`, `entities/meta/api/index.ts`, `entities/market/api/index.ts`.
+- 설정·배포: `deploy/server/docker-compose.yml:13`(`TRADING_API_BASE_URL: ${TRADING_API_BASE_URL}`), `.env.example:3`, `deploy/server/required-env`(**`API_BASE_URL`만 필수, `TRADING_API_BASE_URL`은 목록에 없음**), `.env.production.public`(`NEXT_PUBLIC_API_BASE_URL`만), `Dockerfile:18,27`(`NEXT_PUBLIC_API_BASE_URL`), `.github/workflows/{ci,server-deploy}.yml`, `playwright.config.ts:7-8,35`(`E2E_TRADING_API_BASE` 기본 `http://localhost:8081`), `e2e/global.setup.ts`, `scripts/visual-diff/run.mjs`, `.github/tests/contract.bats`, 문서 `README.md`·`docs/agents/{app,shared,deployment}.md`.
+- 테스트: `proxy.test.ts`, `app/auth/callback/route.test.ts`, `app/api/stats/[[...path]]/route.test.ts`, `shared/lib/proxy/createProxyRoute.test.ts`, `shared/lib/api-client/index.test.ts`, `shared/lib/env.test.ts`, `shared/lib/auth/refresh.test.ts`, `entities/meta/api/index.test.ts`, `entities/market/api/index.test.ts`.
+
+### L-2. 프록시 라우트 -> 호스트 표
+
+| UI 라우트 (`app/api/...`) | target | 실제 호스트(현재) | 경로 prefix 근거 |
+|---|---|---|---|
+| `accounts/[[...path]]` | `'trading'` | trading-core | T `AccountController` 등 |
+| `trading-cycles/[[...path]]` | `'trading'` | trading-core | |
+| `backtest` | `'trading'` | trading-core | |
+| `daily-trades` | `'trading'` | trading-core | |
+| `orders/[[...path]]` | `'trading'` | trading-core | |
+| `crypto-market-indicators` | `'trading'`(공개) | trading-core | T `TradingSecurityPolicy` permitAll |
+| `stats/[[...path]]` | 함수: `segments[0]==='housing-benchmark' ? 'api' : 'trading'` | `housing-benchmark`=root, 그 외(summary·equity-curve·cycles)=trading-core | R·T가 `/api/stats` prefix 공유(Caddy 정규식도 동일 분기) |
+| `admin/[[...path]]` | (기본) | root | `/api/admin/**` |
+| `finance/[[...path]]` | root | root | |
+| `market/[[...path]]` | root | root | |
+| `settings/[[...path]]` | root | root | |
+| `runtime-config`, `client-errors` | root | root | |
+| `auth/*`, `fcm/*`, `trades/stream`, `auth/status-stream` | (직접 fetch) `getApiBaseUrl` | root | |
+| `health` | 로컬 | UI 자체 | |
+
+합병 후: `createProxyRoute`의 `target` 옵션과 `getTradingApiBaseUrl`을 삭제하고 `api-client`의 `TRADING_PREFIXES` 분기를 제거하면 한 호스트가 된다. 이 변경은 **kista-ui 세션의 일**(`feedback_ui_work_to_ui_session`)이며 `docs/superpowers/fable-review/guides/02-data-layer.md`(kista-ui, 3경로 프록시)와 연동된다. 배포 순서: UI가 `TRADING_API_BASE_URL` 미설정 시 단일 호스트로 가도록 먼저 바꾸고(폴백 `TRADING_API_BASE_URL || API_BASE_URL`), 이후 백엔드 전환, 마지막에 env 삭제하는 3단계로 하면 UI·API 배포 순서 의존이 없다.
+
+---
+
+## 요약: 충돌 목록 (우선순위)
+
+| # | 절 | 충돌 | 심각도 |
+|---|---|---|---|
+| 1 | G-1 | `@RestControllerAdvice` 2개의 catch-all(T는 `@Order(HIGHEST)`)이 R 고유 매핑을 가린다 — 가계부 409·Cooldown 429가 500·GENERIC으로 변질 | 조용한 동작 회귀 |
+| 2 | B/J-1 | 클래스패스에 `application.yml`·`-local`·`-prod`가 2벌 — 한쪽만 로드, 다른 쪽 키 소실 | 조용한 설정 소실 |
+| 3 | C1/C2 | search_path 1개 + `scheduler_locks`·`event_publication`이 두 스키마에 중복. `SchedulerLockService`가 unqualified SQL | 락 의미 변경·데이터 이행 |
+| 4 | D-2 | Flyway 이력 2벌: 자동구성이 꺼지므로 `Flyway` 빈 2개 + 초기화 직접 구성, 슬라이스 테스트에도 import | 구성 신설 |
+| 5 | E-3 | 같은 이벤트를 양쪽이 듣는 3종(`AppErrorRaisedEvent` 이중 저장, `UserDeletedEvent`·`UserNotifyProfileChangedEvent` Redis 왕복+직접 이중 실행) + 새로 켜지는 `SchedulerLifecycleEvent` 알림 | 이중 실행 |
+| 6 | A3/A4/A5/B2 | 빈 이름·타입 충돌: `ClockConfig`·`clock`, `fearGreedRestClient`(타임아웃 상이), `TokenBlacklistPort` 후보 2개, `UserEventResubmitScheduler` 이름 | 기동 실패(명시적) |
+| 7 | E-1 | Modulith ID `notify`·`web` 중복, 테스트 ID 집합 | 기동 실패(명시적) |
+
+건수: 빈·이름 5 + `@Bean` 이름 2 + 이벤트 3 + advice 1 + 설정 키 충돌 다수(B-1 표 약 20행) + 스키마 중복 테이블 2 + Modulith ID 2 + 리소스 파일 3종.
