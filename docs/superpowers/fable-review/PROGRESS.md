@@ -49,6 +49,18 @@
 | a69d63e7c1caf2218 | findings/11-broker-api-fit.md (메리츠·토스, 8절 시세 대체) | 지침서 04 개정 |
 | (완료) | findings/12-binance-api-fit.md, findings/13-vr-velog-diff.md | 04 개정, 08 반영 완료 |
 
+## 지침서 05 개정 방향 (2026-11-12, findings 09 수신 후 Fable 판단 — findings 10 수신 뒤 지침서에 반영)
+
+findings 09가 "같은 trading 코드가 web·worker 두 프로세스에서 돌 때" 깨지는 것을 확인했다: M1 계좌 예산 락이 JVM 락뿐(`AccountBudgetLock`, Fable이 코드로 확인. `orders`에 슬롯 유일 제약도 없음), M2 브로커 호출 간격 게이트가 프로세스별, M3 토큰 발급 직렬화가 JVM 락.
+
+**개정 원칙: 코드는 하나로 합치되, 매매 엔진(원장을 바꾸거나 브로커를 호출하는 코드)은 worker 한 프로세스에서만 실행한다.**
+
+- 단계 A(필수): 한 코드베이스·한 모델·한 이미지. role은 web(user·finance·benchmark·market·ops의 HTTP)과 worker(모든 @Scheduled + trading·account·stats·broker의 HTTP 전부 = 지금의 kista-trading + kista-scheduler). trading 코드는 여전히 한 프로세스에서만 돌므로 M1~M3이 **발생하지 않는다**. 합치는 이득(내부 HTTP·contract·사용자 복제본·이중 셸·shared.kernel 해체)은 전부 얻는다. web이 trading 데이터가 필요하면 읽기 전용 모듈 API를 프로세스 안에서 직접 호출한다(DB 조회만, 브로커 호출·쓰기 금지 — 가드로 강제).
+- UI 진입점은 Caddy가 경로로 web·worker에 나눠 보내 하나의 호스트로 보이게 한다. 경로 목록은 컨트롤러의 role 표시에서 생성하고 `CaddyRoutingTest`로 고정한다.
+- 단계 B(선택, 나중): 브로커를 부르지 않는 trading 조회 엔드포인트를 web으로 옮겨 worker 배포 중에도 화면이 뜨게 한다. 전제: 통계 캐시 무효화 전파(S1).
+- 단계 C(선택, 필요해질 때만): 쓰기·브로커 호출까지 web으로 — M1(세션 단위 advisory lock 또는 Redis 락)·M2(Redis 슬롯 예약)·M3(토큰 lease 일반화) 선행. 지금은 하지 않는다.
+- 단계 1의 즉시 위험 M4(같은 이벤트를 root·trading이 서로 재발행 → 무한 순환, 오류 로그 이중 기록)는 "한 컨텍스트에 올리는 커밋"보다 **먼저** 스트림 경로를 끊는 것으로 순서를 바꾼다. M5: role 플래그 기본값은 꺼짐. M6: EPR 테이블 한 벌로.
+
 ## 지침서 주제
 
 | # | 주제 | 주 근거 | 상태 |

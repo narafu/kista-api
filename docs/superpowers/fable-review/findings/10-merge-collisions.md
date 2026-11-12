@@ -285,3 +285,40 @@ R 리스너 19(`@TransactionalEventListener` 16 + `@EventListener` 3), T 리스�
 | `GET /api/internal/trading/stats/portfolio/current`, `/history` | `PortfolioQueryInternalController` | `admin/.../PortfolioQueryHttpAdapter:24`, `:32` | 직접 호출 |
 
 R 호출 어댑터 11개: admin 7(`AccountQuery`, `PortfolioQuery`, `PrivacyQuery`, `TradingCommand`, `TradingPolicy`, `TradingQuery`, `TradingSchedulerCommand`), benchmark 2(`CurrentExchangeRate`, `InvestmentPoints`), market 2(`CandleQuery`, `MarketCalendarQuery`). 단계 2 순서(지침서 05): market -> benchmark -> admin.
+
+## G. Web
+
+### G-1. `@RestControllerAdvice` — 가장 위험한 충돌
+
+| | R `GlobalExceptionHandler` (`R/web/GlobalExceptionHandler.java`) | T `TradingExceptionHandler` (`T/web/TradingExceptionHandler.java`) |
+|---|---|---|
+| 순서 | `@Order` 없음(최저) | `@Order(HIGHEST_PRECEDENCE)` (주석: "다른 advice가 같은 컨텍스트에 생겨도 먼저 평가되도록 하는 방어적 명시") |
+| catch-all | `@ExceptionHandler(Exception.class)` -> `ProblemDetailMappings.catchAll(ex, MAPPINGS, ...)` | 동일 형태, 자기 `MAPPINGS` |
+| 고유 핸들러 | `User.CooldownException`(429 + `Retry-After` 헤더, 개별 유지), `MethodArgumentNotValidException`, `AsyncRequestTimeoutException`/`AsyncRequestNotUsableException`(SSE 종료, 본문 없음) | `BrokerApiException`(503, 벤더 라벨 title, 오류 보고), `MethodArgumentNotValidException` |
+| `MAPPINGS` 고유 | R: `InvalidRefreshTokenException` 401, `AdminBrokerCredentialException` 422, `AdminBrokerRateLimitException` 429, `TradingPolicyUnavailableException` 503, `CandleUnavailableException` 503, `AdminPrivacyTradeConflictException`·`User.AlreadyActiveException`·`FinanceBudget.OverlappingPeriodException`·`FinanceAccount.DuplicateAccountNoException`·`FinanceAccount.LinkedAssetSnapshotsException`·`FinanceCategory.DuplicateNameException`·`FinanceGroupInvitation.InvalidInvitationStateException`·`FinanceGroup.MembershipConflictException` 409, `MonthlyClosing.MonthClosedException` 409+`MONTH_CLOSED` | T: `BrokerWithdrawalEnabledException`·`BrokerIpNotAllowedException`·`BrokerPermissionDeniedException`·`BrokerCredentialException` 422, `BrokerRateLimitException` 429, `AlreadyOrderedTodayException`·`DcaManualExecutionUnsupportedException`·`ManualTradingException`·`OrderCancelException`·`PrivacyTradeConflictException`·`DuplicateStrategyTickerException`·`Account.DuplicateAccountException` 409, `ManualTradingFailedException` 500(고정 문구) |
+| 공통 | `ProblemDetailMappings.GENERIC`(`S/platform/web/ProblemDetailMappings.java`) 11종 병합 | 동일 |
+
+**같은 예외를 다르게 매핑하는 곳은 없다**(양쪽 고유 목록의 교집합 0, 공통은 GENERIC 하나). 같은 의미의 쌍은 있다: `AdminBrokerCredentialException`(R own-type) <-> `BrokerCredentialException`(T), `AdminBrokerRateLimitException` <-> `BrokerRateLimitException`, `AdminPrivacyTradeConflictException` <-> `PrivacyTradeConflictException`. 합병하면 R의 `Admin*` 복원용 own-type이 필요 없어지고(내부 API 응답에서 예외를 되살리던 것 — `InternalApiErrorDetails`, `ErrorBodyDecoder`), T 원본 예외가 그대로 컨트롤러까지 올라와 T 매핑을 쓴다.
+
+**충돌 증상**: 두 advice가 한 컨텍스트에 있으면 `@Order(HIGHEST)`인 T의 `handleGeneric(Exception)`이 **모든 예외를 먼저 잡는다**. Spring은 advice 순서대로 "그 advice에 맞는 핸들러가 하나라도 있는지"를 보고 첫 advice를 채택하므로, R의 고유 핸들러·매핑(Cooldown 429+Retry-After, Finance 409 7종, `MONTH_CLOSED`, `InvalidRefreshToken` 401, SSE 종료)이 **도달하지 못하고** T의 catch-all이 GENERIC 또는 500+오류 보고로 처리한다. 즉 가계부 중복 이름이 409가 아니라 500이 된다. 합병 필수 조치: **advice 1개로 통합**(`MAPPINGS` 합집합, 핸들러 합집합). 둘의 `reportErrorLog`는 caller 문자열 `X.class.getSimpleName()`만 다르다(`web.md` "합치지 못하는 이유" 문구는 프로세스 분리가 근거였으므로 합병 시 소멸). `ExceptionMessageFormatTest`, `docs/agents/modules/api/web.md`·`tradingcore/web.md`의 `MAPPINGS` SSOT 규칙도 갱신.
+
+- 단위 테스트가 이 advice 2개에 걸려 있다(`GlobalExceptionHandler*Test`, `TradingExceptionHandler*Test` — 파일 목록은 `src/test`·`trading-core/src/test` grep으로 확인 필요).
+- `AppErrorRaisedEvent.of(ex, <caller>)`의 caller는 합병 후 단일 이름. 로그 조회(관리자 화면 필터) 호환 확인 필요.
+- T advice의 `BrokerApiException` 핸들러는 R `MAPPINGS`에 없다(R에서는 `CandleUnavailableException` 등 복원 예외로 우회). 합병 후 R 컨트롤러가 브로커 예외를 직접 만나면 이 핸들러가 필요하므로 통합 advice에 포함.
+
+### G-2. URL 매핑 충돌
+
+- 컨트롤러 핸들러 추출: R 105, T 71(`routes.py`, `@RequestMapping` 클래스 prefix + 메서드 매핑 단순 조합). 메서드+경로를 변수명 정규화(`{id}`->`{}`)해 비교한 **교집합 0**. 같은 prefix를 나누는 곳은 `/api/stats`(R `housing-benchmark/*` 5개, T `summary|equity-curve|cycles`)뿐이며 하위 경로가 달라 충돌 없음(Caddy 정규식이 이미 이 분기를 하드코딩 — K절).
+- T 공개 경로: `/api/accounts`(계좌 CRUD 5), `/api/accounts/{accountId}/{crypto-portfolio|crypto-prices|cycle-history|daily-trades|ledger-totals|portfolio|prices|strategy-seed-preview|trading-cycles...}`, `/api/trading-cycles/**`(23), `/api/backtest`, `/api/crypto-market-indicators`, `/api/daily-trades`, `/api/orders/{orderId}`, `/api/stats/{summary|equity-curve|cycles}`. R 공개: `/api/finance/**`, `/api/auth/**`, `/api/settings/**`, `/api/market/{session|holidays|fear-greed|candles}`, `/api/meta`, `/api/runtime-config`, `/api/client-errors`, `/api/fcm/tokens`, `/api/trades/stream`, `/telegram/webhook`, `/api/admin/**`(users 4, logs 4, accounts 4, finance 4, privacy-trade-bases 6, scheduler 6, trades 2, settings 2, dashboard 1, `_ping`).
+- 경계 케이스: R `/api/admin/accounts`·`/api/admin/privacy-trade-bases`와 T `/api/accounts`·`/api/internal/privacy/...`는 접두가 달라 충돌 없음. 단계 2에서 admin 컨트롤러가 T 서비스를 직접 부르면 `/api/admin/*`는 그대로 두고 어댑터만 바꾼다.
+- 정규식 추출이라 `@RequestMapping(method=...)`·상수 경로·`produces` 조합은 놓칠 수 있다. 확정은 합병 후 기동 시 `Ambiguous mapping` 오류로 드러난다(컨텍스트 로드 테스트가 잡는다).
+
+### G-3. `/api/meta`·OpenAPI·Jackson
+
+| 항목 | 현황 | 합병 영향 |
+|---|---|---|
+| `/api/meta` | R `MetaController`(`R/web/MetaController.java`)만. enum 메타 번들 | 충돌 없음. T enum도 `shared.kernel`이라 이미 R이 노출 |
+| OpenAPI `OpenAPI` 빈 | R `OpenApiConfig`(`R/user/.../OpenApiConfig.java:18`: title "KISTA API", bearerAuth, 태그 순서 목록) + `ErrorCodeOpenApiCustomizer`(`R/web/`, `ErrorCode` 스키마 주입). T는 빈 없음, springdoc 기본 | 합병 시 한 spec에 R·T가 합쳐진다. 지금은 UI가 `fetch:spec`으로 8080·8081 spec을 **병합**한다(`trading-core application.yml:51` 주석). 합병 후 UI 병합 스크립트 단순화(L절). 태그 목록(`OpenApiConfig`)에 T 컨트롤러 태그가 이미 있는지는 확인 필요(`거래 사이클`, `통계`가 보임 — T 태그가 R 설정에 이미 선언돼 있다) |
+| `springdoc.paths-to-exclude` | T만 `/api/internal/**` | R에 이식 필요(안 하면 internal contract 타입이 공개 spec에 들어온다). 단계 2 이후 internal 컨트롤러가 없어지면 불필요(FIDA용 `/api/internal/fida-orders` 1개만 남는다) |
+| springdoc 스키마 이름 충돌 | 단순 클래스명이 스키마 ID. 같은 단순명 쌍: `Market`(`S/kernel/Market` vs `R/finance/domain/model/Market`), `MarketSessionResponse`(`S/contract/marketcalendar` vs `R/market/adapter/in/web/dto`), `CycleHistoryResponse`·`CycleHistoryPageResponse`(`T/stats/.../dto` vs `T/trading/.../dto`, **T 내부에서 이미 공존**), `InvestmentPoint`(R/benchmark domain vs T/stats domain, DTO 아님), `PlainDecimalSerializer` | `Market`·`MarketSessionResponse`는 두 쪽이 한 spec에 들어오면 한쪽 스키마가 덮이거나 `Market1` 접미사가 붙는다 -> UI 생성 타입 변경(kista-ui `gen:types`). 공개 경로에서 도달하는지는 `springdoc` 실측 필요(미확인) |
+| Jackson | `ObjectMapper`/`JsonMapper` `@Bean`·`@JsonComponent`·`spring.jackson.*` **모두 0** — Boot 기본 `JsonMapper`(Jackson 3) 1개. 어댑터들이 필요 시 자체 `JsonMapper`를 `new`/주입 | 충돌 없음. `PlainDecimalSerializer`는 2벌(`S/contract/notify/PlainDecimalSerializer`, `T/stats/adapter/in/web/dto/PlainDecimalSerializer`)이라 합병 때 1개로 |
