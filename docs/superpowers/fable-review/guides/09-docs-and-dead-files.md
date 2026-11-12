@@ -224,7 +224,7 @@ T1 → T2 순서는 지킨다(유지 목록을 옮기기 전에 backlog를 지�
 
 ## 9. 이 검토 산출물의 정리 (실행이 전부 끝난 뒤)
 
-`docs/superpowers/fable-review/`도 계획 문서다. 2-1의 기준을 자신에게 적용한다: 지침서가 전부 실행되면 `decisions.md`에 결정을 옮기고, `ui-api-principles.md`는 `docs/agents/`로 올리고(10 T9), `findings/`·`guides/`·`PROGRESS.md`·`cross-repo.md`는 삭제한다. 그 전까지는 이 디렉토리를 예산·삭제 대상에서 뺀다.
+`docs/superpowers/fable-review/`도 계획 문서다. 2-1의 기준을 자신에게 적용한다: 지침서가 전부 실행되면 `decisions.md`에 결정을 옮기고, `ui-api-principles.md`는 `docs/agents/`로 올리고(10 T9), `findings/`·`guides/`·`PROGRESS.md`·`cross-repo.md`·`questions.md`는 삭제한다. 그 전까지는 이 디렉토리를 예산·삭제 대상에서 뺀다.
 
 ## 10. 하지 말 것
 
