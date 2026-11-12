@@ -50,7 +50,7 @@
 - kista-api: `required-env` 경로 제거(`bd1e56f80`), readiness 계약 파일 폐지와 Docker healthcheck 전환(`158722438`, infra 01 T3·T4), 배포 구성도 링크와 postgres 런북 경로 정정. 운영 배포됨(`deploy(kista-api): 158722438a6d`).
 - kista-ui: 테스트 무대·빌더(ui 07), `FormDialog`와 인터셉트 라우트 폐지(ui 04), `required-env` 폐지, archive 71개 삭제.
 - kista-infra: sops + age 전환, 고아 컨테이너 드리프트 알림(03 T8), 배포 구성도 생성기 삭제, readiness·required-env 옛 계약 삭제, 서버 스크립트 공용부 추출.
-- fida: 검토 완료(지침서 4개, 아직 커밋 전). 권고는 "별도 레포 유지 + 접점 축소, 운영 호스트만 통합". 사용자 결정 6건 대기(fida 세션).
+- fida: 검토 완료(지침서 4개, 커밋됨). **별도 레포 유지로 사용자 결정.** kista 쪽 할 일 4건은 `cross-repo.md` D절(05 X5와 묶음). 그중 `FidaOrderRequest.orders` `@NotNull`은 독립 소규모 수정이라 S1 세션에 끼워도 된다.
 
 ## 6. 답을 기다리는 질문 (실행을 막지 않음)
 
