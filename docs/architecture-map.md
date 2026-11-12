@@ -136,7 +136,7 @@ flowchart LR
     end
 
     subgraph SRV["kista-api-server"]
-        RSH["/opt/kista-infra/bin/reconcile.sh<br/>required-env 검사 → role 교체<br/>헬스 게이트 → 스니펫 설치·caddy reload<br/>실패 시 롤백"]
+        RSH["/opt/kista-infra/bin/reconcile.sh<br/>role 교체(앱 필수 환경변수는 compose ${VAR:?} 보간이 검증)<br/>헬스 게이트 → 스니펫 설치·caddy reload<br/>실패 시 롤백"]
         AINF["/opt/kista-infra/bin/apply-infra.sh"]
         ENV["/opt/#lt;app#gt;/.env<br/>/opt/kista-infra/.env"]
     end
