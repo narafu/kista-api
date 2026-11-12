@@ -1,242 +1,301 @@
-# 지침서 05. Spring Modulith 모듈 구성과 kista-api·trading-core 분리 재검토
+# 지침서 05. 코드베이스 통합과 모듈 재구성 — 실행 지침
 
-작성 2026-11-11 (Fable). 근거: `findings/01-vertical-slices.md`(경계 집계), `findings/02-type-duplication.md` E절, `findings/05-frozen-decisions.md` S-01~S-09·S-31, `docs/history/modulith-migration-history.md:132-146`, main import 기준 모듈 의존 집계(2026-11-11), Spring Modulith 2.1 공식 문서(context7 조회), 조기 마감 커밋 `9e542baf7`~`d3d78b0b3`.
+작성 2026-11-11, **전면 개정 2026-11-12** (Fable). 이 문서는 Fable 없이 Opus/Sonnet이 실행하는 것을 전제로 쓴다.
 
-**이 문서는 다른 지침서와 달리 사용자 결정이 먼저 필요하다.** 1~4절이 평가와 권고, 5절이 결정 항목, 6절이 결정 뒤의 실행 계획이다.
+근거(구현 전에 해당 절을 직접 읽는다):
+- `findings/09-process-local-state.md` — trading 코드가 여러 프로세스에서 돌 때 깨지는 것 전수
+- `findings/10-merge-collisions.md` — 두 애플리케이션을 한 컨텍스트에 올릴 때의 충돌 전수(빈, 설정, JPA, Flyway, Modulith·EPR, 보안, 예외 처리기, 경계 코드 3자 매핑표, `shared.kernel` 전수, 빌드, 배포 파일)
+- `findings/01`(경계 집계), `findings/02` E절, `docs/history/modulith-migration-history.md:132-146`
 
-## 1. 현재 구성
+용어: R = root(`src/`, `com.kista.api`), T = trading-core(`trading-core/`, `com.kista.tradingcore`), S = shared.
 
-- Gradle 3개 서브프로젝트(`:api` 16,501줄, `:trading-core` 35,581줄, `:shared` 3,436줄), 프로세스 3 role(kista-api, kista-scheduler, kista-trading), Modulith 모델 2개(api 7 + shared 3, trading-core 9 + shared 3), DB 스키마 5개.
-- root와 trading-core는 컴파일 의존이 양방향 0이고 내부 HTTP·Redis로만 통신한다.
-- Spring Modulith 2.1.1, 감지 전략 `explicitly-annotated`, 모듈 전부 CLOSED(shared 3개만 OPEN).
+## 0. 사용자 결정 (2026-11-12)
 
-모듈 의존(main import 수):
+D1 한 코드베이스로 합치고 실행 역할로 프로세스를 나눈다 / D2 DB 스키마 5개 유지, 물리 DB 분리(S-04) 폐기 / D3 trading 스키마에도 expand/contract / D4 `admin`·`web` 셸 해체. 사용자는 "합칠 때 새로 생기는 문제의 더 나은 대안"을 Fable이 다시 검토하라고 했고, 그 결과가 1절이다.
 
-```
-api.web     -> admin(4) benchmark(3) finance(10) market(1) notify(1) user(2)
-api.notify  -> user(15) benchmark(1) finance(1) market(1)
-api.admin   -> user(21) benchmark(1)            shared.contract(73)
-api.finance -> user(3)
-tc.trading  -> matching(128) broker(70) account(40) marketcalendar(18) privacy(14)   shared.kernel(282)
-tc.stats    -> trading(51) broker(22) matching(12) account(10) privacy(4)            shared.kernel(77)
-tc.notify   -> trading(36) account(3) privacy(1)
-tc.account  -> broker(5)
-tc.privacy  -> matching(1)
-tc.web      -> broker(6) trading(6) account(1) privacy(1)
-```
+## 1. 설계 원칙 (가장 중요 — 이 절을 어기는 구현은 중단한다)
 
-## 2. 프로세스 분리 평가
+### 1-1. 매매 엔진은 한 프로세스에서만 실행한다
 
-### 2-1. 분리가 주는 것
+조사 결과 trading 코드가 두 프로세스에서 동시에 돌면 다음이 깨진다(`findings/09` I-1).
 
-기록된 분리 목표는 "`:api → :trading-core` 컴파일 의존 0"과 "매매 프로세스 단일 인스턴스"다(`history:132` 이하). 왜 그것이 필요한지는 문서에 없다. 코드와 배포 구조에서 읽히는 실제 이득은 둘이다.
-
-1. **배포 독립**: 가계부나 관리자 화면을 고쳐 배포해도 매매 프로세스가 재기동되지 않는다.
-2. **장애 격리**: root의 메모리 부족이나 버그가 매매 배치를 죽이지 않는다.
-
-둘 다 돈이 걸린 배치에는 실제 가치가 있다.
-
-### 2-2. 분리가 치르는 값
-
-| 비용 | 규모·근거 |
-|---|---|
-| 경계 코드 | 내부 컨트롤러·HTTP 어댑터·contract·mapper 약 89파일 3,430줄(main의 6.2%) |
-| 사용자 복제본 | root → Redis Stream → trading-core `user_notify_profile` 동기화 17파일 약 730줄. 기능 1(전략 등록)·2(마감 주문)·6(알림)이 여기에 의존 |
-| 이중 구현 | 예외 처리기 2벌, 보안 셸 2벌, `UserEventResubmitScheduler` 2벌, `PlainDecimalSerializer` 2벌, Alpaca 설정 2벌, 알림 채널 판정 2곳 |
-| `shared.kernel` 비대 | 43파일 1,011줄. trading이 282번 import한다. 프로세스를 넘겨야 해서 `Strategy`·`Broker`·`User`의 enum이 소유 모듈을 떠나 이곳에 모였다 |
-| 이벤트 | 프로세스를 넘는 이벤트는 EPR이 전달하지 못해 Redis Stream 발행·소비·재발행 골격을 따로 갖는다. EPR 재발행 소유 규칙이 role마다 다르다 |
-| 사고 이력 | `@EnableScheduling` 누락으로 자동매매 cron이 배포 기간 내내 돌지 않음, 이벤트 전달 드리프트(`history:136,139`) |
-| 진입점 불일치 | UI가 전략·계좌·통계는 trading-core로 직접, 관리자·벤치마크·시장은 root를 거쳐 trading-core로 간다. 같은 "trading 데이터 조회"가 두 경로다 |
-| 사용자 화면 가용성 | kista-trading은 단일 인스턴스 stop-first(`stop_grace_period` 200s)다. 매매 프로세스를 배포하면 전략·계좌·통계 화면이 그동안 응답하지 못한다 |
-
-### 2-3. 판정
-
-지금의 분리선은 **업무 영역**(매매 대 나머지)을 따라 그어져 있다. 그런데 2-1의 이득 둘은 업무 영역이 아니라 **실행 역할**(요청을 받는 웹 대 시각에 맞춰 도는 배치)에서 나온다. 선이 잘못된 곳에 그어져 있어서, 이득은 절반만 얻고(매매 화면은 여전히 배치 프로세스에 묶여 있다) 비용은 전부 치른다.
-
-**권고: 코드는 하나의 애플리케이션(Modulith 모델 1개)으로 합치고, 프로세스는 실행 역할로 나눈다.**
-
-```
-한 코드베이스 · 한 Modulith 모델 · 한 이미지
- ├─ web role     : 모든 HTTP API (user, finance, admin, trading 조회·명령). blue/green, 다중 인스턴스 가능
- └─ worker role  : 모든 @Scheduled, 매매 배치, Redis 컨슈머, EPR 재발행. 단일 인스턴스, stop-first
-```
-
-- role은 지금도 쓰는 `scheduler.enabled` 방식의 플래그로 가른다. kista-api와 kista-scheduler가 이미 그렇게 나뉘어 있고, kista-trading만 별도 코드베이스다.
-- 모듈 사이 호출은 전부 프로세스 안 호출이 된다. 내부 HTTP, contract, 사용자 복제본, 이중 구현이 사라진다.
-- 배포 독립은 유지된다. infra가 이미 role별 SHA를 따로 선언하므로, worker에 영향이 없는 변경은 worker를 재기동하지 않는다.
-- 장애 격리도 유지된다. web과 worker는 여전히 다른 프로세스다.
-- 매매 화면이 web role로 옮겨와 worker 배포 중에도 응답한다.
-
-### 2-4. 합칠 때 새로 생기는 문제 (정직한 목록)
-
-합치면 "같은 trading 코드가 두 프로세스에서 돈다"는 조건이 새로 생긴다. 지금은 trading 코드가 한 프로세스에만 있어서 성립하던 것들이 깨진다.
-
-| 문제 | 지금 | 합친 뒤 필요한 것 |
+| | 내용 | 근거 |
 |---|---|---|
-| 프로세스 로컬 상태 | 브로커 호출 간격 게이트(`CallIntervalGate`, 메리츠 110ms), `TradingStatsService` 메모리 캐시, `TradingBatchRunState`, 전일 종가 캐시 등이 한 JVM 안에 있다 | 전수 조사 후 항목별 처리: 게이트는 Redis 공유 또는 "브로커 호출은 worker만"으로 좁힘, 캐시는 Redis pub/sub 무효화 또는 TTL |
-| 스키마 호환 | trading 스키마 마이그레이션은 expand/contract 예외다(단일 프로세스가 소유) | web과 worker가 다른 버전으로 겹칠 수 있어 trading 스키마도 expand/contract를 따른다 |
-| 이벤트 리스너 실행 위치 | 리스너는 발행한 프로세스에서 돈다 | web이 발행한 이벤트의 리스너가 web에서 돌아도 되는지 리스너별로 확인(외부 호출·락 의존) |
-| 사용자 발 주문 | 수동 매매·주문 미리보기가 kista-trading에서 배치와 같은 JVM에 있다 | web에서 실행하면 배치와 DB 락으로만 조율된다. 락이 전부 DB·Redis 기반인지 확인 |
+| M1 | 계좌 예산 락이 JVM 락뿐이다. `orders`에 (사이클, 거래일, 슬롯) 유일 제약도 없다. 수동 매매와 배치가 다른 프로세스에서 겹치면 주문 이중 저장·예산 이중 차감 | `AccountBudgetLock.java` 주석 "다중 인스턴스가 되면 DB 락으로 승격" |
+| M2 | 브로커 호출 간격 게이트가 프로세스별이다(메리츠 110ms). 합산되면 벤더 한도 초과, 주문 POST는 재시도가 없어 배치 접수 실패 | `CallIntervalGate` |
+| M3 | 토큰 발급 직렬화가 JVM 락이다 | `DbTokenCoordinator` |
 
-이 표의 전수 조사가 6절 단계 0이고, 그 결과가 진행 여부의 관문이다.
+그래서 **"web이 모든 HTTP를 받고 worker는 배치만"이라는 첫 권고를 버린다.** 대신:
 
-### 2-5. 기각한 대안
+> **원장을 바꾸거나 브로커를 호출하는 코드는 worker 프로세스에서만 실행한다. worker는 항상 1개다.**
 
-- **현 구조 유지 + 비대칭만 정리**(관리자 UI도 trading-core를 직접 부르게 해서 admin HTTP 어댑터 7개와 contract를 줄임): 경계 코드의 절반쯤은 줄지만 사용자 복제본, 이중 셸, `shared.kernel`, 모델 2개는 그대로 남는다. 합치지 않기로 하면 이 안을 한다(5절 선택지 B).
-- **완전 단일 프로세스**(web과 worker를 한 JVM에): 가장 단순하고 현재 사용자 규모(운영 계좌 8개, 활성 전략 9개)에는 충분하다. 다만 배포마다 매매 시간대를 피해야 하고 화면이 재기동 동안 멈춘다. 권고안은 role 플래그 구조라서, 설정만 바꾸면 이 형태로도 돌릴 수 있다.
-- **물리 DB 분리(S-04, 보류 중)**: 권고 방향과 반대다. 폐기를 권한다.
-- **프로세스 간 이벤트를 Modulith 이벤트 외부화로 교체**: 조회한 Modulith 2.1 문서의 외부화 설명은 Kafka·AMQP 같은 메시지 브로커 기준이고 Redis Stream 지원은 확인되지 않았다. 브로커를 새로 들이는 일이 되므로 기각.
+이 원칙이면 M1~M3은 발생하지 않는다(지금의 kista-trading과 같은 조건). 합치는 이득(내부 HTTP·contract·사용자 복제본·이중 구현 제거, `shared.kernel` 해체, 모델 1개)은 전부 얻는다.
 
-## 3. Modulith 모듈 구성 평가
+### 1-2. 역할 배치
 
-### 3-1. 잘 된 것 (유지)
+| role | 인스턴스 | 받는 것 |
+|---|---|---|
+| **worker** | 1개, stop-first, `stop_grace_period` ≥ 200s | 모든 `@Scheduled`, 배치 재개, Redis 스트림 컨슈머, EPR 재발행. **엔진 모듈의 HTTP 전부**: trading, account, stats, broker, calendar, privacy, market, benchmark와 그 관리자 엔드포인트 |
+| **web** | blue/green(교체 중 2개) | 엔진과 무관한 HTTP: user(인증·승인·프로필), finance(가계부), notification 웹훅, ops(오류·감사 로그), `/api/meta`, SSE |
 
-- `matching`이 순수 커널이다(다른 모듈 의존 0, `shared.kernel`만 사용). 백테스트(`stats`)가 같은 커널을 재사용한다.
-- `broker`·`marketcalendar`·`user`·`benchmark`·`market`이 다른 업무 모듈에 의존하지 않는다. 의존 방향에 순환이 없다.
-- `ApplicationModules.verify()`와 ArchUnit으로 경계를 빌드에서 강제한다.
+- 지금의 3 role 대비: kista-trading + kista-scheduler → worker, kista-api → web. **런타임 구조는 거의 그대로이고 코드베이스만 하나가 된다.** 가계부·로그인은 worker 배포 중에도 응답하고, 가계부 배포는 매매 프로세스를 재기동하지 않는다(role별 SHA 선언은 kista-infra가 이미 지원).
+- market·benchmark를 worker에 두는 이유: 캔들·환율 조회가 브로커(시세 공급자)를 호출한다. 원칙 1-1에 따라 worker다.
+- **포기하는 것**: worker 배포 중(약 3~4분) 전략·계좌·통계 화면이 응답하지 않는다(지금과 같다). 되찾는 길은 8절의 선택 단계다.
 
-### 3-2. 문제
+### 1-3. role을 구현하는 방식 (빈을 role로 쪼개지 않는다)
 
-1. **CLOSED이지만 사실상 전부 공개다.** NamedInterface가 56개이고, 모듈 대부분이 `domain`·`usecase`·`port`·`event`를 통째로 공개한다. 공개 패키지에 든 코드가 411파일 12,167줄로 main의 22%다. 특히 `port`(아웃바운드 포트, 영속 포트 포함)를 공개해서 다른 모듈이 남의 저장소 포트를 직접 부를 수 있다. 모듈이 숨기는 것이 `application/service`와 `adapter`뿐이다.
-2. **`shared.kernel`이 OPEN 덤프다.** Modulith 문서는 OPEN 모듈을 "기존 코드를 점진 이관할 때 쓰는 것이고, 완전히 모듈화된 애플리케이션에서 쓰면 모듈화가 최적이 아니라는 신호"라고 적는다. 2-2에서 본 대로 프로세스 분리가 원인이다.
-3. **`web` 셸 모듈 2개.** "여러 모듈을 집계하는 컨트롤러와 전역 advice"를 담는 sink 모듈이다. 어느 모듈에도 속하지 않는 코드를 모듈로 만들어 둔 것이다.
-4. **`notify`가 "순수 아웃바운드 게이트웨이"라면서 업무 모듈 4개를 import한다**(api.notify → user·benchmark·finance·market, tc.notify → trading 36). 남의 이벤트를 듣는 리스너가 게이트웨이 안에 있어서다. 알림 문구를 아는 쪽이 게이트웨이인지 업무 모듈인지가 섞여 있다.
-5. **`admin`이 업무 모듈이 아니라 화면 단위다.** trading 데이터를 보여주려고 `shared.contract`를 73번 import한다. "관리자가 본다"는 것은 권한이지 업무 영역이 아니다.
-6. **작은 모듈에도 같은 의식을 치른다.** `marketcalendar` 493줄, `market` 939줄, `privacy` 1,054줄, `account` 1,065줄이 각각 NamedInterface 2~4개, package-info, 포트·유스케이스 층을 갖는다. package-info만 66개 300줄이다.
-7. **같은 ID가 두 모델에 있다**(`notify`, `web`). 문서에서 매번 루트를 붙여 구분한다.
-8. **Modulith가 주는 기능 중 직접 만든 것이 있다.**
-   - 구조 그림: `flows.yml` + `ArchitectureMapTest`로 수기 관리한다. 모듈 관계도와 모듈별 요약(빈, 이벤트 발행·구독)은 `Documenter`가 생성한다. 흐름·생명주기 탭은 수기로 남기되 모듈 관계 부분은 생성물로 바꿀 수 있다.
-   - 미완료 이벤트 재처리: 2.0부터 staleness monitor(`spring.modulith.events.staleness.*`)와 `FailedEventPublications.resubmit`이 있다. 자체 재발행 스케줄러가 이것으로 대체되는지 확인할 가치가 있다.
+두 role 모두 **전체 컨텍스트를 올린다.** 모듈별로 빈을 조건부 로딩하지 않는다(조건이 수백 곳에 퍼지고 빠뜨리면 조용히 깨진다). role이 가르는 것은 넷뿐이다.
 
-### 3-3. 조기 마감 커밋이 보여준 것
+1. 프로퍼티 하나: `kista.role = web | worker | all`. **기본값 없음 — 누락이면 기동 실패**(`@Validated`). 로컬·테스트는 `all`. 운영 compose가 role별로 준다. 기존 `scheduler.enabled`(누락 시 켜짐)는 없앤다.
+2. worker 전용 빈(`@ConditionalOnWorkerRole` = role이 worker 또는 all): 모든 `@Scheduled` 클래스, `TradingBatchResumer`, Redis 스트림 컨슈머, 스케줄러 수동 트리거. 메타 애너테이션 하나로 표시하고 ArchUnit으로 "`@Scheduled` 메서드를 가진 클래스는 이 애너테이션을 가진다"를 강제한다.
+3. EPR 재발행: worker만 true(compose env).
+4. **요청 경로 가드**: 서블릿 필터 `RoleRoutingGuard`가 role=web일 때 엔진 경로 요청을 503(`code=WRONG_ROLE`)으로 거절하고, role=worker일 때 web 경로를 같은 방식으로 거절한다. 잘못된 라우팅이 조용히 동작하지 않게 한다. `all`이면 통과.
 
-조기 마감일 처리 하나(커밋 5개)에 main 37개 파일이 바뀌었다. "거래일과 세션"이라는 한 개념이 다음에 흩어져 있기 때문이다.
+경로→role 표는 **한 곳**에서 만든다: 컨트롤러가 속한 Modulith 모듈로 판정한다(엔진 모듈 목록은 1-2 표). `RoleRoutes`(platform)가 기동 시 `RequestMappingHandlerMapping`에서 모듈별 경로를 모아 가드에 주고, 테스트가 같은 표로 Caddy 스니펫의 matcher를 검증한다(기존 `CaddyRoutingTest` 확장). UI도 이 표에서 생성한 목록을 쓴다(7절).
 
-| 위치 | 내용 |
-|---|---|
-| `trading/domain/model/DstInfo` 161줄 | DST별 개장·마감 시각표, 정규장 판정 |
-| `marketcalendar/domain/model/MarketSessionTimes` | 실제 세션(조기 마감 포함) 기준 거래일 전환 |
-| `trading/application/service/SessionTradeDates` | 위 둘을 잇는 static 헬퍼. 서비스 8곳이 호출하고 `MarketCalendarPort`를 인자로 넘긴다 |
-| `shared.platform.time.UsTradeDates` | 13개 파일이 참조 |
-| `broker/adapter/out/toss/TossPriceApi:163-199` | `DstInfo`의 정규장 판정을 복제(과거 결정 C-02: broker는 trading을 참조할 수 없어서) |
-| `trading/adapter/in/schedule/TradingCloseScheduler` 239줄 | "실제 마감 30분 전에 예약 실행", "휴장·조기 마감일의 하트비트 대체" 판단이 인바운드 어댑터 안에 있다 |
+### 1-4. role 경계를 넘는 통신은 2가지만 남긴다
 
-관련 파일은 trading 22, broker 7, marketcalendar 4, shared 5, root 2개다.
+| 방향 | 수단 | 내용 |
+|---|---|---|
+| web → worker | Redis Stream `stream:user.deleted`(기존) | 사용자 탈퇴 시 매매 데이터 정리. 미체결 주문 취소가 브로커 호출이라 worker에서 실행돼야 한다 |
+| worker → web | Redis Pub/Sub 매매 이벤트(기존) | web이 쥔 SSE 연결로 매매 알림 푸시 |
 
-- **의심(확인 필요)**: `TossPriceApi`의 복제본은 마감 시각을 DST 05:00·표준시 06:00으로 고정한다(`:171`). 조기 마감일(현지 13:00 마감)에는 실제로 장이 끝났는데도 "정규장 진행 중"으로 판정할 수 있다. 이 판정이 캔들 조회 범위에만 쓰여 영향이 작을 수도 있다. 코드를 끝까지 따라가 확인하지는 않았다.
-- 구조 결론: 이 개념의 주인은 `marketcalendar`다. `broker`와 `marketcalendar`는 서로 의존이 없으므로 `broker → marketcalendar` 의존은 순환 없이 허용된다. C-02의 "복제 유지" 이유(broker가 trading을 참조할 수 없다)는 시각표를 trading이 아니라 marketcalendar가 가지면 사라진다.
-- 스케줄 판단("오늘 마감 배치를 언제 돌릴 것인가")은 도메인 규칙이다. 스케줄러는 그 답을 받아 예약만 한다. 상세는 지침서 06에서 다룬다.
+그 밖의 스트림 3종(`user.notify-profile.changed`, `app.error`, `user.push-notification.requested`)과 내부 HTTP 31개 핸들러는 삭제한다. web이 엔진 모듈을 프로세스 안에서 호출하는 것은 **DB 읽기 전용 조회만** 허용한다(예: `/api/runtime-config`가 매매 정책 설정을 읽는 것). 쓰기와 브로커 호출은 금지다. 허용 목록을 `RoleBoundaryTest`(ArchUnit)에 명시한다: web 모듈(user, finance, notification, ops, app)이 참조할 수 있는 엔진 타입의 화이트리스트.
 
-## 4. 목표 모듈 구성 (합친 뒤)
+**이벤트 주의**: Spring 이벤트 리스너는 발행한 프로세스에서 돈다. web에서 발행되는 이벤트를 엔진 모듈이 `@EventListener`로 직접 들으면 엔진 코드가 web에서 실행된다. 현재 해당하는 것은 `UserDeletedEvent`(→ `TradingUserCascadeListener`)와 `UserNotifyProfileChangedEvent`다. 처리 방법은 3절 P5.
+
+### 1-5. 기각한 대안
+
+- **web이 모든 HTTP를 받는다(첫 권고)**: M1~M3 해결이 선행이다. 분산 락 3종을 새로 만들고 주문 안전 경로를 바꿔야 한다. 이득(worker 배포 중 화면 응답)에 비해 위험이 크다. 8절 단계 C로 미룬다.
+- **브로커를 부르는 요청만 worker로 넘긴다**: 수동 매매·잔고·시세·전략 등록(전일 종가 조회)이 전부 브로커를 불러 경계를 그을 수 없다(`findings/09` I-4).
+- **현 2-코드베이스 유지**: 사용자가 통합으로 결정.
+- **완전 단일 프로세스**: `kista.role=all`로 언제든 가능하다. 운영은 2 role로 간다.
+- **모듈별 조건부 빈 로딩**: 1-3 참고.
+
+## 2. 전체 순서
+
+| 단계 | 내용 | 배포 | 선행 |
+|---|---|---|---|
+| P | 사전 정리(현 2-앱 구조에서, 각각 독립 배포) | 기존 3 role | 지침서 04 단계 A(KIS·업비트 삭제) |
+| M | 한 애플리케이션으로 합치고 2 role로 전환 | **구조 전환 배포**(kista-infra 협업) | P 전부 |
+| X | 경계 코드 제거(내부 HTTP, contract, 복제본, 스트림 3종) | 2 role | M |
+| R | 모듈 재구성(kernel 해체, calendar, admin·web 해체, 공개 범위 축소) | 2 role | X, 지침서 01 단계 B |
+| G | Gradle 서브프로젝트 단일화, UI 진입점 정리 | 2 role | R |
+
+**단계마다 운영에 배포하고 최소 2거래일(개장·마감 배치 각 2회) 관찰한 뒤 다음 단계로 간다.** 단계 M은 매매 시간대 밖(KST 07:00~16:00, 미국장 휴장일이면 더 좋다)에 한다.
+
+공통 검증 명령(이하 "전체 검증"):
+
+```bash
+./gradlew compileJava compileTestJava 2>&1 | grep -E "error:|warning: \[|BUILD"
+./gradlew test 2>&1 | grep -E "FAILED|BUILD"          # 단계 끝에 1회
+grep -l 'failures="[1-9]' build/test-results/test/TEST-*.xml trading-core/build/test-results/test/TEST-*.xml
+```
+
+## 3. 단계 P — 사전 정리 (현 구조에서 충돌 원인을 먼저 없앤다)
+
+각 항목은 동작을 바꾸지 않는 독립 커밋이다. 전부 `findings/10`의 해당 절에 file:line이 있다.
+
+**P1. 예외 처리기 통합** (Opus) — `findings/10` G-1. **가장 위험한 충돌이라 먼저 한다.**
+T `TradingExceptionHandler`가 `@Order(HIGHEST_PRECEDENCE)`에 `@ExceptionHandler(Exception.class)`를 갖고 있다. 한 컨텍스트에 올리면 모든 예외를 먼저 잡아 R의 매핑(가계부 409 7종, `MONTH_CLOSED`, Cooldown 429 + `Retry-After`, `InvalidRefreshToken` 401, SSE 종료 처리)에 도달하지 못한다. 컴파일도 대부분의 테스트도 이를 못 잡는다.
+- 목표: advice 클래스는 S(platform)에 **하나**. 예외→응답 매핑은 모듈이 `ProblemDetailMappingContributor` 빈으로 기여하고 advice가 전부 모아 한 표로 만든다. 개별 핸들러가 필요한 것(Cooldown의 헤더, `BrokerApiException`의 오류 보고, SSE 종료, `MethodArgumentNotValidException`)도 이 advice로 옮긴다.
+- 선행 테스트: R·T 각 `MAPPINGS`의 예외마다 "이 예외가 던져지면 이 상태·code"를 단언하는 표 기반 테스트를 먼저 만든다(현재 값 고정). 통합 뒤에도 같은 테스트가 통과해야 한다.
+- 같은 뜻의 쌍(`AdminBrokerCredentialException`↔`BrokerCredentialException` 등 3쌍)은 단계 X에서 정리한다. 여기서는 건드리지 않는다.
+
+**P2. 중복 빈 정리** (Sonnet) — `findings/10` A절.
+`ClockConfig`·`RedisBlacklistAdapter`를 S로 옮겨 한 벌로(`JwtAuthFilter`가 `TokenBlacklistPort` 단일 빈을 요구한다). `fearGreedRestClient` 빈 이름 충돌(읽기 타임아웃 7s 대 5s)은 이름을 다르게. `AlpacaConfig`·`BinanceConfig`는 명시 이름 덕에 지금은 안 겹치지만 벌 수를 줄인다(Alpaca 3벌 → 1벌). `UserEventResubmitScheduler` 2벌은 P5에서.
+
+**P3. SQL을 search_path에 의존하지 않게** (Sonnet, 기계적·검수 Opus) — `findings/10` C절.
+합친 뒤에는 커넥션 풀이 하나라 search_path도 하나다. 그런데 `scheduler_locks`와 `event_publication`이 public·trading 두 스키마에 같은 이름으로 있다.
+- 모든 `nativeQuery`(R 11곳, T 약 45곳)와 `JdbcTemplate` SQL의 테이블 이름에 스키마를 붙인다(`trading.orders`). 엔티티는 이미 전부 `@Table(schema=...)`다.
+- `SchedulerLockService`(S)는 테이블 이름을 프로퍼티로 받는다(`kista.scheduler-lock.table`, R=`public.scheduler_locks`, T=`trading.scheduler_locks`).
+- 가드 테스트: main의 native SQL 문자열에서 `from|join|into|update` 뒤 식별자가 스키마 한정인지 정규식으로 검사.
+- 검증: 기존 persistence 테스트(`*DbTest`) 전부 통과. **`deleted_at IS NULL` 조건을 건드리지 않는다.**
+
+**P4. role 프로퍼티 도입** (Sonnet)
+`kista.role`을 두 앱에 추가한다(R: kista-api=web, kista-scheduler=worker / T: worker). `@ConditionalOnProperty(prefix="scheduler", ...)`를 전부 `@ConditionalOnWorkerRole`로 바꾸고 `scheduler.enabled` 키와 `SCHEDULER_ENABLED` env를 지운다. T의 `@Scheduled` 클래스에도 붙인다(지금은 게이트가 없는 것이 있다 — Redis 스트림 복구 `@Scheduled` 등, `findings/09` F절). ArchUnit 가드 추가. compose·`.env.example`·bats 갱신(`cross-repo.md`에 env 변경 기록).
+- 함정: 운영 compose에 `KISTA_ROLE`을 넣는 배포와 코드 배포의 순서. **env를 먼저 배포**(구 코드는 무시)하고 코드를 배포한다. 반대면 기동 실패다.
+- `docs/agents/commands.md`의 "SCHEDULER_ENABLED 일회성 override" 주의 문구를 `kista.role`로 고친다.
+
+**P5. 사용자 이벤트 경로 단순화** (Opus) — `findings/09` M4, `findings/10` E-3·H-2.
+지금: R `UserEventStreamPublisher` → Redis Stream → T `UserEventStreamConsumer` → `UserEventRepublisher`가 **같은 이벤트 클래스를 로컬 재발행** → `TradingUserCascadeListener`. 한 컨텍스트에 올리면 재발행된 이벤트를 다시 스트림 발행자가 받아 **무한 순환**한다.
+- 바꾼다: 컨슈머가 이벤트를 재발행하지 않고 **유스케이스(`UserTradingDataEraseService`)를 직접 호출**한다. `TradingUserCascadeListener`·`UserEventRepublisher`·`UserEventStreamBridge`를 지운다.
+- 확인할 것: 재발행이 EPR 재시도를 얻으려던 것인지(`history:139`). 스트림 컨슈머 베이스(`RedisStreamSubscriber`)의 ack·XCLAIM 복구가 같은 보장(처리 실패 시 재전달)을 주는지 코드로 확인하고, 유스케이스가 멱등인지 테스트로 고정한다. 보장이 부족하면 중단하고 보고한다.
+- `UserEventResubmitScheduler`(T)는 재발행 대상이 사라지면 지운다. R 쪽은 발행 실패분 재전송용이면 남긴다.
+- `stream:user.notify-profile.changed`는 단계 X에서 복제본과 함께 지운다. 그때까지는 같은 방식(컨슈머가 포트 직접 호출)으로 바꿔 둔다.
+
+**P6. 오류 로그 이중 기록 방지 준비** (Sonnet)
+`AppErrorRaisedEvent`를 R은 직접 저장하고 T는 스트림으로 R에 보낸다. 합치면 한 이벤트가 2행이 된다. 단계 M의 같은 커밋에서 T `AppErrorStreamPublisher`와 R `AppErrorStreamConsumer`를 지운다(여기서는 삭제 목록만 확정).
+
+**P7. 결정 사항 1건: 스케줄러 라이프사이클 알림** — `findings/10` E-3.
+`SchedulerLifecycleEvent`는 R `SchedulerNotifier`만 듣는다. 지금 매매 잡의 시작·실패 알림은 가지 않는다. 합치면 관리자 텔레그램으로 새로 나간다. **기본값: 매매 잡은 알림에서 제외해 현재 동작을 유지한다**(잡 이름 필터). 받고 싶으면 사용자가 켠다.
+
+단계 P 완료 판정: 전체 검증 통과, 3 role 운영 배포 후 2거래일 관찰(개장·마감 배치 정상, 탈퇴 cascade는 로컬에서 dev-e2e 사용자로 확인).
+
+## 4. 단계 M — 한 애플리케이션으로 합치고 2 role로 전환
+
+### 4-1. 코드 (Opus 설계·검수, Sonnet 적용) — 한 브랜치에서 끝낸다
+
+| # | 작업 | 근거·주의 |
+|---|---|---|
+| M1 | root `build.gradle.kts`에 `implementation(project(":trading-core"))`. T의 `bootJar` 비활성, 일반 `jar` 활성. `Dockerfile`에서 `trading-core.jar`·`APP_JAR` 분기 삭제 | `findings/10` J·K절 |
+| M2 | 앱 클래스 하나: `ApiApplication`을 유지하고 `@SpringBootApplication(scanBasePackages={"com.kista.api","com.kista.tradingcore"})`, `@EntityScan`·`@EnableJpaRepositories`·`@ConfigurationPropertiesScan`에 두 패키지 명시. `TradingApplication` 삭제. **`com.kista`를 통째로 스캔하지 않는다**(S는 `PlatformAutoConfiguration`으로만 올린다는 기존 의도). `@EnableScheduling`이 남아 있는지 확인(과거 누락 사고) | C3 |
+| M3 | yml 병합: T의 `application{,-local,-prod}.yml`을 R 쪽에 키 단위로 합치고 T 파일을 지운다. 같은 이름의 클래스패스 리소스라 둘 다 두면 한쪽이 조용히 사라진다. 값이 다른 키의 결정은 `findings/10` B-1 표의 "합병 판단" 열을 따른다. `spring.application.name`은 **`kista-api` 유지**(Grafana 쿼리 17곳이 이 값으로 필터), `management.metrics.tags.role=${kista.role}` 추가 | B절 |
+| M4 | search_path: P3 덕에 SQL은 의존하지 않는다. `connection-init-sql`은 `SET search_path TO public`으로 단순화하고, Modulith EPR 스키마는 `public` 명시 | C1 |
+| M5 | Flyway 2벌: `Flyway` 빈을 직접 2개 정의(`rootFlyway`: `db/migration`, `flyway_schema_history_api`, `public` / `tradingFlyway`: `db/migration-trading`, `flyway_schema_history_trading`, `trading`), 각 `initMethod="migrate"`. **빈을 하나라도 직접 정의하면 Boot 자동구성이 통째로 꺼진다**(Boot 4.1.1 소스 확인). 기존 env 계약 `SPRING_FLYWAY_BASELINE_ON_MIGRATE`는 새 프로퍼티(`kista.flyway.*.baseline-on-migrate`)로 대체하고 RUNBOOK 갱신. `DataJpaTestBase`에 이 구성을 `@Import`(슬라이스는 직접 만든 Flyway 빈을 로드하지 않는다 — 이미 migrate된 로컬 DB에서는 우연히 통과하므로 **빈 DB로 한 번 검증**) | D절 |
+| M6 | `scheduler_locks`: 한 테이블로. **`trading.scheduler_locks`를 쓴다**(매매 배치 재개가 잔여 락을 인수하므로 이쪽 행을 보존). R 잡 이름과 T 잡 이름이 겹치지 않는지 확인. `public.scheduler_locks`는 contract 단계에서 drop | C2 |
+| M7 | EPR 한 테이블: `public.event_publication`. 전환 절차는 4-3 | E-2 |
+| M8 | Modulith: 모델 1개. ID 충돌 `notify`·`web`은 T 쪽을 `trading-notify`·`trading-web`으로 개명(임시. 단계 R에서 최종 이름). `ModulithArchitectureTest` 2개를 1개로(모듈 19개). listener_id는 FQCN 기반이라 ID 개명과 무관 — **이 단계에서 패키지와 클래스 이름은 바꾸지 않는다** | E-1 |
+| M9 | 삭제: T `AppErrorStreamPublisher` + R `AppErrorStreamConsumer`(P6), `PlainDecimalSerializer` 중복 1벌 | E-3 |
+| M10 | `RoleRoutingGuard`·`RoleRoutes`(1-3) 추가. 이 단계의 엔진 경로 = 현재 Caddy `@trading`·`@scheduler` matcher와 `/api/internal/**` | K-2 |
+| M11 | 내부 HTTP는 **그대로 둔다.** web의 `INTERNAL_API_BASE_URL`은 `http://kista-worker:8080`. worker 자신이 내부 API를 부르는 경로가 있으면(구 kista-scheduler 잡) `http://localhost:8080` | H-1 |
+| M12 | 테스트 정리: `TradingApplicationContextLoadTest`·`SchedulerLockService*Test`의 `TradingApplication` 참조 교체, `RootDataJpaTestBase` 삭제 후 `DataJpaTestBase`로, `GradleModuleBoundaryTest`는 "T → R 의존 금지"만 남기고 "R → T 금지" 삭제. `InternalApiContractTest`는 단계 X까지 유지 | D-3, J절 |
+| M13 | springdoc: `paths-to-exclude: /api/internal/**`를 합친 yml에. 스키마 단순명 충돌(`Market` 2개, `MarketSessionResponse` 2개, `InvestmentPoint` 2개)은 `@Schema(name=...)`으로 분리. UI의 스펙 병합 스크립트는 단일 스펙으로 바뀐다(`cross-repo.md`) | G-3 |
+| M14 | 리소스: Hikari 풀(`findings/10` C4 — 지금 JVM당 5, DB `max_connections` 확인 후 web 5·worker 10 정도로), `TaskScheduler` 풀 크기(R·T 스케줄러가 풀 하나를 공유하게 된다. 기본 1이면 긴 잡이 다른 잡을 막는다 → `spring.task.scheduling.pool.size`를 명시), JVM 힙(web 1280m, worker 2048m에서 시작) | B-2, B-3 |
+
+### 4-2. 예상되는 오류와 대처
+
+| 증상 | 원인 | 대처 |
+|---|---|---|
+| `ConflictingBeanDefinitionException` | 같은 simple name의 `@Component` | P2에서 빠진 것. S로 합치거나 명시 이름 |
+| `NoUniqueBeanDefinitionException` | 타입 후보 2개(`TokenBlacklistPort` 등) | 중복 구현 삭제. `@Primary`로 덮지 않는다 |
+| `Ambiguous mapping` | 같은 메서드+경로(조사상 0건이지만 정규식 추출의 한계) | 실제 중복이면 한쪽 삭제 판단을 보고 |
+| `Schema-validation: missing table` | `@Table(schema)` 누락 또는 스캔 범위 | 엔티티에 스키마 명시(조사상 42/42 명시) |
+| 테이블 없음(빈 DB에서만) | 슬라이스 테스트에 Flyway 구성 미포함 | M5의 `@Import` |
+| 순환 빈 참조 | R 빈과 T 빈이 서로 주입 | `@Lazy`로 덮지 않는다. 어느 쪽이 내부 HTTP 어댑터를 통해야 하는지 확인(단계 M에서는 R → T 직접 주입이 생기면 안 된다) |
+| `ApplicationModules.verify()` 실패 | R 모듈이 T 모듈 내부 참조 | 단계 M에서는 새 참조가 생기면 안 된다. 생겼다면 범위를 넘은 것 |
+| 응답 상태가 바뀜(409 → 500 등) | P1 누락 | P1의 표 테스트로 확인 |
+| 오류 로그 2행 | M9 누락 | |
+| 기동 직후 CPU 100%, Redis 스트림 폭증 | P5 누락(이벤트 순환) | 즉시 중단, 스트림 길이 확인 |
+| 스케줄 잡이 돌지 않음 | `@EnableScheduling` 누락 또는 `kista.role` 조건 | `/actuator/scheduledtasks` 또는 로그의 스케줄 등록 확인 |
+| 잡이 두 번 돔 | worker가 2개 떴다 | 4-3의 전환 순서 위반 |
+
+### 4-3. 전환 배포 (kista-infra 세션과 함께, 매매 시간대 밖 계획 작업)
+
+**main push 자동 배포로 내보내지 않는다.** kista-infra의 reconcile은 `roles`에 있는 서비스만 올리고, 새 번들에서 사라진 서비스의 컨테이너는 지우지 않는다. role 이름이 바뀌는 첫 배포를 자동으로 내보내면 옛 `kista-scheduler`·`kista-trading`이 고아로 계속 도는 옆에 `kista-worker`가 떠서 **스케줄러와 매매 배치가 동시에 두 벌 돈다**(kista-infra 지침서 03 5-1절). 전환 커밋은 배포 범위 판정에서 제외되게 하거나 자동 배포를 잠시 끄고, 아래 순서를 사람이 확인하며 진행한다.
+
+사전(읽기 전용): `SELECT count(*), min(publication_date) FROM trading.event_publication WHERE completion_date IS NULL;` 와 `public` 쪽. 진행 중 배치가 없는지 `trading.scheduler_locks`와 배치 실행 테이블 확인.
+
+1. 옛 `kista-scheduler` → `kista-trading` 순으로 **정지하고 컨테이너를 삭제**한다(trading은 `stop_grace_period`를 다 기다린다). `docker ps`에 두 이름이 없는 것을 확인한다. 옛 `kista-api`는 아직 둔다(가계부·로그인 유지. 매매 화면은 이 동안 응답하지 않는다).
+2. EPR 이관: 미완료 행만 복사 `INSERT INTO public.event_publication SELECT * FROM trading.event_publication WHERE completion_date IS NULL;`(컬럼 동일). 복사한 행 수를 기록.
+3. kista-infra `state/kista-api.yml`의 role 키를 `kista-web`·`kista-worker`로 바꾼다(`build-bundle.sh:17`이 roles 파일과 state 키 집합이 다르면 실패시킨다).
+4. reconcile. `roles` 적용 순서는 **worker → web**이다. 근거: web의 관리자·벤치마크 화면이 단계 X 전까지 worker의 내부 API를 부르고, Flyway 2벌을 worker가 먼저 적용하면 web은 검증만 한다. EPR 재발행 소유는 worker 하나다.
+5. `kista-worker` readiness 확인 → 로그에서 EPR 재발행 처리와 `TradingBatchResumer` 확인.
+6. `kista-web` 기동 확인 → Caddy가 기본 upstream으로 `kista-web`을, `@trading`·`@scheduler`로 `kista-worker`를 가리키는지 확인.
+7. 옛 `kista-api` 컨테이너를 정지·삭제한다.
+8. 확인: 로그인, 가계부 조회(web), 전략 목록·주문 미리보기(worker), 관리자 스케줄러 상태, `/actuator/prometheus`의 role 태그, 오류 로그 1행, `docker ps`에 옛 role 이름 없음.
+
+롤백: 새 2 role을 정지·삭제하고 state 키를 되돌린 뒤 구 이미지 SHA로 3 role을 올린다. **2번에서 복사한 EPR 행은 `public`에 남으므로**, 롤백 전에 그 행들의 `completion_date`를 확인하고 미완료면 `public`의 복사본을 지운다(`trading` 쪽 원본이 재발행된다. 이중 처리 방지). 리스너가 멱등인지에 기대지 않는다.
+
+바뀌는 배포 파일 전수는 `findings/10` K-3 표를 따른다(compose, roles, readiness, bluegreen, Caddy 스니펫, `pre-apply.sh`의 role→schema 매핑, `detect-deploy-scope.sh`, `plan-deploy.sh`, bats, Grafana). `check-migrations.sh`의 expand/contract 검사를 **trading 디렉토리에도 적용**한다(D3).
+
+단계 M 완료 판정: 전체 검증 통과, 빈 DB에서 기동 성공, 2거래일 관찰.
+
+## 5. 단계 X — 경계 코드 제거
+
+원칙: 엔진 모듈을 부르는 컨트롤러는 worker에서 뜨므로, 내부 HTTP 어댑터는 **worker 안의 직접 호출**이 된다. 3자 매핑표(`findings/10` H-1)에 어댑터 메서드 → 내부 엔드포인트 → 실제 서비스가 전부 있다.
+
+| # | 작업 | 주의 |
+|---|---|---|
+| X1 | market(어댑터 2) → benchmark(2) → admin(7) 순으로 어댑터를 직접 호출로 교체하고 대응 내부 컨트롤러·`*ContractMapper`·contract 타입을 지운다. 해당 컨트롤러 경로(`/api/market/**` 캔들·캘린더, `/api/stats/housing-benchmark/**`, `/api/admin/` 중 매매·계좌·PRIVACY·포트폴리오·스케줄러)를 `RoleRoutes`의 엔진 경로로 옮기고 Caddy matcher를 갱신 | 대상 타입이 NamedInterface로 공개돼 있지 않으면 `verify()`가 실패한다. 이 단계에서는 기존 공개 범위(`usecase`·`port`)를 쓴다. 공개 범위 축소는 단계 R |
+| X2 | `Admin*` 복원용 예외 3쌍과 오류 복원 코드(`InternalApiErrorDetails`, `InternalApiStatusHandlers`, T `ErrorBodyDecoder`) 삭제, P1의 매핑 표에서 원본 예외 하나로 | 응답 상태·code가 같아야 한다(P1 테스트) |
+| X3 | `POST /api/internal/trading/trade-corrections`의 20초 쓰기 타임아웃은 직접 호출이 되면 사라진다. 감사 로그가 트랜잭션 밖에서 기록되는 구조는 유지 | |
+| X4 | 스케줄러 수동 트리거: `TradingSchedulerInternalController`가 스케줄러 빈(인바운드 어댑터)을 직접 부른다. 유스케이스로 감싸고 관리자 컨트롤러가 그것을 부른다. worker 전용 | |
+| X5 | **`/api/internal/fida-orders`는 유지**: 외부 FIDA 프로젝트가 호출한다. `InternalTokenAuthFilter`와 `/api/internal/**` 보안 규칙도 남는다. 요청·응답 타입은 contract에서 privacy 모듈의 `api`로 옮긴다. FIDA 통합 여부(fable-fida 검토)에 따라 나중에 달라진다 | |
+| X6 | 사용자 복제본 제거: `TradingUserProfilePort` 호출처 전수(`findings/10` H-3 — 알림 notifier 7종, `BatchContextFactory`, `MarketEventNotifier`, `StrategyCreationService`, `CryptoDcaRunner`, `UserTradingDataEraseService`)를 user 모듈의 읽기 API로 바꾼다. user 모듈에 `UserNotifyProfile` 조회 유스케이스를 만든다(R `UserNotifyProfilePublisher`가 이미 `UserPort` + `UserSettingsPort`로 같은 스냅샷을 조립한다). native SQL `StrategyJpaRepository.java:44-58`의 `JOIN user_notify_profile`은 활성 사용자 id 목록을 user API로 받아 `IN`으로 거르거나, 예외 대장에 올리고 `public.users` 조인으로 | "다른 모듈 소유 테이블 참조 금지" 규칙의 유일한 긴장 지점. 기본값은 **user API로 id 목록을 받는 쪽**(규칙 유지). 활성 사용자 수가 수천을 넘으면 재검토 |
+| X7 | 스트림 삭제: `user.notify-profile.changed`(발행자·컨슈머·`UserNotifyProfileSyncListener`), `user.push-notification.requested`(T 발행자·R 컨슈머 → worker가 `PushNotificationPort` 직접 호출). `user_notify_profile` 테이블 drop은 다음 배포(contract) | FCM 자격증명이 worker에도 필요(`findings/09` S8). 알림 채널 판정 2곳(`TradingUserNotificationAdapter.java:175`, `UserPushNotificationAdapter.java:32`)을 한 곳으로 |
+| X8 | `shared.contract` 삭제(FIDA 타입 제외), `InternalApiClientConfig`·`InternalApiProperties`·`INTERNAL_API_BASE_URL` 삭제, `InternalApiContractTest` 삭제, own-type 원장(`own-type-ledger.md`) 재판정 | |
+| X9 | 통계 캐시: stats가 worker에만 있으므로 프로세스 간 무효화 문제(S1)는 없다. 확인만 | |
+
+완료 판정: 전체 검증, `grep -rn "api/internal" src trading-core --include=*.java`가 FIDA 경로만 남음, 2거래일 관찰(알림 발송·관리자 화면·벤치마크).
+
+## 6. 단계 R — 모듈 재구성
+
+목표 구성(패키지 루트는 최종적으로 `com.kista.<module>`):
 
 ```
-com.kista
-  user          가입·승인·프로필·인증·알림 설정
-  account       브로커 자격증명
-  broker        매매 venue + 시세 공급 (지침서 04)
-  calendar      거래일·세션·휴장·조기 마감. DstInfo·MarketSessionTimes·SessionTradeDates·UsTradeDates를 흡수
-  matching      주문 계산 커널 (순수)
-  trading       전략·사이클·주문·배치
-    └ privacy   (중첩 모듈) FIDA 기준 매매표 — trading과 stats만 쓴다
-  stats         통계·백테스트·포트폴리오 (trading의 읽기 모델)
-  market        공포탐욕·시장 지표
-  benchmark     주택·ETF 벤치마크
-  finance       가계부
-  notification  발송 게이트웨이(텔레그램·FCM). 업무 모듈을 import하지 않는다
-  ops           런타임 설정·감사 로그·오류 로그 (현 admin에서 남는 것)
-  platform      인프라 leaf (보안 필터, 암호화, 스케줄 골격, Redis 골격)
+user  account  broker  calendar  matching  trading(+privacy 중첩 검토)  stats
+market  benchmark  finance  notification  ops  platform  app(모듈 아님: 앱 클래스·role 가드·조립)
 ```
 
 규칙:
+1. 모듈이 공개하는 NamedInterface는 `api`(다른 모듈이 부르는 서비스와 입출력 값)와 `events`뿐이다. `domain`·`port`·`usecase`를 통째로 공개하지 않는다. `allowedDependencies`를 package-info에 선언한다.
+2. `shared.kernel` 해체: `Strategy*` → trading, `Broker`·`Market` → broker, `User*`·`NotificationChannel` → user. 세 모듈 이상이 쓰는 순수 값(`Currency`, `Quantities`, `TimeZones`, `AccountNumberMasker`)만 platform. 타입별 참조 수와 원 소유는 `findings/10` I절 표.
+3. `calendar`: `DstInfo`(trading), `MarketSessionTimes`, `SessionTradeDates`, `UsTradeDates`(platform)를 흡수. `TossPriceApi`의 세션 판정 복제 삭제(지침서 04).
+4. `admin` 해체: 관리자 엔드포인트는 데이터 소유 모듈의 `Admin*Controller`. 남는 것(런타임 설정, 감사·오류 로그)은 `ops`.
+5. `web` 셸 해체: advice·보안 정책은 platform, 조립 코드는 `app`.
+6. `notification`: 채널 선택과 발송만. 무엇을 누구에게 보낼지는 업무 모듈이 정해 `notification :: api`를 호출. 남의 이벤트를 듣는 리스너는 이벤트를 발행한 모듈 쪽으로.
+7. 1,500줄 미만 모듈은 3단 패키지를 강제하지 않는다.
 
-1. **모듈이 공개하는 것은 `api` 하나와 `events`뿐이다.** `api`는 다른 모듈이 부르는 서비스 타입과 그 입출력 값 타입이다. `port`·`domain`·`usecase`를 통째로 공개하지 않는다. `allowedDependencies`를 package-info에 명시해 의존 그래프를 선언으로 고정한다(예: `allowedDependencies = {"matching", "broker :: api", "account :: api", "calendar :: api"}`).
-2. **`shared.kernel`을 해체한다.** `Strategy.*` enum은 trading으로, `Broker`·`Market`은 broker로, `User*`는 user로 돌아간다. 세 모듈 이상이 쓰는 순수 값 타입(`Currency`, `Quantities`, `TimeZones`, `AccountNumberMasker`)만 `platform` 또는 작은 `common`에 남긴다. OPEN 모듈은 `platform` 하나만 둔다.
-3. **`shared.contract`를 삭제한다.** 프로세스 경계가 없으면 wire 계약도 없다.
-4. **`web` 셸을 없앤다.** 전역 advice·보안 정책은 `platform`으로, 여러 모듈을 집계하는 컨트롤러는 데이터를 소유한 모듈로 옮긴다. 어느 모듈에도 속하지 않는 조립 코드는 모듈로 감지되지 않는 루트 패키지(`com.kista.app`)에 둔다.
-5. **`admin`을 해체한다.** 관리자 엔드포인트는 데이터를 소유한 모듈의 `adapter/in/web`에 `Admin*Controller`로 둔다(권한은 `hasRole`). 런타임 설정·감사·오류 로그만 `ops`로 남는다.
-6. **알림**: 무엇을 누구에게 어떤 문구로 보낼지는 업무 모듈이 정해서 `notification :: api`를 호출한다. `notification`은 채널 선택과 발송만 한다. 리스너는 이벤트를 발행한 모듈 쪽에 둔다.
-7. **작은 모듈은 층을 줄인다.** 지침서 01의 기준(거울 인터페이스 금지)에 더해, 1,500줄 미만 모듈은 `domain`/`application`/`adapter` 3단 패키지를 강제하지 않는다. 가드는 "도메인이 인프라 타입을 모른다"만 남긴다.
-8. **privacy는 trading의 중첩 모듈로 둔다.** Modulith 1.3부터 중첩 모듈을 지원한다. 중첩 모듈은 부모와 형제에게만 보이고 부모의 내부에 접근할 수 있다. 다만 stats가 privacy를 4곳에서 쓰므로, 중첩으로 숨기면 그 접근을 `trading :: api`로 돌려야 한다. 돌릴 수 없으면 최상위 모듈로 둔다(실행 시 판정).
-9. **문서**: 모듈 관계도와 모듈 요약은 `Documenter` 생성물로 바꾸고, `architecture.md`의 모듈 표와 `docs/architecture-map.md`의 해당 구간을 삭제한다.
+**이 단계의 최대 위험: 이벤트·리스너 클래스의 패키지 이동.** EPR의 `listener_id`는 `FQCN.method(이벤트FQCN)`이고 직렬화된 이벤트도 타입 이름으로 복원한다. 옮기면 미완료 행이 고아가 된다.
+- 이벤트·리스너를 옮기는 커밋은 **그것만** 담고, 배포 직전 운영에서 미완료 행이 0인지 확인한다(`deploy/hooks/pre-apply.sh`·`epr-orphans.sh`, `docs/agents/docker-infra.md`의 EPR 절). 0이 아니면 소진을 기다리거나 런북대로 `listener_id`를 UPDATE한다.
+- `@Enumerated(STRING)` 컬럼의 enum은 상수 이름만 유지하면 패키지 이동은 안전하다. JSON으로 저장된 타입 이름(EPR `serialized_event`, Redis 페이로드)은 별도 확인.
 
-프로세스를 합치지 않기로 해도(5절 선택지 B) 1, 4, 5, 6, 7, 9번과 3-3의 calendar 통합은 그대로 적용할 수 있다. 2, 3번은 합칠 때만 가능하다.
+순서: ① kernel 해체(이벤트 제외) ② calendar ③ admin·web 해체 ④ notification ⑤ 이벤트·리스너 이동(EPR 절차) ⑥ 공개 범위 축소와 `allowedDependencies` ⑦ 패키지 루트를 `com.kista.<module>`로(대량 rename, IDE 리팩토링, 이것도 EPR 절차). 각각 별도 커밋 묶음·별도 배포.
 
-## 5. 사용자 결정 항목
+지침서 01 단계 B(UseCase 인터페이스 제거)를 ⑥ 전에 끝낸다. ⑥에서 `api`로 공개할 타입이 구체 서비스 클래스가 된다.
 
-| # | 결정 | 선택지 | Fable 권고 |
-|---|---|---|---|
-| D1 | 프로세스·코드베이스 구조 | **A.** 한 코드베이스·한 모델로 합치고 web/worker role로 분리 / **B.** 현 2-코드베이스 유지, 비대칭만 정리 / **C.** 완전 단일 프로세스 | A. 단, 6절 단계 0의 조사 결과를 보고 최종 확정 |
-| D2 | DB 스키마 5개 | 유지(모듈 소유 표시로 값이 싸다) / 통합 | 유지. "다른 모듈 소유 테이블에 FK 금지"는 모듈 규칙으로 남긴다. 물리 DB 분리(S-04)는 폐기 |
-| D3 | trading 스키마에도 expand/contract 적용 | D1=A면 필수 | D1에 따름 |
-| D4 | `admin` 해체, `web` 셸 해체 | 진행 / 유지 | 진행 (D1과 무관하게 가능) |
+문서: 모듈 관계도는 Modulith `Documenter` 생성물로 바꾸고 `architecture.md`의 모듈 표를 지운다(지침서 09).
 
-D1이 가장 큰 결정이고 비용도 가장 크다(main 약 5,000줄 삭제, 변경 파일 수백 개, 배포 구조 변경, kista-ui 프록시 경로 변경, kista-infra role 정의 변경).
+## 7. 단계 G — 마무리
 
-## 6. 실행 계획 (D1=A 기준)
+- Gradle: `:trading-core`·`:shared`를 루트 프로젝트로 합친다(모듈 경계는 Modulith와 ArchUnit이 지킨다). testFixtures·`workingDir` 특례 삭제.
+- UI 진입점: API 게이트웨이는 Caddy 하나다. kista-ui의 서버 측 호출도 Caddy 내부 주소 하나로 보내 UI가 role을 모르게 한다. **fable-infra가 로컬에서 실증했다(2026-11-12, 운영과 같은 `caddy:2.9-alpine`)**: api 스니펫(`deploy/server/caddy/kista-api.caddy`)의 사이트 주소에 하나를 더 적는다 — `{$API_DOMAIN}, http://:8080 { … }`. 한 사이트 블록이라 `@trading`·`@scheduler` matcher가 그대로 재사용된다. 8080은 infra compose의 공개 포트가 아니라 `shared_net` 안에서만 닿는다. UI는 `API_BASE_URL=http://caddy:8080` 하나를 쓰고 `TRADING_API_BASE_URL`을 지운다(UI 지침서 02 태스크 8). 스니펫만 바뀌는 배포는 caddy reload뿐이다. **이 변경은 단계 M 직후에 해도 된다**(단계 G까지 기다릴 필요 없다).
+  - 확인할 것 (a) 내부 리스너 요청은 `X-Forwarded-Proto: http`, `Host: caddy:8080`으로 온다. 이 값으로 쿠키 Secure·리다이렉트 주소·CORS를 판단하는 코드가 api·ui에 있는지 grep한다(`app.cookie.secure`는 프로퍼티 고정이라 영향이 없어야 한다) (b) `CaddyRoutingTest`가 주소 2개짜리 사이트 줄을 파싱하는지 (c) FIDA의 `/api/internal/fida-orders`는 공인 도메인 경로 그대로다.
+  - fable-ui 확인 결과(2026-11-12): UI는 api의 리다이렉트를 브라우저로 넘기지 않고 AT 쿠키를 직접 만든다. api의 RT `Set-Cookie`는 3곳에서 그대로 전달하지만 `RefreshTokenCookieHelper.java:23-38`이 Secure·SameSite를 설정값으로 만들고 Domain을 달지 않아 영향이 없다. **불변 조건: RT 쿠키를 요청의 scheme·Host로 만들지 않는다.** `server.forward-headers-strategy`를 켜거나 Secure를 `request.isSecure()`로 바꾸면 UI 중계가 깨진다. 이 조건을 `RefreshTokenCookieHelper`의 주석과 테스트(요청 scheme이 http여도 Secure 값이 설정대로)로 고정한다.
+  - SSE(fable-infra 로컬 실증 2026-11-12): 내부 리스너를 지나는 SSE는 버퍼링되지 않고(`flush_interval` 지정 불필요, `encode` 포함 상태), 130초 무송신에도 끊기지 않았다. upstream 정지 시 스트림은 정상 종료로 닫히고 재연결하면 새 컨테이너로 간다. `caddy reload`에도 유지된다. 미확인: undici Agent로 붙었을 때와 Spring SSE의 graceful 종료 — 첫 실배포에서 본다.
+  - worker가 내려가 있을 때의 응답(실증 완료): 엔진 handle 안에서 `vars engine 1`을 심고 사이트 블록 수준의 `handle_errors`에서 그 변수와 상태 502·503·504로 가른다(`handle_errors`는 `handle @trading` 안에 넣을 수 없다. matcher를 다시 적지 않는다). 본문 `{"status":503,"code":"ENGINE_RESTARTING","detail":"매매 서버를 재시작하는 중입니다. 잠시 후 다시 시도해 주세요."}`, `Content-Type: application/problem+json`, `Retry-After: 30`. Caddy가 만든 오류에만 걸리고 worker가 직접 응답한 5xx는 그대로 지나간다. 스니펫 전문은 kista-infra 지침서 03 5-5절. `RoleRoutingGuard`의 `WRONG_ROLE`도 같은 형식이다. 두 code를 `ErrorCode`에 추가한다. detail에 내부 호스트·경로를 넣지 않는다.
+  - 엔진 대역의 `lb_try_duration`은 **5초**(지금 `@scheduler`는 120초). worker 재시작이 3~4분이라 길게 기다려도 넘기지 못하고 요청만 붙잡힌다. web 대역은 현재 값 유지.
+  - `CaddyRoutingTest`가 `vars`·`handle_errors` 줄과 주소 2개짜리 사이트 줄을 견디는지 확인하고 고친다.
+  - 통합 OpenAPI 스펙 주소: `/api-docs`(지금의 root 주소 그대로, 단계 M부터 trading 경로 포함). UI의 스펙 병합 스크립트(`scripts/fetch-spec.mjs`)는 단일 주소 내려받기로 바뀐다.
+  - 상세: kista-infra 지침서 03 5-4절.
+- 문서 전면 갱신(지침서 09): `architecture.md`, `constraints.md`, `docker-infra.md`, `commands.md`, `local-dev.md`, `flyway.md`, `flows.yml`.
 
-### 단계 0. 관문 조사 (Sonnet 조사, Opus 판정) — 코드 변경 없음
+## 8. 선택 단계 (지금은 하지 않는다)
 
-1. trading-core의 프로세스 로컬 상태 전수: static·인스턴스 필드에 상태를 가진 빈(캐시, 게이트, 카운터, in-memory 락, `ConcurrentHashMap`, `AtomicX`), `@PostConstruct` 초기화, 스레드·실행기. 항목마다 "두 프로세스에서 돌면 무엇이 깨지는가"를 적는다.
-2. 이벤트 리스너 전수와 실행 위치 요구(외부 호출, 락, 순서 의존).
-3. 사용자 발 요청이 브로커를 호출하는 경로 전수(연결 테스트, 미리보기, 잔고 조회, 수동 매매).
-4. 락 전수: DB·Redis 기반인지 JVM 기반인지.
-5. Opus가 2-4절 표를 항목별로 채우고 "진행 / 조건부 진행 / 중단"을 판정해 사용자에게 보고한다. 산출물: `findings/09-process-local-state.md`.
+- **B. 조회 화면을 web으로**: 브로커를 부르지 않는 trading 조회(전략 목록, 주문·사이클 이력, 통계)를 web 경로로 옮겨 worker 배포 중에도 뜨게 한다. 선행: 통계 캐시 무효화를 Redis Pub/Sub으로 전파(S1), 조회 경로가 브로커 포트에 닿지 않음을 ArchUnit으로 고정. 시작 조건: worker 배포 중 화면 중단이 실제 불편이 될 때.
+- **C. 쓰기·브로커 호출도 web으로**: 선행 M1(계좌 예산 락을 세션 단위 advisory lock 또는 Redis 락으로. 임계 구역 본문이 여러 짧은 트랜잭션이라 트랜잭션 하나로 감싸면 의미가 바뀐다), M2(호출 간격을 Redis 슬롯 예약으로), M3(토큰 lease 일반화), `orders` 슬롯 유일 인덱스. 지침서 04의 토큰 단순화(메모리 캐시)는 이 단계와 양립하지 않는다. 시작 조건: 다중 worker가 필요해질 때. 지금 규모(계좌 8, 활성 전략 9)에서는 필요 없다.
 
-### 단계 1. 한 JVM에 올린다 (Opus 설계, Sonnet 적용)
+## 9. 판단이 갈릴 때의 기본값
 
-1. root가 `:trading-core`를 `implementation`으로 의존하고 `ApiApplication`이 `com.kista` 전체를 스캔한다. Modulith 모델을 1개로 합치고 중복 ID(`notify`, `web`)를 개명한다.
-2. role 플래그를 정의한다: `kista.role.web`, `kista.role.worker`. 스케줄러·컨슈머·EPR 재발행은 worker 조건, 컨트롤러는 web 조건. 로컬은 둘 다 켠다.
-3. 이 단계에서는 내부 HTTP 호출을 그대로 둔다(자기 자신을 부른다). 동작을 바꾸지 않고 컨텍스트 로드와 전체 테스트가 통과하는지만 본다.
-4. Flyway 이력 2벌(root·trading)을 그대로 유지한 채 한 프로세스가 둘 다 실행하게 한다.
+| 상황 | 기본값 |
+|---|---|
+| 어떤 엔드포인트가 web인지 worker인지 애매 | worker. 호출 그래프가 broker 모듈이나 trading 쓰기에 닿으면 무조건 worker |
+| web이 엔진 데이터를 읽어야 함 | DB 읽기 전용 `api` 호출만. 화이트리스트(`RoleBoundaryTest`)에 추가하고 이유를 주석으로 |
+| 새 role 간 통신이 필요해 보임 | 만들지 않는다. 해당 엔드포인트를 worker로 옮긴다 |
+| 충돌을 `@Primary`·`@Lazy`·`allow-bean-definition-overriding`으로 넘기고 싶음 | 금지. 원인(중복)을 없앤다 |
+| 동작이 바뀌는 것을 발견(알림이 새로 나감, 상태 코드 변화) | 현재 동작을 유지하고 보고 |
+| 한 단계가 예상보다 커짐 | 쪼개서 배포한다. 단계 M만은 쪼갤 수 없다(코드 합병 + 전환) |
 
-### 단계 2. 경계 코드를 걷어낸다 (Sonnet, 모듈 단위)
+## 10. 중단 조건 (사용자에게 보고하고 멈춘다)
 
-1. 내부 HTTP 어댑터를 모듈 `api` 직접 호출로 바꾸고 내부 컨트롤러·contract·mapper를 지운다. 순서: market → benchmark → admin(가장 큼).
-2. 사용자 복제본(`user_notify_profile`)과 Redis Stream 동기화를 지우고 `user :: api` 직접 조회로 바꾼다. 테이블 drop은 contract 단계로 따로.
-3. 이중 구현(예외 처리기, 보안 셸, 재발행 스케줄러, Alpaca 설정)을 한 벌로 합친다.
-4. `GradleModuleBoundaryTest`, `InternalApiContractTest`를 삭제한다.
+- P5에서 스트림 복구가 EPR 재시도와 같은 보장을 주지 않는다.
+- 단계 M에서 R ↔ T 순환 빈 참조가 구조적으로 풀리지 않는다.
+- 전환 배포 중 옛 `kista-scheduler`·`kista-trading` 컨테이너가 남아 있거나 worker가 2개 뜬 흔적(잡 이중 실행, 락 인수 로그 2회).
+- 전환 후 개장·마감 배치의 주문 수·금액이 전환 전 미리보기와 다르다.
+- EPR 미완료 행이 재기동 후에도 줄지 않는다.
 
-### 단계 3. 모듈 재구성 (4절)
-
-`shared.kernel` 해체 → `calendar` 통합 → `admin`·`web` 해체 → 공개 범위를 `api`·`events`로 좁히고 `allowedDependencies` 선언. 각각 별도 커밋 묶음. 지침서 01(인터페이스 제거)과 같은 파일을 건드리므로 01의 단계 B를 먼저 끝낸다.
-
-### 단계 4. 배포 구조 전환 (kista-infra 세션과 협업)
-
-1. 이미지 1개, role 2개(kista-web, kista-worker)로 compose와 infra role 정의를 바꾼다. worker는 단일 인스턴스·stop-first·`stop_grace_period` 200s를 그대로 물려받는다.
-2. kista-ui의 API 진입점이 하나가 된다(`TRADING_API_BASE_URL` 삭제).
-3. Gradle 서브프로젝트를 하나로 합친다(마지막. 모듈 경계는 Modulith가 지킨다).
-
-각 단계는 독립 배포 가능해야 한다. 단계 1 뒤에도 운영은 기존 3 role 그대로 돌 수 있다(trading-core jar가 따로 빌드되는 동안).
-
-### D1=B일 때
-
-단계 0·1·2를 하지 않는다. 대신: 관리자 UI가 trading-core의 관리자 엔드포인트를 직접 부르게 해서 admin HTTP 어댑터 7개와 대응 내부 컨트롤러·contract를 지운다. 시장·캘린더·캔들도 같은 방식으로 UI가 직접 부른다. 남는 내부 호출은 벤치마크의 투자 포인트·환율 정도다. 그 뒤 4절의 1, 4, 5, 6, 7, 9번과 calendar 통합을 각 프로세스 안에서 적용한다.
-
-## 7. 재심한 과거 결정
+## 11. 재심한 과거 결정
 
 | 결정 | 재심 결과 |
 |---|---|
-| S-01 2-프로세스 분리(업무 영역 기준) | **뒤집기를 권고**(D1). 분리의 이득은 실행 역할 기준 분리로 더 싸게 얻는다 |
-| S-03 스키마 5분리 | 유지 권고(D2) |
-| S-04 물리 DB 분리 보류 | **폐기 권고** |
-| S-05 Modulith 구조, `explicitly-annotated` | 유지. 모델은 1개로 |
-| S-07 NamedInterface만 거친다 / wire 타입은 contract | 전반 유지, 공개 범위를 `api`·`events`로 축소. contract는 D1=A면 소멸 |
-| S-08·S-09 own-type 게이트와 원장 | D1=A면 (b) 외부 계약 분리 사유가 대부분 소멸한다. 원장을 다시 판정한다 |
-| S-31 EPR 재발행 소유 규칙 | D1=A면 "worker만 true" 한 줄로 단순해진다 |
-| C-02 세션 계산 복제 유지(`TossPriceApi`) | **뒤집는다.** 시각표를 calendar가 소유하면 복제 이유가 없다. 조기 마감 미반영 의심도 함께 해소 |
-| memory "Pub/Sub @PostConstruct 유지" 등 2026-10-31 확정 항목 | 단계 0 조사에서 항목별로 다시 본다 |
+| S-01 2-프로세스 분리(코드베이스 분리) | 뒤집는다. 런타임 분리(엔진 단일 프로세스)는 유지 |
+| S-03 스키마 5분리 | 유지. P3으로 SQL이 스키마를 명시 |
+| S-04 물리 DB 분리 보류 | 폐기 |
+| S-05 Modulith, `explicitly-annotated` | 유지, 모델 1개 |
+| S-07·S-08·S-09 NamedInterface·contract·own-type | 공개 범위를 `api`·`events`로 축소, contract 소멸(FIDA 제외), 원장 재판정 |
+| S-31 EPR 재발행 소유 | worker 하나 |
+| `AccountBudgetLock`의 JVM 락(주석의 승격 계획) | 유지. 엔진 단일 프로세스가 전제임을 주석과 `constraints.md`에 명시 |
+| "kista-trading 단일 인스턴스·stop-first·200s"(`constraints.md` Git 규칙) | worker에 그대로 승계 |
+| memory "Pub/Sub @PostConstruct 유지"(2026-10-31) | 유지. worker → web 매매 이벤트 Pub/Sub은 남는다 |
+| C-02 세션 계산 복제 | 뒤집는다(calendar) |
 
-## 8. 하지 말 것
+## 12. 다른 지침서·레포와의 관계
 
-- 단계 0의 판정 없이 단계 1을 시작하지 않는다.
-- 합치는 작업과 모듈 재구성을 한 커밋 묶음에 섞지 않는다.
-- 매매 배치의 동작(실행 시각, 락, 재개)을 이 지침서의 작업으로 바꾸지 않는다.
-- 운영 role 전환(단계 4)을 매매 시간대에 하지 않는다.
-
-## 9. 다른 지침서와의 관계
-
-- 01: 단계 B(UseCase 제거)를 먼저. 단계 C(포트 제거)와 이 지침서 단계 3의 공개 범위 축소는 같은 파일을 건드리므로 순서를 정해 묶는다.
-- 04: 브로커 삭제를 가장 먼저. 경계를 넘는 브로커 관련 contract가 줄어든다.
-- 06: 스케줄 판단의 도메인 이동, 배치 오케스트레이션.
-- 10: T4 ④(내부 API 목록 규약)는 D1=A면 불필요.
-- kista-ui 지침서 02(데이터 층, 3경로 프록시), kista-infra 지침서 01(role 정의): D1 결정을 두 세션에 알린다.
+- 04: 단계 A(KIS·업비트 삭제)를 가장 먼저. 토큰 단순화는 이 문서의 원칙 1-1을 전제로 한다.
+- 01: 단계 B는 P와 병행 가능, 단계 C(포트 제거)는 단계 R ⑥과 묶는다.
+- 02: View·결과 record의 위치는 모듈 `api`. 02의 trading 저장소 통합(T6)은 단계 X 뒤.
+- 10: 내부 API 목록 규약(T4 ④)은 불필요해진다. 단일 OpenAPI 스펙(M13).
+- kista-infra: role 2개, 전환 배포(4-3, infra 지침서 03 5-1절과 짝), Caddy 내부 리스너(7절), `KISTA_ROLE` env, EPR 훅, 고아 컨테이너 감지(infra 03 T8). 인스턴스 구성은 "운영 1대(3 OCPU·18GB로 확대, fida 포함) + 최소 대기 1대"로 사용자 결정(2026-11-12) — worker·web·DB가 한 호스트라는 전제는 그대로다.
+- kista-ui: 스펙 병합 스크립트(M13), 진입점(7절).
+- fida: `/api/internal/fida-orders` 계약(X5).
