@@ -322,3 +322,249 @@ R 호출 어댑터 11개: admin 7(`AccountQuery`, `PortfolioQuery`, `PrivacyQuer
 | `springdoc.paths-to-exclude` | T만 `/api/internal/**` | R에 이식 필요(안 하면 internal contract 타입이 공개 spec에 들어온다). 단계 2 이후 internal 컨트롤러가 없어지면 불필요(FIDA용 `/api/internal/fida-orders` 1개만 남는다) |
 | springdoc 스키마 이름 충돌 | 단순 클래스명이 스키마 ID. 같은 단순명 쌍: `Market`(`S/kernel/Market` vs `R/finance/domain/model/Market`), `MarketSessionResponse`(`S/contract/marketcalendar` vs `R/market/adapter/in/web/dto`), `CycleHistoryResponse`·`CycleHistoryPageResponse`(`T/stats/.../dto` vs `T/trading/.../dto`, **T 내부에서 이미 공존**), `InvestmentPoint`(R/benchmark domain vs T/stats domain, DTO 아님), `PlainDecimalSerializer` | `Market`·`MarketSessionResponse`는 두 쪽이 한 spec에 들어오면 한쪽 스키마가 덮이거나 `Market1` 접미사가 붙는다 -> UI 생성 타입 변경(kista-ui `gen:types`). 공개 경로에서 도달하는지는 `springdoc` 실측 필요(미확인) |
 | Jackson | `ObjectMapper`/`JsonMapper` `@Bean`·`@JsonComponent`·`spring.jackson.*` **모두 0** — Boot 기본 `JsonMapper`(Jackson 3) 1개. 어댑터들이 필요 시 자체 `JsonMapper`를 `new`/주입 | 충돌 없음. `PlainDecimalSerializer`는 2벌(`S/contract/notify/PlainDecimalSerializer`, `T/stats/adapter/in/web/dto/PlainDecimalSerializer`)이라 합병 때 1개로 |
+
+## H. 프로세스 경계 코드 삭제 대상
+
+### H-1. HTTP 3자 매핑 (R 어댑터 메서드 -> 내부 엔드포인트 -> T 서비스/포트)
+
+`TradingContractMapper`(`T/trading/adapter/in/web/`), `StatsContractMapper`(`T/stats/adapter/in/web/`), `PrivacyContractMapper`(`T/privacy/adapter/in/web/`)가 T 도메인 <-> `shared.contract` 변환을 한다. R 쪽은 어댑터가 contract 응답을 R own-type(`AdminStats`, `AdminAnomalies` 등 `R/admin/domain/model/`)으로 다시 변환한다.
+
+| R 어댑터 (`R/.../adapter/out/internal/`) | 엔드포인트 | T 컨트롤러가 부르는 실제 대상 | 합병 후 직접 호출 대상 |
+|---|---|---|---|
+| admin `AccountQueryHttpAdapter` | `GET /accounts`, `/accounts/count` | `AccountPort.findAll()`, `countAll()` | `account` 모듈 `AccountPort`(NamedInterface 노출 여부 확인) |
+| admin `PortfolioQueryHttpAdapter` | `GET /trading/stats/portfolio/current`, `/history` | `PortfolioUseCase.getCurrent(userId)`, `getHistory(userId,from,to)` + `StatsContractMapper` | `stats` 모듈 `PortfolioUseCase` |
+| admin `PrivacyQueryHttpAdapter` | `GET /privacy/trade-bases`; `GET/PATCH /privacy/trade-bases/{id}`; `POST .../orders`; `PATCH/DELETE .../orders/{orderId}`; `POST /fida-orders` | `PrivacyTradePort.findBasesFromTradeDate/findByIdOrThrow/updateBase/addOrder/updateOrder/deleteOrder`, `PrivacyUseCase`(fida-orders, `PrivacyContractMapper.toCommand/toResponse`) | `privacy` 모듈 포트·유스케이스. **admin이 `PrivacyTradePort`(영속 포트)를 직접 부르게 되므로 지침서 05 4절 규칙 1과 충돌** -> 유스케이스 경유 필요 |
+| admin `TradingCommandHttpAdapter` | `POST /trading/trade-corrections`(write 클라이언트), `PATCH .../strategies/{id}/status` | `ManualTradeCorrectionUseCase.correctManualFills(...)`, `AccountPort`·`StrategyPort`·`StrategyUseCase.resume/pause`(account.userId() 위임) | `trading` 모듈 유스케이스 |
+| admin `TradingPolicyHttpAdapter` | `GET/PUT /trading/policy-settings` | `TradingPolicyUseCase.getPolicy()/replacePolicy()` | `trading` 모듈 |
+| admin `TradingQueryHttpAdapter` | `GET /trading/orders`, `/orders/distinct-account-ids`, `/accounts/{a}/strategies`, `/accounts/{a}/strategies/{s}/trade-dates`; `POST /strategies/by-account-ids`, `/strategy-summaries` | `OrderPort.findAll/findDistinctAccountIdsByTradeDateBetween/findTradeDatesByStrategyId`, `StrategyPort.findByAccountId/findByAccountIds/findSummariesByCycleIds` + `TradingContractMapper` | `trading` 모듈. **영속 포트(`OrderPort`·`StrategyPort`) 직접 호출이라 관리자용 읽기 유스케이스 신설 필요** |
+| admin `TradingSchedulerCommandHttpAdapter` | `POST /trading/scheduler/open`, `/close` | `TradingOpenScheduler`·`TradingCloseScheduler` 빈 직접 호출(`scheduler.enabled` 게이트) | `trading` 모듈 스케줄러 트리거. **인바운드 어댑터 클래스를 서비스처럼 부르는 구조라 유스케이스로 감싸야 한다** |
+| benchmark `CurrentExchangeRateHttpAdapter` | `GET /trading/stats/exchange-rate` | `BrokerStatisticsUseCase.currentExchangeRate().midRate()` | `stats`/`broker` 모듈 |
+| benchmark `InvestmentPointsHttpAdapter` | `GET /trading/stats/investment-points` | `InvestmentPointsQuery.fetch(userId, scope, strategyId, currency, from, to)` + `StatsContractMapper.toResponse` | `stats` 모듈 |
+| market `CandleQueryHttpAdapter` | `GET /broker/candles/latest`, `/range` | `CandlePort.getLatestCandles/getCandles` | `broker` 모듈 포트(`CandleUnavailableException` 복원 코드 삭제) |
+| market `MarketCalendarQueryHttpAdapter` | `GET /marketcalendar/holidays`, `/session` | `MarketCalendarPort.findHolidaysForMonth/findSession/isMarketOpen` | `marketcalendar` 모듈 |
+
+삭제 대상 합계(합병 단계 2 완료 시): R 어댑터 11 + R `package-info`/포트 일부, T 내부 컨트롤러 12개(`FidaOrderController`는 외부 FIDA 계약이라 유지), T `*ContractMapper` 3, `shared.contract` 21 중 대부분(아래 I절), R `Admin*` own-type·예외 복원 코드(`InternalApiErrorDetails`·`InternalApiStatusHandlers`·T `ErrorBodyDecoder`), `InternalApiClientConfig`·`InternalApiProperties`(token은 FIDA 때문에 `InternalTokenAuthFilter`가 계속 필요하므로 properties 일부는 남음), `AdminInternalApiIntegrationTest`, `InternalApiContractTest`, `CaddyRoutingTest` 중 `/api/internal` 분기.
+
+### H-2. Redis 채널·스트림 4종 + Pub/Sub 1종
+
+| 종류 | 키/채널(`RedisStreamConfig`·`RedisPubSubConfig`) | 방향 | 발행자 | 소비자 | 합병 후 대체 |
+|---|---|---|---|---|---|
+| Stream | `stream:user.deleted` | R -> T | `R/user/.../UserEventStreamPublisher.onUserDeleted` | `T/trading/adapter/in/redis/UserEventStreamConsumer` -> `UserEventStreamBridge`·`UserEventRepublisher`(로컬 재발행) -> `TradingUserCascadeListener` | **직접 이벤트**(R 발행이 T 리스너에 도달). 발행자·컨슈머·브리지·재발행자·`UserEventResubmitScheduler` 2개 삭제 |
+| Stream | `stream:user.notify-profile.changed` | R -> T | `UserEventStreamPublisher.onProfileChanged` | T `UserEventStreamConsumer` -> `UserNotifyProfileSyncListener`(복제본 upsert) | **복제본 자체 삭제**(H-3) |
+| Stream | `stream:app.error` | T -> R | `T/trading/adapter/out/redis/AppErrorStreamPublisher`(`@EventListener AppErrorRaisedEvent`) | `R/admin/adapter/in/redis/AppErrorStreamConsumer` | R `AppErrorRaisedListener`가 같은 이벤트를 직접 받는다 — **발행자·컨슈머 삭제 안 하면 이중 저장**(E-3) |
+| Stream | `stream:user.push-notification.requested` (maxlen 10,000) | T -> R | `T/notify/adapter/out/gateway/RedisPushNotificationPublisher` | `R/notify/adapter/in/redis/PushNotificationStreamConsumer` -> FCM 발송 | 직접 포트 호출(`PushNotificationPort`). 컨슈머 그룹 `root`(kista-api·kista-scheduler 공용), `trading-core` 그룹 삭제. `UserPushNotificationRequestedEvent`(`shared.kernel`) 소멸 |
+| Pub/Sub | 매매 이벤트 채널 | T -> R | `T/notify/adapter/out/gateway/RedisTradeEventPublisher` | R `RedisTradeEventSubscriber`(SSE 푸시, `TradeSseEmitterRegistry`), `TradeEventBenchmarkCacheInvalidator` | 같은 JVM이면 Spring 이벤트로 대체 가능하나 **web/worker 분리 시 worker가 발행하고 web이 SSE를 쥐므로 Redis Pub/Sub이 계속 필요**. 유지 판정 — 삭제 대상 아님. (memory "Pub/Sub @PostConstruct 유지" 확정 항목 재검토 대상, 지침서 05 7절) |
+
+`RedisStreamSubscriber`(`S/platform/redis/`)는 남는 스트림 컨슈머가 0개가 되면 삭제 가능(Pub/Sub 컨테이너 `RedisPubSubConfig`는 유지). `RedisStreams` 정적 유틸·`RedisStreamConfig` 상수도 동시 정리. **role 분리 시 컨슈머는 worker 조건**(지침서 05 단계 1-2).
+
+### H-3. `user_notify_profile` 복제본 읽는 곳 전수
+
+복제본 테이블 `trading.user_notify_profile`(엔티티 `T/trading/adapter/out/persistence/UserNotifyProfileEntity.java:` 컬럼: user_id, notification_prefs(JSON), is_active, telegram_bot_token(AES), chat_id, updated_at, notification_channel)을 `TradingUserProfilePort`(`T/trading/application/port/output/TradingUserProfilePort.java`: `findByUserId`, `findAllByUserIds`, `findAllActive`, `applyChange`, `markDeleted`)로 읽는 호출처:
+
+| 호출처(`T/`) | 용도 |
+|---|---|
+| `notify/adapter/out/gateway/CycleEndedNotifier`, `CycleLifecycleNotifier`(2), `CryptoTradeNotifier`, `TradingReportNotifier`, `TradingAlertNotifier`(약 8메서드), `ApiKeyExpiryNotifier`, `TradingUserProfiles`(헬퍼 `requireProfile`) | 알림 수신자·채널·봇 토큰 조회 |
+| `trading/adapter/in/schedule/BatchContextFactory` | 배치 컨텍스트에 프로필 적재 |
+| `trading/application/service/MarketEventNotifier` | 개장·마감 브로드캐스트(`findAllActive`) |
+| `trading/application/service/StrategyCreationService` | 등록 시 사용자 활성·프로필 확인 |
+| `trading/application/service/CryptoDcaRunner` | 코인 DCA 알림 |
+| `trading/application/service/UserTradingDataEraseService` | 탈퇴 정리 `markDeleted` |
+| `trading/adapter/in/event/UserNotifyProfileSyncListener` | 쓰기(`applyChange`) |
+| **native SQL**: `T/trading/adapter/out/persistence/StrategyJpaRepository.java:44-58` | `JOIN user_notify_profile p ON p.user_id = a.user_id` — 활성 사용자 필터. 복제본 삭제 시 `public.users`(+ status) 조인으로 바꿔야 하며 이것이 "다른 서비스 소유 테이블 참조 금지"(`constraints.md`) 규칙의 변경점이다 |
+
+원본(R `user` 모듈)에서 같은 정보를 얻는 길: `UserPort.findById`(status·`telegramBotToken`·`telegramChatId`·`notificationChannel`)와 `UserSettingsPort.findOrDefault(userId)`(`notificationPrefs`) — R `UserNotifyProfilePublisher`(`R/user/application/service/`)가 정확히 이 두 포트를 합쳐 스냅샷을 만든다. 합병 후에는 `user` 모듈이 `TradingUserProfile`에 해당하는 읽기 유스케이스(예: `UserNotifyProfileQuery.findByUserId/findAllByUserIds/findAllActive`)를 `user :: api`로 공개하고 T 호출처 12곳을 이것으로 바꾼다. `TradingUserProfile`(`T/trading/domain/model/`)은 R 쪽 타입 하나로 통합. **주의**: `telegram_bot_token`은 R `users`에 AES 암호문(`@Convert`)으로 있어 R 포트가 복호화된 평문을 이미 돌려준다 — 복제본의 복호화 어댑터 코드는 불필요.
+
+## I. `shared.kernel` · `shared.contract` 전수
+
+참조 수 = main 소스에서 해당 FQCN(또는 같은 패키지 와일드카드)을 import하고 단순명을 쓰는 **파일 수**(`refs.py`, 테스트 제외). S = 같은 `:shared`의 다른 패키지 파일 수. kernel 42개 타입 + `package-info` = 43파일, contract 20개 타입 + `package-info` = 21파일(지침서의 '43개·21개'는 `package-info` 포함 파일 수). 합병 후 `shared.kernel`은 지침서 05 4절에 따라 해체 대상이다.
+
+### I-1. `shared.kernel`
+
+| 타입 | 종류 | R 파일 | T 파일 | S 파일 | 원래 소유로 보이는 모듈 |
+|---|---|---|---|---|---|
+| `AccountNumberMasker` | class | 2 | 2 | 0 | platform(공용 유틸) |
+| `ApiKeyExpirySource` | enum | 0 | 2 | 0 | account(T) |
+| `AppErrorRaisedEvent` | record/event | 4 | 3 | 0 | ops/admin(R 소비) · 합병 후 platform 이벤트 |
+| `Broker` | enum | 5 | 40 | 2 | broker/account |
+| `BrokerSettings` | record | 1 | 0 | 0 | broker(R만 참조: 관리자 설정) |
+| `CryptoTradingRules` | record | 0 | 5 | 0 | trading(T) |
+| `Currency` | enum | 10 | 55 | 4 | 공용 값타입(common) |
+| `DcaExecutionStatus` | enum | 1 | 2 | 0 | trading(T) |
+| `DcaFrequency` | enum | 1 | 4 | 0 | trading |
+| `DcaIndicator` | enum | 2 | 8 | 0 | trading |
+| `DcaOperator` | enum | 1 | 5 | 0 | trading |
+| `DcaShortfallPolicy` | enum | 1 | 5 | 0 | trading |
+| `DcaSizingType` | enum | 1 | 6 | 0 | trading |
+| `DcaSkipReason` | enum | 1 | 14 | 0 | trading |
+| `KstDays` | class | 0 | 4 | 0 | platform(time) |
+| `Market` | enum | 0 | 14 | 0 | broker/marketcalendar |
+| `MarketSession` | enum | 0 | 1 | 0 | marketcalendar |
+| `NotificationChannel` | enum | 8 | 4 | 0 | user |
+| `NotificationType` | enum | 7 | 6 | 0 | user |
+| `OrderDirection` | enum | 2 | 66 | 5 | matching/trading |
+| `OrderStatus` | enum | 1 | 15 | 1 | trading |
+| `OrderTiming` | enum | 1 | 18 | 1 | trading |
+| `OrderType` | enum | 1 | 24 | 4 | trading |
+| `Quantities` | class | 1 | 9 | 0 | 공용 값타입 |
+| `RecurringMode` | enum | 1 | 3 | 0 | trading |
+| `ReturnMetrics` | class | 1 | 1 | 0 | stats |
+| `StrategyCapability` | record | 1 | 1 | 0 | trading |
+| `StrategyCreationSettings` | record | 2 | 9 | 0 | trading(+admin 정책) |
+| `StrategyCycleSeedType` | enum | 1 | 20 | 1 | trading |
+| `StrategyDefaults` | class | 0 | 9 | 0 | trading |
+| `StrategyFieldSettings` | record | 2 | 0 | 0 | trading(+admin 정책) |
+| `StrategyStatus` | enum | 6 | 11 | 2 | trading |
+| `StrategyTicker` | enum | 5 | 124 | 7 | trading |
+| `StrategyType` | enum | 6 | 49 | 4 | trading |
+| `TimeZones` | class | 8 | 27 | 0 | 공용 |
+| `TradeLegSummary` | record | 0 | 3 | 0 | trading |
+| `TradingPolicySettings` | record | 6 | 5 | 0 | trading(런타임 정책, R admin이 편집) |
+| `UserDeletedEvent` | record/event | 6 | 4 | 0 | user |
+| `UserNotifyProfileChangedEvent` | record/event | 3 | 4 | 0 | user(복제본 삭제 시 소멸) |
+| `UserPushNotificationRequestedEvent` | record/event | 1 | 2 | 0 | notification(Redis 삭제 시 소멸) |
+| `UserRole` | enum | 19 | 0 | 0 | user |
+| `UserStatus` | enum | 23 | 0 | 0 | user |
+
+### I-2. `shared.contract` (합병 단계 2에서 대부분 삭제)
+
+| 타입 | 종류 | R 파일 | T 파일 | S 파일 | 비고 |
+|---|---|---|---|---|---|
+| `AccountSummaryResponse` | record | 10 | 1 | 0 | account |
+| `DailyCandleResponse` | record | 5 | 1 | 0 | broker |
+| `MarketSessionResponse` | record | 2 | 1 | 0 | marketcalendar |
+| `PlainDecimalSerializer` | class | 0 | 0 | 0 | platform |
+| `TradeEventEnvelope` | record | 2 | 1 | 0 | notify(Pub/Sub 유지 시 존속) |
+| `TradeEventMessage` | record | 1 | 4 | 0 | notify(Pub/Sub 유지 시 존속) |
+| `FidaOrderRequest` | record | 5 | 2 | 0 | privacy(외부 FIDA 계약 — 유지) |
+| `FidaOrderResponse` | record | 1 | 2 | 0 | privacy(유지) |
+| `PrivacyBaseUpdateRequest` | record | 5 | 2 | 0 | privacy |
+| `PrivacyOrderAddRequest` | record | 5 | 2 | 0 | privacy |
+| `PrivacyOrderUpdateRequest` | record | 5 | 2 | 0 | privacy |
+| `PrivacyTradeBaseResponse` | record | 7 | 3 | 0 | privacy |
+| `InvestmentPointsResponse` | record | 1 | 2 | 0 | stats |
+| `PortfolioCurrentResponse` | record | 3 | 2 | 0 | stats |
+| `PortfolioOrderResponse` | record | 3 | 2 | 0 | stats |
+| `OrderResponse` | record | 6 | 2 | 0 | trading |
+| `StrategyResponse` | record | 7 | 2 | 0 | trading |
+| `StrategySummaryResponse` | record | 6 | 2 | 0 | trading |
+| `TradeCorrectionRequest` | record | 5 | 2 | 0 | trading |
+| `TradeCorrectionResponse` | record | 5 | 2 | 0 | trading |
+
+관찰:
+- **R만 쓰는 kernel 타입**: `UserRole`(19)·`UserStatus`(23)·`BrokerSettings`·`StrategyFieldSettings` — T 참조 0. 프로세스를 넘겨야 해서가 아니라 contract/kernel 규칙 때문에 `shared`에 있었다. 합병 후 `user`·`broker`로 복귀 가능(지침서 05 4절 규칙 2).
+- **T만 쓰는 kernel 타입**: `ApiKeyExpirySource`, `CryptoTradingRules`, `KstDays`, `Market`, `MarketSession`, `StrategyDefaults`, `TradeLegSummary` — R 참조 0(`Market`은 R에 같은 이름의 `finance.Market`이 따로 있다, G-3).
+- **양쪽이 쓰는 핵심**: `StrategyTicker`(T 124), `Currency`(T 55), `OrderDirection`(T 66), `StrategyType`(T 49), `Broker`(T 40). T 내부에서 압도적으로 쓰이므로 해체 시 `trading`/`broker`로 이동하는 것이 대량 import 변경(수백 파일)이다. 단계 3의 별도 커밋 묶음.
+- **이벤트 5종**(`AppErrorRaisedEvent`, `UserDeletedEvent`, `UserNotifyProfileChangedEvent`, `UserPushNotificationRequestedEvent` + 이미 platform의 `SchedulerLifecycleEvent`)은 H-2에서 보듯 3종이 Redis 경유 전달용이라 합병으로 소멸하거나 단순 이벤트가 된다.
+- contract는 R의 admin 어댑터·T 내부 컨트롤러/mapper가 대부분 유일한 사용처다. 예외: `FidaOrderRequest/Response`(외부 FIDA HTTP 계약), `TradeEventEnvelope/Message`·`PlainDecimalSerializer`(Pub/Sub·SSE 경로, 유지). `InternalApiContractTest`가 이 패키지의 규약을 강제한다(J절).
+
+## J. 빌드 · 테스트
+
+### J-1. Gradle 구성 차이
+
+| 항목 | 루트 `:api` (`build.gradle.kts`) | `:trading-core` (`trading-core/build.gradle.kts`) | `:shared` |
+|---|---|---|---|
+| 플러그인 | java, java-test-fixtures, spring-boot, dependency-mgmt | 동일 | 동일(`bootJar` `enabled=false`) |
+| `settings.gradle.kts` | `include("trading-core")`, `include("shared")` (3줄) | | |
+| main 의존 `:shared` | `implementation(project(":shared"))` | 동일 | |
+| main 의존 상대 프로젝트 | **없음** | 없음 | 없음 |
+| 루트에만 | `firebase.admin`(FCM), `gson`(runtimeOnly), `testImplementation(project(":trading-core"))`, `mockwebserver3:5.5.0`, `httpclient5`(테스트), `spring-boot-starter-jdbc-test`/`resttestclient`/`http-client`/`restclient`, `spring.modulith.docs`(Documenter) | | |
+| trading-core에만 | | `micrometer.prometheus`, `micrometer.otlp`(`implementation`, 주석: 이 둘만 있고 actuator가 없으면 부팅 실패) | `:shared`가 `micrometer.*`·`httpclient5`·`starter-data-redis`를 `implementation`으로 가진다(런타임 전이) |
+| 버전 | 전부 `gradle/libs.versions.toml` 카탈로그(Boot 4.1.1, Modulith BOM 동일, springdoc 3.1.1 등)라 **버전 차이 없음** | | |
+| `bootJar` | `app.jar` | `trading-core.jar` | 비활성 |
+| `Dockerfile` | `./gradlew clean bootJar :trading-core:bootJar` -> 이미지에 `app.jar`·`trading-core.jar` 둘 다(`Dockerfile:18-30`), 실행은 `APP_JAR` | | |
+
+합병(단계 1) 시 필요한 의존 변경: 루트 `implementation(project(":trading-core"))` 추가(현재 `testImplementation`만 있음, 주석에 의도 명시). trading-core는 Boot 플러그인을 적용해 `jar`가 plain 산출물이라 의존 해결은 되지만 `:trading-core:bootJar`는 `enabled = false`로 꺼야 이미지·CI 시간이 줄어든다.
+
+**클래스패스 리소스 충돌(합병의 숨은 위험)**: 루트 jar에 두 프로젝트 리소스가 들어가면 `application.yml`·`application-local.yml`·`application-prod.yml`이 **같은 이름으로 2벌** 존재한다(`src/main/resources/`, `trading-core/src/main/resources/`). Spring Boot는 `classpath:/application.yml`을 단일 리소스로 로드하므로 **클래스패스 순서상 먼저인 한쪽만 적용되고 다른 쪽은 조용히 무시된다**(`BOOT-INF/classes`가 `BOOT-INF/lib`보다 먼저라 루트가 이긴다 — 확인 필요). B절 키 병합을 먼저 끝내 단일 yml로 만든 뒤 `trading-core/src/main/resources/application*.yml`을 삭제해야 한다. 같은 이유로 `db/migration`(루트)과 `db/migration-trading`은 디렉토리가 달라 안전하나, `CLAUDE.md` 파일(`db/migration/CLAUDE.md`, `db/migration-trading/CLAUDE.md`)이 jar에 포함되는 것은 현재도 동일.
+
+### J-2. 테스트 태스크
+
+| 항목 | 루트 | trading-core |
+|---|---|---|
+| `test` | `excludeTags("integration")`, `maxHeapSize=2g`, `-XX:+EnableDynamicAgentLoading`, `user.timezone=Asia/Seoul`, JUnit 병렬(`concurrent`/dynamic) 켬, `inputs.file(deploy/server/caddy/kista-api.caddy)`(`CaddyRoutingTest` 입력) | `workingDir = rootProject.projectDir`, `maxHeapSize=2g`, TZ, **병렬 설정 없음**, `EnableDynamicAgentLoading` 없음 |
+| `integration` | `kistadb_it`, `includeTags("integration")` | 동일 + `workingDir=rootProject.projectDir` |
+| `testJvmSlot` | 루트 `build.gradle.kts` 하단에서 `allprojects { tasks.withType<Test>().configureEach { usesService(testJvmSlot) } }` — 로컬에서 테스트 JVM 동시 1개 | 위 allprojects 적용 |
+| testFixtures | `testFixtures(project(":shared"))`(`DataJpaTestBase`/`WebMvcTestSupport`/`FixedClockTestConfig`/`application-test.yml`), 자체 `DomainFixtures`(User) | `testFixtures(project(":shared"))` + 자체 `TradingFixtures`·`StubBrokerApiException` |
+| 서로의 test 의존 | 루트 `testImplementation(project(":trading-core"))`(main만, trading-core testFixtures는 아님) | 루트 test 소스를 보지 않음 |
+
+합병 후 테스트 태스크는 1개로: 병렬 설정(루트 방식)을 T 테스트에도 적용하면 T 테스트의 `@Execution`/상태 공유 가정이 깨질 수 있다(`testing.md` "Mockito 병렬 테스트 주의"는 이미 루트 기준 규칙이라 T 테스트가 병렬 안전한지는 확인 필요). `workingDir`가 루트 `projectDir`로 통일되는지(T `ExceptionMessageFormatTest`류 소스 스캔 경로, `backtest-golden` 리소스 경로) 확인.
+
+### J-3. "두 프로젝트 분리"를 전제로 한 가드 테스트
+
+| 테스트 | 위치 | 지키는 것 | 합병 후 |
+|---|---|---|---|
+| `GradleModuleBoundaryTest` | `src/test/.../architecture/` | `:trading-core`·`:shared`가 `com.kista.api`를 참조하지 않음, `:shared`가 `tradingcore`/`api`를 참조하지 않음 | `shared`가 api/tradingcore를 참조하지 않는 규칙 1개만 `HexagonalArchitectureTest`로 이관, 나머지 삭제 |
+| `InternalApiContractTest` | 〃 | `/api/internal/**` 핸들러 반환·바디 타입은 contract·kernel·JDK만, contract는 허용 패키지만 의존 | 단계 2 후 삭제(FIDA 1개만 남으면 `FidaOrder*` contract 정도로 축소) |
+| `TradingCoreTestVendorModelTest` | `trading-core/src/test/.../architecture/` | broker 밖 T **테스트**가 벤더 타입(`domain.model.kis/toss/upbit/meritz/binance`) 미참조 | 유지. 합병 후엔 루트 `HexagonalArchitectureTest.vendor_models_must_not_leak_outside_broker`(주석: "T 테스트 클래스는 못 본다")가 이 역할까지 하도록 스캔 범위 확장 후 2개를 합칠 수 있다 |
+| `ModulithArchitectureTest` ×2 | R·T 각각 | 프로세스별 모델 + 모듈 ID 집합 | 1개로 합침(E-1) |
+| `ArchitectureMapTest`(+`ArchitectureMapExporter`·`ModuleGraphExporter`) | `src/test/.../architecture/` | `flows.yml`의 `code:` 참조 존재·enum 집합, 맵 HTML 생성(`ApiApplication` 참조) | 합병 후 trading 클래스를 `flows.yml`이 이미 참조하는지(테스트 classpath에 T main 포함이라 현재도 가능) — 앱 클래스 참조만 바꾸면 됨 |
+| `OpenApiSchemaNameCollisionTest` ×2 | R·T 각각 | web DTO + contract record의 simple name 충돌 시 구조(컴포넌트)가 같아야 함 | 합쳐서 R+T DTO 전체를 스캔하게 하면 `MarketSessionResponse`(`S/contract` vs `R/market/.../dto`)와 `CycleHistoryResponse`(T 내부 2벌) 구조 동일 여부가 새로 검증됨(현재는 각자 안에서만) — 실패하면 DTO 정리 필요(G-3) |
+| `CaddyRoutingTest` | `src/test/.../architecture/` | Caddy `@trading`·`@scheduler` regex가 컨트롤러 경로와 맞는지(2026-09-16·17 사고 재발 방지), `inputs.file(caddy)` | 라우팅이 web 하나(+scheduler 수동 트리거)가 되면 `@trading` 분기가 소멸 — 테스트를 `@scheduler`만 남기거나 삭제. Caddy 파일 갱신과 같은 커밋(K절) |
+| `EventPublicationRegistryTest` | 〃 | EPR이 `@TransactionalEventListener`를 전역 추적함을 실증(`public.event_publication` 사용) | 유지(EPR 1개). 주석의 "4a에서 이관" 문구는 합병 시 stale |
+| `StreamSubscriberStartupTest` | `trading-core/src/test/.../architecture/` | `RedisStreamSubscriber` 하위가 `@PostConstruct`로 구독 시작 금지 | 컨슈머가 사라지면 삭제(남은 스트림 0개일 때) |
+| `HexagonalArchitectureTest`(506줄) | 루트 | 레이어 방향, `kernel`·`contract`·`platform`·`matching` 불변식, `@GeneratedValue` 금지 등 | `kernel_must_not_depend...`·`contract_must_not_depend...` 2개는 contract 삭제·kernel 해체와 함께 수정. 나머지는 스캔 루트(`com.kista.api` 전체)가 `tradingcore`까지 넓어져야 한다 — **현재 루트 ArchUnit이 T까지 검사하는 규칙이 있는지는 `feedback_root_archunit_covers_tradingcore`(memory)가 이미 언급** |
+| `ExceptionMessageFormatTest` | 루트 | application·domain의 IAE/ISE 리터럴이 "~니다."로 끝남 | T 소스 스캔이 포함되는지 확인(소스 루트 경로 상수) |
+| `RepositoryLimitingQueryTest` | 루트 | 숫자 없는 `Top/First`+`Pageable` 금지 | 현재도 T main 리포지토리를 함께 검사(테스트 classpath) — 변경 없음 |
+| `ApplicationContextLoadTest`·`SchedulerDisabledContextTest`(루트), `TradingApplicationContextLoadTest`(T) | | 각 앱 컨텍스트 로드, scheduler.enabled=false 시 `AdminSchedulerController` 부재 | 1개 컨텍스트 테스트로 합치고 role 플래그 2가지(web/worker) 조합을 각각 로드하는 테스트로 대체 |
+| `SchedulerLockServiceTest/DbTest` | `trading-core/src/test/java/com/kista/shared/platform/scheduling/` | `@ContextConfiguration(classes = TradingApplication.class)` | 앱 클래스 참조 변경 |
+| `AdminInternalApiIntegrationTest` | 루트 | 관리자 -> 내부 API 통합 | 단계 2에서 삭제 |
+
+`HexagonalArchitectureTest.setUp`·각 ArchUnit 테스트의 `ClassFileImporter` 스캔 범위·`archunit.properties`(`failOnEmptyShould=true`, R·T 각 1개 — 합병 후 1개)도 합병 영향권이다.
+
+## K. 배포 · 운영
+
+### K-1. 현재 3 role 정의 (`deploy/server/docker-compose.yml`)
+
+| 항목 | kista-api | kista-scheduler | kista-trading |
+|---|---|---|---|
+| 이미지 | `${KISTA_API_IMAGE}` | `${KISTA_SCHEDULER_IMAGE}` | `${KISTA_TRADING_IMAGE}` — **전부 같은 GHCR 레포의 SHA 태그**(`server-deploy.yml:147-151` `ghcr.io/<repo>:<sha>`), role별로 다른 SHA를 줄 수 있을 뿐 이미지 빌드는 1개 |
+| 실행 jar | `app.jar`(기본) | `app.jar` | `APP_JAR=trading-core.jar` |
+| `container_name` | 없음(blue/green이 옆에 새 컨테이너) | `kista-scheduler` | `kista-trading` |
+| 핵심 env | `SCHEDULER_ENABLED=false`, `INTERNAL_API_BASE_URL=http://kista-trading:8080` | `SCHEDULER_ENABLED=true`, `...REPUBLISH...=true`, `INTERNAL_API_BASE_URL` 동일 | `SERVER_PORT=8080`, `SCHEDULER_ENABLED=true`, `...REPUBLISH...=true` |
+| healthcheck(공통 anchor) | `wget http://localhost:8080/actuator/health/liveness`, interval 30s, timeout 10s, start_period 180s, retries 3 | 동일 | 동일 |
+| `stop_grace_period` | 35s | 200s | 200s |
+| `mem_limit` / `-Xmx` | 2048m / 1280m | 1536m / 896m | 2816m / 2048m |
+| 네트워크 | `shared_net`(Caddy), `data_net`(postgres·redis) | 동일 | 동일 |
+| 포트 | `expose: 8080` | 8080 | 8080 |
+| 교체 방식 | blue/green(`deploy/server/bluegreen`에 `kista-api`만) | stop-first | stop-first, **단일 인스턴스 불변식** |
+| 헬스 게이트 | `deploy/server/readiness`: 3 role 모두 `http://localhost:8080/actuator/health/readiness` | | |
+| 적용 순서 | `deploy/server/roles`: `kista-trading` -> `kista-api` -> `kista-scheduler` (이유: kista-api가 trading 내부 API 호출, `user_notify_profile` 발행 순서) | | |
+
+`Dockerfile`은 1개(루트): 빌더 단계에서 `bootJar :trading-core:bootJar`, 런타임에 `app.jar`·`trading-core.jar` 둘 다 복사(`Dockerfile:18-35`), `ENTRYPOINT java $JAVA_OPTS -jar ${APP_JAR:-app.jar}`. 로컬 `docker-compose.yml`(루트)은 postgres·prometheus·grafana·redis만 있고 앱 서비스 없음.
+
+### K-2. Caddy (`deploy/server/caddy/kista-api.caddy`)
+
+| matcher | upstream | 규칙 |
+|---|---|---|
+| `@scheduler` `^/api/admin/scheduler/.+$` | `kista-scheduler:8080` | 스케줄러 수동 트리거 전부(`AdminSchedulerController`가 scheduler role에만 있음). `lb_try_duration 120s`, health_uri liveness |
+| `@trading` `^/api/(trading-cycles(/.*)?|accounts(/.*)?|backtest|crypto-market-indicators|daily-trades|orders(/.*)?|stats/(summary|equity-curve|cycles)|internal/fida-orders)$` | `kista-trading:8080` | T 공개 경로 + 외부 FIDA 경로 |
+| 기본 `handle` | `kista-api:8080` | `transport http { keepalive off }`(blue/green 교체 중 502 방지) |
+
+### K-3. 이미지 1개 · role 2개(web/worker)가 될 때 바뀌어야 할 파일
+
+| 파일 | 변경 |
+|---|---|
+| `Dockerfile` | jar 1개. `COPY app.jar` 1줄, `APP_JAR` 분기 삭제(또는 유지 불필요), `:trading-core:bootJar` 삭제 |
+| `deploy/server/docker-compose.yml` | 서비스 3 -> 2(`kista-web`, `kista-worker`), 변수 `KISTA_WEB_IMAGE`/`KISTA_WORKER_IMAGE`. worker: `container_name`, `stop_grace_period >= 200s`, env `...REPUBLISH...=true`, role 플래그(예: `KISTA_ROLE_WORKER=true`), 단일 인스턴스. web: blue/green, 35s. `INTERNAL_API_BASE_URL`·`APP_JAR`·`SERVER_PORT` 삭제. **JAVA_OPTS·mem_limit 재산정**(합 6400m 호스트 11.6GiB 제약, 주석 `mem_limit` 블록) |
+| `deploy/server/roles` | 순서 재정의(예: worker -> web, 또는 web -> worker; 사용자 복제본이 사라지면 순서 제약 소멸) |
+| `deploy/server/readiness`, `deploy/server/bluegreen` | role 이름 교체. `bluegreen`은 web만 |
+| `deploy/server/caddy/kista-api.caddy` | `@trading` 분기 삭제(모두 web). `@scheduler`는 worker 유지(`AdminSchedulerController`가 worker에서만 뜨는 한). **`/api/admin/scheduler/**`는 worker, `internal/fida-orders`는 web**. `CaddyRoutingTest`를 같은 커밋에서 갱신 |
+| `deploy/hooks/pre-apply.sh` | role->schema 매핑(`:11-14` `kista-trading=trading`, `kista-scheduler=public`)을 worker->`public` 1개로 |
+| `deploy/hooks/epr-orphans.sh` | 변경 없음(FQCN 기반, 스키마 무관) |
+| `.github/scripts/detect-deploy-scope.sh` | 플래그 `api/scheduler/trading` 3개 -> `web/worker` 2개. 경로 규칙: `trading-core/src/main/*`·`src/main/*` 구분이 사라지고(한 jar) 스케줄러 전용 경로(`adapter/in/schedule/*`, `AdminSchedulerController`)만 worker 단독 판정. `db/migration*` 둘 다 양 role |
+| `.github/scripts/plan-deploy.sh` | `pick "$sha" "${role#kista-}"`(`:46`)가 role 이름 접두 `kista-`를 떼서 플래그 키로 쓴다 — role명 변경 시 키 매핑 수정 |
+| `.github/scripts/check-migrations.sh` | `ALL_DIRS`에 두 디렉토리를 그대로 둘 수 있다. **root expand/contract 검사(`ROOT_DIR`만)가 trading 디렉토리에도 적용되어야 한다**(D3: web·worker 버전 중첩) — 지침서 05 D3 |
+| `.github/workflows/server-deploy.yml` | build 잡은 이미 이미지 1개라 변경 없음. `client_payload[roles]`가 새 role 이름을 싣는다. `event_type=deploy-kista-api`, `app=kista-api`는 kista-infra와 계약이라 이름 유지 권고 |
+| `.github/tests/*.bats` | `compose-invariants.bats`(role 이름·이미지 변수·roles/readiness 계약·`bluegreen` 내용), `deploy-plan.bats`, `pre-apply.bats`, `check-migrations.bats` 갱신 |
+| `deploy/server/README.md`, `deploy/server/schema-reorg/RUNBOOK.md` | role 이름·`SPRING_FLYWAY_BASELINE_ON_MIGRATE` env 계약(D-2의 새 프로퍼티) 갱신 |
+| `infra/prometheus/prometheus.yml`·`deploy/grafana/kista-api-dashboard.json` | 대시보드 쿼리 17곳이 `application="kista-api"`로 필터한다(`management.metrics.tags.application=${spring.application.name}`). 합병 후 이름을 유지하면 worker·web이 한 시리즈로 합쳐진다 -> role 태그 추가가 필요하면 `management.metrics.tags.role` 신설 |
+| `scripts/dev-seed/seed.sh` | `TRADING=${TRADING:-http://localhost:8081}`(`:14`) -> 8080 |
+| docs | `docs/agents/{docker-infra,commands,local-dev,architecture,constraints,workflow,workflow-batch,flyway}.md`, `docs/architecture-map.md`, `CLAUDE.md` 상단, `README.md`, 모듈 `CLAUDE.md`, `.github/CLAUDE.md`(8081·3 role·EPR 2테이블 서술). kista-infra 레포의 role 정의·state 스키마(`state/kista-api.yml`의 `kista-*` role 키)·`Reconcile App` 워크플로는 **이 레포 밖** — 지침서 05 단계 4가 협업 항목으로 지정 |
+
+- 단계 1(내부 HTTP 유지) 동안 운영은 기존 3 role 그대로 돌 수 있다: 이 단계의 jar는 여전히 `app.jar`·`trading-core.jar` 2개가 빌드되어야 하므로 `bootJar :trading-core:bootJar` 유지(J-1의 `:trading-core:bootJar` 비활성은 단계 4).
+- `INTERNAL_API_BASE_URL`: 단계 1에서 각 role이 자기 자신을 가리키게 하면 kista-trading(구 jar)과 신 jar가 섞이는 기간이 생긴다 — 같은 SHA 쌍으로 교체해야 한다.
+- `kista-api-net` 네트워크(로컬 compose `:58`)·로컬 포트 8081 문서는 단계 1 후 제거.
+
+## L. kista-ui 연계
+
+(조사 대상 `/Users/phs/workspace/kista/kista-ui`, 읽기만)

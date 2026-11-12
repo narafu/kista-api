@@ -194,3 +194,147 @@ per client × group TPS(개요 문서): AUTH 5, ACCOUNT 1, ASSET 5, ORDER 10, OR
 | 시세·캔들·환율·장 정보 | **관리자(별도) client 토큰** — "계좌 정보 없이 액세스 토큰만으로 호출"(Market Data·Market Info 그룹). `X-Tossinvest-Account` 헤더 불필요 | MARKET_DATA 15, CHART 20, MARKET_INFO 3 TPS(per client). 캔들은 `1m`·`1d`만, ≤200/요청, 분봉은 `before`가 날짜 단위인 코드 쪽 한계로 1페이지 |
 | 보유·매수가능·체결 | **계좌별 사용자 client 토큰** + `X-Tossinvest-Account` | ASSET 5, ORDER_INFO 6, ORDER_HISTORY 5, ORDER 10 TPS(per 사용자 client) |
 | 대시보드(보유 현황) | `holdings`, `buying-power`, `exchange-rate` | holdings가 종목 필터·요약(원금·평가·손익)을 이미 제공 |
+
+## 8. 토스 관리자 키 공용 시장 데이터의 메리츠 대체 가능성
+
+전제(코드로 확인): 토스에서 공용으로 받는 것은 `TossPriceApi`(현재가·전일종가·확정종가), `TossCandleApi`(일봉·분봉), `exchange-rate`, 그리고 이를 소비하는 `TossAdminPriceSource`(관리자 시세 1순위, `AdminMarketPriceAdapter`가 Toss → KIS 순으로 누락 종목만 보충), Mock 브로커(`MockBrokerAdapter.java:29,87,140`가 `TossPriceApi.getClosingPrice/fetchConfirmedCandle`을 직접 호출), root `api.market`(`CandleQueryHttpAdapter` → 내부 `/api/internal/broker/candles/{latest,range}`)·`api.benchmark`(`CurrentExchangeRateHttpAdapter` → `/api/internal/trading/stats/exchange-rate`). **장 상태·휴장일은 토스에서 받지 않는다** — 휴장일은 `marketcalendar`의 Alpaca 어댑터, 정규장 진행 판정은 `TossPriceApi.resolveMarketSessionAt`의 하드코딩 DST 표(`:170-206`)다.
+
+### 8-1. 항목별 판정
+
+| 항목 | 현재 토스 (엔드포인트 / 인증 주체 / 한도) | 메리츠 스펙 대응 (경로·파라미터·응답 필드·범위) | 메리츠 인증 | 호출 한도 | 판정 |
+|---|---|---|---|---|---|
+| 현재가 | `GET /api/v1/prices?symbols=` 최대 200종목 1회 / **관리자 키** / MARKET_DATA 15 TPS | `GET /market/v1/overseas/prices` **단건**(`mrkt_div_code=OV, mrkt_cls_code(OQ/NY/AX), iscd, dely_rltm_cls_code 0 실시간·1 지연`) → `prpr`. 종목 범위: 해외 거래소별 코드 필수(KISTA 레지스트리 6종목 고정, 신규 종목마다 거래소 코드 매핑 필요 — 토스는 심볼만). 시간외: 정규장 `prices`와 별도로 `prices/daytime`(주간)·`prices/after`(애프터)가 있음. **`prices`가 프리·애프터 체결을 포함하는지 스펙에 없음**(? 토스 `lastPrice`는 확장시간 체결가 포함이라는 `AdminMarketPricePort` 계약과 의미가 다를 수 있음) | 앱키 1개=계좌 1개, 토큰 필수(`mac_address` 포함). **공용·계좌 무관 키 없음** | 앱키 단위, 스펙 수치 없음(`EGW00200`). 코드는 앱키별 110ms 게이트 | **부분 가능** — 정규장 현재가는 가능(이미 계좌 단계에서 사용 중), 종목당 1회×110ms, 시간외 가격 의미는 실측 필요 |
+| 전일 종가 | 캔들 `GET /api/v1/candles?interval=1d&count=1&before=` 종목당 1회 + 세션 판정·캐시 / 관리자 키 / CHART 20 TPS | **`prices` 응답의 `prdy_clpr`**(전일종가) — 현재가와 **같은 호출 1회**로 동시 취득. 메리츠 계좌 단계 `MeritzPriceApi.getPriceSnapshot`이 이미 사용(`:46-60`). 정규장 종료 후·프리마켓 시간대에 `prdy_clpr`이 "직전 거래일 종가"로 유지되는지는 스펙에 없음(? 토스 코드가 세션 판정 로직을 둔 이유가 바로 이 경계) | 위와 같음 | 위와 같음 | **대체 가능(조건부)** — 호출·코드가 크게 줄지만 경계 시각(05:00~06:00·18:00~) 동작을 실측 후 확정 |
+| 확정 종가(마감 리포트·VR 롤오버·Mock) | 일봉 캔들 `from=to` / 관리자 키 | `GET /market/v1/overseas/candles/days`(`from=to=US거래일`, `mod_stpr_cls_code` 필수) → `date, prpr(종가), oprc, hprc, lprc, acml_vol`. 이미 `MeritzPriceApi.fetchConfirmedClose`(`:98-129`)가 사용 | 위와 같음 | 위와 같음 | **대체 가능** — `1`(원 주가) 사용 유지. 휴장·미발행 봉은 날짜 불일치로 탈락 |
+| 일봉 캔들(기간·개수) — UI·DCA 지표 | `GET /api/v1/candles` 200봉/요청, `nextBefore` 페이징, `adjusted=true`(분할·배당 조정, DCA만) / 관리자 키 / CHART 20 TPS. UI 최신 600봉, 기간 최대 5년 | `candles/days`: `from`·`to` 함께 주면 "그 기간 일봉 모두", 생략 시 **최신 40건**, **개수 파라미터 없음·연속조회 없음**. 최근 일자 앞. `mod_stpr_cls_code` `0`=**분할** 보정, `1`=원 주가(**배당 조정 언급 없음**). 분봉: `candles/minutes`(`hour_cls_code` 초 단위 간격, 최근 구간부터, `korea_date/korea_hour`) | 위와 같음 | 위와 같음 | **부분 가능** — 5년(≈1,260봉)·600봉을 1회로 줄 수 있는지 문서에 없음(? 서버 상한 불명, 분할 호출하려면 구간 쪼개기), 배당 조정 차이가 DCA 지표값을 바꿀 수 있음(레버리지 ETF 소액 배당, 지표 민감도는 별도 검증). UI 차트용은 가능성 높음, DCA 지표는 `0`이 `adjusted=true`와 동치인지 확인 전엔 유지 |
+| 환율(USD/KRW) | `GET /api/v1/exchange-rate` `rate`(매수), `midRate` / 관리자 키 / MARKET_INFO 3 TPS, 60s 캐시 | ① `GET /forex/v1/rates?stnd_date=YYYYMMDD&crcd=USD`(고시환율: `deal_stnd_exrt` 매매기준환율, `stnd_exrt`, `tltr_slrt/byrt`, `tr_date`) ② `GET /market/v1/overseas/fx/prices?iscd=USDKRWSMBS`(시장 환율 `prpr`, 전일대비, 시고저) | 위와 같음 | 위와 같음 | **대체 가능** — `midRate` 소비처(벤치마크)는 `deal_stnd_exrt` 또는 `fx/prices.prpr`, 대시보드 KRW 환산에 쓰는 `rate`(토스 "매수 환율")는 `tltr_aply_slrt`(전신환 적용 매도율, 고객이 달러를 살 때) 계열로 의미를 맞춰야 하며 값이 소폭 다름. 응답 라벨 `"TOSS_INVEST"`(`BenchmarkService.java:240`) 변경 필요 |
+| 장 상태·세션 판정 | 토스 API 미사용(코드 내 DST 표) | `GET /reference/v1/overseas/market-hours`(`ovrs_stck_mrkt_tr_cls_code=01` → `ovrs_mkop_cls_code`(004 정규장 개시 등), `mrkt_begn_time/mrkt_fin_time` KST HHMM, 닫힘이면 `0000`), `GET .../market-days`(해당 거래소 현재 영업일 `bsop_date`) | 위와 같음 | 위와 같음 | **가능(현재 상태 단건)** — 정규장 진행 여부 판정용 DST 표 대체 가능. 세션 목록·조기마감 규칙은 스펙에 없음 |
+| 휴장일 캘린더 | 토스 API 미사용(Alpaca 어댑터) | **없음**(영업일 단건뿐, 휴장일 목록·다음 영업일 계산 API 없음) | — | — | **불가** — Alpaca 유지(토스 `market-calendar/US`는 전일·당일·익일 3영업일과 4세션을 주지만 현재 미사용) |
+| 관리자 시세 체인 `TossAdminPriceSource` | Toss → KIS 순(`@Order(1)`). 현재가·전일종가·확정종가 부분 결과 계약 | 위 세 항목의 메리츠 구현을 `MeritzAdminPriceSource`로 교체(체인 구조 `AdminMarketPriceAdapter`·`AdminPriceSource` 유지) | **관리자용 메리츠 앱키 필요** | 관리자 앱키 전용 게이트 | **대체 가능(조건부)** — KIS 삭제 확정이면 체인 단계가 1개가 되어 `AdminMarketPriceAdapter`·`AdminPriceSource` 추상도 불필요해질 수 있음(별도 판단) |
+| Mock 브로커 시세 | `TossPriceApi.getClosingPrice/fetchConfirmedCandle`(관리자 키) → 체결 판정에 OHLC 사용 | `candles/days`의 `oprc/hprc/lprc/prpr` | 위와 같음 | 위와 같음 | **대체 가능** — 단 Mock이 `TossPriceApi`에 직접 의존하는 구조(`MockBrokerAdapter.java:4`)를 포트로 바꿔야 함 |
+| 캔들 통계(`TossCandleApi`) | `CandlePort`(UI 최신·기간, DCA 일봉) | 위 일봉 행과 동일 | 위와 같음 | 위와 같음 | 일봉 행과 동일(부분 가능) |
+| root `api.market` 캔들·`api.benchmark` 환율 | 내부 HTTP로 trading-core 경유 → 토스 | 내부 계약(`/api/internal/broker/candles/*`, `/stats/exchange-rate`)은 공급자 무관한 `shared.contract` 타입이므로 **root 코드 변경 불필요**. DTO 이름 `TossCandleResponse`·`CurrentExchangeRate.source="TOSS_INVEST"`만 정리 | — | — | 공급자 교체와 무관하게 root 영향 작음 |
+
+### 8-2. 메리츠 인증 조건(핵심 제약)
+
+- 메리츠 토큰은 **앱키 1개 = 계좌 1개**에 매핑("접근토큰에 매핑된 계좌" 문구가 계좌·시세 API 전반에 반복). 스펙에 **계좌와 무관한 공용 키는 없다.** 시세 API(`/market/v1/...`)도 `authorization: Bearer`·`mac_address`가 필수라 토큰 없이 부를 수 없다(토스는 "계좌 정보 없이 액세스 토큰만" 호출 가능, 계좌 헤더 불필요).
+- 따라서 서버 공용 호출에는 **운영자 본인의 메리츠 계좌 앱키(관리자 키)가 필요**하다. 사용자 키로 부르면 ① 사용자 한도·게이트를 시세 호출이 갉아먹고 ② 사용자 키 만료·권한 오류가 시세 장애로 번지며 ③ 사용자별 계좌 유무에 시세가 종속된다 → 권장하지 않음.
+- 관리자 키 토큰 관리: 메리츠 재발급은 같은 토큰·같은 `expires_date`를 돌려줘(실측) 비파괴이므로 분산 조정이 필요 없다. 다만 현재 `DbTokenCoordinator`는 `accountId`(UUID) 키라 계좌 없는 관리자 키에는 맞지 않아 앱키 단위 메모리 캐시(락 1개) 한 곳이 필요하다.
+- 접속 IP 제한 여부, 실시간 시세 이용 조건·신청 필요 여부는 스펙에 없음(? 확인 필요).
+
+### 8-3. 호출 한도 공유
+
+- `CallIntervalGate`는 **앱키 문자열 단위**(`MeritzHttpClient.awaitSlot` → `account.appKey()`)라 관리자 앱키와 사용자 앱키가 다르면 버킷이 분리된다. 단 운영자 계좌를 매매에도 쓰고 같은 키를 관리자 키로 쓰면 시세와 주문이 같은 110ms 게이트를 공유한다(시세 N종목 호출이 주문 접수를 최대 N×110ms 지연, 최대 대기 20s 상한).
+- 스펙은 한도 수치를 주지 않는다(`EGW00200`만). 문서의 "API별 10 TPS"는 실측 추정 → 시세 호출이 `GET`이라 `EGW00200` 시 백오프 재시도(최대 3s)가 걸린다.
+- 토스는 한도가 **client×그룹**(MARKET_DATA 15·CHART 20·MARKET_INFO 3 TPS)이고 관리자 client 1개가 모든 계좌 배치를 받는 구조라 대체 시 메리츠 단일 관리자 앱키가 같은 부하를 110ms 게이트로 직렬화하게 된다(종목 6개 기준 현재가+전일종가 약 0.7s, 확정종가 약 0.7s, 충분).
+
+### 8-4. 결론 후보
+
+| 후보 | 내용 | 근거 | 위험 |
+|---|---|---|---|
+| A. 전부 대체 | 시세·캔들·환율을 메리츠로 통일, 토스는 주문(+계좌별 보유 조회) 전용 | 전일종가가 `prices` 1회로 해결, 토스 관리자 토큰·Redis 조정·DST 표·세션 캐시 제거 | 5년/600봉 범위·배당 조정·시간외 가격 의미·휴장일 목록 부재(Alpaca는 유지) 4가지가 **미확인**. 관리자 앱키 장애가 곧 시세 전체 장애(토스 폴백 소멸) |
+| **B. 일부만 대체(권장 후보)** | 현재가·전일종가·확정종가·Mock 시세·환율은 메리츠, **일봉 캔들(UI·DCA)은 토스 유지** | 앞의 항목은 이미 계좌 단계에서 메리츠로 운영 중이라 실측 근거가 있고, 캔들은 메리츠 범위 상한·배당 조정을 모름. 캔들만 남기면 토스 관리자 토큰(`AdminToken`)이 남아 제거 효과가 반감 | 토스 관리자 키 의존이 남음 |
+| C. 유지 | 토스 관리자 키 유지 | 시세 장애 시 메리츠 한 곳이 단일 실패점이 되지 않음 | 두 공급자·두 토큰 모델·Redis 조정 유지 비용 지속 |
+
+권장 순서: ① 운영 서버에서 메리츠 읽기 전용 실측 3건(관리자 앱키로 `prices`의 `prdy_clpr`가 05:00·06:00 KST 경계에서 직전 정규 종가인지, `candles/days`를 1,260봉 구간 1회 호출 시 전량 반환인지, `prices`가 시간외 체결가를 포함하는지) → ② 통과하면 B → ③ 캔들까지 통과하면 A.
+
+### 8-5. 대체 시 삭제 가능한 토스 코드와 남는 의존
+
+| 대상 | 줄 수 | 비고 |
+|---|---|---|
+| `TossPriceApi` | 255 | 현재가·전일종가·세션 DST 표·캐시 (A·B 모두 삭제) |
+| `TossAdminPriceSource` | 59 | 체인 교체 |
+| `UsdKrwRateCache` + `TossExchangeRate` | 46 + 16 | 환율을 메리츠로 옮길 때(B 포함) |
+| `TossHoldingsApi`의 환율 부분(`:37-42,137-165`) | 약 35 | 대시보드 환율은 메리츠 환율로 |
+| `TossCandleApi` + `TossCandle` | 174 + 21 | **A에서만 삭제**(B는 유지) |
+| 관리자 토큰 경로: `TossAuthApi`(`getAdminToken`·`recoverAdminToken`·`issueAdminToken`·`@Value admin*`) ~15, `TossDistributedTokenCoordinator.getAdminToken/recoverAdminToken/ADMIN_SCOPE` ~10, `TossHttpClient.getCommon·retryOnTooManyRequests`(`:54-83`) ~30, 설정 `toss.admin-client-*` | 약 55 | **A에서만 삭제.** B에서는 캔들 때문에 남음 |
+| `TossBrokerAdapter`의 가격 6메서드 위임(`:67-110`) | 약 45 | 가격 포트는 라우터의 관리자 체인에 맡기고 토스 어댑터는 계좌 계열만 남기도록 정리 |
+
+합계: **B ≈ 395줄, A ≈ 685줄**(테스트 제외). 남는 토스 의존: 주문(`TossOrderApi` 214줄)·계좌 보유/매수가능(`TossHoldingsApi` 약 180줄)·계좌별 토큰 코디네이터·계좌 검증, 그리고(B 한정) 일봉 캔들용 관리자 토큰.
+
+## 4. 두 브로커 공통점·차이점
+
+| 축 | 메리츠 | 토스 | 공통 골격에 넣을 수 있나 |
+|---|---|---|---|
+| 인증 | OAuth2 client_credentials(form), 앱키=계좌 종속, 헤더 `authorization`+필수 `mac_address`. 재발급은 같은 토큰(실측) | OAuth2 client_credentials(form), **client당 토큰 1개·재발급 시 이전 토큰 무효화**, 헤더 `Authorization`+계좌 헤더 `X-Tossinvest-Account` | 요청 서명자(헤더 주입)는 벤더별. "토큰 확보·1회 재발급" 골격은 공통 가능, 토스는 직렬화 필요 |
+| 성공 판정 | **본문 `rsp_cd`**(HTTP 500도 성공 가능), API별 성공 코드가 다름 | HTTP 상태코드 + `result` 래퍼 | 불가 — 오류 매퍼는 벤더별 |
+| 오류 형식 | `{rsp_cd, rsp_msg, rsp_sub_msg}`, 오류 코드표 없음 | `{"error":{requestId, code, message}}` 코드표 있음, 토큰 엔드포인트만 OAuth 표준 | 불가 |
+| rate limit 신호 | 본문 `EGW00200`(HTTP 500), 수치·헤더 없음 | HTTP 429 + `X-RateLimit-*`·`Retry-After`, client×그룹 TPS 공개 | 재시도 가능 판정 인터페이스(`isRateLimited`, `retryAfter`)만 공통 |
+| 호출 간격 | 클라이언트 게이트 110ms(앱키별) | 게이트 없음(서버 버킷) | 최소 호출 간격은 정책 값(메리츠 110, 토스 0/없음)으로 공통화 가능 |
+| 페이징 | 30건/페이지, `tr_cont=1`+`tr_cont_key`(쿼리, 공백 포함 원문), 키 오류 시 조용히 첫 페이지 | CLOSED 목록 `cursor`/`hasNext`(limit ≤100), 캔들 `before`/`nextBefore`(≤200) | 불가 — 방식이 다름 |
+| 주문 식별자 | 숫자 `oder_no`(+ 날짜 `oder_date`가 취소에 필요) | 불투명 문자열 `orderId`, 취소·정정마다 새 orderId | `externalOrderId` 문자열로 이미 통일 |
+| 멱등성 | 없음 | `clientOrderId` 36자·10분 | 포트에 `clientOrderId`(이미 있음)를 두되 메리츠는 무시 |
+| 금액·수량 | 문자열/숫자 혼재, 수량 소수 10자리, 가격 4자리, 요청 Number 타입 | 문자열 decimal, 미국 소수 수량은 시장가 매도만, 가격 $1 이상 2자리 | 파싱 헬퍼(`decimal`, `wholeQuantity`)는 공용 유틸로 합칠 수 있음 |
+| 날짜·시간대 | 주문일·체결일은 미국 거래일(YYYYMMDD) | 주문 접수일 KST, 체결 시각 ISO8601 KST | 불가(변환 규칙이 다름) |
+| 시세 호출 | 종목 단건(현재가·일봉 모두), 거래소 코드 필수 | 현재가 다건(≤200), 캔들 단건 | 불가 |
+
+`BrokerHttpPolicy`(baseUrl·최소 간격·재시도 가능 판정·오류 매퍼·서명자)로 묶을 수 있는 것은 **baseUrl·타임아웃(3s 연결/10s 읽기 이미 `HttpClientTimeouts.jdkTimeouts` 공용)·최소 호출 간격·`isRetryable(응답)` 함수 자리·헤더 서명자 함수**까지다. 응답 판정·페이징·토큰 규칙은 벤더별로 남아야 한다(`MeritzResponse`의 본문 판정과 `TossHttpClient`의 401/429 루프는 구조가 달라 추상화하면 오히려 분기만 늘어난다).
+
+## 5. 현재 코드에서 줄일 수 있는 것 / 빠진 처리
+
+### 5-1. 미사용·중복 (삭제 후보)
+
+| 항목 | 근거 | 위치 |
+|---|---|---|
+| `MarginPort.getMargin`·`MarginItem`·메리츠 `EstimateRow.rate`·토스 `getMargin`(3병렬 호출) | 호출처 0 | `MeritzTradingApi.java:75-81`, `TossHoldingsApi.java:55-77` |
+| `BrokerPricePort.getPriceSnapshot(s)`·`PriceSnapshot`(타입 사용처 재확인 필요) | 호출처 0(테스트 `never()`만) | 양 어댑터 + 라우터 |
+| 메리츠 `SUCCESS_CODES`의 `5620`·`5822` | 스펙상 국내 예약주문·국내 조회 전용, 해외 경로 무관 | `MeritzResponse.java:27` |
+| 메리츠 `OrderRow` 9필드 합집합(당일·기간 2엔드포인트 공용) | 당일 `odqt/cntg_qty/oder_able_qty`, 기간 `oder_dqty/cntg_dqty/ncnt_odqt` — 기간 경로는 `oder_dqty-cntg_dqty` 계산으로 `ncnt_odqt` 제거 가능 | `MeritzOrderApi.java:52-61` |
+| 메리츠 주문 body `Map<String,String>` | 스펙 타입이 `odqt`·`orgl_oder_no` Number, `oder_cond_cls_code` 선택 → 작은 record 2개(주문·취소)로 대체하면 매핑 배열 `m[0..2]` 제거 | `MeritzOrderApi.java:74-87` |
+| 토스 `getPresentBalance`의 USD·KRW 매수가능 2회 + 환율 | 대시보드용이면 KRW 호출은 ORDER_INFO 한도(개장 직후 3 TPS)를 쓰므로 환산 표시 필요 시에만 | `TossHoldingsApi.java:89-97` |
+| 토스 `getSellableQuantity` 전체 holdings | `holdings?symbol=` 필터 지원 | `TossHoldingsApi.java:171-183` |
+| 토스 `nextBefore` 미사용 + 자체 `before` 날짜 계산 | 스펙이 `nextBefore`를 제공 | `TossCandleApi.java:50-70,108` |
+| 토스 DST 세션 표 복제 | `market-calendar/US` 또는 메리츠 `market-hours`로 대체 | `TossPriceApi.java:170-206` |
+| 토스 환율 `result==null → 0` 폴백 | 스펙상 `result` 필수 | `TossHoldingsApi.java:158-159` |
+| 종목별 `getExecutions` 반복(메리츠: 같은 계좌·기간 history를 종목마다 전량 조회) | 스펙에 종목 필터 없음 → 호출부에서 계좌·일자당 1회로 합치면 페이지 호출이 종목 수만큼 감소 | `T/TradingReporter.java:58`, `CancelledOrderFillRecorder.java:38` |
+| 토스 분산 토큰(Redis 약 690줄) | 3-2절: 단일 인스턴스에서 문서 정당화 불가 | `TossDistributedTokenCoordinator`(207)·`TossRedisTokenStore`(229)·`TossTokenStore`(39)·관련 |
+
+### 5-2. 문서가 보장하지 않아 방어를 유지해야 하는 것
+
+- 메리츠 `HTTP 500 + rsp_cd` 본문 판정, `0000`이 오류에도 오는 경우(스펙이 market-hours에서 명시), 연속조회 키 오류 시 조용히 첫 페이지 → `MAX_PAGES` 가드 유지, `iscd` 접미사 시 가격 0 → `signum<=0` 검사 유지. 모두 스펙이 함정으로 명시한 것이라 **제거하면 안 된다**.
+- 토스 `result` 래퍼 언랩, 401 코드 구분은 스펙으로 보장됨.
+
+### 5-3. 문서상 필요한데 빠진 처리 (버그 의심은 [의심] 표시)
+
+| 구분 | 내용 |
+|---|---|
+| [의심] 메리츠 | 기간 폴백의 `ncnt_odqt` 신뢰(스펙은 계산하라고 명시) — `MeritzOrderApi.java:61,163` |
+| [의심] 메리츠 | holdings `rmnd_clcd`(일반·소수·대출) 행 미합산, 소수부 버림 — `MeritzTradingApi.java:92,138` |
+| [의심] 토스 | `Integer.parseInt(quantity)`가 소수 수량에서 대시보드 전체 실패 — `TossHoldingsApi.java:108` |
+| [의심] 토스 | `status=OPEN`/`CLOSED` 목록에서 `PARTIAL_FILLED`가 양쪽에 있어 `orderId` 중복 제거 없음 — `TossOrderApi.java:86-87` |
+| 토스 | 429의 `Retry-After` 무시, 계좌 API 429 무재시도(주문 POST는 멱등키로 재시도 가능) |
+| 토스 | 401 본문 `error.code`(`token-revoked`/`expired-token`/`invalid-token`) 미사용 |
+| 토스 | 취소 409 `already-processing`·422 `cancel-restricted` 미분류 |
+| 메리츠 | `EGW00202`을 REST 권한 오류로 분류하나 스펙에서는 WebSocket Bearer 접두어 누락 코드 |
+| 메리츠 | 토큰 응답 `expires_date`(스펙 밖 필드)에 단독 의존, `expires_in` 폴백 없음 |
+| 공통 | 두 브로커의 `verifyAccount`가 호출 한도·재발급 부작용(토스 토큰 무효화)을 고려하지 않음 |
+
+## 6. 문서 드리프트
+
+| 문서 | 서술 | 스펙/코드와 어긋남 |
+|---|---|---|
+| `meritz-api.md` 일봉 | `mod_stpr_cls_code` 필수만 기재, 코드 주석은 `1`=수정주가 반영 | 스펙: `0`=분할 보정, **`1`=보정 전 원주가** |
+| `meritz-api.md` 호출 간격 | "초당 한도(API별 10 TPS)" | 스펙에 수치 없음 — 실측·포털 출처 표기 필요 |
+| `meritz-api.md` 오류 코드 | `EGW00121/123`·`IGW50024`·`1543`·`5988`·`0760/EGW00202` 권한 | 스펙에 코드표 없음. `EGW00202`은 스펙에서 WebSocket 접두어 오류. 나머지는 실측 근거로 표기 필요 |
+| `meritz-api.md` 토큰 | `expires_in` 43200·`expires_date` | 스펙 응답은 `expires_in`(예시 604800=7일)만, `expires_date` 필드 없음 |
+| `meritz-api.md` 체결 조회 | history 1행·누적 체결(실측 733건) | 스펙 history도 주문당 1행이나 `detail` API는 체결 건별 행이라 혼용 금지 주의 추가 필요 |
+| `toss-api.md` 시세 | "Toss는 MARKET 주문 미지원"(`TossOrderApi.java:42` 주석 포함) | 스펙: US `MARKET`·`DAY`/미국 소수 시장가 매도 지원, 미지원은 MOC·MOO |
+| `toss-api.md` 토큰 | Redis 분산 fencing을 필수 설계로 기술 | 스펙 근거는 "client당 토큰 1개·재발급 즉시 무효화"까지 |
+| `toss-api.md` 연결 검증 | `BrokerConnectionTestPort` "어느 계좌 토큰도 건드리지 않는다" | 같은 client_id로 발급하면 기존 토큰이 무효화됨(스펙) |
+| `toss-api.md` 체결 상태 | "PARTIAL_FILLED는 OPEN에 속함" | 스펙 CLOSED 상태 집합에도 `PARTIAL_FILLED`가 기재됨 |
+| `toss-api.md` 시세 | "adjusted=true는 이 경로만" | 스펙 기본값이 `true` — 다른 경로는 `adjusted`를 안 보내므로 사실상 수정주가 조회(의도 확인 필요) |
+| `toss-api.md` 캔들 페이징 | 직전 페이지 가장 오래된 봉 날짜 00:00 UTC | 스펙은 `nextBefore` 제공 |
+| `docs/agents/modules/tradingcore/broker.md` | 사실 확인 못 함(이번 조사 범위 외, 미열람) | — |
+
+## 7. 불명확·확인 못 한 것
+
+1. 메리츠 `prices`의 프리·애프터 체결가 포함 여부, `prdy_clpr`의 경계 시각(정규장 종료 직후·프리마켓) 의미.
+2. 메리츠 `candles/days` 1회 호출의 최대 기간·봉 수(스펙 없음), 배당 조정 여부(`0`은 분할만 서술).
+3. 메리츠 TPS 수치(스펙에 없음), 110ms 근거는 실측뿐. 실시간 시세 이용 신청·IP 제한 여부.
+4. 메리츠 `orders/today`의 "당일"이 KST인지 미국 거래일인지, `estimate`의 `intg_marg_iqry_yn` 기본값, 주문 API의 소수 수량 입력 규칙, 프리·애프터 주문 가능 여부.
+5. 메리츠 `tr_cont_key` 쿼리 인코딩(`+`·`&` 포함 시) — 733건 연속조회 실측은 통과.
+6. 토스 `PARTIAL_FILLED` 양쪽 목록 중복 여부, `lastPrice`의 확장시간 체결가 포함 여부, `timestamp=null` 의미, 가격 절삭 규칙과 상위 반올림의 경계 영향.
+7. 토스 토큰 수명 공식 문서화(응답 예시 86400만), 개요 문서 TPS 수치는 웹 요약본(`X-RateLimit-Limit` 헤더가 정본).
+8. 토스 관리자 키를 로컬 개발과 공유하는지(공유하면 서로의 토큰을 무효화).
+9. `docs/agents/modules/tradingcore/broker.md`·`guides/04-broker.md`는 시간상 열람하지 못함(지침서 재작성 시 대조 필요).
+10. 실계좌 호출·빌드·테스트는 금지 조건이라 어떤 항목도 실호출로 검증하지 못했다.

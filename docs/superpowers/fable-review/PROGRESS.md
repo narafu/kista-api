@@ -44,9 +44,9 @@
 
 | id | 산출물 | 쓰임 |
 |---|---|---|
-| a23fdb7b3f6b2304a | findings/09-process-local-state.md | 지침서 05 개정 |
+| (완료) | findings/09-process-local-state.md | 지침서 05 개정(아래 방향) |
 | a1e300633c9e53756 | findings/10-merge-collisions.md | 지침서 05 개정 |
-| a69d63e7c1caf2218 | findings/11-broker-api-fit.md (메리츠·토스, 8절 시세 대체) | 지침서 04 개정 |
+| (완료) | findings/11-broker-api-fit.md | 지침서 04 개정 완료 |
 | (완료) | findings/12-binance-api-fit.md, findings/13-vr-velog-diff.md | 04 개정, 08 반영 완료 |
 
 ## 지침서 05 개정 방향 (2026-11-12, findings 09 수신 후 Fable 판단 — findings 10 수신 뒤 지침서에 반영)
@@ -68,7 +68,7 @@ findings 09가 "같은 trading 코드가 web·worker 두 프로세스에서 돌 
 | 01 | 헥사고날 다이어트 | findings 02 B·C | **작성 완료** `guides/01-hexagonal-diet.md` |
 | 02 | 영속·DTO 삼중 구조 축소: 조회는 View 직행, Command 직접 바인딩, 애그리게이트당 Store. JPA 유지(JDBC 전환 기각) | findings 02 A·D, JPA 사용 집계 | **작성 완료** `guides/02-persistence-and-dto.md` |
 | 03 | 전략 축 재설계 | findings 03 A·E | 미착수 |
-| 04 | 브로커 축: 업비트·KIS 삭제, 시세 분리, HTTP·토큰 공통 골격, facade 제거. **가장 먼저 실행** | findings 03 B | **작성 완료** `guides/04-broker.md`. 토스 주문 삭제는 사용자 확인 대기 |
+| 04 | 브로커 축: KIS·업비트 삭제, 토스 주문 유지, 스펙 결함 9건, 토큰 단순화, 시세 공급자 메리츠 이전(2단계) | findings 03 B·11·12 | **개정 완료(2026-11-12)** `guides/04-broker.md`. 사용자 결정 대기: 운영자 메리츠 앱키를 관리자 키로 쓸지, 시세 이전 2단계 권고 |
 | 05 | Modulith 모듈 구성과 프로세스 분리 재검토 | findings 01·02 E·05, history, Modulith 2.1 문서 | **작성 완료** `guides/05-modules-and-processes.md`. **사용자 결정 D1~D4 대기**(D1: 한 코드베이스 + web/worker role 권고). 결정 뒤 단계 0 조사(`findings/09-process-local-state.md`)부터 |
 | 06 | 배치 오케스트레이션 | findings 03 C·D | 미착수 |
 | 07 | 테스트 전략 | findings 04 | 01~03 뒤 |
