@@ -9,7 +9,7 @@
 ```text
 /opt/kista-api/
 ├── .env                    ← kista-infra 배포 워크플로가 렌더링·덮어쓴다 (이 레포의 Actions는 관여하지 않음, 아래 "GitHub Secrets" 참고)
-├── releases/<id>/          ← kista-infra가 config SHA의 deploy/server/{docker-compose.yml,roles,readiness,bluegreen,caddy/} + images.env로 구성한 bundle
+├── releases/<id>/          ← kista-infra가 config SHA의 deploy/server/{docker-compose.yml,roles,bluegreen,caddy/} + images.env로 구성한 bundle
 ├── current → releases/<id> ← 마지막 적용 성공 release
 ├── previous → releases/<id>
 ├── caddy/kista-api.caddy   ← reconcile이 current bundle에서 설치(kista-infra caddy가 ro 마운트 — 경로 변경 금지)
@@ -118,7 +118,7 @@ JAVA_OPTS=-Xmx1280m -Xms256m -XX:MaxMetaspaceSize=320m -XX:ReservedCodeCacheSize
 4. `deploy` — kista-infra에 `repository_dispatch(deploy-kista-api)`로 `{config, roles(전 role SHA), request_id}`를 보내고 그 `Reconcile App` run이 끝날 때까지 대기(`wait-reconcile.sh`). 커밋의 초록불 = 서버 적용·헬스 게이트 통과. 대기 중 더 새 요청이 자리를 대체하면 생략으로 성공 처리(payload가 전체 상태라 손실 없음)
 5. kista-infra `Reconcile App` — SHA·이미지 검증 → state와 신선도 병합 → config SHA로 bundle 구성 → `deploy/hooks/pre-apply.sh`(EPR 고아 검사 — kista-trading·kista-scheduler 이미지가 바뀔 때, `docs/agents/docker-infra.md` "배포 직전 EPR 정리 런북") → 서버 `reconcile.sh`:
    - `deploy/server/roles` 순서(kista-trading → kista-api → kista-scheduler)로 `docker compose up -d --no-deps <role>` — compose config-hash가 같으면 재생성하지 않는다
-   - 컨테이너가 바뀐 role만 헬스 게이트: Docker 헬스(liveness) healthy **+** `deploy/server/readiness`의 readiness URL(readinessState·db·redis) UP, 10초 간격 최대 5분
+   - 컨테이너가 바뀐 role만 헬스 게이트: Docker 헬스 healthy(compose healthcheck가 `/actuator/health/readiness` — readinessState·db·redis UP), 10초 간격 최대 5분. Caddy `health_uri`는 liveness
    - 모든 role 통과 후 Caddy 스니펫 설치 + reload 1회
    - 실패 시 이번에 바꾼 role을 역순으로 직전 release(이미지·compose·스니펫)로 롤백 — 앱 단위 전부 아니면 전무
    - 성공 시 `current` 전환, 오래된 release·미사용 이미지 태그 정리 → kista-infra가 `state/kista-api.yml` 커밋

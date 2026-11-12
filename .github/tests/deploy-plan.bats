@@ -15,7 +15,7 @@ scope() { printf '%s\n' "$@" | bash "$SCRIPTS/detect-deploy-scope.sh" | tr '\n' 
 }
 
 @test "scope: compose·roles·hook은 config만, Caddy는 config+verify" {
-  [ "$(scope deploy/server/docker-compose.yml deploy/server/roles deploy/server/readiness deploy/hooks/pre-apply.sh)" = "verify=false config=true api=false scheduler=false trading=false " ]
+  [ "$(scope deploy/server/docker-compose.yml deploy/server/roles deploy/hooks/pre-apply.sh)" = "verify=false config=true api=false scheduler=false trading=false " ]
   [ "$(scope deploy/server/caddy/kista-api.caddy)" = "verify=true config=true api=false scheduler=false trading=false " ]
   [ "$(scope deploy/server/bluegreen)" = "verify=false config=true api=false scheduler=false trading=false " ]
 }

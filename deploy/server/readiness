@@ -1,3 +1,0 @@
-kista-trading http://localhost:8080/actuator/health/readiness
-kista-api http://localhost:8080/actuator/health/readiness
-kista-scheduler http://localhost:8080/actuator/health/readiness

@@ -2,8 +2,11 @@
 # kista-api는 OTLP 직접 푸시로 Grafana Cloud 메트릭 전송
 # Caddy(리버스 프록시·HTTPS)와 Redis는 kista-infra 레포가 소유 — kista-api는 shared_net/data_net으로 합류만 한다
 
+# Docker healthy = 준비 완료(readinessState·db·redis UP) — 배포 헬스 게이트(kista-infra reconcile.sh gate)가 이 상태만 본다
+# unhealthy여도 restart: unless-stopped라 재기동되지 않는다 — autoheal 등 unhealthy 기반 재기동을 붙이지 말 것(DB 순간 장애가 kista-trading 재기동으로 번진다)
+# Caddy health_uri는 liveness 유지(caddy/kista-api.caddy) — readiness로 바꾸면 DB 순간 장애 때 upstream 전체가 빠져 502
 x-healthcheck: &healthcheck
-  test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/liveness"]
+  test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/readiness"]
   interval: 30s
   timeout: 10s
   start_period: 180s
