@@ -9,7 +9,7 @@ API 문서 원본: 메리츠 `/Users/phs/Downloads/meritz_openapi_spec_20261112.
 - **KIS 삭제.** 활성 전략 1건의 이전이 선행 조건이다.
 - **업비트 매매 어댑터 삭제.** 김프 지표용 업비트 공개 시세(`stats`)는 남긴다.
 - **토스 주문 유지**(2026-11-12). 대중적인 증권사라 연결을 남긴다. 메리츠를 우선하는 이유는 환율·매매 수수료다. 따라서 매매 브로커는 메리츠·토스(주식), 바이낸스(코인), Mock이다.
-- 공용 시장 데이터(2026-11-12 결정, 4-2절): 메리츠 관리자 키는 쓰지 않는다. 캔들·현재가·전일 종가는 Alpaca, 환율은 Frankfurter(예비 fawazahmed0), Alpaca로 안 되는 것(확정 종가)은 토스 유지.
+- 공용 시장 데이터(2026-11-12 최종, 4-3절): 기본 마켓 데이터는 토스 유지. 환율만 Frankfurter(예비 fawazahmed0). 메리츠 관리자 키·Alpaca 시세 이전은 하지 않는다.
 
 운영 현황: MERITZ 계좌 3·활성 전략 2, BINANCE 1·1, KIS 1·1, MOCK 1·4, TOSS 1·0, UPBIT 1·0.
 
@@ -155,7 +155,14 @@ KISTA는 이미 Alpaca를 쓴다(휴장일 캘린더, 벤치마크 지수 일봉
 
 KISTA는 LOC·MOC 주문, 마감 리포트, VR 롤오버, Mock 체결 판정에 **확정 종가**를 쓴다. 몇 센트 차이가 LOC 체결 판정과 원장을 바꾼다. 그래서 확정 종가와 주문 기준 가격은 증권사 값을 써야 하고, Alpaca로 옮길 수 있는 것은 차트·지표용 일봉 캔들이다.
 
-### 4-2. 사용자 결정 (2026-11-12)
+### 4-3. 사용자 결정 갱신 (2026-11-12 밤) — 4-2를 대체한다
+
+- **기본 마켓 데이터(현재가, 전일 종가, 확정 종가, 일봉 캔들, Mock 시세)는 지금처럼 토스에 둔다.** Alpaca 약관(데이터 재배포 제한) 위험을 지금 지지 않기 위해서다. Alpaca는 지금 쓰는 범위(휴장일 캘린더, 벤치마크 지수)만 유지한다.
+- 환율만 Frankfurter(예비 fawazahmed0)로 옮긴다. 이 결정은 Alpaca와 무관하다(4-2절의 환율 내용은 그대로 유효).
+- 따라서 토스 관리자 키는 남는다. 2-2절의 시세 포트 분리(벤더 이름 제거, `MockBrokerAdapter`가 포트 주입)는 그대로 한다 — 공급자를 나중에 바꿀 수 있게 하는 구조 정리라서다.
+- 재검토 조건: 토스 관리자 키에 장애가 잦아지거나, Alpaca 유료 데이터 계약을 검토할 때.
+
+### 4-2. 사용자 결정 (2026-11-12, 4-3으로 대체됨 — 환율 부분만 유효)
 
 - **메리츠 관리자 키는 쓰지 않는다.** 앱키가 계좌에 묶여 공용 키로 쓸 수 없다. 위 표의 메리츠 열은 폐기한다.
 - **현재가·전일 종가는 Alpaca로 옮긴다. Alpaca로 안 되는 것은 지금처럼 토스에 둔다.**
@@ -240,12 +247,12 @@ KISTA는 LOC·MOC 주문, 마감 리포트, VR 롤오버, Mock 체결 판정에 
 
 2-5, 2-6. 3절의 "줄일 수 있는 것" 목록도 여기서 처리한다.
 
-### 단계 F. 시세 공급자 이전 (4-2절, Opus)
+### 단계 F. 환율 공급자 이전 (4-3절, Opus)
 
-1. 환율 → Frankfurter(예비 fawazahmed0). 주문·원장 경로에 환율이 없는지 먼저 확인. 토스 환율 코드(`UsdKrwRateCache`, `TossExchangeRate`, `TossHoldingsApi`의 환율 부분) 삭제. 독립 태스크라 가장 먼저 해도 된다.
-2. 일봉 캔들 → Alpaca. `adapter/out/marketdata`에 구현 추가(Alpaca 설정 3벌은 1벌로). DCA 지표를 두 공급자 캔들로 병행 계산해 차이를 로그로 남긴 뒤 전환, `TossCandleApi` 삭제. 무료 등급은 당일 통합 시세 조회가 막히므로(403 실측 주석) 당일 봉을 요청하지 않는다.
-3. 현재가·전일 종가 → Alpaca snapshot. 4-2절의 병행 비교 10거래일을 통과하면 전환, `TossPriceApi`의 해당 부분 삭제.
-4. 확정 종가: Alpaca 일봉 종가와 토스 확정 종가를 60거래일 표본으로 비교한다. 전부 일치하면 옮기고 토스 관리자 키 경로(`toss.admin-client-*`, 관리자 토큰, `TossAdminPriceSource`)를 지운다. 하나라도 어긋나면 토스에 둔다. 운영 secret에서 뺄 키는 `cross-repo.md`에 적는다.
+1. 주문·원장 계산에 환율이 들어가지 않는지 확인: `grep -rn "ExchangeRate\|exchangeRate" trading-core/src/main src/main`. 들어가는 곳이 있으면 그 경로는 옮기지 않고 보고한다.
+2. `adapter/out/marketdata`에 환율 구현 추가: Frankfurter `GET https://api.frankfurter.dev/v2/rate/USD/KRW` → 실패 시 fawazahmed0 → 둘 다 실패하면 마지막 캐시 값. 하루 캐시, 응답에 기준 날짜를 함께 싣는다. 출처 라벨은 공급자에서 받는다(`BenchmarkService.java:240`의 `"TOSS_INVEST"` 하드코딩 제거).
+3. 토스 환율 코드(`UsdKrwRateCache`, `TossExchangeRate`, `TossHoldingsApi`의 환율 부분) 삭제.
+4. 대시보드 원화 환산 표시가 "일 단위 참고 환율"이 된다는 점을 `cross-repo.md`에 적어 UI 문구에 반영되게 한다.
 
 ## 9. 하지 말 것
 
