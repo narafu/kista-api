@@ -1,6 +1,6 @@
 name: Server Deploy
 
-# 배포 = kista-infra에 목표 상태(config SHA + role별 이미지 SHA)를 dispatch하고 서버 적용 결과까지 대기.
+# 배포 = kista-infra에 목표 상태(config SHA + role별 이미지 SHA)를 dispatch하고 끝난다(결과는 이 커밋의 commit status deploy/production).
 # 판정은 .github/scripts(bats로 검증), 서버 적용·헬스 게이트·롤백은 kista-infra reconcile.yml + deploy/bin/reconcile.sh.
 # 설계: kista-infra/docs/superpowers/specs/2026-10-02-deploy-reconcile-design.md
 
