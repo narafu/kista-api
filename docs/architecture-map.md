@@ -142,7 +142,7 @@ flowchart LR
     end
 
     PUSH --> WF -->|build-push| GHCR
-    WF -->|"repository_dispatch deploy-#lt;app#gt;<br/>GitHub App kista-infra-dispatch"| REC
+    WF -->|"repository_dispatch deploy<br/>GitHub App kista-infra-dispatch"| REC
     REC -->|SSH| RSH
     GHCR -->|"compose pull (public)"| RSH
     RSH -->|성공| STATE

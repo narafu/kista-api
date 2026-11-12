@@ -49,7 +49,6 @@ jobs:
           owner: narafu
           repositories: kista-infra
           permission-contents: write   # state 조회 + repository_dispatch
-          permission-actions: read     # reconcile run 추적
       - name: state 기준 배포 계획
         id: plan
         shell: bash
@@ -73,7 +72,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: shellcheck
-        run: shellcheck .github/scripts/*.sh deploy/hooks/*.sh .github/tests/stub/gh
+        run: shellcheck .github/scripts/*.sh deploy/hooks/*.sh
       - name: bats
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq bats >/dev/null
@@ -170,8 +169,8 @@ jobs:
           cache-to: type=gha,mode=max
           tags: ${{ steps.image.outputs.image }}
 
-  # 서버 적용은 kista-infra Reconcile App이 한다(검증·신선도 병합·EPR hook·reconcile.sh·state 커밋). 여기선 요청 후 결과까지 대기 —
-  # 커밋의 초록불 = 서버 적용·헬스 게이트 통과. 대기 중 더 새 요청이 대체하면(취소) 생략으로 성공 처리
+  # 서버 적용은 kista-infra Reconcile App이 한다(검증·신선도 병합·EPR hook·reconcile.sh·state 커밋). 여기선 요청만 보낸다 —
+  # 서버 적용·헬스 게이트 결과는 이 커밋의 commit status deploy/production으로 본다(이 잡의 초록불은 요청 전송 완료)
   deploy:
     name: Deploy (kista-infra reconcile)
     needs: [plan, deploy-checks, verify, build]
@@ -181,14 +180,12 @@ jobs:
       && contains(fromJSON('["success","skipped"]'), needs.verify.result)
       && contains(fromJSON('["success","skipped"]'), needs.build.result)
     runs-on: ubuntu-24.04 # 명시 고정 — ubuntu-latest는 2026-10-19부터 Ubuntu 26
-    timeout-minutes: 75   # infra reconcile 대기열(앞선 run 최대 30분) + 자기 run 30분 + 여유
     environment:
       name: production
     env:
       CONFIG: ${{ needs.plan.outputs.config }}
       ROLES: ${{ needs.plan.outputs.roles }}
       FORCE: ${{ github.event.inputs.force || 'false' }}
-      REQUEST_ID: kista-api-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # kista-infra 전용 GitHub App의 1시간짜리 설치 토큰 — 장기 PAT 대신(유출돼도 곧 무효, 갱신 불필요)
@@ -201,32 +198,11 @@ jobs:
           owner: narafu
           repositories: kista-infra
           permission-contents: write   # state 조회 + repository_dispatch
-          permission-actions: read     # reconcile run 추적
+      # 보내고 끝난다 — 서버 적용 결과는 kista-infra reconcile.yml이 이 커밋의 status(deploy/production)로 되돌려 쓴다
       - name: dispatch
         env:
           GH_TOKEN: ${{ steps.infra-token.outputs.token }}
         run: |
-          gh api repos/narafu/kista-infra/dispatches -f event_type=deploy-kista-api             -f "client_payload[app]=kista-api" -f "client_payload[config]=$CONFIG" -f "client_payload[roles]=$ROLES"             -f "client_payload[request_id]=$REQUEST_ID" -f "client_payload[force]=$FORCE"
-      # 앱 토큰은 1시간이면 만료 — 50분 안에 안 끝나면 run_id를 넘기고 토큰을 재발급해 이어서 대기(job timeout 75분 설계 유지)
-      - name: 서버 적용 대기
-        id: wait
-        env:
-          GH_TOKEN: ${{ steps.infra-token.outputs.token }}
-          WATCH_TIMEOUT: 50m
-        run: bash .github/scripts/wait-reconcile.sh "$REQUEST_ID"
-      - name: kista-infra 앱 토큰 재발급
-        id: infra-token-2
-        if: steps.wait.outputs.run_id != ''
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          client-id: ${{ vars.INFRA_APP_CLIENT_ID }}
-          private-key: ${{ secrets.INFRA_APP_PRIVATE_KEY }}
-          owner: narafu
-          repositories: kista-infra
-          permission-actions: read     # reconcile run 추적
-      - name: 서버 적용 대기 (이어서)
-        if: steps.wait.outputs.run_id != ''
-        env:
-          GH_TOKEN: ${{ steps.infra-token-2.outputs.token }}
-          RUN_ID: ${{ steps.wait.outputs.run_id }}
-        run: bash .github/scripts/wait-reconcile.sh "$REQUEST_ID"
+          gh api repos/narafu/kista-infra/dispatches -f event_type=deploy \
+            -f "client_payload[app]=kista-api" -f "client_payload[config]=$CONFIG" -f "client_payload[roles]=$ROLES" \
+            -f "client_payload[sha]=$GITHUB_SHA" -f "client_payload[force]=$FORCE"

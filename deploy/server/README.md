@@ -54,7 +54,7 @@
 
 | Secret | 설명 |
 |--------|------|
-| `INFRA_APP_PRIVATE_KEY` (secret) + `INFRA_APP_CLIENT_ID` (Actions variable) | GitHub App `kista-infra-dispatch`(kista-infra에만 설치, Contents read/write·Actions read) — Actions 변수 `INFRA_APP_CLIENT_ID` + secret `INFRA_APP_PRIVATE_KEY`, 워크플로가 실행마다 `actions/create-github-app-token`으로 1시간짜리 설치 토큰 발급(장기 PAT 없음). 이 레포는 서버 SSH 키를 갖지 않는다 |
+| `INFRA_APP_PRIVATE_KEY` (secret) + `INFRA_APP_CLIENT_ID` (Actions variable) | GitHub App `kista-infra-dispatch`(kista-infra·kista-api·kista-ui에 설치, Contents read/write·Statuses write — statuses 쓰기는 kista-infra `reconcile.yml`이 한다) — Actions 변수 `INFRA_APP_CLIENT_ID` + secret `INFRA_APP_PRIVATE_KEY`, 워크플로가 실행마다 `actions/create-github-app-token`으로 1시간짜리 설치 토큰 발급(장기 PAT 없음). 이 레포는 서버 SSH 키를 갖지 않는다 |
 
 `.env`는 이 레포의 Actions가 아니라 `kista-infra` 레포의 배포 워크플로가 관리한다 — `kista-infra`에 GPG로 암호화 커밋된 `secrets/kista-api.env.gpg`를 복호화해 매 배포마다 `/opt/kista-api/.env`를 렌더링·덮어쓴다. 값을 바꾸려면 `kista-infra`의 `scripts/env.sh edit kista-api`로 수정 후 커밋·배포해야 하며, 서버에서 `.env`를 직접 수정해도 다음 kista-infra 배포 시 되돌아간다.
 
@@ -115,7 +115,7 @@ JAVA_OPTS=-Xmx1280m -Xms256m -XX:MaxMetaspaceSize=320m -XX:ReservedCodeCacheSize
 1. `plan` 잡 — 기준점은 kista-infra `state/kista-api.yml`(마지막 서버 적용 성공 상태). role별 `state SHA..이 커밋` diff를 `detect-deploy-scope.sh`로 분류해 바뀐 role만 이 커밋 SHA로, `deploy/server/**`·`deploy/hooks/**`가 바뀌면 `config`도 이 커밋으로(이미지 재빌드 없이 compose·Caddy만 재적용). state보다 옛 커밋(옛 run Re-run)이면 아무것도 하지 않는다. 수동 실행은 config·전 role을 이 커밋으로
 2. `deploy-checks` — 배포 판정 스크립트·hook shellcheck·bats(`compose-invariants.bats` 포함) + Flyway 마이그레이션 검사
 3. `verify`(전체 테스트 + `integration`, ArchUnit·`CaddyRoutingTest` 포함)와 이미지 빌드(role 변경 시만, 3 role 공용 단일 이미지, SHA 태그)가 병렬
-4. `deploy` — kista-infra에 `repository_dispatch(deploy-kista-api)`로 `{config, roles(전 role SHA), request_id}`를 보내고 그 `Reconcile App` run이 끝날 때까지 대기(`wait-reconcile.sh`). 커밋의 초록불 = 서버 적용·헬스 게이트 통과. 대기 중 더 새 요청이 자리를 대체하면 생략으로 성공 처리(payload가 전체 상태라 손실 없음)
+4. `deploy` — kista-infra에 `repository_dispatch(deploy)`로 `{app, config, roles(전 role SHA), sha(이 커밋), force}`를 보내고 끝난다(대기 없음). 서버 적용·헬스 게이트 결과는 kista-infra `reconcile.yml`이 이 커밋의 commit status `deploy/production`(pending → success/failure, `target_url`은 infra run)으로 되돌려 쓴다 — 워크플로 run의 초록불은 "요청 전송 완료"이고 배포 완료는 커밋 status로 본다
 5. kista-infra `Reconcile App` — SHA·이미지 검증 → state와 신선도 병합 → config SHA로 bundle 구성 → `deploy/hooks/pre-apply.sh`(EPR 고아 검사 — kista-trading·kista-scheduler 이미지가 바뀔 때, `docs/agents/docker-infra.md` "배포 직전 EPR 정리 런북") → 서버 `reconcile.sh`:
    - `deploy/server/roles` 순서(kista-trading → kista-api → kista-scheduler)로 `docker compose up -d --no-deps <role>` — compose config-hash가 같으면 재생성하지 않는다
    - 컨테이너가 바뀐 role만 헬스 게이트: Docker 헬스 healthy(compose healthcheck가 `/actuator/health/readiness` — readinessState·db·redis UP), 10초 간격 최대 5분. Caddy `health_uri`는 liveness

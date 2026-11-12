@@ -8,7 +8,7 @@
 
 | # | 변경 | api 영향 | ui 영향 | 상태 |
 |---|---|---|---|---|
-| A1 | 배포 대기 구조 제거: 앱 CI는 dispatch만 하고, infra `reconcile.yml`이 결과를 앱 커밋의 commit status로 되돌려 쓴다 | `wait-reconcile.sh`·bats·`stub/gh`·대기·토큰 재발급 step 삭제 | 같은 사본 삭제(두 레포 합 약 320줄) | GitHub App `kista-infra-dispatch`를 앱 레포에 설치하고 statuses:write 부여 필요 — **사용자 승인 필요** |
+| A1 | 배포 대기 구조 제거: 앱 CI는 dispatch만 하고, infra `reconcile.yml`이 결과를 앱 커밋의 commit status로 되돌려 쓴다 | `wait-reconcile.sh`·bats·`stub/gh`·대기·토큰 재발급 step 삭제 | 같은 사본 삭제(두 레포 합 약 320줄) | infra 완료(ab5dd7a, payload `sha`가 있으면 status 기록). api 완료(2026-11-13: `event_type=deploy` + `client_payload[sha]`, 대기 구조 삭제). ui는 남음. 그 뒤 infra가 옛 dispatch 타입 2개와 `run-name` request_id를 지운다 |
 | A2 | `required-env` 계약 파일 폐지, compose `${VAR:?}` 필수 보간으로 대체 | `detect-deploy-scope.sh:42`의 required-env 패턴 삭제 | `deploy/server/docker-compose.yml`에 `${API_BASE_URL:?}`·`${TRADING_API_BASE_URL:?}`, required-env와 contract.bats 단언 삭제 | 완료: 1단계 infra 번들 수용(5209cb8)·2단계 api(bd1e56f80)·ui, 3단계 infra `reconcile.sh` 검사 삭제(d541047, 배포 완료) |
 | A3 | `readiness` 계약 파일 폐지: compose healthcheck를 `/actuator/health/readiness`로 바꿔 Docker healthy = 준비 완료 | compose healthcheck 변경, `Dockerfile:46-47` HEALTHCHECK 삭제 | 없음 | **api 판단 대기**: readiness 그룹에 DB·Redis가 있어 일시 장애 때 unhealthy가 돼도 부작용이 없는지, Caddy `health_uri`는 liveness로 둘지 |
 | A4 | Caddy 라우팅 소유 대칭화: ui도 자기 스니펫을 소유, 공용 upstream 블록은 infra Caddyfile의 named snippet 1회 정의 | api 스니펫 3회 반복 블록을 import로, `CaddyRoutingTest`가 import 문을 견디는지 확인 | `deploy/server/caddy/kista-ui.caddy` 신설 | 후보 |
