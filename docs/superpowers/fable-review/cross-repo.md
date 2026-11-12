@@ -119,3 +119,29 @@ ui에만 있던 규칙(서버가 검증하지 않아 지금은 우회 가능한 
   4. fida의 `requireSubmittable()`은 kista `PrivacyTradeValidationService`와 일부 겹치지만 400 사전 차단이라 fida에 유지. 기준 규칙은 kista.
 - 같은 호스트로 옮긴 뒤 fida의 `KISTA_URL`을 내부 주소로 바꾸면 Caddy 경로 의존(2026-09-17 404 사고 원인)이 사라진다. fida 앱 컨테이너는 kista-worker에 닿아야 하고 playwright 컨테이너는 data_net에 넣지 않는다 — 네트워크 설계는 fable-infra.
 - 함께 승인: fida `POST /orders/from-image` 삭제, GH Actions 수동 재실행 삭제(kista 영향 없음).
+
+## E. 추가 검토(지침서 11~13)에서 나온 레포 간 항목 (2026-11-13, fable-api)
+
+kista-infra에 요청:
+
+- **엔드포인트별 호출 수 수집**(지침서 12 A1). 운영에 접근 로그와 메트릭 수집이 없어 조회 전용 기능(통계·백테스트·벤치마크·코인 지표)이 쓰이는지 알 수 없다. kista-api는 Actuator `http.server.requests`를 이미 만든다. 운영에서 그것을 모아 30일 보관하는 가장 가벼운 방법을 infra가 정한다(Prometheus 한 컨테이너, 또는 Caddy 접근 로그 집계). 30일치가 쌓이면 12의 D1·D2를 다시 본다.
+- 11의 D4가 승인되면 운영 정리 SQL 2건(죽은 `scheduler_locks` 7행, 옛 `public.flyway_schema_history`)의 실행 절차는 infra 런북을 따른다.
+- 11 T4·T7·T5의 contract 마이그레이션(컬럼·테이블 drop)은 `check-migrations.sh`의 expand/contract 검사를 통과해야 한다. trading 스키마에도 검사가 적용되는 시점(05 D3)을 맞춘다.
+
+kista-ui에 요청·확인:
+
+- `GET /api/admin/accounts/{a}/strategies/{s}/trade-dates`는 ui 호출이 0이다. 쓸 계획이 없으면 삭제한다(12 F2).
+- 12의 D1(주택 벤치마크 삭제)이 결정되면 `/stats/benchmark`의 주택 부분을 먼저 걷어낸다. api 코드 삭제는 그 뒤, 테이블 drop은 그 다음 배포다.
+- 12의 D0이 (나)(본인·가족용 확정)면 `/pending`·`/rejected`·`/admin/pending`·`/admin/settings` 일부·`/admin/{accounts,users,trades}`가 삭제 대상이 된다. 결정 전에는 이 화면들의 리팩토링을 미룬다.
+- 13 U8: "이미 그 상태" 충돌 응답이 400에서 409로 바뀐다(`StrategyService`의 일시정지·재개·삭제). ui가 이 경우 400에 기대는 분기가 있는지 확인한다. 같은 날 배포.
+- 13 U5: 사용자 알림 문구의 금액 표기가 `Currency.format` 한 가지로 통일된다(`$1234.50` → `1,234.50 USD` 계열). 푸시 알림 본문을 파싱하는 ui 코드가 있으면 알린다.
+- 13 U1: 승인 전(PENDING) 사용자의 토큰에는 `role` 클레임이 없어지고, 승인 대기 화면이 쓰는 경로 말고는 403이 된다. 승인 대기 화면이 부르는 api 경로 목록을 ui가 확정해 준다.
+
+fida에 확인:
+
+- 운영자가 PRIVACY 기준표를 90일 동안 11번 손으로 고쳤다(`audit_logs`의 `PRIVACY_BASE_UPDATE`). fida가 보낸 값이 틀렸던 것인지 kista의 수신 검증이 놓친 것인지 원인을 나눈다(12 B5).
+
+정정:
+
+- `findings/09`의 "`fallbackExecution` 리스너는 EPR 기록 없음"은 틀렸다. Spring Modulith 2.1.1은 `fallbackExecution` 리스너도 `event_publication`에 기록한다(`findings/18` C절, `PersistentApplicationEventMulticaster:116-145`). 05의 판단(스트림 경로를 먼저 끊는다, EPR 한 테이블)은 바뀌지 않는다.
+- 04 단계 A의 업비트 삭제 범위에서 `tradingcore/stats/adapter/out/upbit`(코인 시장 지표의 김치 프리미엄 시세)는 뺀다. 브로커 어댑터가 아니다(12의 3-4).

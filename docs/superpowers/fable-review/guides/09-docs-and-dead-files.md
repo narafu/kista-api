@@ -204,7 +204,7 @@ docs/superpowers/fable-review/    이 검토(실행이 끝나면 9절에 따라 
 | T6 | 항상 로드 문서 축소(4-3)와 리소스 디렉토리 `CLAUDE.md` 이전(2-5) | Opus | 5파일 합 26KB 이하. `./gradlew bootJar :trading-core:bootJar` 뒤 jar에 `CLAUDE.md`가 없다(`unzip -l … | grep -c CLAUDE.md` = 0) |
 | T7 | `check-doc-budget.sh`와 bats, CI 연결 | Sonnet | 예산을 일부러 넘겨 실패하는지 확인 |
 | T8 | memory 정리(2-3)와 로컬 잔재 삭제(4-5) — 사용자 승인 항목만 | Sonnet | `MEMORY.md` 줄 수, 삭제 목록 보고 |
-| T9 | 단계 2 마감 점검(5절 표, README 대조, 예산 재측정) | Opus | 5절 표의 행마다 반영 여부 |
+| T9 | 단계 2 마감 점검(5절 표, README 대조, 예산 재측정, IntelliJ 미사용 선언 검사 1회 — 13의 9절) | Opus | 5절 표의 행마다 반영 여부 |
 
 T1 → T2 순서는 지킨다(유지 목록을 옮기기 전에 backlog를 지우지 않는다). T3~T7은 독립이지만 같은 파일(`constraints.md`, `docker-infra.md`)을 건드리는 태스크는 한 세션에 묶는다: **T2+T3+T6**, **T4+T5**.
 
