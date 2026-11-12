@@ -1,15 +1,21 @@
 # kista-api Fable 검토 진행 원장
 
-## 새 세션 인계 (2026-11-12 밤, 첫 fable-api 세션 종료)
+## 새 세션 인계 (2026-11-13 새벽, 두 번째 fable-api 세션 종료)
 
 새 fable 세션은 이 순서로 읽는다: `CHARTER.md` → 이 파일 → `guides/00-roadmap.md`(실행 가능 묶음) → `cross-repo.md`.
 
-- 작성 완료 지침서: 00 로드맵, 01 헥사고날, 02 영속·DTO, 04 브로커(시세·환율 결정 반영), 05 통합·모듈(전면 개정), 08 매매 공식, 10 UI 계약. 원칙 문서 `ui-api-principles.md`.
-- **남은 지침서 작성: 03 전략 축, 06 배치 오케스트레이션, 07 테스트 전략, 09 문서 구조 개편·불필요 파일 삭제.** 측정은 끝나 있다(findings 01~04, 06). 06은 조기 마감 커밋(`TradingCloseScheduler` 239줄의 스케줄 판단)과 05의 calendar 모듈을 함께 본다. 09는 findings 06 + `cross-repo.md` A5·A6 + 이미 다른 세션이 처리한 것(00-roadmap 5절)을 빼고 쓴다.
+- **지침서 10개 전부 작성 완료**: 00 로드맵, 01 헥사고날, 02 영속·DTO, 03 전략 축, 04 브로커, 05 통합·모듈, 06 배치 오케스트레이션, 07 테스트 전략, 08 매매 공식, 09 문서·불필요 파일, 10 UI 계약. 원칙 문서 `ui-api-principles.md`.
+- 남은 Fable 작업: 없음(검토 단계 종료). 이후는 실행 세션(Opus/Sonnet)이 `guides/00-roadmap.md`의 묶음을 골라 진행한다.
+- **사용자 답을 기다리는 것**: ① 09 8절 승인 A~G(문서·파일 삭제 — S8의 시작 조건) ② 06 3절 D1~D3(개장 대상 확정 시각, 하트비트 하루 1회, 수동 실행 차단 구간. 실행을 막지는 않고 배포 전 확인).
+- 이번 세션에서 코드로 확인한 것(06): 거래일 경계 규칙이 호출처마다 다르다(세션 기반 `SessionTradeDates` vs 04:30 고정 `DstInfo.nextTradeDate` — 조기 마감일 02:30~04:30 구간에서 답이 갈린다). `TradingService.executeBatch(contexts)`(주문 시각 대기 경로)는 스케줄러 호출처가 없어 보인다. `DstInfo`에 DST 고정 시각표와 세션 기반 두 모델이 공존한다.
+- 09 작성 중 확인: `V1__init.sql` 2개의 주석이 `deploy/server/schema-reorg/`를 가리킨다 — 디렉토리를 지워도 이 주석은 고치면 안 된다(체크섬). `findings/06`의 "Java 소스 `CQ-` 인용 0건"은 틀렸다(테스트 `@DisplayName`·주석·`V17` 마이그레이션에 있다. 그대로 둔다).
 - 진행 중 서브에이전트: 없음.
-- 다른 세션 상태: fable-infra 검토 완료·실행 진행 중, fable-ui 지침서 9개 완료·실행 진행 중, fable-fida 검토 완료(별도 레포 유지 결정).
+- 다른 세션 상태(2026-11-12 기준): fable-infra 검토 완료·실행 진행 중, fable-ui 지침서 9개 완료·실행 진행 중, fable-fida 검토 완료(별도 레포 유지 결정).
+
+### 이전 인계 (2026-11-12 밤)
+
 - 2026-11-12 밤 결정: 시세·캔들·환율 전부 토스 유지(04 4-3절). 공급자 이전 작업 없음.
-- VR 기본값 차이 8건: KISTA 값이 맞다고 확정(2026-11-12). 기본값은 운영 판단으로 바뀔 수 있는 값이라 공식 SSOT의 "변경 금지" 대상에서 뺀다(08 T6에서 반영). 답을 기다리는 질문 없음.
+- VR 기본값 차이 8건: KISTA 값이 맞다고 확정(2026-11-12). 기본값은 운영 판단으로 바뀔 수 있는 값이라 공식 SSOT의 "변경 금지" 대상에서 뺀다(08 T6에서 반영).
 
 
 새 세션은 `CHARTER.md`를 먼저 읽는다.
@@ -83,13 +89,13 @@ findings 09가 "같은 trading 코드가 web·worker 두 프로세스에서 돌 
 |---|---|---|---|
 | 01 | 헥사고날 다이어트 | findings 02 B·C | **작성 완료** `guides/01-hexagonal-diet.md` |
 | 02 | 영속·DTO 삼중 구조 축소: 조회는 View 직행, Command 직접 바인딩, 애그리게이트당 Store. JPA 유지(JDBC 전환 기각) | findings 02 A·D, JPA 사용 집계 | **작성 완료** `guides/02-persistence-and-dto.md` |
-| 03 | 전략 축 재설계 | findings 03 A·E | 미착수 |
+| 03 | 전략 축 재설계: sealed `PlanInput`·`PlanState`, 종류별 핸들러 `StrategyKind`, 종류별 패키지, 백테스트 `runDays` 통합 | findings 03 A·E | **작성 완료(2026-11-13)** `guides/03-strategy-axis.md` |
 | 04 | 브로커 축: KIS·업비트 삭제, 토스 주문 유지, 스펙 결함 9건, 토큰 단순화, 시세 공급자 메리츠 이전(2단계) | findings 03 B·11·12 | **개정 완료(2026-11-12)** `guides/04-broker.md`. 사용자 결정 대기: 운영자 메리츠 앱키를 관리자 키로 쓸지, 시세 이전 2단계 권고 |
 | 05 | 코드베이스 통합과 모듈 재구성(엔진은 worker 단일 프로세스, 단계 P→M→X→R→G) | findings 09·10 | **전면 개정 완료(2026-11-12)** `guides/05-modules-and-processes.md`. 사용자 확인 대기: 통합 방식 개정(첫 권고 대비 worker 배포 중 매매 화면이 멈추는 점) |
-| 06 | 배치 오케스트레이션 | findings 03 C·D | 미착수 |
-| 07 | 테스트 전략 | findings 04 | 01~03 뒤 |
+| 06 | 배치 오케스트레이션: 단계 3개(자지 않는 배치), 판정표 순수 함수, 스케줄러 하나, 시각 모델 하나, DCA 실행기는 둘 유지 | findings 03 C·D, 스케줄러·`TradingService`·`DstInfo` 직접 확인 | **작성 완료(2026-11-13)** `guides/06-batch-orchestration.md`. 사용자 결정 D1~D3 대기(실행은 막지 않음) |
+| 07 | 테스트 전략: 종류 4개(규칙·흐름·저장·계약), 규칙을 아래로, fixture 단일화, 보안·오류 상태는 정책 테스트 한 곳 | findings 04 | **작성 완료(2026-11-13)** `guides/07-test-strategy.md`. T1만 지금 시작 가능 |
 | 08 | 매매 공식 대조 판정 | docs/reference/quantstack, findings 08, 커널 코드 직접 확인 | **작성 완료** `guides/08-formulas.md`. **사용자 결정 F1·F3·F4·F6·F7·F8 대기**. F1(별%를 금액 자릿수로 반올림)은 결함 판정 |
-| 09 | 문서 구조 개편과 불필요 파일 삭제 | findings 06(완료), cross-repo A5·A6·결정 2·6 | 미착수 |
+| 09 | 문서 구조 개편과 불필요 파일 삭제: 남기는 기준 2문, `decisions.md` 한 곳, 크기 예산 CI 가드, archive 5.6MB 삭제 | findings 06, cross-repo A5·A6·결정 2·6 | **작성 완료(2026-11-13)** `guides/09-docs-and-dead-files.md`. **사용자 승인 A~G 대기** |
 | 10 | UI 계약: 스펙 required·BigDecimal(T1·T2 최우선), 목록 규약(객체 봉투, 커서 1종), 메타 통합, 상태 플래그, 오류 문구, 가계부 집계 | cross-repo B, ui-api-principles.md, findings 07 | **작성 완료** `guides/10-ui-contract.md`. T8(가계부 집계)은 fable-ui 명세 대기 |
 
 재심은 주제별로 한다: findings 05에서 그 주제에 걸리는 결정만 꺼내 지침서에 재심 결과를 적는다.
