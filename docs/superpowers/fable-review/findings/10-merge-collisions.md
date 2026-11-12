@@ -111,3 +111,177 @@ simple name이 겹치는 것은 5종. 이 중 둘은 이미 `@Configuration("...
 | `SERVER_PORT` | 없음 | 없음 | `"8080"` | 삭제 |
 | `JAVA_OPTS` | `-Xmx1280m`(`mem_limit` 2048m) | `-Xmx896m`(1536m) | `-Xmx2048m`(2816m) | 새로 정해야 함. 3 role 합 6400m. web은 trading 조회가 들어오므로 1280m로는 부족할 수 있음, worker는 T 값(2048m) 기준 |
 | `stop_grace_period` | 35s | 200s | 200s | web 35s, worker 200s |
+
+## C. JPA·영속
+
+### C-1. 사실관계
+
+| 항목 | 값 | 근거 |
+|---|---|---|
+| 엔티티 수 | R 21, T 21, S 0(`BaseAuditEntity`·`BaseCreatedAtEntity`는 `@MappedSuperclass`) | `grep '^@Entity'` |
+| 엔티티·`*JpaRepository` simple name 중복 | **0** | 전수 비교 |
+| 같은 테이블을 가리키는 엔티티 양쪽 존재 | **없음.** `trading.user_notify_profile`은 T `UserNotifyProfileEntity`만 매핑. R의 `users`/`user_settings`는 R만 | `@Table(name,schema)` 전수 |
+| `@Table(schema=...)` 명시 | R 21/21, T 21/21 (`finance` 9, `public` 8, `trading` 17, `trading_ref` 3) | grep. `kista_ref` 테이블은 엔티티 없음(JdbcTemplate만) |
+| `event_publication` 엔티티 | 없음(Modulith JDBC 저장소가 직접 SQL) | |
+| EntityManagerFactory·TransactionManager | 각 앱 1개(Boot 자동구성). `@Transactional(transactionManager=...)`·`@EnableJpaRepositories`·`@EntityScan` 사용 0 | grep |
+| 스캔 범위 | `@SpringBootApplication` 패키지 하위가 전부 — R=`com.kista.api`, T=`com.kista.tradingcore`(`ApiApplication.java:10`, `TradingApplication.java:11`) | |
+| `ddl-auto: validate` | 양쪽 `application.yml:24`; 엔티티가 스키마를 전부 명시하므로 **한 컨텍스트에서 5개 스키마 42 엔티티 검증 가능** | |
+
+### C-2. 합병 시 부딪히는 지점
+
+| # | 문제 | 근거 | 조치 |
+|---|---|---|---|
+| C1 | **search_path 단일화.** 엔티티는 스키마를 명시하지만, 다음은 unqualified 이름을 search_path로 해석한다: 모든 `nativeQuery`(R finance 11곳, T trading 약 45곳), `JdbcTemplate`(R `HousingPriceIndexPersistenceAdapter:22`·`HousingBenchmarkPricePersistenceAdapter:20`은 `kista_ref`, T `TradingBatchRunPersistenceAdapter:22`는 `trading`), `SchedulerLockService`(`S/.../scheduling/SchedulerLockService.java:60-107`) | R `application.yml:19`, T `:19` | 풀 하나에 `SET search_path TO finance, kista_ref, trading, trading_ref, public`처럼 합집합. **이름이 겹치는 테이블이 있으면 이 방법이 깨진다 -> C2** |
+| C2 | **같은 이름 테이블이 두 스키마에 있다: `scheduler_locks`(public·trading), `event_publication`(public·trading)** | R `V1__init.sql:300`(`public.event_publication`)·`public.scheduler_locks`, T `V1__init.sql:77`(`trading.event_publication`)·`trading.scheduler_locks` | `scheduler_locks`는 `SchedulerLockService`가 unqualified로 쓰므로 search_path 순서가 곧 사용 테이블이다. 한 테이블로 정해야 한다. 판단 재료: 락은 짧은 수명(`lock_until`)이고 이름이 서로 다른 잡이지만, **trading 락은 재기동 시 `TradingBatchResumer`가 잔여 락을 인수하는 의미를 가진다**(`docker-infra.md:13`, `constraints.md` Git 규칙). 전환 시점에 `trading.scheduler_locks` 행을 새 테이블로 옮기거나 진행 중 배치가 없을 때 전환해야 한다. `event_publication`은 E절 |
+| C3 | 스캔 루트. 합병 앱 클래스를 `com.kista`에 두면 `com.kista.shared`까지 컴포넌트 스캔되어 `PlatformAutoConfiguration`의 의도("앱은 :shared를 스캔하지 않는다", `PlatformAutoConfiguration.java:25-28` 주석)가 깨진다 | | `@SpringBootApplication(scanBasePackages = {"com.kista.api","com.kista.tradingcore"})` + `@EntityScan`·`@EnableJpaRepositories`에 두 패키지 명시(JPA 스캔은 `scanBasePackages`와 무관하게 `AutoConfigurationPackages`=앱 클래스 패키지를 쓰기 때문). 앱 클래스를 `com.kista.api`에 두고 `com.kista.tradingcore`를 추가 스캔하는 안이 가장 작다. `@ConfigurationPropertiesScan`은 두 패키지 모두로 |
+| C4 | Hikari 풀. 지금 prod는 JVM당 max 5(`application-prod.yml:6`), 3 JVM = 15. 합병 후 2 JVM = 10이고 web이 매매 조회를 겸하므로 web 쪽 부족 가능 | | 값 재산정 필요. DB 쪽 `max_connections`(kista-infra) 확인 |
+| C5 | `@SQLRestriction`·soft delete는 엔티티 단위라 충돌 없음. `deleted_at` 수동 조건은 native 쿼리 규칙(constraints.md)이 그대로 | | 없음 |
+| C6 | `JpaAuditingConfig`(`@EnableJpaAuditing`)는 `:shared`에서 1회만 등록되므로 중복 없음. 단 테스트 베이스 `DataJpaTestBase.TestJpaAuditingConfig`가 별도로 `@EnableJpaAuditing` 선언 | `DataJpaTestBase.java` | 유지 |
+
+## D. Flyway
+
+### D-1. 현재 구성
+
+| 항목 | R | T |
+|---|---|---|
+| 디렉토리 | `src/main/resources/db/migration`(V1~V6, 6개) | `trading-core/src/main/resources/db/migration-trading`(V1~V20, 20개) |
+| 이력 테이블 | `flyway_schema_history_api`(`public`) | `flyway_schema_history_trading`(`trading`) |
+| `default-schema` | `public` | `trading` |
+| baseline | `baseline-on-migrate: false`(운영 첫 기동만 env로 true) | 동일 |
+| 구성 코드 | **없음** — `spring.flyway.*` 프로퍼티뿐, Flyway `@Bean` 0개 | 동일 |
+| 문서 | `docs/agents/flyway.md`, 마이그레이션 디렉토리마다 `CLAUDE.md` 존재 | |
+| 의존성 | `libs.spring.boot.starter.flyway`, `libs.flyway.postgresql`(`build.gradle.kts:45-46`) | `trading-core/build.gradle.kts:41-42` |
+
+CI 가드 `.github/scripts/check-migrations.sh`가 양 디렉토리의 기존 파일 변경 금지·root의 expand/contract를 검사한다(경로 하드코딩 여부는 K절에서 재확인).
+
+### D-2. 한 프로세스가 이력 2벌을 실행하게 하는 구성
+
+Boot 4.1.1 `FlywayAutoConfiguration`(`spring-boot-flyway-4.1.1-sources.jar`, `:125-128`)의 `FlywayConfiguration`은 `@ConditionalOnMissingBean(Flyway.class)`이고 `FlywayMigrationInitializer`도 이 안(`:338-342`)에 있다. 따라서 `Flyway` 빈을 하나라도 직접 정의하면 **자동구성이 통째로 꺼지므로** 두 벌 모두 직접 정의해야 한다. 필요한 것:
+
+1. `Flyway` 빈 2개(`rootFlyway`, `tradingFlyway`): `Flyway.configure().dataSource(ds).locations(...).table(...).defaultSchema(...).baselineOnMigrate(...).validateOnMigrate(true)`. 값은 기존 `spring.flyway.*`를 대체할 새 프로퍼티(예: `kista.flyway.api.*`, `kista.flyway.trading.*`)로 받는다(기존 `spring.flyway.baseline-on-migrate`를 쓰는 `SPRING_FLYWAY_BASELINE_ON_MIGRATE` env 계약이 바뀐다 -> RUNBOOK `deploy/server/schema-reorg/RUNBOOK.md` 갱신).
+2. 각 Flyway에 `@Bean(initMethod = "migrate")` 또는 `FlywayMigrationInitializer` 2개. 순서: root 먼저·trading 나중(두 이력은 서로 독립이라 순서는 무관하나 로그 일관성용).
+3. EMF·JdbcTemplate 등이 마이그레이션 뒤에 뜨는 보장은 Boot의 `DatabaseInitializerDetector`(`FlywayDatabaseInitializerDetector`, `AbstractBeansOfTypeDatabaseInitializerDetector` 상속, `META-INF/spring.factories`)가 `Flyway` **타입 빈 전부**를 감지해 의존을 걸므로 자동이다.
+4. `FlywaySchemaManagementProvider`(`:119`)는 `ObjectProvider<Flyway>`를 받으므로 2개여도 동작(Hibernate ddl 모드 판정용).
+5. **`spring.flyway.enabled=false`로는 못 끈다**: 직접 만든 빈은 이 플래그와 무관하다 — 필요하면 `@ConditionalOnProperty`를 직접 붙인다.
+6. 대안(권고하지 않음): `locations`를 두 디렉토리로 합치면 V1 버전이 충돌하고 이력 2개를 1개로 합치는 운영 마이그레이션이 필요하다.
+
+현재 구성 코드 위치: 없음(순수 프로퍼티). 새 `@Configuration`은 `com.kista.api` 최상위(`ClockConfig`와 같은 자리) 또는 `com.kista.shared.platform.persistence`에 둔다. 후자는 `:shared`에 `Flyway` 의존을 추가해야 하고 `shared/build.gradle.kts` 확인 필요.
+
+### D-3. 테스트 DB 영향
+
+- 현재: 테스트 DB는 `kistadb_test`(integration은 `kistadb_it`)로 양 서브프로젝트가 **같은 DB**를 쓰고, 각자 `application.yml`의 `spring.flyway.*`로 자기 이력을 만든다(`shared/src/testFixtures/resources/application-test.yml`에는 flyway 키가 없다). `@DataJpaTest`는 `FlywayAutoConfiguration`만 포함하므로 직접 만든 `Flyway` 빈은 **슬라이스에 로드되지 않는다** -> `DataJpaTestBase`(`shared/src/testFixtures/.../DataJpaTestBase.java`)에 Flyway 구성을 `@Import`해야 슬라이스 테스트가 새 DB에서 스키마를 만든다(이미 migrate된 DB에서만 돌면 우연히 통과해서 놓치기 쉽다).
+- `RootDataJpaTestBase`(`src/test/java/com/kista/api/web/RootDataJpaTestBase.java`)는 "엔티티 스캔이 root 범위로 좁혀진다"는 주석대로 존재 이유가 스캔 범위 분리뿐이다. 합병 후 스캔 범위가 하나가 되면 이 클래스는 빈 껍데기라 삭제하고 사용처(root persistence 테스트)를 `DataJpaTestBase`로 바꾼다(grep: 상속처 수 확인 필요). 슬라이스가 42 엔티티를 전부 검증하게 되고 테스트 시작 비용이 늘어난다.
+- search_path: 테스트 JVM의 Hikari 설정은 모듈 `application.yml`에서 오므로 합병 후 한 yml의 합집합 search_path가 테스트에도 적용된다. `scheduler_locks` 해석(C2)이 테스트에서도 같게 동작하는지 `SchedulerLockServiceTest`·`SchedulerLockServiceDbTest`(`docs/agents/testing.md`)로 확인.
+- 기존 테스트 DB에 이미 두 이력 테이블이 있으므로 합병 후에도 DB 재생성은 불필요하다(같은 이름의 이력 테이블을 그대로 사용).
+
+## E. Modulith · EPR
+
+### E-1. 모듈 전수 (package-info의 `@ApplicationModule`, 전부 `@Modulithic(additionalPackages="com.kista.shared")`)
+
+| 프로세스 | 모듈 ID (type) | 비고 |
+|---|---|---|
+| R | `admin`, `benchmark`, `finance`, `market`, `notify`, `user` (type 미지정 = CLOSED 기본), `web` (`Type.CLOSED` 명시) | `R/<id>/package-info.java` |
+| T | `account`, `broker`, `marketcalendar`, `matching`, `notify`, `privacy`, `stats`, `trading` (미지정), `web` (명시) | `T/<id>/package-info.java` |
+| S | `kernel`, `contract`, `platform` (전부 `Type.OPEN`) | `S/<id>/package-info.java` |
+
+- **ID 충돌 2건: `notify`, `web`.** 패키지가 다르므로(`com.kista.api.notify` 대 `com.kista.tradingcore.notify`) 코드 충돌은 없고 `id = "..."` 속성만 바꾸면 된다. 두 ID는 테스트 단언에 문자열로 들어 있다: `src/test/.../ModulithArchitectureTest.java`(R 모듈 10개 `containsExactlyInAnyOrder`), `trading-core/src/test/.../ModulithArchitectureTest.java`(T 12개). 합병 후 두 테스트는 1개로 합치고 ID 집합은 19개(7+9+3)가 된다. 그 외 ID 문자열 참조: 테스트 코드에서 `"notify"`/`"web"` 리터럴 0건(grep), 문서·`flows.yml`·CLAUDE.md의 "api.notify/tradingcore.notify" 표기는 합병 시 갱신. 지침서 05 4절 목표 구성(`notification`, `ops`로 통합)을 따르면 ID 개명 대신 모듈 통합이 되지만 단계 1에서는 개명만 한다(권고 `api-notify`→`notify`, `tc-notify`→`trading-notify` 형식은 실행자가 선택; 중요한 것은 유일성).
+- `spring.modulith.detection-strategy: explicitly-annotated`는 양쪽 동일(`application.yml:40`/`:40`). 합병하면 한 줄.
+- `@NamedInterface` 선언은 `package-info.java`에 합계 62줄(문자열 포함 라인 수). 합병 후에도 모듈 간 접근은 NamedInterface로만 허용되므로, R이 T 모듈을 부르는 새 코드(내부 HTTP 어댑터 -> 직접 호출)는 **T 모듈이 해당 타입을 NamedInterface로 노출해야 한다**. 노출되지 않은 것을 단계 2에서 부르면 `ApplicationModules.verify()` 실패. 지침서 05 4절 규칙 1(`api`·`events`만 공개)은 단계 3의 일이므로 단계 2에서는 기존 NamedInterface만 쓴다.
+- 허용 모듈 의존(지침서 05 1절, 2026-11-11 main import 집계): `web -> admin/benchmark/finance/market/notify/user`, `notify -> user/benchmark/finance/market`, `admin -> user/benchmark + shared.contract`, `finance -> user`; T: `trading -> matching/broker/account/marketcalendar/privacy`, `stats -> trading/broker/matching/account/privacy`, `notify -> trading/account/privacy`, `account -> broker`, `privacy -> matching`, `web -> broker/trading/account/privacy`. `allowedDependencies` 선언 0건. 합병으로 생기는 새 방향: `admin -> trading/account/broker/privacy/stats`(내부 HTTP 어댑터 대체), `benchmark -> stats`(투자 포인트), `market -> marketcalendar/broker`(캔들·휴장일), `notify(api) -> trading`(알림 위임). **순환 위험**: T `notify -> trading` 이미 있고 R `admin -> trading`이 새로 생기면, `trading`이 `admin`을 부르는 경로가 있는지(예: 감사 로그, 오류 보고) 확인해야 한다 — `trading`이 `AppErrorRaisedEvent`를 발행해 admin이 듣는 현재 구조는 이벤트라 순환이 아니지만, 직접 포트 호출로 바꾸면 순환이 생긴다.
+- `Documenter`: R `ModulithArchitectureTest`가 `writeModulesAsPlantUml()`/`writeIndividualModulesAsPlantUml()`을 호출(T는 안 함). 합병 후 19개 모듈 그림 1벌.
+- 모델에 의존하는 테스트 파일: `ModulithArchitectureTest`(R·T), `ArchitectureMapTest`, `ModuleGraphExporter`, `HexagonalArchitectureTest`(`ApiApplication` 참조), `AdminInternalApiIntegrationTest`(`ApiApplication` 참조), `TradingApplicationContextLoadTest`, `SchedulerLockServiceTest/DbTest`(`TradingApplication`을 `@ContextConfiguration`). 앱 클래스가 하나가 되면 이 참조들이 전부 바뀐다.
+
+### E-2. EPR 테이블 2개
+
+| 항목 | R (`public.event_publication`) | T (`trading.event_publication`) |
+|---|---|---|
+| 설정 | `spring.modulith.events.jdbc.schema: public`, `schema-initialization.enabled: false`(`application.yml:42-45`) | `schema: trading`, 동일 비활성(`:42-45`) |
+| 테이블 DDL | `R V1__init.sql:300` — id uuid, listener_id text, event_type text, serialized_event text, publication_date, completion_date, status text, completion_attempts int, last_resubmission_date | `T V1__init.sql:77` — **컬럼 동일** |
+| completion mode | 미설정 = 기본 UPDATE(완료 시 `completion_date` 채움, archive 테이블 없음 — `archive` 키 grep 0건) | 동일 |
+| republish | 기본 true -> prod false -> scheduler role만 env true | 키 없음 -> compose가 env로 true |
+| 추적 리스너 수(`@TransactionalEventListener`) | 16 | 21 |
+| 재발행 소유 | `kista-scheduler` | `kista-trading` |
+| 배포 전 고아 검사 | `deploy/hooks/pre-apply.sh`: role `kista-scheduler` -> `public`, `kista-trading` -> `trading`(`:11-14`), `epr-orphans.sh`가 `listener_id` 파싱 | |
+
+- **JDBC 저장소 설정은 앱당 1개다**(`spring.modulith.events.jdbc.schema`는 단일 값). 한 컨텍스트가 두 테이블에 쓰게 하려면 `EventPublicationRepository` 자체를 커스터마이즈해야 해서 비현실적이다. 합병은 **EPR 테이블을 하나로** 만든다는 뜻이다.
+- listener_id 형식: `com.kista.x.Listener.method(com.kista.y.SomeEvent)`(Spring `ApplicationListenerMethodAdapter` 기본 id, `docs/agents/docker-infra.md:134`, `deploy/hooks/epr-orphans.sh:6`). 합병은 패키지 루트(`com.kista.api`, `com.kista.tradingcore`)와 리스너·이벤트 클래스명을 **바꾸지 않으면** 양쪽 테이블의 기존 행이 새 앱에서 그대로 resolve된다. 모듈 ID 개명은 listener_id에 영향이 없다(FQCN 기반). 단 단계 3에서 `shared.kernel` 이벤트(`UserDeletedEvent` 등)나 패키지를 옮기면 모든 미완료 행이 고아가 된다(`flyway.md` "이벤트 클래스·리스너 패키지 이동").
+- **합병 전환 절차 재료**(결정은 Opus):
+  1. 대상 테이블 선택: `public`(root, 변경 없는 DDL) 권고. `spring.modulith.events.jdbc.schema: public`만 유지.
+  2. 전환 전: `SELECT count(*), min(publication_date) FROM trading.event_publication WHERE completion_date IS NULL` 및 `public`을 읽기 전용으로 조회해 미완료 행 수를 확인(운영 DB 직접 조회는 이 조사에서 하지 않았다).
+  3. 미완료 행이 0이면 `trading.event_publication`은 그대로 두고 contract 단계에서 drop. 남아 있으면 `INSERT INTO public.event_publication SELECT * FROM trading.event_publication WHERE completion_date IS NULL`(컬럼 동일하므로 가능, id uuid 충돌 가능성은 uuid 난수라 사실상 0) 후 새 앱을 기동하면 재발행이 이어진다. 이때 `republish-outstanding-events-on-restart=true`가 worker에서만 켜져 있어야 이중 claim이 없다.
+  4. 전환 중 두 옛 프로세스가 모두 죽은 상태에서 복사한다(`kista-trading` stop-first). 
+- 합병 후 규칙: 재발행 소유 = worker 1곳(`SPRING_MODULITH_EVENTS_REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART`). `pre-apply.sh`의 role->schema 매핑(`:11-14`)과 `epr-orphans.sh` 호출은 role이 `kista-web`/`kista-worker`로 바뀌므로 수정 대상(K절).
+
+### E-3. 같은 이벤트를 양쪽이 듣는 곳 = 합병 시 중복 실행
+
+R 리스너 19(`@TransactionalEventListener` 16 + `@EventListener` 3), T 리스너 23(21 + 2). 양쪽이 같은 이벤트 타입을 듣는 것은 3종:
+
+| 이벤트(타입 위치) | R 리스너 | T 리스너 | 합병 시 문제 |
+|---|---|---|---|
+| `AppErrorRaisedEvent` (`shared.kernel`) | `R/admin/adapter/in/event/AppErrorRaisedListener.on` (`@EventListener`) — `app_error_logs` 직접 저장 | `T/trading/adapter/out/redis/AppErrorStreamPublisher.onAppErrorRaised` (`@EventListener`) — Redis `app.error` 스트림 발행 -> R `AppErrorStreamConsumer`가 같은 저장 수행 | **한 컨텍스트에서 이벤트 1건이 오류 로그 2행을 만든다**(직접 + 스트림 왕복). `AppErrorStreamPublisher`·스트림 컨슈머를 함께 삭제해야 한다. 삭제 순서가 어긋나면 중복 |
+| `UserDeletedEvent` (`shared.kernel`) | `UserEventStreamPublisher.onUserDeleted`(스트림 발행) + finance cascade·FCM 정리·탈퇴 알림 3개 | `TradingUserCascadeListener.onUserDeleted` — 지금은 **스트림 컨슈머 -> `UserEventRepublisher`가 로컬 재발행**해야 실행 | 합병하면 R의 발행이 T 리스너를 **직접** 깨운다. 스트림 발행자·컨슈머·`UserEventRepublisher`·`UserEventStreamBridge`를 남겨 두면 T cascade가 2번 돈다(멱등이라 데이터는 안전하나 중복 알림·로그) |
+| `UserNotifyProfileChangedEvent` (`shared.kernel`) | `UserEventStreamPublisher.onProfileChanged` | `UserNotifyProfileSyncListener.onProfileChanged` — `user_notify_profile` 복제본 갱신 | 같은 사정. 복제본 제거 시(지침서 05 단계 2-2) 이 리스너와 발행자를 함께 삭제 |
+
+- 역으로 **한쪽만 듣던 이벤트가 합병 후 새로 양쪽에서 실행되는 경우**: `SchedulerLifecycleEvent`(`shared.platform.scheduling`)는 R `SchedulerNotifier.onSchedulerLifecycle`만 듣는다. `SchedulerJobRunner`(shared)가 이를 발행하는데 T에는 리스너가 없어 **현재 매매 잡의 라이프사이클 알림은 가지 않는다**. 합병하면 매매 잡 시작·실패 알림이 관리자 텔레그램으로 새로 나간다(동작 변경 — 의도인지 확인, 지침서 05 "동작 변경 금지" 원칙과 충돌하므로 알림 필터 또는 의도적 허용을 결정).
+- 또 하나: R `CompositeUserNotificationAdapter`(`@Primary`) 등이 `@TransactionalEventListener`로 듣는 사용자 알림 이벤트와 T `*Notifier`가 듣는 매매 이벤트(`TradingReportReadyEvent` 등)는 타입이 달라 중복 없음. T `TradingStatsService`의 `@EventListener` 2개(캐시 무효화)는 합병해도 같은 JVM에서만 유효 — web과 worker가 갈리면 web 캐시가 worker의 이벤트를 못 받는다(지침서 05 2-4절, 이 조사의 범위 밖이나 확인 필요).
+- 이중 재발행 스케줄러 `UserEventResubmitScheduler` 2벌: A5 참고. 단일 EPR가 되면 하나가 상대 이벤트를 포함해야 하나, 복제본 삭제 후에는 `AccountDeletedEvent`용 1개만 남을 가능성이 높다.
+
+## F. Security
+
+### F-1. 구성 (이미 대부분 공용)
+
+`SecurityConfig`·`JwtAuthFilter`·`InternalTokenAuthFilter`는 `:shared`에 **1벌**이다(`S/platform/security/`). 프로세스별 차이는 `SecurityRoutePolicy` 구현 2개뿐이다.
+
+| 순서 | 규칙(첫 매치 우선, `SecurityConfig.java:44-53`) | 출처 |
+|---|---|---|
+| 1 | `/error`, `/actuator/**`, `/swagger-ui/**`, `/api-docs/**`, `/swagger-ui.html` permitAll | 공용 |
+| 2 | `/api/internal/**` `hasRole("INTERNAL")` | 공용 |
+| 3 | `/api/admin/**` `hasRole("ADMIN")` | 공용 |
+| 4 | `policies.orderedStream()` 기여 규칙 | R `RootSecurityPolicy`, T `TradingSecurityPolicy` |
+| 5 | `anyRequest().authenticated()` | 공용 |
+
+| 정책 | 규칙 |
+|---|---|
+| `R/web/RootSecurityPolicy.java` | permitAll: `/telegram/webhook`, `POST /api/client-errors`, `GET /api/market/**`, `GET /api/meta`, `GET /api/runtime-config`, `/api/auth/**`(단 아래 예외 먼저). authenticated: `/api/auth/status-stream`, `/api/trades/stream`, `DELETE /api/auth/me`, `GET /api/auth/me`, `POST /api/auth/approval-requests`. 익명 폴백(무효 토큰 통과): client-errors·market·meta·runtime-config |
+| `T/web/TradingSecurityPolicy.java` | permitAll: `GET /api/crypto-market-indicators`. 익명 폴백 동일 경로 |
+
+- **경로 충돌 없음**: 두 정책의 경로 집합이 겹치지 않고, 서로 다른 정책이 같은 URL에 다른 인가를 주는 곳이 없다. 합병하면 `ObjectProvider<SecurityRoutePolicy>`가 2개를 모두 받는다(`@Order` 없음, 서로 독립이라 순서 무관). `JwtAuthFilter`도 `policies.orderedStream()`으로 두 정책의 폴백을 합친다(`JwtAuthFilter.java` `anonymousFallback`) — 변경 불필요.
+- T는 `/api/admin/**` 컨트롤러가 **0개**다(위 경로 추출). `/api/internal/**`는 R에 컨트롤러가 0개, T에만 있다.
+- CORS: 공용 `SecurityConfig.corsConfigurationSource()` 1벌(`:57-73`). 양쪽 값 차이는 B절의 `cors.allowed-origins` 기본값뿐.
+- `JwtAuthFilter`는 `TokenBlacklistPort` 단일 빈을 요구한다 — A4(T `RedisBlacklistAdapter` 삭제 필수).
+- `InternalTokenAuthFilter`는 `internal.api.token`이 빈값이면 모든 internal 요청을 401로 거부한다(`:36`). 단계 1(자기 호출 유지)에서는 token env 하나를 root가 호출·수신에 겸용하므로 동작은 같다. 단계 2에서 internal 컨트롤러가 전부 사라지면 이 필터와 `/api/internal/**` 규칙(2행)은 **`/api/internal/fida-orders`**(외부 FIDA가 호출, T `FidaOrderController`)가 남는 한 지울 수 없다 — **Caddy `@trading` 정규식에도 이 경로가 있다**(`kista-api.caddy` `@trading`). FIDA 호출자는 외부이므로 이 엔드포인트의 URL·토큰 헤더는 유지해야 한다.
+- 시큐리티 테스트: `SecurityConfigOrderingTest`(`src/test/.../web/`, 규칙 순서 잠금), `TradingSecurityPolicy` 대응 테스트 존재 여부는 `trading-core/src/test` 확인 필요.
+
+### F-2. `/api/internal/**` 엔드포인트 전수 (T 컨트롤러 31개 핸들러) ↔ 호출 어댑터
+
+(경로·메서드는 `routes.py` 추출 결과. 호출자는 `src/main`의 `.uri(` grep. 호출되지 않는 엔드포인트는 "호출자 없음".)
+
+| 엔드포인트 | T 컨트롤러 | R 호출자(어댑터 파일) | 합병 후 |
+|---|---|---|---|
+| `GET /api/internal/accounts` | `AccountInternalController` | `admin/.../AccountQueryHttpAdapter:22-23` | 직접 호출 |
+| `GET /api/internal/accounts/count` | 〃 | 〃 `:34` | 직접 호출 |
+| `GET /api/internal/broker/candles/latest` | `CandleInternalController` | `market/.../CandleQueryHttpAdapter:34` | 직접 호출 |
+| `GET /api/internal/broker/candles/range` | 〃 | 〃 `:48` | 직접 호출 |
+| `POST /api/internal/fida-orders` | `FidaOrderController` | `admin/.../PrivacyQueryHttpAdapter:46`(관리자 경유) **+ 외부 FIDA 직접 호출** | **URL 유지 필수**(외부 호출자) |
+| `GET /api/internal/marketcalendar/holidays` | `MarketCalendarInternalController` | `market/.../MarketCalendarQueryHttpAdapter:22` | 직접 호출 |
+| `GET /api/internal/marketcalendar/session` | 〃 | 〃 `:33` | 직접 호출 |
+| `GET /api/internal/marketcalendar/is-open` | 〃 | **호출자 없음**(grep 0건) | 삭제 후보 |
+| `GET /api/internal/privacy/trade-bases` | `PrivacyInternalQueryController` | `admin/.../PrivacyQueryHttpAdapter:37` | 직접 호출 |
+| `GET/PATCH /api/internal/privacy/trade-bases/{baseId}` | `PrivacyBaseInternalController` | 〃 `:63`, `:75` | 직접 호출 |
+| `POST /api/internal/privacy/trade-bases/{baseId}/orders` | 〃 | 〃 `:97` | 직접 호출 |
+| `DELETE/PATCH .../orders/{orderId}` | 〃 | 〃 `:86`, `:108` | 직접 호출 |
+| `GET /api/internal/trading/accounts/{accountId}/strategies` | `TradingInternalQueryController` | `admin/.../TradingQueryHttpAdapter:42` | 직접 호출 |
+| `GET .../strategies/{strategyId}/trade-dates` | 〃 | 〃 `:65` | 직접 호출 |
+| `GET /api/internal/trading/orders` | 〃 | 〃 `:28` | 직접 호출 |
+| `GET /api/internal/trading/orders/distinct-account-ids` | 〃 | 〃 `:35` | 직접 호출 |
+| `POST /api/internal/trading/strategies/by-account-ids` | 〃 | 〃 `:49` | 직접 호출 |
+| `POST /api/internal/trading/strategy-summaries` | 〃 | 〃 `:57` | 직접 호출 |
+| `PATCH .../strategies/{strategyId}/status` | `StrategyStatusInternalController` | `admin/.../TradingCommandHttpAdapter:41` | 직접 호출 |
+| `POST /api/internal/trading/trade-corrections` | `TradingInternalCommandController` | 〃 `:28`(`internalApiWriteRestClient`, 응답 타임아웃 20s) | 직접 호출. **20s 쓰기 타임아웃의 존재 이유(브로커 동기 호출 중 HTTP 타임아웃 -> 감사 로그 누락)는 프로세스 내 호출이 되면 사라지나, 감사 로그 기록이 트랜잭션 밖(`auditLogPort.log`)이라는 구조는 남는다** |
+| `GET/PUT /api/internal/trading/policy-settings` | `TradingPolicyInternalController` | `admin/.../TradingPolicyHttpAdapter:32`, `:53` | 직접 호출 |
+| `POST /api/internal/trading/scheduler/open`, `/close` | `TradingSchedulerInternalController`(`scheduler.enabled` 게이트) | `admin/.../TradingSchedulerCommandHttpAdapter:22`, `:30` | 직접 호출. **합병 후 web role에서 수동 트리거가 실행되면 배치가 web JVM에서 돈다**(role 게이트 설계 필요) |
+| `GET /api/internal/trading/stats/exchange-rate` | `TradingStatsInternalController` | `benchmark/.../CurrentExchangeRateHttpAdapter:26` | 직접 호출 |
+| `GET /api/internal/trading/stats/investment-points` | 〃 | `benchmark/.../InvestmentPointsHttpAdapter:29` | 직접 호출 |
+| `GET /api/internal/trading/stats/portfolio/current`, `/history` | `PortfolioQueryInternalController` | `admin/.../PortfolioQueryHttpAdapter:24`, `:32` | 직접 호출 |
+
+R 호출 어댑터 11개: admin 7(`AccountQuery`, `PortfolioQuery`, `PrivacyQuery`, `TradingCommand`, `TradingPolicy`, `TradingQuery`, `TradingSchedulerCommand`), benchmark 2(`CurrentExchangeRate`, `InvestmentPoints`), market 2(`CandleQuery`, `MarketCalendarQuery`). 단계 2 순서(지침서 05): market -> benchmark -> admin.

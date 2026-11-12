@@ -38,6 +38,17 @@
 - 2026-11-12 지침서 08: F1~F6 권고대로 진행. **F7 KISTA 유지(실력공식 — 근거: 사용자 글 https://velog.io/@narafu/VR , 원저작자 라오어 카페 글 인용)**, F8 KISTA 유지.
 - 2026-11-12 지침서 04: **토스 주문 유지**(대중적인 증권사라 연결을 남긴다. 메리츠를 우선하는 이유는 환율·매매 수수료). 메리츠·토스·바이낸스 API 문서를 다시 확인해 KISTA 필요 기능에 맞춰 리팩토링. 문서 원본: `/Users/phs/Downloads/meritz_openapi_spec_20261112.json`, `/Users/phs/Downloads/toss/`, https://developers.binance.com/en/docs/catalog
 
+- 2026-11-12 추가 요청: ① OCI 인스턴스 2개(1번 kista-ui·kista-api, 2번 fida) 통합 여부와 더 나은 구성 → fable-infra에 위임(`kista-infra/.../guides/03-instance-topology.md`) ② fida를 KISTA에 합칠지 → fable-fida 세션에 위임 ③ 토스 관리자 키로 받는 공용 시장 데이터를 메리츠로 대체 가능한지 → findings 11의 8절(서브에이전트 진행 중), 결과를 지침서 04에 반영.
+
+## 진행 중 서브에이전트 (2026-11-12 11:40, 죽으면 SendMessage로 재개)
+
+| id | 산출물 | 쓰임 |
+|---|---|---|
+| a23fdb7b3f6b2304a | findings/09-process-local-state.md | 지침서 05 개정 |
+| a1e300633c9e53756 | findings/10-merge-collisions.md | 지침서 05 개정 |
+| a69d63e7c1caf2218 | findings/11-broker-api-fit.md (메리츠·토스, 8절 시세 대체) | 지침서 04 개정 |
+| (완료) | findings/12-binance-api-fit.md, findings/13-vr-velog-diff.md | 04 개정, 08 반영 완료 |
+
 ## 지침서 주제
 
 | # | 주제 | 주 근거 | 상태 |

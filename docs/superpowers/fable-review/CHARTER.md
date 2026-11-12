@@ -49,4 +49,4 @@ kista-api·kista-ui·kista-infra 세 레포 공통 기준이다. 각 레포의 F
 
 ## 세션 간 연락
 
-세션 이름은 `fable-api`·`fable-ui`·`fable-infra`다. 각 세션이 자기 레포의 PROGRESS·findings·지침서를 관장하고, 공통 기준(이 헌장)과 `cross-repo.md`만 fable-api가 쥔다. 다른 레포에 영향 주는 발견은 해당 세션에 SendMessage로 알리고 `cross-repo.md`에도 적는다.
+세션 이름은 `fable-api`·`fable-ui`·`fable-infra`·`fable-fida`(2026-11-12 추가, 레포 `/Users/phs/workspace/fida`)다. 각 세션이 자기 레포의 PROGRESS·findings·지침서를 관장하고, 공통 기준(이 헌장)과 `cross-repo.md`만 fable-api가 쥔다. 다른 레포에 영향 주는 발견은 해당 세션에 SendMessage로 알리고 `cross-repo.md`에도 적는다.
