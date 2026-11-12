@@ -138,7 +138,7 @@ KISTA는 적립·거치에서 문헌보다 공격적이고 인출에서 보수�
 
 ### F8 참고: 소유자 글과 코드의 기본값 차이
 
-F8은 유지로 확정됐다. 다만 `findings/13-vr-velog-diff.md`에서 소유자 글의 값과 코드 기본값이 8건 다르게 나왔다. 의도된 차이인지 확인할 가치가 있어 기록한다(실행 대상 아님).
+F8은 유지로 확정됐다. `findings/13-vr-velog-diff.md`에서 소유자 글의 값과 코드 기본값이 8건 다르게 나왔고, **사용자가 코드(KISTA) 값이 맞다고 확인했다(2026-11-12).** 기본값은 운영 판단으로 언제든 바뀔 수 있는 값이라 공식 문서에서 "변경 금지"로 다루지 않는다. 아래 표는 기록용이다.
 
 | 항목 | velog 글 | 코드 기본값 |
 |---|---|---|
@@ -164,7 +164,7 @@ F8은 유지로 확정됐다. 다만 `findings/13-vr-velog-diff.md`에서 소유
 | T3 | F4: 보유 0일 때 주문 구성 변경. cap 경로(`buildCappedBuyOrders`)와 보정 주문 부착이 새 구성에서도 맞는지 확인 | Opus | 같은 명령 |
 | T4 | F6: 운영 DB 읽기 전용 조회로 `INFINITE_MOC_SELL` 발생 이력 확인 → 도달 경로 분석 → 교체 또는 삭제 | Opus | 조사 결과를 이 문서에 추기 |
 | T5 | F7·F8: 코드 변경 없음. `trading-formulas.md`의 VR 절에 "실력공식 사용, 근거 `docs/reference/laor/vr-velog.md`"를 적고 `VrPosition.nextValue` 주석에 같은 근거 경로를 단다 | Sonnet | 문서 검토 |
-| T6 | 문서: `trading-formulas.md`를 "문헌 규칙 / KISTA 변형과 이유 / KISTA 고유 요소" 3단으로 다시 쓴다. "변경 금지" 문구는 "변경 시 이 문서와 테스트를 함께 고친다"로 바꾼다. `findings/08` 6절의 문서·코드 불일치 8건을 반영한다. cap 1.05 재평가 서술과 memory `project_infinite_correction_followups`의 모순을 정리한다 | Sonnet | 문서 검토 |
+| T6 | 문서: `trading-formulas.md`를 "문헌 규칙 / KISTA 변형과 이유 / KISTA 고유 요소" 3단으로 다시 쓴다. "변경 금지" 문구는 "변경 시 이 문서와 테스트를 함께 고친다"로 바꾼다. VR 기본값 표(유형별 G·pool 한도·램프 주기)는 공식이 아니라 운영 기본값 절로 분리하고 "운영 판단으로 바뀔 수 있음"을 명시한다. `findings/08` 6절의 문서·코드 불일치 8건을 반영한다. cap 1.05 재평가 서술과 memory `project_infinite_correction_followups`의 모순을 정리한다 | Sonnet | 문서 검토 |
 | T7 | 배포 전 확인: 진행 중인 전략에 대해 변경 전후 다음 거래일 주문 미리보기를 나란히 뽑아 사용자에게 보여준다(운영 DB 읽기 전용 + 로컬 계산) | Opus | 사용자 확인 |
 
 배포 시점: 매매 시간대 밖. T1~T3은 한 번에 배포한다(같은 전략의 주문가가 여러 번 바뀌지 않게).
