@@ -240,7 +240,9 @@ market  benchmark  finance  notification  ops  platform  app(모듈 아님: 앱 
 ## 7. 단계 G — 마무리
 
 - Gradle: `:trading-core`·`:shared`를 루트 프로젝트로 합친다(모듈 경계는 Modulith와 ArchUnit이 지킨다). testFixtures·`workingDir` 특례 삭제.
-- UI 진입점: API 게이트웨이는 Caddy 하나다. kista-ui의 서버 측 호출도 Caddy 내부 주소 하나로 보내 UI가 role을 모르게 한다(`TRADING_API_BASE_URL` 삭제, UI 지침서 02 태스크 8). **kista-infra 확인 필요**: Caddy에 내부 전용 리스너를 두는 구성. 불가하면 UI는 `RoleRoutes`에서 생성한 경로 목록으로 2-호스트 매핑을 유지한다(수기 목록 금지).
+- UI 진입점: API 게이트웨이는 Caddy 하나다. kista-ui의 서버 측 호출도 Caddy 내부 주소 하나로 보내 UI가 role을 모르게 한다. **fable-infra가 로컬에서 실증했다(2026-11-12, 운영과 같은 `caddy:2.9-alpine`)**: api 스니펫(`deploy/server/caddy/kista-api.caddy`)의 사이트 주소에 하나를 더 적는다 — `{$API_DOMAIN}, http://:8080 { … }`. 한 사이트 블록이라 `@trading`·`@scheduler` matcher가 그대로 재사용된다. 8080은 infra compose의 공개 포트가 아니라 `shared_net` 안에서만 닿는다. UI는 `API_BASE_URL=http://caddy:8080` 하나를 쓰고 `TRADING_API_BASE_URL`을 지운다(UI 지침서 02 태스크 8). 스니펫만 바뀌는 배포는 caddy reload뿐이다. **이 변경은 단계 M 직후에 해도 된다**(단계 G까지 기다릴 필요 없다).
+  - 확인할 것 (a) 내부 리스너 요청은 `X-Forwarded-Proto: http`, `Host: caddy:8080`으로 온다. 이 값으로 쿠키 Secure·리다이렉트 주소·CORS를 판단하는 코드가 api·ui에 있는지 grep한다(`app.cookie.secure`는 프로퍼티 고정이라 영향이 없어야 한다) (b) `CaddyRoutingTest`가 주소 2개짜리 사이트 줄을 파싱하는지 (c) FIDA의 `/api/internal/fida-orders`는 공인 도메인 경로 그대로다.
+  - 상세: kista-infra 지침서 03 5-4절.
 - 문서 전면 갱신(지침서 09): `architecture.md`, `constraints.md`, `docker-infra.md`, `commands.md`, `local-dev.md`, `flyway.md`, `flows.yml`.
 
 ## 8. 선택 단계 (지금은 하지 않는다)
