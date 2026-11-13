@@ -31,6 +31,8 @@ kista-infra 검토는 지침서 기준으로 끝났다(실행은 별도 세션).
 
 ## B. api ↔ ui 계약
 
+**T1·T2 완료, ui 01 시작 가능** (2026-11-13, api `1915ba682`). 생성 스펙 변화: `@NullMarked` 범위 record는 non-null 컴포넌트가 required, null 가능 컴포넌트는 optional + nullable(스칼라 `type:[x,"null"]`, enum은 `enum`에 null 포함, 객체 `$ref`는 `oneOf[$ref,{type:null}]`). BigDecimal은 전역 plain number(`1E+2` → `100`). 스키마명 `OrderLine`(관리자 PRIVACY 기준표 주문 행) → `AdminPrivacyBaseOrderLine`. 요청 스키마는 `@NotNull` 없는 primitive 11개(`MonthlyClosingRequest.completed`, `NotificationPrefRequest.enabled`, 가계부 금액 등)가 required로 바뀐다. `BenchmarkComparisonResponse.currentExchangeRate`는 키가 항상 오지만 스펙상 optional+nullable(규칙 일관성).
+
 책임 분담 기준은 `ui-api-principles.md`(사용자 지시로 작성). api 쪽 실행은 지침서 10.
 
 - 측정에서 확인: kista-ui는 전략·계좌·통계를 root를 거치지 않고 trading-core로 직접 프록시한다(`kista-ui/app/api/trading-cycles/[[...path]]/route.ts:3-5`). 프로세스 통합·분리 재검토(주제 05) 결론에 따라 ui 프록시 라우트 구조가 바뀐다.
@@ -58,7 +60,7 @@ ui 지침서: `kista-ui/docs/superpowers/fable-review/guides/`. api 태스크 �
 
 | api 선행 | ui 후행 | 배포 |
 |---|---|---|
-| T1 required 표기, T2 BigDecimal plain number | ui 01 타입 SSOT(생성 타입 직접 사용) | api 먼저, ui는 타입 재생성 후 |
+| T1 required 표기, T2 BigDecimal plain number — **T1·T2 완료(2026-11-13, api `1915ba682`), ui 01 시작 가능** | ui 01 타입 SSOT(생성 타입 직접 사용) | api 먼저, ui는 타입 재생성 후 |
 | (없음) | ui 02 데이터 층(openapi-fetch, `resolveUpstream` 한 함수) ← ui 01 | ui 단독 |
 | T11 단건 조회 | ui 02의 "목록을 받아 find" 쿼리 삭제 | api 먼저 |
 | T5 메타 통합 | ui 05 메타 소비·runtime-config 통합 | api 먼저(추가만이라 안전) |
