@@ -127,7 +127,7 @@ api 답(2026-11-13, fable-api — 코드 확인 기준, 실행 전):
 | U4 | **서버 산출은 불가.** 기준표는 KISTA가 계산하는 값이 아니라 FIDA가 외부 매매표를 수집해 `POST /api/internal/fida-orders`로 넣는 원천 데이터다. KISTA에 산출 공식이 없다 | 관리자가 손으로 넣는 것이 주 경로가 아니다. 수동 등록·수정(`AdminPrivacyTradeController.java:52-102`, 5개)은 FIDA 수신 실패 대응용이고 90일 수정 11건이다(지침서 12 B5). 화면을 줄일 근거는 B5(수동 수정 원인 제거) 결과다. 그 전에는 조회 + 건별 수정이 남아야 한다 | 지침서 12 B5 조사 뒤 재판정. ui는 그때까지 화면 축소를 정하지 않는다 |
 | U5 | ① `/api/accounts/{accountId}/daily-trades`: 삭제 확정. `findings/16` 135행의 ui 호출부 표기는 틀렸다 — `entities/trade/api/index.ts:74`는 유저 범위 `/api/daily-trades`를 부른다(fable-ui 회신 + api가 ui 레포 grep으로 확인, 2026-11-13. 계좌별 경로는 생성 타입 `api-types.ts`에만 있다) ② `trade-dates`: 삭제 확정(이 요청을 "쓸 계획 없음" 확인으로 본다). root 컨트롤러·`TradingQueryHttpAdapter.java:65`·내부 API를 함께 지운다 ③ `manual-fills`: 화면을 만들지 않는다. 12 D3이 "유지하되 동결, 삭제 방향"이다 ④ `scheduler/{open,close}`: 서버는 유지(운영 수단, 12 3절). 화면은 api 쪽 필요가 없다 — ui D6 사용자 결정에 따른다 | ①·② 조건 해소 | 지침서 12 F2(반영함) |
 | U6 | **지금은 받지 않는다.** 전 목록이 `from`/`to`(`LocalDate`)이고 PRIVACY의 `range`는 정수(`Integer`)라 `3M` 같은 이름이 아니다. **받도록 바꾼다**: `range` 프리셋 코드(메타가 코드·라벨 제공)를 받고 서버가 KST 오늘 기준으로 범위를 계산한다. `from`/`to`와 함께 오면 400 | "날짜 계산은 서버"(`ui-api-principles.md`)와 KST 단일 기준에 맞는다. 차트 시계열의 받은 범위 안 토글은 그대로 ui 소유. PRIVACY의 정수 `range`는 같은 규약으로 바꾼다 | 지침서 10의 2-2절·T4(반영함), 메타는 T5 |
-| U7 | **서버는 지우지 않는다(보류).** 필드 위치는 `UserResponse.rejectReason`(`UserResponse.java:34`, REJECTED일 때만 값)이다. fable-ui 정정(2026-11-13): "폐기(2026-11-12)"는 ui에 남아 있던 미구현 spec 문서를 지운 결정이었고 서버 구현을 지우라는 결정이 아니다 | 서버에는 이미 구현돼 있다: `AdminStatusRequest.reason`, `UserService.reject`, `User.rejectReason`, 텔레그램 반려 알림의 사유 줄, `users.reject_reason`. ui D7(양쪽 삭제 / ui를 마저 만듦, ui 권고는 후자 — 서버 변경 없음)로 사용자에게 다시 묻는 중 | D7 답 전에는 태스크를 만들지 않는다 |
+| U7 | **양쪽에서 삭제(사용자 결정 2026-11-13, ui D7 — fable-ui 전달).** 필드 위치는 `UserResponse.rejectReason`(`UserResponse.java:34`). 앞서 "폐기(2026-11-12)"로 올라온 것은 ui의 미구현 spec 문서 삭제였고, 서버 삭제는 이 D7 결정이 근거다 | 지울 것: `UserResponse.rejectReason`, `AdminStatusRequest.reason`, `UserUseCase.reject`의 reason 인자, `User.rejectReason`, `NotificationRecipient.rejectReason`, 텔레그램 반려 알림의 사유 줄(`TelegramUserNotificationAdapter.java:46-47`), `users.reject_reason` 컬럼(expand/contract — 코드 삭제 배포 뒤 다음 배포에서 드롭), `constraints.md` "상태 종속 민감 필드 마스킹" 절과 `modules/api/user.md`의 해당 서술. ui는 그 필드를 읽지 않아 순서 제약이 없다 | 지침서 13 U1 묶음(반영함) |
 
 ui 결정에서 온 요청(fable-ui 전달 2026-11-13: 사용자가 ui 지침서 10의 결정 목록을 "모두 권장대로" 승인). 태스크 분해는 아직 하지 않았다 — 각 지침서의 해당 태스크를 실행할 때 넣는다:
 
@@ -140,8 +140,16 @@ ui 결정에서 온 요청(fable-ui 전달 2026-11-13: 사용자가 ui 지침서
 | D13 내보내기 | 가계부 거래·자산 기록의 `text/csv` 응답(목록과 같은 필터 파라미터) | 지침서 10 T4 가계부 묶음 뒤 |
 | D14 삭제 실행 취소 | 가계부 5종의 복구 엔드포인트(`POST …/{id}/restore`). 집계(T8)가 복구를 반영해야 한다 | 지침서 10 T8과 함께 |
 | E3·E4 (= U2·U1) | 위 "api 답" 표와 같다 | 지침서 13 U1 |
+| D6 스케줄러 수동 실행 화면(추가로 결정, 2026-11-13 2차) | 아래 "D6 확인 답"의 빈칸 둘: 감사 로그, 실행 여부를 알려 주는 응답 | 지침서 06(판정표가 생긴 뒤 — `runNow(step)`의 Decision을 응답으로 돌려준다) |
 
-아직 열림(태스크를 만들지 않는다): D6 스케줄러 수동 실행 화면(삭제로 정해지면 서버 삭제), D7 반려 사유(U7), D15 CSV 가져오기("미리보기 → 확정" 엔드포인트). D16 반복 거래는 만들지 않는다.
+D6 확인 답(fable-api, 2026-11-13 — 코드와 `docs/agents/workflow-batch.md` 기준, 실행해 보지는 않았다):
+
+- **감사 로그: 남기지 않는다.** `AdminTradingSchedulerController`는 포트만 부른다. 화면을 만들면 추가해야 한다.
+- **응답: 본문이 없다.** 항상 202이고 실행은 백그라운드 가상 스레드다(`TradingSchedulerInternalController.triggerAsync`). 결과 요약은 응답이 아니라 관리자 텔레그램으로 간다. 마감은 접수 창(실제 마감 90분 전~10분 전) 밖이면 실행하지 않고 관리자 알림만 보내는데 이때도 202다. 실행 중 예외도 로그에만 남는다. **ui가 "응답을 그대로 보인다"로는 보일 것이 없다.**
+- **중복 주문: 주문 슬롯 단위로 막는다.** 같은 job이 돌고 있으면 스케줄러 락(`schedulerLockService.tryRun`)이 건너뛰고, 이미 돈 날 다시 누르면 계획은 다시 계산하되 이미 있는 슬롯은 `TradingOrderSlots.excludeExisting`이 걸러 다시 저장·접수하지 않는다. 개장 수동 실행은 시각 창 판정이 없다(개장 대기 없이 즉시 접수). 결과가 불명(SUBMITTING)으로 남은 주문은 다시 만들지 않는다.
+- 그래서 화면에 필요한 api 변경: ① 동기 판정 결과를 응답으로(`{accepted, reasonCode}` — 창 밖·이미 실행 중·휴장), 실행 결과는 지금처럼 텔레그램 ② 감사 로그. 지침서 06의 판정표(Decision)가 이 응답의 원천이라 06 실행 뒤에 한다. 그 전에 화면을 만들면 "요청을 보냈다"까지만 보일 수 있다.
+
+닫힘: D15 CSV 가져오기·D16 반복 거래는 만들지 않는다(사용자 결정). `manual-fills`는 화면 없음. 아직 열림: D10(위 표).
 
 infra 요청(fable-infra에 전달함): Caddy access log 켜기(ui D17 — 화면 사용 흔적을 볼 수단이 없다), 보안 헤더(HSTS·`X-Content-Type-Options`·frame 제한·`Referrer-Policy`)가 Caddy와 Next 설정 어디에도 없어 보인다(ui 11의 10-3, 운영 응답은 확인하지 않음).
 
