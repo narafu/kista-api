@@ -261,7 +261,8 @@ class MeritzOrderApiTest {
     @Test
     void cancel_falls_back_to_history_then_unknown() {
         String historyRow = "{\"oder_date\":\"20261020\",\"oder_no\":1295619,\"aspr_type_code\":\"7\","
-                + "\"oder_dqty\":\"36.0000000000\",\"cntg_dqty\":\"6.0000000000\",\"ncnt_odqt\":30}";
+                + "\"oder_dqty\":\"36.0000000000\",\"cntg_dqty\":\"6.0000000000\",\"ncnt_odqt\":30,"
+                + "\"ovrs_stck_oder_stat_cls_code\":\"0\",\"oder_rctf_cncl_cls_code\":\"0\",\"orgl_oder_no\":0}";
         expectToday(todayRow(2700414, "8", 0, 40, 0));
         server.expect(requestTo(startsWith(ORDERS + "history"))).andExpect(method(HttpMethod.GET))
                 .andExpect(queryParam("cntg_cls_code", "0"))
@@ -282,9 +283,64 @@ class MeritzOrderApiTest {
         expectToday("");
         server.expect(requestTo(startsWith(ORDERS + "history"))).andRespond(ok("{\"rsp_cd\":\"5820\",\"data\":[]}"));
         assertThatThrownBy(() -> api.cancel(new CancelInstruction(StrategyTicker.SOXL, "9999999"), ACCOUNT))
-                .isInstanceOfSatisfying(MeritzApiException.class, e -> {
-                    assertThat(e.isRejected()).isFalse();
-                });
+                .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(e.isRejected()).isFalse());
+        server.verify();
+    }
+
+    // 스펙 응답 예시 원행(obtro_oder_201r) — 미체결 1주인데 ncnt_odqt=0. 스펙: 잔량은 oder_dqty − cntg_dqty로 계산
+    private static String historyRow(long orderNo, String stat, String kind, long origNo) {
+        return "{\"oder_date\":\"20260824\",\"oder_no\":" + orderNo + ",\"orgl_oder_no\":" + origNo
+                + ",\"iscd\":\"NVDA.OQ\",\"seln_byov_clcd\":\"2\",\"oder_dqty\":\"1.0000000000\","
+                + "\"ovrs_stck_oder_prc\":\"216.46000000\",\"cntg_dqty\":\"0.0000000000\",\"ncnt_odqt\":0,"
+                + "\"ovrs_stck_oder_stat_cls_code\":\"" + stat + "\",\"oder_rctf_cncl_cls_code\":\"" + kind + "\","
+                + "\"aspr_type_code\":\"2\",\"oder_cond_cls_code\":\"8\"}";
+    }
+
+    private void expectHistory(String rows) {
+        expectToday("");
+        server.expect(requestTo(startsWith(ORDERS + "history")))
+                .andRespond(ok("{\"rsp_cd\":\"5766\",\"data\":[" + rows + "],\"tr_cont\":\"0\"}"));
+    }
+
+    @Test
+    void cancel_history_fallback_computes_remaining_instead_of_trusting_ncnt_odqt() {
+        expectHistory(historyRow(7, "0", "0", 0));
+        server.expect(requestTo(ORDERS + "cancel"))
+                .andExpect(jsonPath("$.orgl_oder_no").value("7"))
+                .andExpect(jsonPath("$.oder_cls_code").value("01"))
+                .andExpect(jsonPath("$.odqt").value("1"))
+                .andRespond(ok(orderResponse("0", 9)));
+
+        assertThat(api.cancel(new CancelInstruction(StrategyTicker.SOXL, "7"), ACCOUNT)).isEqualTo(CancelOutcome.CANCELLED);
+        server.verify();
+    }
+
+    @Test
+    void cancel_history_fallback_treats_cancel_row_or_closed_status_as_terminal() {
+        // 취소는 별도 행(oder_rctf_cncl_cls_code=2, orgl_oder_no=원주문) — 원주문 행은 잔량이 남은 모양 그대로
+        expectHistory(historyRow(7, "0", "0", 0) + "," + historyRow(9, "0", "2", 7));
+        assertThat(api.cancel(new CancelInstruction(StrategyTicker.SOXL, "7"), ACCOUNT)).isEqualTo(CancelOutcome.ALREADY_CANCELED);
+        server.verify(); // cancel POST 없음
+
+        server.reset();
+        expectHistory(historyRow(7, "3", "0", 0)); // 자동취소
+        assertThat(api.cancel(new CancelInstruction(StrategyTicker.SOXL, "7"), ACCOUNT)).isEqualTo(CancelOutcome.ALREADY_CANCELED);
+        server.verify();
+
+        server.reset();
+        expectHistory(historyRow(7, "0", "0", 0) + "," + historyRow(9, "1", "2", 7)); // 거부된 취소 행 — 원주문은 살아 있다
+        server.expect(requestTo(ORDERS + "cancel")).andExpect(jsonPath("$.odqt").value("1"))
+                .andRespond(ok(orderResponse("0", 10)));
+        assertThat(api.cancel(new CancelInstruction(StrategyTicker.SOXL, "7"), ACCOUNT)).isEqualTo(CancelOutcome.CANCELLED);
+        server.verify();
+    }
+
+    @Test
+    void cancel_history_partial_fill_then_cancel_row_is_already_canceled() {
+        String partial = historyRow(7, "0", "0", 0).replace("\"oder_dqty\":\"1.0000000000\"", "\"oder_dqty\":\"5.0000000000\"")
+                .replace("\"cntg_dqty\":\"0.0000000000\"", "\"cntg_dqty\":\"2.0000000000\"");
+        expectHistory(partial + "," + historyRow(9, "0", "2", 7));
+        assertThat(api.cancel(new CancelInstruction(StrategyTicker.SOXL, "7"), ACCOUNT)).isEqualTo(CancelOutcome.ALREADY_CANCELED);
         server.verify();
     }
 }

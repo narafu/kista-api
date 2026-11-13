@@ -60,7 +60,7 @@ adapter/out/meritz/ ← MeritzHttpClient(본문 `rsp_cd` 기반 응답 판정 �
 ### 취소
 `CancelInstruction`에는 ticker·외부 주문번호뿐이라 어댑터가 **당일 주문체결내역에서 `oder_no`로 원주문을 조회**해 `oder_date`·`oder_cls_code`·`odqt`를 채운다. `odqt`=`oder_able_qty`(잔량), `oder_cls_code`는 목록의 `aspr_type_code` 역매핑(`1시장가→05, 2지정가→01, 4LOO→31, 5LOC→32, 6MOO→33, 7MOC→34, 8→35, 9→36, A→37, B→38`).
 - `oder_able_qty=0`(이미 종결): 체결수량이 주문수량과 같으면 `CancelOutcome.ALREADY_FILLED`, 아니면 `ALREADY_CANCELED`를 반환하고 취소 API는 부르지 않는다.
-- 당일 목록에 없음: 최근 7일 기간 목록으로 한 번 더 찾고, 그래도 없으면 결과 불명(`rejected=false`) — 접수 직후 목록 지연 가능성이 있어 "이미 취소"로 단정하지 않는다.
+- 당일 목록에 없음: 최근 7일 기간 목록으로 한 번 더 찾는다. 기간 목록의 `ncnt_odqt`는 스펙상 실제 미체결과 다를 수 있어(스펙 예시: 미체결 1주인데 0) 읽지 않고 잔량을 `oder_dqty − cntg_dqty`로 계산한다. 원주문 행은 취소·만료 뒤에도 그 모양 그대로라 상태 코드(`ovrs_stck_oder_stat_cls_code`≠0) 또는 이 주문을 `orgl_oder_no`로 가리키는 취소 행(`oder_rctf_cncl_cls_code=2`)이 있으면 종결로 본다. 상태 0·취소 행 없음인 만료 주문은 스펙으로 구분할 수 없어 취소 API를 부른다(오류는 호출처가 알림 후 진행). 그래도 없으면 결과 불명(`rejected=false`) — 접수 직후 목록 지연 가능성이 있어 "이미 취소"로 단정하지 않는다.
 - LOC 등 조건부 주문은 장 마감 시 거래소가 만료시킨다(실측 `ovrs_stck_rfus_reas="Trading Sequence Completed"`). 그러나 **지정가는 애프터장까지 살아 있다** — 실측 2026-10-29 거래일 SOXL 매수 지정가 43주 @100.62(주문번호 1878526)가 04:30:02 KST 접수 → 06:10:21 KST 애프터장 체결. 그래서 마감 리포트(`TradingReporter.cancelUnresolvedOrders`, 전 증권사 공통)가 체결 조회 직전에 잔여 PLACED를 명시 취소한다. 이미 종결된 주문은 위 `oder_able_qty=0` 판정으로 `CancelOutcome`이 되어 리포트가 조용히 넘긴다. (취소 없이 05:10 리포트가 CANCELLED로 기록하면 애프터장 체결이 원장에서 누락된다. 원장과 증권사 보유의 어긋남을 따로 감지하는 장치가 없으므로 이 매수 누락은 취소가 유일한 방어선이다.)
 
 ### 접수 시각

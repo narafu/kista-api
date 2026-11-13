@@ -22,6 +22,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 // 메리츠 해외주식 주문 접수·취소 — 경고(warn_cls_code 1/3)는 warn_cnfr_yn=Y로 1회 재전송, 그 외 자동 재시도 없음
@@ -57,8 +58,10 @@ class MeritzOrderApi {
             @JsonProperty("cntg_qty") String todayFilled,        // 당일: 체결수량
             @JsonProperty("oder_able_qty") String todayCancelable, // 당일: 정정·취소 가능 수량
             @JsonProperty("oder_dqty") String histOrdered,       // 기간: 주문수량
-            @JsonProperty("cntg_dqty") String histFilled,        // 기간: 누적 체결수량
-            @JsonProperty("ncnt_odqt") String histCancelable) {} // 기간: 미체결(취소 가능) 수량
+            @JsonProperty("cntg_dqty") String histFilled,        // 기간: 누적 체결수량 — 미체결 ncnt_odqt는 스펙상 신뢰 불가라 읽지 않는다
+            @JsonProperty("ovrs_stck_oder_stat_cls_code") String status, // 0 정상 / 1 거부 / 2 자동거부 / 3 자동취소 / 4 미접수
+            @JsonProperty("oder_rctf_cncl_cls_code") String kind,  // 0 원주문 / 1 정정 / 2 취소
+            @JsonProperty("orgl_oder_no") String targetOrderNo) {} // 정정·취소 행이 대상으로 삼은 주문번호
 
     // 정규화된 원주문 — 출처(당일/기간)와 무관
     private record Original(String orderDate, String asprType, int ordered, int filled, int cancelable) {}
@@ -158,12 +161,29 @@ class MeritzOrderApi {
         histParams.add("oder_sta_date", today.minusDays(8).format(DateTimeFormatter.BASIC_ISO_DATE));
         histParams.add("oder_fin_date", today.plusDays(1).format(DateTimeFormatter.BASIC_ISO_DATE));
         histParams.add("cntg_cls_code", "0");
-        for (OrderRow r : http.getAllPages(HISTORY_PATH, account, histParams, OrderRow.class)) {
-            if (sameOrderNo(r.orderNo(), orderNo)) {
-                return new Original(r.orderDate(), r.asprType(), qty(r.histOrdered()), qty(r.histFilled()), qty(r.histCancelable()));
+        List<OrderRow> rows = http.getAllPages(HISTORY_PATH, account, histParams, OrderRow.class);
+        for (OrderRow r : rows) {
+            if (codeOrZero(r.kind()).equals("0") && sameOrderNo(r.orderNo(), orderNo)) {
+                int ordered = qty(r.histOrdered());
+                int filled = qty(r.histFilled());
+                return new Original(r.orderDate(), r.asprType(), ordered, filled,
+                        historyClosed(r, rows, orderNo) ? 0 : ordered - filled);
             }
         }
         throw new MeritzApiException(null, "원주문 조회 실패", null, false);
+    }
+
+    // 기간 목록의 원주문 행은 취소·만료 뒤에도 잔량이 남은 모양 그대로다 — 비정상 상태 코드 또는 이 주문을 대상으로 한
+    // 정상 접수된 취소 행이 있으면 종결(거부된 취소 행은 원주문을 끝내지 않는다). kista는 정정을 내지 않아 정정 행은 보지 않는다
+    private static boolean historyClosed(OrderRow original, List<OrderRow> rows, String orderNo) {
+        if (!codeOrZero(original.status()).equals("0")) return true;
+        return rows.stream().anyMatch(r -> codeOrZero(r.kind()).equals("2") && codeOrZero(r.status()).equals("0")
+                && sameOrderNo(r.targetOrderNo(), orderNo));
+    }
+
+    // 상태·구분 코드 누락은 기본값 "0"(정상·원주문)으로 본다
+    private static String codeOrZero(String code) {
+        return code == null || code.isBlank() ? "0" : code.trim();
     }
 
     // oder_no는 JSON 숫자 — 숫자 값으로 비교(선행 0·공백 차이 무시)
