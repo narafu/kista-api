@@ -18,17 +18,17 @@
 ## 항목
 
 ### Q-01 B3 바이낸스 403의 전제가 공식 문서와 맞지 않는다
-- 상태: 미답
+- 상태: 답변됨
 - 묶음·태스크: S1 / 지침서 04 3절 B3
 - 걸린 곳: 04 3절 B3 "HTTP 403(방화벽 차단)을 주문 확정 거절로 처리한다. 접수 여부를 모르는 상태를 거절로 단정한다 — 높음(이중 주문 또는 누락)"
 - 근거: 바이낸스 General API Information "HTTP Return Codes"(2026-11-13 확인) — "HTTP `403` return code is used when a WAF (Web Application Firewall) rule has been violated. This can indicate a rate limit violation or a security block." 실행 상태 불명(UNKNOWN)으로 명시된 것은 `5XX`와 `-1006`·`-1007`뿐이다. 403은 매칭 엔진 전 차단이라 접수 불명이 아니다. 현재 코드 `BinanceHttpClient.translate()`는 403을 `rejected=true`로 만들고, `CryptoFailure`가 REJECTED(라운드 SKIP)로 본다. 이중 주문 위험은 없다. findings 12 M4도 "주문 전 차단이라 대체로 안전, 등급 낮음"이다.
 - 선택지: ① 그대로 둔다(문서상 미접수 확정). ② 403을 `BrokerRateLimitException`으로 바꿔 `CryptoFailure`가 TRANSIENT(다음 틱 재시도)로 보게 한다(findings 12 M4 — rate limit 위반일 수 있다는 문서 문구 근거, 위험 낮음). ③ 결과 불명(`rejected=false`)으로 바꾼다 — 문서와 어긋나 권하지 않는다.
 - 멈춘 범위: B3만 고치지 않았다. B2·B6·B5·B7·B4는 계속 진행.
-- 답:
+- 답: (Fable) 지침서 04의 3절 B3 행·"B3 철회 메모"와 8절 단계 C 개정 — B3 철회(선택지 ①, 코드 변경 없음. 테스트 1건과 `binance-api.md` 한 줄만), `20e27a822`
 
 
 ### Q-02 B7 토스 연결 테스트가 "캐시에 새 토큰을 넣는" 경로가 코드에 없다
-- 상태: 미답
+- 상태: 답변됨
 - 묶음·태스크: S1 / 지침서 04 3절 B7, 2-4절 마지막 항목
 - 걸린 곳: 04 2-4절 "위 '401 시 1회 재발급'이 이것도 흡수하지만, 연결 테스트가 캐시에 새 토큰을 넣도록 고친다"
 - 근거: 스펙(auth) "client 당 유효한 access token 은 1 개입니다. 재발급 시 이전에 발급된 token 은 즉시 무효화됩니다" — 무효화 자체는 맞다. 그러나 토큰 캐시는 계좌 UUID 키(`toss:token:canonical:account:<UUID>`, `TossRedisTokenStore`)이고 연결 테스트 호출 3곳 중
