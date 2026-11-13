@@ -11,7 +11,7 @@ adapter/out/binance/ ← BinanceConfig(binanceRestClient — baseUrl 없음)/Bin
 ### 기본 사실
 - Base `https://api.binance.com`(프로퍼티 `binance.base-url`, 기본값은 `BinanceHttpClient`의 `@Value` — yml에는 없다). 테스트넷은 `https://testnet.binance.vision`. `BinanceConfig`의 `binanceRestClient`는 baseUrl이 없다 — 서명된 절대 URI를 그대로 보내 템플릿 재인코딩(서명 불일치)을 피한다. 타임아웃 connect 3s·read 10s.
 - 계좌번호가 없다: 키 쌍(`appKey`=API key, `secretKey`)만 쓰고 `accountNo`는 null이다. `Broker.isKeyOnlyCredentials()=true`라 중복 판정 키는 appKey(`Account.dedupeKey()`)이고, 키 만료일이 없어 `apiKeyExpiring=false`(`ApiKeyExpiryScheduler` 대상 아님)다. 시크릿은 서명에 필수다.
-- 서명: HMAC-SHA256 hex, 헤더 `X-MBX-APIKEY`. 모든 파라미터는 **query string**에 넣고(POST 포함) body는 비운다 — 서명 경로를 1개로 만든다. payload = 호출 파라미터 + `recvWindow=5000` + `timestamp`(`Clock.millis()`) 순서이고, **퍼센트 인코딩된 그 문자열이 곧 서명 대상**이다(2026-01 이후 -1022 규칙, 공식 문서 기준, 미실측). `signature`는 마지막에 붙인다. 공개 시세·exchangeInfo는 서명 없음.
+- 서명: HMAC-SHA256 hex, 헤더 `X-MBX-APIKEY`. 모든 파라미터는 **query string**에 넣고(POST 포함) body는 비운다 — 서명 경로를 1개로 만든다. payload = 호출 파라미터 + `recvWindow=5000` + `timestamp`(`Clock.millis()` + 서버 시각 오프셋) 순서이고, **퍼센트 인코딩된 그 문자열이 곧 서명 대상**이다(2026-01 이후 -1022 규칙, 공식 문서 기준, 미실측). `signature`는 마지막에 붙인다. 공개 시세·exchangeInfo는 서명 없음.
 - 키/시크릿이 비어 있으면 호출 전에 `BrokerCredentialException`이다.
 - 레이트: IP 단위. 성공 요청은 weight 0(2026-04 변경, 공식 문서 기준, 미실측)이라 `X-MBX-USED-WEIGHT-1M` 로깅은 생략하고 429/418만 `BrokerRateLimitException`으로 매핑한다.
 
@@ -38,7 +38,7 @@ adapter/out/binance/ ← BinanceConfig(binanceRestClient — baseUrl 없음)/Bin
 | 1 | HTTP 429 / 418 | `BrokerRateLimitException` | 재시도는 호출부 몫 |
 | 2 | code ∈ {-2014, -2015, -1022} | `BrokerCredentialException` | -2015는 키·IP·권한을 구분하지 않는다("Invalid API-key, IP, or permissions for action.") — IP 미허용으로 단정하지 않는다. 실행 중에는 `CryptoFailure.KEY_EXPIRED`로 분류된다 |
 | 3 | HTTP ≥ 500 또는 code ∈ {-1006, -1007} | `BinanceApiException(rejected=false)` | 실행 상태 불명 — 실패 취급·재전송 금지 |
-| 4 | 그 외 (-1021 포함) | `BinanceApiException(rejected=true)` | 확정 거절. -1021(timestamp 범위 초과)은 재시도·시각 동기화 없이 ERROR 로그만 남긴다 |
+| 4 | 그 외 (-1021 포함) | `BinanceApiException(rejected=true)` | 확정 거절. -1021(timestamp 범위 초과)은 서명 호출(`executeSigned`)이 `GET /api/v3/time`(weight 1)으로 서버 시각 오프셋을 갱신한 뒤 1회 재서명·재전송한다(매칭 엔진 전 거절이라 이중 주문 아님, 공식 Timing security). 오프셋은 프로세스 메모리에 유지돼 다음 호출부터 보정된다. 재전송도 -1021이거나 시각 조회가 실패하면 원래 확정 거절 그대로 + ERROR 로그 |
 | — | I/O 실패(`RestClientException`) | `BinanceApiException(rejected=false, status=0)` | 접수 여부 불명 |
 - 오류 바디가 JSON이 아니면(WAF HTML 등) code 없이 상태 코드로만 판정한다. 원문 바디는 WARN 로그에만 남기고 예외 메시지에는 status·code만 싣는다.
 - 주문 조회 -2013(없음)·-2026(90일 지난 무체결 종료 주문)만 "없음" 취급한다(아래 clientOrderId 규칙). 연결 테스트 예외 3종은 "연결 테스트" 절.
@@ -87,7 +87,7 @@ adapter/out/binance/ ← BinanceConfig(binanceRestClient — baseUrl 없음)/Bin
 
 ### 미검증 (실계좌·키가 필요한 항목)
 - `myTrades` 반영 지연(Memory→Database) — 동기화기는 10분 뒤 조회하고 불일치면 예외 → 다음 틱 재시도로 방어한다. 실제 지연은 미실측.
-- -1021 빈도 — OCI 시각 오차 실측 없음. 운영 로그에 -1021이 보이면 `/api/v3/time` 오프셋 보정을 추가한다.
+- -1021 빈도 — OCI 시각 오차 실측 없음. 보정이 동작하면 WARN "서버 시각 보정(-1021)" 로그가 남는다.
 
 ### 배포·롤백
 - **롤백 위험**: 관리자가 정책을 저장해 JSON에 BINANCE가 들어갔거나 BINANCE 계좌가 생기면, kista-trading을 BINANCE 이전 이미지로 되돌릴 수 없다. `TradingPolicySettingsPersistenceAdapter.deserialize`가 예외를 던지고 `accounts.broker='BINANCE'`는 읽을 수 없다.

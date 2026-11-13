@@ -118,7 +118,7 @@ class BinanceHttpClientTest {
             "400,-2015,CREDENTIAL", "401,-2014,CREDENTIAL", "400,-1022,CREDENTIAL",
             "429,-1003,RATE", "418,-1003,RATE",
             "500,,UNKNOWN", "503,,UNKNOWN", "400,-1006,UNKNOWN", "408,-1007,UNKNOWN",
-            "400,-2010,REJECTED", "400,-1013,REJECTED", "400,-1021,REJECTED", "400,-2013,REJECTED", "403,,REJECTED"})
+            "400,-2010,REJECTED", "400,-1013,REJECTED", "400,-2013,REJECTED", "403,,REJECTED"})
     void errorMapping(int status, Integer code, String kind) {
         String body = code == null ? "<html>" : "{\"code\":" + code + ",\"msg\":\"x\"}";
         server.expect(anything()).andRespond(withStatus(HttpStatusCode.valueOf(status)).contentType(APPLICATION_JSON).body(body));
@@ -138,6 +138,57 @@ class BinanceHttpClientTest {
                 assertThat(b.code()).isEqualTo(code);
             }
         }
+    }
+
+    // -1021: 서명 요청 timestamp가 서버 시각보다 1초 넘게 앞섬(공식 오류 코드) — 매칭 엔진 전 거절이라 재전송해도 이중 주문이 아니다
+    private static final String TS_ERROR = "{\"code\":-1021,\"msg\":\"Timestamp for this request was 1000ms ahead of the server's time.\"}";
+
+    private void expectSignedPost(long timestamp, org.springframework.test.web.client.ResponseCreator response) {
+        String payload = "symbol=BTCUSDT&recvWindow=5000&timestamp=" + timestamp;
+        server.expect(requestTo(BASE + "/api/v3/order?" + payload + "&signature=" + BinanceHttpClient.sign("sk", payload)))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(response);
+    }
+
+    @Test
+    void invalidTimestampSyncsServerTimeAndRetriesOnceThenKeepsOffset() {
+        long serverNow = NOW - 2000; // 로컬 시계가 2초 앞섬
+        expectSignedPost(NOW, withStatus(HttpStatusCode.valueOf(400)).contentType(APPLICATION_JSON).body(TS_ERROR));
+        server.expect(requestTo(BASE + "/api/v3/time")).andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("{\"serverTime\":" + serverNow + "}", APPLICATION_JSON));
+        expectSignedPost(serverNow, withSuccess("{}", APPLICATION_JSON));
+        expectSignedPost(serverNow, withSuccess("{}", APPLICATION_JSON)); // 다음 호출은 보정된 시각으로 바로
+
+        client.postSigned("/api/v3/order", params("symbol", "BTCUSDT"), AUTH, MAP);
+        client.postSigned("/api/v3/order", params("symbol", "BTCUSDT"), AUTH, MAP);
+    }
+
+    @Test
+    void invalidTimestampAfterResyncIsRejectedWithoutSecondRetry() {
+        long serverNow = NOW - 2000;
+        expectSignedPost(NOW, withStatus(HttpStatusCode.valueOf(400)).contentType(APPLICATION_JSON).body(TS_ERROR));
+        server.expect(requestTo(BASE + "/api/v3/time"))
+                .andRespond(withSuccess("{\"serverTime\":" + serverNow + "}", APPLICATION_JSON));
+        expectSignedPost(serverNow, withStatus(HttpStatusCode.valueOf(400)).contentType(APPLICATION_JSON).body(TS_ERROR));
+
+        assertThatThrownBy(() -> client.postSigned("/api/v3/order", params("symbol", "BTCUSDT"), AUTH, MAP))
+                .isInstanceOfSatisfying(BinanceApiException.class, e -> {
+                    assertThat(e.isRejected()).isTrue();
+                    assertThat(e.code()).isEqualTo(-1021);
+                });
+    }
+
+    @Test
+    void serverTimeFailureKeepsOriginalRejection() {
+        expectSignedPost(NOW, withStatus(HttpStatusCode.valueOf(400)).contentType(APPLICATION_JSON).body(TS_ERROR));
+        server.expect(requestTo(BASE + "/api/v3/time")).andRespond(withException(new SocketTimeoutException()));
+
+        // 시각 조회 I/O 실패가 결과 불명(rejected=false)으로 바뀌면 주문이 SUBMITTING에 묶인다
+        assertThatThrownBy(() -> client.postSigned("/api/v3/order", params("symbol", "BTCUSDT"), AUTH, MAP))
+                .isInstanceOfSatisfying(BinanceApiException.class, e -> {
+                    assertThat(e.isRejected()).isTrue();
+                    assertThat(e.code()).isEqualTo(-1021);
+                });
     }
 
     @Test

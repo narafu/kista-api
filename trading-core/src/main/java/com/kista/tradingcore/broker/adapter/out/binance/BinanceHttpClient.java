@@ -33,11 +33,13 @@ class BinanceHttpClient {
     private static final int RECV_WINDOW_MS = 5000;                            // 서명 요청 허용 시차
     private static final Set<Integer> CREDENTIAL_CODES = Set.of(-2014, -2015, -1022); // 키 형식·권한·서명 오류 (-2015는 키·IP·권한 구분 불가)
     private static final Set<Integer> UNKNOWN_CODES = Set.of(-1006, -1007);    // 실행 상태 불명 — 실패 취급 금지
+    private static final int INVALID_TIMESTAMP = -1021;                        // timestamp가 서버 시각보다 1초 넘게 앞서거나 recvWindow 밖
 
     private final RestClient binanceRestClient; // baseUrl 없는 RestClient (BinanceConfig)
     private final ObjectMapper objectMapper;   // 오류 바디 파싱
     private final String baseUrl;              // binance.base-url (테스트넷 전환용)
     private final Clock clock;                 // timestamp 원천 — 테스트에서 고정
+    private volatile long serverOffsetMs;      // 서버 시각 − 로컬 시각 — -1021을 받으면 /api/v3/time으로 갱신
 
     BinanceHttpClient(RestClient binanceRestClient, ObjectMapper objectMapper,
                       @Value("${binance.base-url:https://api.binance.com}") String baseUrl, Clock clock) {
@@ -55,24 +57,58 @@ class BinanceHttpClient {
     }
 
     <T> T getSigned(String path, LinkedHashMap<String, String> params, BrokerAccountRef auth, ParameterizedTypeReference<T> type) {
-        URI uri = signedUri(path, params, auth);
-        return execute("GET " + path, () -> binanceRestClient.get().uri(uri)
+        return executeSigned("GET " + path, () -> binanceRestClient.get().uri(signedUri(path, params, auth))
                 .header("X-MBX-APIKEY", auth.appKey()).retrieve().body(type));
     }
 
     // POST도 파라미터는 query, body 없음
     <T> T postSigned(String path, LinkedHashMap<String, String> params, BrokerAccountRef auth, ParameterizedTypeReference<T> type) {
-        URI uri = signedUri(path, params, auth);
-        return execute("POST " + path, () -> binanceRestClient.post().uri(uri)
+        return executeSigned("POST " + path, () -> binanceRestClient.post().uri(signedUri(path, params, auth))
                 .header("X-MBX-APIKEY", auth.appKey()).retrieve().body(type));
     }
+
+    // -1021은 매칭 엔진 전 timestamp 검사에서 거절된 것이라(공식 Timing security) 서버 시각을 맞춘 뒤 1회 재서명·재전송해도 이중 주문이 아니다
+    private <T> T executeSigned(String action, Supplier<T> call) {
+        try {
+            return execute(action, call);
+        } catch (BinanceApiException e) {
+            if (!Integer.valueOf(INVALID_TIMESTAMP).equals(e.code())) throw e;
+            try {
+                syncServerTime();
+            } catch (RuntimeException syncFailure) {
+                // 시각 조회 실패가 원래의 확정 거절(-1021)을 결과 불명으로 바꾸지 않게 원 예외를 던진다
+                log.error("Binance {} 서버 시각 조회 실패 — -1021 거절 유지: {}", action, syncFailure.getMessage());
+                throw e;
+            }
+            try {
+                return execute(action, call);
+            } catch (BinanceApiException retry) {
+                if (Integer.valueOf(INVALID_TIMESTAMP).equals(retry.code())) {
+                    log.error("Binance {} 서버 시각 보정 후에도 timestamp 범위 초과(-1021): 서버 시계 확인 필요", action);
+                }
+                throw retry;
+            }
+        }
+    }
+
+    // GET /api/v3/time(weight 1) — 왕복 중간 시각을 로컬 기준으로 오프셋 계산
+    private void syncServerTime() {
+        long sent = clock.millis();
+        ServerTime time = getPublic("/api/v3/time", new LinkedHashMap<>(), new ParameterizedTypeReference<>() { });
+        long received = clock.millis();
+        long offset = time.serverTime() - (sent + received) / 2;
+        log.warn("Binance 서버 시각 보정(-1021): offset {}ms → {}ms", serverOffsetMs, offset);
+        serverOffsetMs = offset;
+    }
+
+    private record ServerTime(long serverTime) {} // GET /api/v3/time 응답
 
     // payload = params + recvWindow + timestamp 순서, 서명 대상은 퍼센트 인코딩된 그 문자열
     private URI signedUri(String path, LinkedHashMap<String, String> params, BrokerAccountRef auth) {
         if (isBlank(auth.appKey()) || isBlank(auth.secretKey())) throw new BrokerCredentialException();
         LinkedHashMap<String, String> all = new LinkedHashMap<>(params);
         all.put("recvWindow", String.valueOf(RECV_WINDOW_MS));
-        all.put("timestamp", String.valueOf(clock.millis()));
+        all.put("timestamp", String.valueOf(clock.millis() + serverOffsetMs));
         String payload = queryString(all);
         // 절대 URI 그대로 전송 — RestClient 템플릿 재인코딩 방지
         return URI.create(baseUrl + path + "?" + payload + "&signature=" + sign(auth.secretKey(), payload));
@@ -123,10 +159,6 @@ class BinanceHttpClient {
         String message = "Binance " + action + " 실패: status=" + status + ", code=" + code;
         if (status >= 500 || (code != null && UNKNOWN_CODES.contains(code))) {
             return new BinanceApiException(status, code, message, e, false); // 실행 상태 불명
-        }
-        if (Integer.valueOf(-1021).equals(code)) {
-            // ponytail: 서버 시각 동기화 없음 — 로그에 -1021이 보이면 /api/v3/time 오프셋 보정 추가
-            log.error("Binance {} timestamp 범위 초과(-1021): 서버 시각 확인 필요", action);
         }
         return new BinanceApiException(status, code, message, e, true);
     }
