@@ -91,7 +91,7 @@ ui에만 있던 규칙(서버가 검증하지 않아 지금은 우회 가능한 
 - 진입점 단일화 짝: api 지침서 05의 배포 전환 단계 ↔ ui 지침서 02 태스크 8(`resolveUpstream`이 한 호스트만 반환, `getTradingApiBaseUrl`·`TRADING_API_BASE_URL`·`NEXT_PUBLIC_TRADING_API_BASE_URL` 폴백·루트/deploy compose 값 삭제). **같은 날 배포.** 그 전까지 ui는 두 호스트 매핑을 유지한다.
 - 매매 공식 변경(api 지침서 08 F1)의 ui 영향(fable-ui grep 확인): `currentRound`는 화면 3곳이 `toFixed(1)`로 표시해 자릿수가 늘어도 깨지지 않는다. `priceOffsetRate`는 표시·비교·계산 코드가 없다. 소수 2자리를 가정한 비교는 없다. 회차 표시는 소수 1자리를 유지한다(ui 변경 없음).
 
-### fable-ui 요청 (2026-11-13) — `fieldErrors` 응답 규약, api 지침서 10의 2-5절·T7 반영 대기
+### fable-ui 요청 (2026-11-13) — `fieldErrors` 응답 규약, api 지침서 10의 2-5절·T7에 반영함(실행은 T7, S5 P1 뒤)
 
 ui 지침서 04 "서버 오류의 분담"의 전제다. ui는 실패 토스트를 전역 한 곳에서 항상 `detail`로 띄우고, 폼은 `fieldErrors`를 필드 옆에 더한다.
 

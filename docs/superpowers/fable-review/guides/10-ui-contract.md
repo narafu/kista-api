@@ -69,6 +69,8 @@
 ### 2-5. 오류 문구
 
 - `detail`은 항상 사용자에게 보여줄 한국어 문장이다. Bean Validation 메시지도 포함한다: 제약 애너테이션에 한국어 `message`를 주고, 필드명을 노출하는 `[필드명: ...]` 조립을 없애고 필드는 확장 속성 `fieldErrors[{field, detail}]`로 싣는다.
+- `fieldErrors`가 하나라도 있는 응답의 `detail`은 요약 문장 하나로 고정한다("입력값을 확인해 주세요."). 필드별 문장은 `fieldErrors[].detail`에만 싣는다. Bean Validation 실패와 필드를 지목하는 도메인 검증 실패 둘 다 같다(ui는 토스트에 `detail`, 필드 옆에 `fieldErrors`를 함께 띄워 같은 문장이 두 번 나오지 않게 한다 — `cross-repo.md` B절 fable-ui 요청 2026-11-13).
+- `fieldErrors[].field`는 요청 바디의 필드 경로를 Spring 기본 표기(`orders[0].price`) 그대로 싣는다. ui 폼 이름에 맞춰 바꾸지 않는다(ui가 맞춘다).
 - `ErrorCode`는 동작 분기용이다. UI가 코드→문구 맵을 갖지 않는다. 상수 이름은 바꾸지 않는다(기존 계약).
 
 ### 2-6. 가계부 집계
@@ -103,7 +105,7 @@
 | T4 | 42개 엔드포인트 분류표 확정(`findings/07` A절 기반)과 전환. 묶음: ① 가계부 ② 전략 주문·체결·사이클 이력 ③ 관리자 ④ 내부 API. 묶음마다 keyset 인덱스가 필요한지 확인하고 필요하면 Flyway 추가. `/stats/cycles`는 쿼리 수준 페이징으로 바꾼다 | Opus(분류·keyset 키 결정), Sonnet(적용) | 묶음별 web·persistence 테스트, ui 동시 배포 |
 | T5 | 메타 통합: 누락 enum 추가, `description` 정리, `/api/runtime-config` 전략 기본값·VR 램프 기본값표 이관, 가드 테스트 | Sonnet, 캐시 정책은 Opus | 가드 테스트 통과 |
 | T6 | 상태 플래그: 전략 `allowedActions`·`blockedActions`, 계좌 `apiKeyExpiry`, 미리보기 `warnings`. 판정 로직은 도메인에 두고 단위 테스트로 고정 | Opus | 도메인 테스트 통과 |
-| T7 | 오류 문구: Bean Validation 한국어화, `fieldErrors` 확장, `ExceptionMessageFormatTest` 범위 확대 | Sonnet | 테스트 통과 |
+| T7 | 오류 문구: Bean Validation 한국어화, `fieldErrors` 확장(2-5절: `fieldErrors`가 있으면 `detail`은 요약 문장 고정, `field`는 Spring 경로 표기), `ExceptionMessageFormatTest` 범위 확대 | Sonnet | 테스트 통과(필드 1개짜리 검증 실패에서 `detail`이 요약 문장인지 포함) |
 | T8 | 가계부 집계 엔드포인트(fable-ui 명세 수신 후) | Opus(명세), Sonnet(구현) | 서비스·web 테스트 |
 | T9 | `ui-api-principles.md`를 `docs/agents/ui-api-contract.md`로 옮겨 상시 규칙화, `constraints.md`에서 가리킨다. 가드: 컬렉션을 반환하는 컨트롤러 메서드는 `Items`/`CursorPage`만 반환(ArchUnit) | Sonnet | 가드 통과 |
 
