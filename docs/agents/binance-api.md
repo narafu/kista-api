@@ -38,7 +38,7 @@ adapter/out/binance/ ← BinanceConfig(binanceRestClient — baseUrl 없음)/Bin
 | 1 | HTTP 429 / 418 | `BrokerRateLimitException` | 재시도는 호출부 몫 |
 | 2 | code ∈ {-2014, -2015, -1022} | `BrokerCredentialException` | -2015는 키·IP·권한을 구분하지 않는다("Invalid API-key, IP, or permissions for action.") — IP 미허용으로 단정하지 않는다. 실행 중에는 `CryptoFailure.KEY_EXPIRED`로 분류된다 |
 | 3 | HTTP ≥ 500 또는 code ∈ {-1006, -1007} | `BinanceApiException(rejected=false)` | 실행 상태 불명 — 실패 취급·재전송 금지 |
-| 4 | 그 외 (-1021 포함) | `BinanceApiException(rejected=true)` | 확정 거절. -1021(timestamp 범위 초과)은 서명 호출(`executeSigned`)이 `GET /api/v3/time`(weight 1)으로 서버 시각 오프셋을 갱신한 뒤 1회 재서명·재전송한다(매칭 엔진 전 거절이라 이중 주문 아님, 공식 Timing security). 오프셋은 프로세스 메모리에 유지돼 다음 호출부터 보정된다. 재전송도 -1021이거나 시각 조회가 실패하면 원래 확정 거절 그대로 + ERROR 로그 |
+| 4 | 그 외 (-1021 포함) | `BinanceApiException(rejected=true)` | 확정 거절. 403(WAF)은 매칭 엔진 전 차단이라 확정 거절이다(공식 HTTP Return Codes — 실행 상태 불명은 5XX·-1006·-1007뿐). -1021(timestamp 범위 초과)은 서명 호출(`executeSigned`)이 `GET /api/v3/time`(weight 1)으로 서버 시각 오프셋을 갱신한 뒤 1회 재서명·재전송한다(매칭 엔진 전 거절이라 이중 주문 아님, 공식 Timing security). 오프셋은 프로세스 메모리에 유지돼 다음 호출부터 보정된다. 재전송도 -1021이거나 시각 조회가 실패하면 원래 확정 거절 그대로 + ERROR 로그 |
 | — | I/O 실패(`RestClientException`) | `BinanceApiException(rejected=false, status=0)` | 접수 여부 불명 |
 - 오류 바디가 JSON이 아니면(WAF HTML 등) code 없이 상태 코드로만 판정한다. 원문 바디는 WARN 로그에만 남기고 예외 메시지에는 status·code만 싣는다.
 - 주문 조회 -2013(없음)·-2026(90일 지난 무체결 종료 주문)만 "없음" 취급한다(아래 clientOrderId 규칙). 연결 테스트 예외 3종은 "연결 테스트" 절.
