@@ -121,10 +121,12 @@ T `TradingExceptionHandler`가 `@Order(HIGHEST_PRECEDENCE)`에 `@ExceptionHandle
 
 **P5. 사용자 이벤트 경로 단순화** (Opus) — `findings/09` M4, `findings/10` E-3·H-2.
 지금: R `UserEventStreamPublisher` → Redis Stream → T `UserEventStreamConsumer` → `UserEventRepublisher`가 **같은 이벤트 클래스를 로컬 재발행** → `TradingUserCascadeListener`. 한 컨텍스트에 올리면 재발행된 이벤트를 다시 스트림 발행자가 받아 **무한 순환**한다.
-- 바꾼다: 컨슈머가 이벤트를 재발행하지 않고 **유스케이스(`UserTradingDataEraseService`)를 직접 호출**한다. `TradingUserCascadeListener`·`UserEventRepublisher`·`UserEventStreamBridge`를 지운다.
-- 확인할 것: 재발행이 EPR 재시도를 얻으려던 것인지(`history:139`). 스트림 컨슈머 베이스(`RedisStreamSubscriber`)의 ack·XCLAIM 복구가 같은 보장(처리 실패 시 재전달)을 주는지 코드로 확인하고, 유스케이스가 멱등인지 테스트로 고정한다. 보장이 부족하면 중단하고 보고한다.
-- `UserEventResubmitScheduler`(T)는 재발행 대상이 사라지면 지운다. R 쪽은 발행 실패분 재전송용이면 남긴다.
-- `stream:user.notify-profile.changed`는 단계 X에서 복제본과 함께 지운다. 그때까지는 같은 방식(컨슈머가 포트 직접 호출)으로 바꿔 둔다.
+- **단계 P에서는 손대지 않는다(사용자 결정 2026-11-13, Q-06).** 컨슈머가 유스케이스를 직접 부르는 안은 EPR과 같은 보장을 주지 않는다 — 스트림은 24회(약 2시간) 뒤 포기하고, IAE·NPE를 poison으로 보고 알림 없이 ack하며, 내구성이 Postgres 행이 아니라 Redis pending 목록에 기댄다. 두 프로세스인 동안은 순환이 생기지 않으므로 지금 경로를 그대로 둔다.
+- 단계 M의 합병 커밋(M9)에서 스트림 경로를 통째로 지운다: R `UserEventStreamPublisher`, T `UserEventStreamConsumer`·`UserEventRepublisher`·`UserEventStreamBridge`. R이 발행한 `UserDeletedEvent`·`UserNotifyProfileChangedEvent`를 T `TradingUserCascadeListener`·`UserNotifyProfileSyncListener`가 직접 받는다. 두 리스너는 지우지 않는다 — `@TransactionalEventListener`라 EPR 재시도·재기동 재발행 보장이 그대로 남는다.
+- 리스너 FQCN·메서드 시그니처를 바꾸지 않는다(EPR listener_id 유지). 4-3의 EPR 이관이 미완료 행을 그대로 옮긴다.
+- `UserEventResubmitScheduler` 2벌은 M9에서 한 벌로 합친다(빈 이름 충돌, `findings/10` A5). 남는 한 벌의 필터 대상에 위 두 이벤트가 들어 있는지 확인한다.
+- 스트림 발행자를 지우기 전 `stream:user.deleted`·`stream:user.notify-profile.changed`의 pending 0건을 확인한다(4-3 사전 확인에 추가). 남아 있으면 옛 `kista-trading`이 소진할 때까지 기다린 뒤 정지한다.
+- `user_notify_profile` 복제본과 `UserNotifyProfileSyncListener`는 예정대로 단계 X에서 지운다.
 
 **P6. 오류 로그 이중 기록 방지 준비** (Sonnet)
 `AppErrorRaisedEvent`를 R은 직접 저장하고 T는 스트림으로 R에 보낸다. 합치면 한 이벤트가 2행이 된다. 단계 M의 같은 커밋에서 T `AppErrorStreamPublisher`와 R `AppErrorStreamConsumer`를 지운다(여기서는 삭제 목록만 확정).
@@ -132,7 +134,7 @@ T `TradingExceptionHandler`가 `@Order(HIGHEST_PRECEDENCE)`에 `@ExceptionHandle
 **P7. 결정 사항 1건: 스케줄러 라이프사이클 알림** — `findings/10` E-3.
 `SchedulerLifecycleEvent`는 R `SchedulerNotifier`만 듣는다. 지금 매매 잡의 시작·실패 알림은 가지 않는다. 합치면 관리자 텔레그램으로 새로 나간다. **기본값: 매매 잡은 알림에서 제외해 현재 동작을 유지한다**(잡 이름 필터). 받고 싶으면 사용자가 켠다.
 
-단계 P 완료 판정: 전체 검증 통과, 3 role 운영 배포 후 2거래일 관찰(개장·마감 배치 정상, 탈퇴 cascade는 로컬에서 dev-e2e 사용자로 확인).
+단계 P 완료 판정: 전체 검증 통과, 3 role 운영 배포 후 2거래일 관찰(개장·마감 배치 정상). 탈퇴 cascade 확인(로컬 dev-e2e 사용자)은 경로가 바뀌는 단계 M 완료 판정으로 옮긴다.
 
 ## 4. 단계 M — 한 애플리케이션으로 합치고 2 role로 전환
 
@@ -148,7 +150,7 @@ T `TradingExceptionHandler`가 `@Order(HIGHEST_PRECEDENCE)`에 `@ExceptionHandle
 | M6 | `scheduler_locks`: 한 테이블로. **`trading.scheduler_locks`를 쓴다**(매매 배치 재개가 잔여 락을 인수하므로 이쪽 행을 보존). R 잡 이름과 T 잡 이름이 겹치지 않는지 확인. `public.scheduler_locks`는 contract 단계에서 drop | C2 |
 | M7 | EPR 한 테이블: `public.event_publication`. 전환 절차는 4-3 | E-2 |
 | M8 | Modulith: 모델 1개. ID 충돌 `notify`·`web`은 T 쪽을 `trading-notify`·`trading-web`으로 개명(임시. 단계 R에서 최종 이름). `ModulithArchitectureTest` 2개를 1개로(모듈 19개). listener_id는 FQCN 기반이라 ID 개명과 무관 — **이 단계에서 패키지와 클래스 이름은 바꾸지 않는다** | E-1 |
-| M9 | 삭제: T `AppErrorStreamPublisher` + R `AppErrorStreamConsumer`(P6), `PlainDecimalSerializer` 중복 1벌, T `com.kista.tradingcore.ClockConfig`(P2에서 넘어옴 — R 것과 본문 동일. `main_code_must_not_read_system_clock_directly` 예외 목록에서 T FQCN도 지운다) | E-3, A3 |
+| M9 | 삭제: T `AppErrorStreamPublisher` + R `AppErrorStreamConsumer`(P6), 사용자 이벤트 스트림 경로 4종과 `UserEventResubmitScheduler` 한 벌(P5 — 남기면 이벤트 무한 순환), `PlainDecimalSerializer` 중복 1벌, T `com.kista.tradingcore.ClockConfig`(P2에서 넘어옴 — R 것과 본문 동일. `main_code_must_not_read_system_clock_directly` 예외 목록에서 T FQCN도 지운다) | E-3, A3 |
 | M10 | `RoleRoutingGuard`·`RoleRoutes`(1-3) 추가. 이 단계의 엔진 경로 = 현재 Caddy `@trading`·`@scheduler` matcher와 `/api/internal/**` | K-2 |
 | M11 | 내부 HTTP는 **그대로 둔다.** web의 `INTERNAL_API_BASE_URL`은 `http://kista-worker:8080`. worker 자신이 내부 API를 부르는 경로가 있으면(구 kista-scheduler 잡) `http://localhost:8080` | H-1 |
 | M12 | 테스트 정리: `TradingApplicationContextLoadTest`·`SchedulerLockService*Test`의 `TradingApplication` 참조 교체, `RootDataJpaTestBase` 삭제 후 `DataJpaTestBase`로, `GradleModuleBoundaryTest`는 "T → R 의존 금지"만 남기고 "R → T 금지" 삭제. `InternalApiContractTest`는 단계 X까지 유지 | D-3, J절 |
@@ -168,7 +170,7 @@ T `TradingExceptionHandler`가 `@Order(HIGHEST_PRECEDENCE)`에 `@ExceptionHandle
 | `ApplicationModules.verify()` 실패 | R 모듈이 T 모듈 내부 참조 | 단계 M에서는 새 참조가 생기면 안 된다. 생겼다면 범위를 넘은 것 |
 | 응답 상태가 바뀜(409 → 500 등) | P1 누락 | P1의 표 테스트로 확인 |
 | 오류 로그 2행 | M9 누락 | |
-| 기동 직후 CPU 100%, Redis 스트림 폭증 | P5 누락(이벤트 순환) | 즉시 중단, 스트림 길이 확인 |
+| 기동 직후 CPU 100%, Redis 스트림 폭증 | M9의 P5 삭제 누락(이벤트 순환) | 즉시 중단, 스트림 길이 확인 |
 | 스케줄 잡이 돌지 않음 | `@EnableScheduling` 누락 또는 `kista.role` 조건 | `/actuator/scheduledtasks` 또는 로그의 스케줄 등록 확인 |
 | 잡이 두 번 돔 | worker가 2개 떴다 | 4-3의 전환 순서 위반 |
 
@@ -271,7 +273,7 @@ market  benchmark  finance  notification  ops  platform  app(모듈 아님: 앱 
 
 ## 10. 중단 조건 (사용자에게 보고하고 멈춘다)
 
-- P5에서 스트림 복구가 EPR 재시도와 같은 보장을 주지 않는다.
+- 단계 M에서 사용자 이벤트 스트림 경로를 지운 뒤 탈퇴 cascade가 EPR 행 없이 실행된다(리스너가 `@TransactionalEventListener`가 아니게 됐거나 발행이 트랜잭션 밖이다).
 - 단계 M에서 R ↔ T 순환 빈 참조가 구조적으로 풀리지 않는다.
 - 전환 배포 중 옛 `kista-scheduler`·`kista-trading` 컨테이너가 남아 있거나 worker가 2개 뜬 흔적(잡 이중 실행, 락 인수 로그 2회).
 - 전환 후 개장·마감 배치의 주문 수·금액이 전환 전 미리보기와 다르다.
