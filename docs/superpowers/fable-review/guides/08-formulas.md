@@ -183,3 +183,14 @@ F8은 유지로 확정됐다. `findings/13-vr-velog-diff.md`에서 소유자 글
 - 사용자 결정 없이 공식을 바꾸지 않는다.
 - F1을 고치면서 `amountScale` 사용처를 일괄 치환하지 않는다. 금액에는 맞는 자릿수다. 비율에 쓰인 곳만 고친다(`grep -rn "amountScale" matching/`으로 전수 확인 후 항목별 판정).
 - 실계좌 통합 테스트로 검증하지 않는다.
+
+## 7. 실행 기록 (S2, 2026-11-13)
+
+### T4(F6) 도달 경로 분석 결과
+일반모드 최종회차 분기(`InfiniteStrategy.buildLateStageOrders`의 `isFinalRound`)는 **도달 가능**하다. 리버스 플래그는 마감 리포트에서만 켜지므로, 계획 시점에 플래그가 꺼진 채 `isFinalRound`가 되는 경로가 셋 있다.
+1. 보유를 가진 채 등록: `StrategyCreationPersister:78`이 개장 행 detail을 `reverse=false`로 저장한다. 보유 대비 예수금이 작으면 첫 계획부터 최종회차다.
+2. 리버스 종료 직후: `InfinitePosition.nextReverseMode(true)`는 종가 회복만 보고 `isFinalRound`를 보지 않는다. 예수금이 여전히 1회분보다 작으면 다음 날 일반모드가 이 분기를 탄다.
+3. 마감 리포트 뒤 계획 전 원장 변경: 인출(`CapitalLedgerService.withdraw`가 최신 행을 제자리 갱신)로 예수금이 줄면 플래그는 그대로인데 계획은 최종회차가 된다.
+4. 종가 없는 마감 리포트: `nextReverseMode(false)`는 `prevClosePrice != null`을 요구해 종가가 null이면 플래그를 켜지 않는다. 다음 날 일반모드가 이 분기를 탄다.
+
+운영 발생은 0건(2026-11-12 조회)이지만 경로가 있으므로 삭제하지 않고 **리버스 첫날 규칙으로 교체**했다: 수량 보유 ÷ (분할수/2)(`ReverseModePosition.calcMocSellQuantity` 재사용), 마감 MOC(`AT_CLOSE`, 리버스 첫날과 같은 접수 시점), leg는 출처 구분을 위해 `INFINITE_MOC_SELL` 유지, 최소 1주(보유 < 분할수/2이면 0주가 돼 주문 0건 → 후보가 빠져 마감 리포트가 돌지 않고 플래그가 영영 켜지지 않는다). 리버스 첫날(`ReverseInfiniteStrategy.buildFirstDayOrders`)의 같은 0주 공백은 기존 동작이라 손대지 않았다. 교체 뒤 다음 날 첫날 MOC가 한 번 더 나가는 부작용은 `questions.md` Q-04.

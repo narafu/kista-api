@@ -162,7 +162,7 @@ public record InfinitePosition(
         return lateBuyQuantity(unitAmount(), locBuyPrice());
     }
 
-    // 전후반 공통 LOC 매도 수량 — 후반 calcMocSellQuantity와 계산식은 같지만 별개 주문(LOC vs MOC)
+    // 전후반 공통 LOC 매도 수량 — 보유의 1/4
     public int calcLocSellQuantity() {
         return sellQuantityQuarter();
     }
@@ -171,9 +171,11 @@ public record InfinitePosition(
         return holdings() - sellQuantityQuarter();
     }
 
-    // 후반(unitAmount>deposit) MOC 매도 수량 — calcLocSellQuantity와 계산식은 같지만 별개 주문(LOC vs MOC)
+    // 최종회차(리버스 플래그가 아직 꺼진 채 isFinalRound) MOC 매도 수량 — 리버스 첫날 규칙과 같은 보유 ÷ (분할수/2)
+    // 보유가 분할수/2 미만이어도 최소 1주 — 주문이 0건이면 후보가 빠져 마감 리포트가 돌지 않고 리버스 플래그가 영영 켜지지 않는다
     public int calcMocSellQuantity() {
-        return sellQuantityQuarter();
+        if (holdings() == 0) return 0;
+        return Math.max(1, ReverseModePosition.of(balance, ticker, divisionCount, null, true).calcMocSellQuantity());
     }
 
     private int sellQuantityQuarter() {

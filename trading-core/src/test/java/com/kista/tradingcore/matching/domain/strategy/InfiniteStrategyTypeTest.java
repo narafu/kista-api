@@ -185,7 +185,7 @@ class InfiniteStrategyTypeTest {
     }
 
     @Test
-    @DisplayName("buildOrders 후반 기준가 1주>원장: MOC 매도 1건만")
+    @DisplayName("buildOrders 후반 기준가 1주>원장: 리버스 첫날 규칙 MOC 매도 1건만")
     void lateStageOneShareOverDepositEmitsMocSellOnly() {
         // unitAmount=22 <= deposit=25 이지만 기준가(≈34) > 25 → 1주도 못 사므로 최종회차
         AccountBalance balance = new AccountBalance(10, new BigDecimal("41.5"), new BigDecimal("25"));
@@ -194,11 +194,24 @@ class InfiniteStrategyTypeTest {
         List<PlannedOrder> orders = strategy.buildOrders(position, TODAY);
 
         assertThat(orders).extracting(PlannedOrder::orderLeg).containsExactly("INFINITE_MOC_SELL");
-        assertThat(orders.getFirst().quantity()).isEqualTo(2); // 10/4
+        // 리버스 첫날 규칙: 보유 ÷ (분할수/2) = 10/10 = 1주 MOC, 마감 접수
+        assertThat(orders.getFirst()).matches(o -> o.orderType() == MOC && o.quantity() == 1 && o.timing() == OrderTiming.AT_CLOSE);
     }
 
     @Test
-    @DisplayName("buildOrders 후반 unitAmount>deposit: MOC 매도 1건만")
+    @DisplayName("buildOrders 최종회차 보유 < 분할수/2: MOC 최소 1주 — 0건이면 마감 리포트가 돌지 않아 리버스 진입이 멈춘다")
+    void finalRound_fewHoldings_sellsAtLeastOneShare() {
+        // 보유 5주·평단 50·예수금 10 → unitAmount (10+250)/20 = 13 > 10 → 최종회차, 5 ÷ 10 = 0 → 최소 1주
+        AccountBalance balance = new AccountBalance(5, new BigDecimal("50"), new BigDecimal("10"));
+        InfinitePosition position = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("50"), 20);
+
+        List<PlannedOrder> orders = strategy.buildOrders(position, TODAY);
+
+        assertThat(orders).singleElement().matches(o -> "INFINITE_MOC_SELL".equals(o.orderLeg()) && o.quantity() == 1);
+    }
+
+    @Test
+    @DisplayName("buildOrders 후반 unitAmount>deposit: 리버스 첫날 규칙 MOC 매도(보유 ÷ 분할수/2) 1건만")
     void buildOrders_backHalf_insufficientDeposit() {
         // averagePrice=5, holdings=200, deposit=50 → totalAssets=1050, unitAmount=52.50, currentRound≈19.05 (후반), unitAmount(52.50)>deposit(50)
         AccountBalance balance = new AccountBalance(200, new BigDecimal("5"),
@@ -208,7 +221,9 @@ class InfiniteStrategyTypeTest {
         List<PlannedOrder> orders = strategy.buildOrders(position, TODAY);
 
         assertThat(orders).hasSize(1);
-        assertThat(orders.getFirst()).matches(o -> o.orderType() == MOC && o.direction() == SELL && o.quantity() == 50); // 200/4
+        // 리버스 첫날 규칙(문헌 4.0 — 쿼터손절 대신 리버스 첫날 MOC): 200 ÷ (20/2) = 20주, 마감 접수
+        assertThat(orders.getFirst()).matches(o -> o.orderType() == MOC && o.direction() == SELL && o.quantity() == 20
+                && o.timing() == OrderTiming.AT_CLOSE);
         assertThat(orders).extracting(PlannedOrder::orderLeg)
                 .containsExactly("INFINITE_MOC_SELL");
     }

@@ -186,9 +186,10 @@ public class InfiniteStrategy {
         if (position.isFinalRound()) {
             int mocSellQuantity = position.calcMocSellQuantity();
             if (mocSellQuantity >= 1) {
-                // 최종회차 MOC 매도 — 개장 시 선접수
+                // 최종회차 — 리버스 플래그가 꺼진 채 소진 구간에 들어온 날(보유 有 등록·리버스 종료 직후·장중 인출)
+                // 문헌 4.0은 쿼터손절(1/4) 대신 리버스모드로 넘어가므로 리버스 첫날 규칙(보유 ÷ 분할수/2, 마감 MOC)을 따른다
                 orders.add(PlannedOrder.of(tradeDate, position.ticker(), MOC, SELL, mocSellQuantity,
-                        BigDecimal.ZERO, AT_OPEN, "INFINITE_MOC_SELL"));
+                        BigDecimal.ZERO, "INFINITE_MOC_SELL"));
             }
         } else {
             // LOC 매수 — 별지점 − 0.01
