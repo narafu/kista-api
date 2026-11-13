@@ -127,6 +127,34 @@ class MeritzTradingApiTest {
         });
     }
 
+    // 스펙: 잔고는 rmnd_clcd(1 일반 / 2 소수 / 3 대출)별 행으로 온다 — 같은 종목이 여러 행일 수 있다
+    private static final String SPLIT_HOLDINGS = "{\"rsp_cd\":\"5766\",\"data\":["
+            + "{\"rmnd_clcd\":\"2\",\"ovrs_stck_symb_iscd\":\"SOXL\",\"rmnd_dqty\":\"1.5000000000\",\"avrg_unpr\":\"90.000000\",\"psnt_prc\":\"100.000000\"},"
+            + "{\"rmnd_clcd\":\"1\",\"ovrs_stck_symb_iscd\":\"SOXL\",\"rmnd_dqty\":\"10.0000000000\",\"avrg_unpr\":\"100.000000\",\"psnt_prc\":\"100.000000\"}]}";
+
+    @Test
+    void sellable_quantity_counts_general_rows_only_when_split_by_balance_class() {
+        expect("/accounts/v1/me/overseas/holdings", SPLIT_HOLDINGS);
+
+        // 소수 행이 먼저 와도 일반 잔고 10주 — 정수 주문으로 팔 수 있는 수량
+        assertThat(api.getSellableQuantity(StrategyTicker.SOXL, ACCOUNT).quantity()).isEqualTo(10);
+    }
+
+    @Test
+    void present_balance_merges_rows_of_same_symbol() {
+        expect("/accounts/v1/me/overseas/holdings", SPLIT_HOLDINGS);
+        expect("/accounts/v1/me/overseas/currencies", CURRENCIES);
+        expect("/trading/v1/overseas/orders/estimate", ESTIMATE);
+
+        PresentBalanceResult r = api.getPresentBalance(ACCOUNT);
+
+        // 10 + 1.5 = 11.5주 → 정수 11주, 평단은 수량 가중 (10×100 + 1.5×90) / 11.5
+        assertThat(r.items()).singleElement().satisfies(i -> {
+            assertThat(i.holdings()).isEqualTo(11);
+            assertThat(i.avgPrice()).isEqualByComparingTo(new java.math.BigDecimal("1135").divide(new java.math.BigDecimal("11.5"), 6, java.math.RoundingMode.HALF_UP));
+        });
+    }
+
     @Test
     void present_balance_aggregates_holdings_with_usd_and_krw_deposit() {
         expect("/accounts/v1/me/overseas/holdings", HOLDINGS);

@@ -17,11 +17,14 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+import java.util.Objects;
 
 // 메리츠 해외주식 계좌 조회 — 잔고·주문가능금액·증거금·판매가능수량·보유현황·체결 내역
 @Component
@@ -33,10 +36,12 @@ class MeritzTradingApi {
     private static final String ESTIMATE_PATH = "/trading/v1/overseas/orders/estimate";
     private static final String HISTORY_PATH = "/trading/v1/overseas/orders/history";
 
+    private static final int AVG_PRICE_SCALE = 6; // 평균단가 자릿수 — 스펙 avrg_unpr 소수 6자리
     private final MeritzHttpClient http;
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record HoldingRow(
+            @JsonProperty("rmnd_clcd") String balanceClass,       // 잔고구분 1 일반 / 2 소수 / 3 대출 — 같은 종목이 구분별 행으로 온다
             @JsonProperty("ovrs_stck_symb_iscd") String symbol,   // 종목코드(접미사 없는 심볼)
             @JsonProperty("rmnd_dqty") String holdings,           // 잔고수량 — "417.0000000000" 소수 표기
             @JsonProperty("avrg_unpr") String avgPrice,           // 평균단가
@@ -82,20 +87,31 @@ class MeritzTradingApi {
 
     // 포트 계약(미체결 매도 미차감 보유 수량)에 맞춰 잔고수량 rmnd_dqty를 쓴다 — seln_able_dqty는 미체결 매도를 이미 뺀 순수량이라
     // 소비처가 DB PLANNED/PLACED SELL 예약을 다시 빼면 이중 차감된다(Toss 0d74f846과 같은 이유)
+    // 정수 주문으로 팔 수 있는 일반 잔고 행만 센다(소수·대출 잔고는 별도 주문 경로라 포함하면 수량 부족 거절 위험)
     SellableQuantity getSellableQuantity(StrategyTicker ticker, BrokerAccountRef account) {
-        HoldingRow row = findHolding(account, ticker);
-        return new SellableQuantity(ticker.name(), row == null ? 0 : MeritzResponse.wholeQuantity(row.holdings()));
+        BigDecimal general = holdings(account).stream()
+                .filter(h -> ticker.name().equals(h.symbol()) && isGeneral(h))
+                .map(h -> orZero(h.holdings()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new SellableQuantity(ticker.name(), wholeOf(general));
     }
 
     PresentBalanceResult getPresentBalance(BrokerAccountRef account) {
-        List<PresentBalanceResult.TossHolding> holdings = new ArrayList<>();
+        // 종목별로 잔고구분 행을 합친다 — 수량은 합산 후 정수 내림, 평단은 수량 가중 평균
+        Map<StrategyTicker, List<HoldingRow>> bySymbol = new LinkedHashMap<>();
         for (HoldingRow h : holdings(account)) {
-            Optional<StrategyTicker> ticker = StrategyTicker.tryParse(h.symbol());
-            int qty = MeritzResponse.wholeQuantity(h.holdings());
-            if (ticker.isEmpty() || qty == 0) continue; // 전략 종목 밖·0주는 제외
-            holdings.add(new PresentBalanceResult.TossHolding(ticker.get(), qty,
-                    MeritzResponse.decimal(h.avgPrice()), MeritzResponse.decimal(h.currentPrice())));
+            StrategyTicker.tryParse(h.symbol()).ifPresent(t -> bySymbol.computeIfAbsent(t, _ -> new ArrayList<>()).add(h));
         }
+        List<PresentBalanceResult.TossHolding> holdings = new ArrayList<>();
+        bySymbol.forEach((ticker, rows) -> {
+            BigDecimal qty = rows.stream().map(h -> orZero(h.holdings())).reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (wholeOf(qty) == 0) return; // 전략 종목 밖·1주 미만은 제외
+            BigDecimal cost = rows.stream().map(h -> orZero(h.holdings()).multiply(orZero(h.avgPrice())))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            holdings.add(new PresentBalanceResult.TossHolding(ticker, wholeOf(qty),
+                    cost.divide(qty, AVG_PRICE_SCALE, RoundingMode.HALF_UP), rows.stream()
+                    .map(h -> MeritzResponse.decimal(h.currentPrice())).filter(Objects::nonNull).findFirst().orElse(null)));
+        });
         CurrencyRow usd = http.rowList(http.get(CURRENCIES_PATH, account, new LinkedMultiValueMap<>()), CurrencyRow.class)
                 .stream().filter(c -> "USD".equals(c.currency())).findFirst().orElse(null);
         EstimateRow krw = estimateRow(account, "KRW");
@@ -135,8 +151,13 @@ class MeritzTradingApi {
         return dot < 0 ? iscd : iscd.substring(0, dot);
     }
 
-    private HoldingRow findHolding(BrokerAccountRef account, StrategyTicker ticker) {
-        return holdings(account).stream().filter(h -> ticker.name().equals(h.symbol())).findFirst().orElse(null);
+    // 잔고구분 누락은 일반으로 본다
+    private static boolean isGeneral(HoldingRow h) {
+        return h.balanceClass() == null || h.balanceClass().isBlank() || "1".equals(h.balanceClass().trim());
+    }
+
+    private static int wholeOf(BigDecimal qty) {
+        return qty.setScale(0, RoundingMode.DOWN).intValueExact();
     }
 
     private EstimateRow estimateRow(BrokerAccountRef account, String currency) {

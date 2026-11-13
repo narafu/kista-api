@@ -31,7 +31,7 @@ adapter/out/meritz/ ← MeritzHttpClient(본문 `rsp_cd` 기반 응답 판정 �
 |---|---|---|
 | 현재가 | `GET /market/v1/overseas/prices`(`iscd`, `mrkt_div_code=OV`, `mrkt_cls_code`, `dely_rltm_cls_code=0`) | `prpr`, `prdy_clpr` |
 | 일봉(확정 종가) | `GET /market/v1/overseas/candles/days`(`mod_stpr_cls_code` 필수, `from`/`to` US) | `date`, `prpr`(종가) |
-| 잔고 | `GET /accounts/v1/me/overseas/holdings`(연속조회) | `ovrs_stck_symb_iscd`, `rmnd_dqty`(판매가능수량 포트도 이 값 — `seln_able_dqty`는 미체결 매도 차감 순수량이라 쓰지 않음, `SellableQuantityPort` 계약. 2026-10-28 실측: SOXL 미체결 매도 1주 중 `rmnd_dqty=345`·`seln_able_dqty=344`), `avrg_unpr`, `psnt_prc`, `frcr_vltn_amt` |
+| 잔고 | `GET /accounts/v1/me/overseas/holdings`(연속조회, 잔고구분 `rmnd_clcd` 1일반/2소수/3대출별 행 — 같은 종목이 여러 행일 수 있어 보유 현황은 종목별 합산·수량 가중 평단, 판매가능수량은 정수 주문 대상인 일반 행만) | `ovrs_stck_symb_iscd`, `rmnd_dqty`(판매가능수량 포트도 이 값 — `seln_able_dqty`는 미체결 매도 차감 순수량이라 쓰지 않음, `SellableQuantityPort` 계약. 2026-10-28 실측: SOXL 미체결 매도 1주 중 `rmnd_dqty=345`·`seln_able_dqty=344`), `avrg_unpr`, `psnt_prc`, `frcr_vltn_amt` |
 | 외화잔고 | `GET /accounts/v1/me/overseas/currencies` | USD `frcr_amt`(예수금), `estm_frcr_amt` |
 | 주문가능금액 | `GET /trading/v1/overseas/orders/estimate` | 전 통화 행 `oder_crnc_oder_able_camt` 합(행마다 USD 환산값 — 원화는 주문 시 자동 환전되며 KRW 행은 예수금 95% ÷ 환율, 2026-10-30 실측) |
 | 당일 주문체결 | `GET /trading/v1/overseas/orders/today` | 수량 `cntg_qty` |
