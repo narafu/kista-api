@@ -125,22 +125,23 @@ api 답(2026-11-13, fable-api — 코드 확인 기준, 실행 전):
 | U2 | **삭제 가능.** ui가 구독을 지운 배포 뒤에 api가 `StatusStreamController`와 사용자 상태용 emitter 등록을 지운다 | 승인 1건(2026-06-17), `approvalRequired=false`. 프로세스 로컬 상태가 하나 준다(`findings/09`). `SseEmitterRegistry`를 다른 SSE가 함께 쓰는지는 삭제 태스크에서 확인한다(미확인). 지침서 13의 "SSE 컨트롤러 2개 유지" 판정은 이 답으로 1개 유지로 바뀐다 | 지침서 13 U1 뒤. 순서: ui 먼저 |
 | U3 | **구분한다.** 규약: `allowedActions ∪ blockedActions` = 그 전략 종류가 지원하는 동작 전체. 둘 다에 없으면 미지원(버튼 없음). `blockedActions`의 항목은 "지원하지만 지금은 불가"이고 `reasonCode`가 반드시 있다 | 판정은 도메인에 두고 "종류별 지원 동작 집합 = allowed ∪ blocked" 단위 테스트로 고정한다 | 지침서 10의 2-4절·T6(반영함) |
 | U4 | **서버 산출은 불가.** 기준표는 KISTA가 계산하는 값이 아니라 FIDA가 외부 매매표를 수집해 `POST /api/internal/fida-orders`로 넣는 원천 데이터다. KISTA에 산출 공식이 없다 | 관리자가 손으로 넣는 것이 주 경로가 아니다. 수동 등록·수정(`AdminPrivacyTradeController.java:52-102`, 5개)은 FIDA 수신 실패 대응용이고 90일 수정 11건이다(지침서 12 B5). 화면을 줄일 근거는 B5(수동 수정 원인 제거) 결과다. 그 전에는 조회 + 건별 수정이 남아야 한다 | 지침서 12 B5 조사 뒤 재판정. ui는 그때까지 화면 축소를 정하지 않는다 |
-| U5 | ① `/api/accounts/{accountId}/daily-trades`: 삭제 동의. `findings/16` 135행은 ui 호출부가 있다고 적었다(`entities/trade/api/index.ts`) — ui가 호출부를 지운 뒤 삭제 ② `trade-dates`: 삭제 확정(이 요청을 "쓸 계획 없음" 확인으로 본다). root 컨트롤러·`TradingQueryHttpAdapter.java:65`·내부 API를 함께 지운다 ③ `manual-fills`: 화면을 만들지 않는다. 12 D3이 "유지하되 동결, 삭제 방향"이다 ④ `scheduler/{open,close}`: 서버는 유지(운영 수단, 12 3절). 화면은 api 쪽 필요가 없다 — ui D6 사용자 결정에 따른다 | ①은 ui 선행. ②는 조건 해소 | 지침서 12 F2(반영함) |
+| U5 | ① `/api/accounts/{accountId}/daily-trades`: 삭제 확정. `findings/16` 135행의 ui 호출부 표기는 틀렸다 — `entities/trade/api/index.ts:74`는 유저 범위 `/api/daily-trades`를 부른다(fable-ui 회신 + api가 ui 레포 grep으로 확인, 2026-11-13. 계좌별 경로는 생성 타입 `api-types.ts`에만 있다) ② `trade-dates`: 삭제 확정(이 요청을 "쓸 계획 없음" 확인으로 본다). root 컨트롤러·`TradingQueryHttpAdapter.java:65`·내부 API를 함께 지운다 ③ `manual-fills`: 화면을 만들지 않는다. 12 D3이 "유지하되 동결, 삭제 방향"이다 ④ `scheduler/{open,close}`: 서버는 유지(운영 수단, 12 3절). 화면은 api 쪽 필요가 없다 — ui D6 사용자 결정에 따른다 | ①·② 조건 해소 | 지침서 12 F2(반영함) |
 | U6 | **지금은 받지 않는다.** 전 목록이 `from`/`to`(`LocalDate`)이고 PRIVACY의 `range`는 정수(`Integer`)라 `3M` 같은 이름이 아니다. **받도록 바꾼다**: `range` 프리셋 코드(메타가 코드·라벨 제공)를 받고 서버가 KST 오늘 기준으로 범위를 계산한다. `from`/`to`와 함께 오면 400 | "날짜 계산은 서버"(`ui-api-principles.md`)와 KST 단일 기준에 맞는다. 차트 시계열의 받은 범위 안 토글은 그대로 ui 소유. PRIVACY의 정수 `range`는 같은 규약으로 바꾼다 | 지침서 10의 2-2절·T4(반영함), 메타는 T5 |
-| U7 | 필드 위치는 `UserResponse.rejectReason`(`UserResponse.java:34`, REJECTED일 때만 값)이다. **"반려 사유 기능 폐기(2026-11-12)" 결정은 api 쪽 기록에 없다**(B절 2026-11-12 결정에는 REJECTED 라벨 "반려"만 있다) — 원문 위치를 알려 달라 | 폐기가 맞으면 응답 필드만이 아니라 한 줄기를 지운다: `AdminStatusRequest.reason`, `UserService.reject`의 reason, `User.rejectReason`, 텔레그램 반려 알림의 사유 줄(`TelegramUserNotificationAdapter.java:46-47`), `NotificationRecipient.rejectReason`, `users.reject_reason` 컬럼(expand/contract 2배포), `constraints.md` "상태 종속 민감 필드 마스킹" 절 | 결정 원문 확인 뒤 지침서 13 U1 묶음에 넣는다. 응답 필드 삭제는 ui가 읽기를 멈춘 뒤 |
+| U7 | **서버는 지우지 않는다(보류).** 필드 위치는 `UserResponse.rejectReason`(`UserResponse.java:34`, REJECTED일 때만 값)이다. fable-ui 정정(2026-11-13): "폐기(2026-11-12)"는 ui에 남아 있던 미구현 spec 문서를 지운 결정이었고 서버 구현을 지우라는 결정이 아니다 | 서버에는 이미 구현돼 있다: `AdminStatusRequest.reason`, `UserService.reject`, `User.rejectReason`, 텔레그램 반려 알림의 사유 줄, `users.reject_reason`. ui D7(양쪽 삭제 / ui를 마저 만듦, ui 권고는 후자 — 서버 변경 없음)로 사용자에게 다시 묻는 중 | D7 답 전에는 태스크를 만들지 않는다 |
 
-결정 대기(사용자가 ui 지침서 10의 결정 목록에서 승인하면 요청이 된다):
+ui 결정에서 온 요청(fable-ui 전달 2026-11-13: 사용자가 ui 지침서 10의 결정 목록을 "모두 권장대로" 승인). 태스크 분해는 아직 하지 않았다 — 각 지침서의 해당 태스크를 실행할 때 넣는다:
 
-| ui 결정 | 승인 시 api에 필요한 것 |
-|---|---|
-| D2 `/admin/pending` 병합 | 관리자 사용자 목록의 `status` 필터 파라미터(T4 관리자 묶음에 포함) |
-| D8 "보관" 전략 | 메타의 전략 상태 라벨 변경, 또는 보관 해제 엔드포인트 |
-| D9 VR 투자금 경로 통일 | VR 투자금 추가·인출을 재설정 요청에서 분리(다른 종류와 같은 엔드포인트) |
-| D10 DCA 다음 주문 예정 | DCA 다음 실행 예정(일자·규칙별 금액·건너뛸 조건) 응답 |
-| D13 내보내기 | 가계부 거래·자산 기록의 `text/csv` 응답(목록과 같은 필터 파라미터) |
-| D14 삭제 실행 취소 | 가계부 5종의 복구 엔드포인트(`POST …/{id}/restore`). 집계(T8)가 복구를 반영해야 한다 |
-| D15 가져오기, D16 반복 거래 | "미리보기 → 확정" 엔드포인트(지침서 10의 2-6절 일괄 등록과 같은 모양) |
-| D6 운영 도구 화면 | 없음(엔드포인트가 이미 있다). 삭제로 결정되면 서버 삭제 |
+| ui 결정 | api에 필요한 것 | 넣을 곳 |
+|---|---|---|
+| D2 `/admin/pending` 병합 | 관리자 사용자 목록의 `status` 필터 파라미터 | 지침서 10 T4 관리자 묶음 |
+| D8 "보관" 전략 | 메타의 전략 상태 라벨을 동작에 맞게 바꾼다. 보관 해제 엔드포인트는 만들지 않는다. ui 기본 문구는 "종료됨(기록 보관)"이고 api가 라벨을 정하면 그것을 따른다 | 지침서 10 T5(메타) |
+| D9 VR 투자금 경로 통일 | VR 투자금 추가·인출을 재설정 요청에서 분리(다른 종류와 같은 엔드포인트) | 지침서 03(전략 축) 실행 때 |
+| D10 DCA 다음 주문 예정 | DCA 다음 실행 예정(일자·규칙별 금액·건너뛸 조건) 응답 | **사용자 확인 필요** — api 지침서 12 D4에서 "코인 DCA 주문 미리보기는 추가하지 않는다"로 답했다(`PROGRESS.md`). 같은 것인지, D10이 그 답을 바꾸는지 확인 전에는 태스크를 만들지 않는다 |
+| D13 내보내기 | 가계부 거래·자산 기록의 `text/csv` 응답(목록과 같은 필터 파라미터) | 지침서 10 T4 가계부 묶음 뒤 |
+| D14 삭제 실행 취소 | 가계부 5종의 복구 엔드포인트(`POST …/{id}/restore`). 집계(T8)가 복구를 반영해야 한다 | 지침서 10 T8과 함께 |
+| E3·E4 (= U2·U1) | 위 "api 답" 표와 같다 | 지침서 13 U1 |
+
+아직 열림(태스크를 만들지 않는다): D6 스케줄러 수동 실행 화면(삭제로 정해지면 서버 삭제), D7 반려 사유(U7), D15 CSV 가져오기("미리보기 → 확정" 엔드포인트). D16 반복 거래는 만들지 않는다.
 
 infra 요청(fable-infra에 전달함): Caddy access log 켜기(ui D17 — 화면 사용 흔적을 볼 수단이 없다), 보안 헤더(HSTS·`X-Content-Type-Options`·frame 제한·`Referrer-Policy`)가 Caddy와 Next 설정 어디에도 없어 보인다(ui 11의 10-3, 운영 응답은 확인하지 않음).
 

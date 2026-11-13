@@ -134,7 +134,7 @@ main/test는 줄 수다. 기능 사이에 겹치는 파일이 있어 합계는 �
 | `GET /api/admin/_ping` | 삭제 | 호출처 없음 |
 | `GET /api/internal/marketcalendar/is-open` | 삭제 | 호출처 없음(테스트만). 05 X에서 내부 API가 사라질 때 함께 |
 | `GET /api/admin/accounts/{a}/strategies/{s}/trade-dates` | 삭제 | ui 호출 0. fable-ui 확인 완료(2026-11-13, `cross-repo.md` B절 U5). root 컨트롤러·`TradingQueryHttpAdapter`·내부 API를 함께 지운다 |
-| `GET /api/accounts/{accountId}/daily-trades` | 삭제 | 유저 범위 `/api/daily-trades`로 대체(U5). ui가 호출부를 지운 뒤 |
+| `GET /api/accounts/{accountId}/daily-trades` | 삭제 | 유저 범위 `/api/daily-trades`로 대체(U5). ui 호출부 없음 확인(2026-11-13) |
 
 ## 4. 보완할 것
 
