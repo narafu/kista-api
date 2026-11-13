@@ -117,6 +117,18 @@ api 판단 요청(답이 ui 지침서의 방향을 정한다):
 | U6 | 페이지형 목록이 기간을 프리셋 이름으로 받는가(`range=3M`). PRIVACY 목록은 이미 `range`를 받는다 | ui 11의 6절. ui에 기간 프리셋 체계가 3벌이고 KST·UTC가 섞여 있다 | 받으면 ui의 날짜 범위 계산이 사라진다 |
 | U7 | 사용자 응답의 `rejectReason` 필드(`MeResponse` 추정)는 반려 사유 기능 폐기(2026-11-12) 뒤에도 남아 있다 | ui 10의 B4 | 서버 필드 삭제 후보 |
 
+api 답(2026-11-13, fable-api — 코드 확인 기준, 실행 전):
+
+| # | 답 | 근거·조건 | 실행 위치 |
+|---|---|---|---|
+| U1 | **수용.** AT에 `status` 클레임을 더한다. `role`은 이미 있다(`JwtIssuerService.java:41`). 상태가 바뀌면(승인·반려·재신청) 역할 변경과 같은 장치(`BlacklistPort.markRoleChanged` → `JwtAuthFilter.java:58-66`의 `iat` 비교)로 옛 AT를 거절한다. 거절 코드는 `TOKEN_STALE_ROLE`을 그대로 쓴다(ui가 이미 이 코드로 갱신한다. 코드를 하나 더 만들지 않는다) | 지금 장치는 역할 변경(`UserService.java:198`)에만 걸려 있다. 반려는 userId 블랙리스트(`TOKEN_BLACKLISTED`)로 막힌다 — 반려된 사용자가 `/rejected` 화면·재신청을 쓸 수 있는지는 실행 태스크에서 먼저 확인한다(미확인). ui는 클레임을 화면 분기에만 쓰고 권한 강제는 서버가 한다. 클레임 추가는 가산적이라 api가 먼저 배포하고 ui가 캐시 쿠키를 그 뒤에 지운다 | 지침서 13 U1(보안 절 처방에 반영함) |
+| U2 | **삭제 가능.** ui가 구독을 지운 배포 뒤에 api가 `StatusStreamController`와 사용자 상태용 emitter 등록을 지운다 | 승인 1건(2026-06-17), `approvalRequired=false`. 프로세스 로컬 상태가 하나 준다(`findings/09`). `SseEmitterRegistry`를 다른 SSE가 함께 쓰는지는 삭제 태스크에서 확인한다(미확인). 지침서 13의 "SSE 컨트롤러 2개 유지" 판정은 이 답으로 1개 유지로 바뀐다 | 지침서 13 U1 뒤. 순서: ui 먼저 |
+| U3 | **구분한다.** 규약: `allowedActions ∪ blockedActions` = 그 전략 종류가 지원하는 동작 전체. 둘 다에 없으면 미지원(버튼 없음). `blockedActions`의 항목은 "지원하지만 지금은 불가"이고 `reasonCode`가 반드시 있다 | 판정은 도메인에 두고 "종류별 지원 동작 집합 = allowed ∪ blocked" 단위 테스트로 고정한다 | 지침서 10의 2-4절·T6(반영함) |
+| U4 | **서버 산출은 불가.** 기준표는 KISTA가 계산하는 값이 아니라 FIDA가 외부 매매표를 수집해 `POST /api/internal/fida-orders`로 넣는 원천 데이터다. KISTA에 산출 공식이 없다 | 관리자가 손으로 넣는 것이 주 경로가 아니다. 수동 등록·수정(`AdminPrivacyTradeController.java:52-102`, 5개)은 FIDA 수신 실패 대응용이고 90일 수정 11건이다(지침서 12 B5). 화면을 줄일 근거는 B5(수동 수정 원인 제거) 결과다. 그 전에는 조회 + 건별 수정이 남아야 한다 | 지침서 12 B5 조사 뒤 재판정. ui는 그때까지 화면 축소를 정하지 않는다 |
+| U5 | ① `/api/accounts/{accountId}/daily-trades`: 삭제 동의. `findings/16` 135행은 ui 호출부가 있다고 적었다(`entities/trade/api/index.ts`) — ui가 호출부를 지운 뒤 삭제 ② `trade-dates`: 삭제 확정(이 요청을 "쓸 계획 없음" 확인으로 본다). root 컨트롤러·`TradingQueryHttpAdapter.java:65`·내부 API를 함께 지운다 ③ `manual-fills`: 화면을 만들지 않는다. 12 D3이 "유지하되 동결, 삭제 방향"이다 ④ `scheduler/{open,close}`: 서버는 유지(운영 수단, 12 3절). 화면은 api 쪽 필요가 없다 — ui D6 사용자 결정에 따른다 | ①은 ui 선행. ②는 조건 해소 | 지침서 12 F2(반영함) |
+| U6 | **지금은 받지 않는다.** 전 목록이 `from`/`to`(`LocalDate`)이고 PRIVACY의 `range`는 정수(`Integer`)라 `3M` 같은 이름이 아니다. **받도록 바꾼다**: `range` 프리셋 코드(메타가 코드·라벨 제공)를 받고 서버가 KST 오늘 기준으로 범위를 계산한다. `from`/`to`와 함께 오면 400 | "날짜 계산은 서버"(`ui-api-principles.md`)와 KST 단일 기준에 맞는다. 차트 시계열의 받은 범위 안 토글은 그대로 ui 소유. PRIVACY의 정수 `range`는 같은 규약으로 바꾼다 | 지침서 10의 2-2절·T4(반영함), 메타는 T5 |
+| U7 | 필드 위치는 `UserResponse.rejectReason`(`UserResponse.java:34`, REJECTED일 때만 값)이다. **"반려 사유 기능 폐기(2026-11-12)" 결정은 api 쪽 기록에 없다**(B절 2026-11-12 결정에는 REJECTED 라벨 "반려"만 있다) — 원문 위치를 알려 달라 | 폐기가 맞으면 응답 필드만이 아니라 한 줄기를 지운다: `AdminStatusRequest.reason`, `UserService.reject`의 reason, `User.rejectReason`, 텔레그램 반려 알림의 사유 줄(`TelegramUserNotificationAdapter.java:46-47`), `NotificationRecipient.rejectReason`, `users.reject_reason` 컬럼(expand/contract 2배포), `constraints.md` "상태 종속 민감 필드 마스킹" 절 | 결정 원문 확인 뒤 지침서 13 U1 묶음에 넣는다. 응답 필드 삭제는 ui가 읽기를 멈춘 뒤 |
+
 결정 대기(사용자가 ui 지침서 10의 결정 목록에서 승인하면 요청이 된다):
 
 | ui 결정 | 승인 시 api에 필요한 것 |

@@ -52,6 +52,8 @@
 
 차트용 시계열(자산 스냅샷 추이 등)은 "기간 파라미터로 범위를 정하는 전량형"으로 둔다. 기간 상한을 서버가 강제한다.
 
+기간 파라미터는 `from`/`to`(날짜) 또는 `range`(프리셋 코드, 예 `3M`) 중 하나다. `range`는 서버가 KST 오늘 기준으로 범위를 계산하고, 프리셋의 코드·라벨은 메타가 준다(T5). 둘이 함께 오면 400. 관리자 PRIVACY 목록의 정수 `range`도 이 규약으로 바꾼다(T4 — `cross-repo.md` B절 U6).
+
 ### 2-3. 메타 한 곳
 
 - `/api/meta`가 UI가 쓰는 모든 코드값의 라벨·설명과 **등록 기본값·허용 범위**의 단일 출처다. `/api/runtime-config`의 전략 기본값·허용값과 VR 램프 기본값표(`VrRampInput.withDefaults`)를 메타로 합친다. 런타임에 바뀌는 값이면 메타 응답이 그 시점 값을 싣는다(캐시 정책은 T5에서 정한다).
@@ -61,7 +63,7 @@
 
 ### 2-4. 서버가 판정해서 내려준다
 
-- 전략 상세: `allowedActions`(예: `PAUSE`, `RESUME`, `INJECT_CAPITAL`, `WITHDRAW_CAPITAL`, `EDIT_SEED`, `RESET_VR`, `DELETE`)와, 막힌 액션은 `blockedActions[{action, reasonCode}]`. 사유 코드의 문구는 메타가 준다.
+- 전략 상세: `allowedActions`(예: `PAUSE`, `RESUME`, `INJECT_CAPITAL`, `WITHDRAW_CAPITAL`, `EDIT_SEED`, `RESET_VR`, `DELETE`)와, 막힌 액션은 `blockedActions[{action, reasonCode}]`. 사유 코드의 문구는 메타가 준다. 두 목록의 합집합이 그 전략 종류가 지원하는 동작 전체다 — 둘 다에 없는 동작은 미지원이고(UI는 버튼을 그리지 않는다), `blockedActions`는 "지원하지만 지금은 불가"만 싣는다. 이 불변식을 도메인 단위 테스트로 고정한다(`cross-repo.md` B절 U3).
 - 계좌: `apiKeyExpiry{status: OK|EXPIRING|EXPIRED|NONE, expiresOn, daysLeft}`.
 - 주문 미리보기: 경고를 `warnings[{code, detail}]` 배열로. UI의 `computeOrderReadiness`가 하던 판정을 서버로 옮긴다.
 - 예약 시작·투자금 조정 가능 여부도 같은 방식.
