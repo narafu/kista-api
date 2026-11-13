@@ -28,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 @Component
 @RequiredArgsConstructor
@@ -81,11 +82,13 @@ class TossOrderApi {
     }
 
     public List<Execution> getExecutions(LocalDate from, LocalDate to, StrategyTicker ticker, BrokerAccountRef account) {
-        // CLOSED + OPEN 두 상태 모두 조회 — PARTIAL_FILLED는 OPEN에 속함
-        List<Execution> result = new ArrayList<>();
-        result.addAll(fetchExecutions("CLOSED", from, to, ticker, account));
-        result.addAll(fetchExecutions("OPEN",   from, to, ticker, account));
-        return result;
+        // CLOSED + OPEN 두 상태 모두 조회 — PARTIAL_FILLED는 스펙상 두 그룹 모두에 속해 같은 주문이 양쪽에 올 수 있다.
+        // 주문당 누적 체결이므로 orderId별 1건, 두 조회 사이 체결이 진행됐으면 수량이 큰 쪽을 남긴다
+        Map<String, Execution> byOrderId = new LinkedHashMap<>();
+        Stream.concat(fetchExecutions("CLOSED", from, to, ticker, account).stream(),
+                        fetchExecutions("OPEN", from, to, ticker, account).stream())
+                .forEach(e -> byOrderId.merge(e.externalOrderId(), e, (a, b) -> b.quantity() > a.quantity() ? b : a));
+        return new ArrayList<>(byOrderId.values());
     }
 
     // status별 GET /api/v1/orders — 페이지네이션 루프 처리 (CLOSED), OPEN은 단일 응답

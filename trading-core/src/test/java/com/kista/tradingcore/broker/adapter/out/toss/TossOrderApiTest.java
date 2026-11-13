@@ -278,6 +278,27 @@ class TossOrderApiTest {
         assertThat(result.getFirst().quantity()).isEqualTo(2);
     }
 
+    @Test
+    @DisplayName("PARTIAL_FILLED는 OPEN·CLOSED 양쪽 그룹에 속한다(스펙) — 같은 orderId는 한 번만, 체결 수량이 큰 쪽")
+    void getExecutions_sameOrderInBothGroups_countedOnce() {
+        TossOrderApi.OrderItem closedView = new TossOrderApi.OrderItem("oid-5", "BUY",
+                new TossOrderApi.OrderExecutionItem("2", "30.00", "60.00", null));
+        TossOrderApi.OrderItem openView = new TossOrderApi.OrderItem("oid-5", "BUY",
+                new TossOrderApi.OrderExecutionItem("3", "30.00", "90.00", null));
+
+        when(tossHttpClient.get(anyString(), any(), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(wrapOrders(new TossOrderApi.OrdersResponse(List.of(closedView), null, false)))
+            .thenReturn(wrapOrders(new TossOrderApi.OrdersResponse(List.of(openView), null, false)));
+
+        List<Execution> result = tossOrderApi.getExecutions(
+            LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), StrategyTicker.SOXL, ACCOUNT);
+
+        assertThat(result).singleElement().satisfies(e -> {
+            assertThat(e.externalOrderId()).isEqualTo("oid-5");
+            assertThat(e.quantity()).isEqualTo(3);
+        });
+    }
+
     @ParameterizedTest(name = "{0} 체결 → 거래일 {1} 조회 포함={2}")
     @DisplayName("filledAt은 뉴욕 일자+1 KST 거래일로 판정 — 전날 저녁 장중·자정 이후·애프터마켓 체결이 거래일 D에 포함")
     @CsvSource({
