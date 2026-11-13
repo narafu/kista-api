@@ -110,6 +110,38 @@ class FidaOrderControllerTest {
     }
 
     @Test
+    void placeFidaOrder_order_element_missing_price_returns_400() throws Exception {
+        // 주문 원소의 price 누락 — @Valid 없으면 검증이 안 내려가 DB NOT NULL 위반(500)이 된다
+        String json = """
+                {"releaseDate":"2026-01-02","ticker":"SOXL","currentCycleStart":500.00,
+                 "currentCycleRealizedPnl":0,"avgPrice":25.5,"holdings":10,
+                 "orders":[{"direction":"SELL","orderType":"LIMIT","quantity":3}]}""";
+
+        mockMvc.perform(post("/api/internal/fida-orders")
+                        .header("X-Internal-Token", VALID_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isBadRequest());
+        org.mockito.Mockito.verifyNoInteractions(privacy);
+    }
+
+    @Test
+    void placeFidaOrder_null_order_element_returns_400() throws Exception {
+        // orders에 null 원소 — 교차 검증(isBuyQuantityValid)이 NPE로 500을 내지 않고 400이어야 한다
+        String json = """
+                {"releaseDate":"2026-01-02","ticker":"SOXL","currentCycleStart":500.00,
+                 "currentCycleRealizedPnl":0,"avgPrice":25.5,"holdings":10,
+                 "orders":[null]}""";
+
+        mockMvc.perform(post("/api/internal/fida-orders")
+                        .header("X-Internal-Token", VALID_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isBadRequest());
+        org.mockito.Mockito.verifyNoInteractions(privacy);
+    }
+
+    @Test
     void placeFidaOrder_unauthenticated_returns_401() throws Exception {
         mockMvc.perform(post("/api/internal/fida-orders")
                         .contentType(MediaType.APPLICATION_JSON)

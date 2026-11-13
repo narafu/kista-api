@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.StrategyTicker;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -23,22 +24,22 @@ public record FidaOrderRequest(
         @NotNull BigDecimal currentCycleRealizedPnl,            // 사이클 실현 수익($)
         @Nullable BigDecimal avgPrice,                                    // 평단가 (nullable)
         @PositiveOrZero int holdings,                           // 보유 수량
-        @NotNull List<PlannedOrder> orders                      // 계획 주문 — 누락이면 400(빈 목록은 허용)
+        @NotNull List<@NotNull @Valid PlannedOrder> orders      // 계획 주문 — 누락·null 원소면 400(빈 목록은 허용)
 ) {
     // quantity=null은 "남은 전부 매도"를 의미 — SELL 방향에서만 허용
     @JsonIgnore
     @AssertTrue(message = "BUY 주문의 quantity는 null일 수 없습니다")
     public boolean isBuyQuantityValid() {
         return orders == null || orders.stream()
-                .filter(o -> o.direction() == OrderDirection.BUY)
+                .filter(o -> o != null && o.direction() == OrderDirection.BUY) // null 원소는 @NotNull이 400으로 거른다 — 여기서 NPE로 500이 되지 않게
                 .allMatch(o -> o.quantity() != null);
     }
 
     // FIDA 계획 주문 1건
     public record PlannedOrder(
-            @Nullable OrderDirection direction, // 매수/매도
-            @Nullable OrderType orderType,      // LOC / MOC / LIMIT
+            @NotNull OrderDirection direction,    // 매수/매도
+            @NotNull OrderType orderType,      // LOC / MOC / LIMIT
             @Nullable Integer quantity,         // 주문 수량 (nullable — SELL "잔량 전부" 의미)
-            @Nullable BigDecimal price          // 주문 가격
+            @NotNull BigDecimal price          // 주문 가격
     ) {}
 }

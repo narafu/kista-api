@@ -17,7 +17,7 @@ public record PlannedOrder(
         OrderTiming timing,         // AT_OPEN/AT_CLOSE
         OrderDirection direction,   // BUY/SELL
         String orderLeg,            // 전략 주문 다리 식별자
-        Integer quantity,           // 주문 수량 (nullable — SELL "잔량 전부")
+        int quantity,               // 주문 수량
         BigDecimal price            // 주문 가격
 ) {
     public static final String UNKNOWN_LEG = "UNKNOWN";
