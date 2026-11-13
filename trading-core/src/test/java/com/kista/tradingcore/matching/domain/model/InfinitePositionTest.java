@@ -253,20 +253,20 @@ class InfinitePositionTest {
     }
 
     @Test
-    @DisplayName("30분할 수량: 전반(14회차) 평단 매수 50주·기준가 매수 49주, 후반(15회차) 100주")
+    @DisplayName("30분할 수량: 전반(14회차) 평단 매수 50주·별지점−0.01 매수 50주, 후반(15회차) 101주")
     void quantities_30div() {
-        InfinitePosition early = posAtAvg1(1400, 1600, 30); // unit=100, 평단 1, 기준가 1.01
+        InfinitePosition early = posAtAvg1(1400, 1600, 30); // unit=100, 평단 1, 별지점 1.01, LOC 매수가 1.00
         int byAvg = early.calcEarlyBuyQuantityByAvgPrice();
 
         assertThat(byAvg).isEqualTo(50);                                       // floor(50/1)
-        assertThat(early.calcEarlyBuyQuantityByRefPrice(byAvg)).isEqualTo(49); // floor(50/1.01)
-        assertThat(posAtAvg1(1500, 1500, 30).calcLateBuyQuantity()).isEqualTo(100); // floor(100/1.00)
+        assertThat(early.calcEarlyBuyQuantityByRefPrice(byAvg)).isEqualTo(50); // floor(50/1.00)
+        assertThat(posAtAvg1(1500, 1500, 30).calcLateBuyQuantity()).isEqualTo(101); // floor(100/0.99) — 별지점 1.00 − 0.01
     }
 
     @Test
-    @DisplayName("40분할 수량: 전반(19회차) 평단 매수 50주, 후반(20회차) 100주")
+    @DisplayName("40분할 수량: 전반(19회차) 평단 매수 50주, 후반(20회차) 101주")
     void quantities_40div() {
         assertThat(posAtAvg1(1900, 2100, 40).calcEarlyBuyQuantityByAvgPrice()).isEqualTo(50);
-        assertThat(posAtAvg1(2000, 2000, 40).calcLateBuyQuantity()).isEqualTo(100);
+        assertThat(posAtAvg1(2000, 2000, 40).calcLateBuyQuantity()).isEqualTo(101); // floor(100/0.99)
     }
 }

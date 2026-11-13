@@ -88,6 +88,11 @@ public record InfinitePosition(
                 .setScale(Currency.USD.amountScale(), HALF_UP);
     }
 
+    // LOC 매수가 = 별지점 − 0.01 — 같은 종가에서 매수·매도가 함께 체결되지 않게 매도(별지점)보다 1틱 아래에 둔다(문헌 규칙)
+    public BigDecimal locBuyPrice() {
+        return referencePrice().subtract(TICK_SIZE);
+    }
+
     public BigDecimal targetPrice() {
         return averagePrice().multiply(BigDecimal.ONE.add(ticker.getTargetProfitRate()))
                 .setScale(Currency.USD.amountScale(), HALF_UP);
@@ -150,11 +155,11 @@ public record InfinitePosition(
 
     public int calcEarlyBuyQuantityByRefPrice(int buyQuantityByAvgPrice) {
         return earlyBuyQuantity2(unitAmount(), averagePrice(), buyQuantityByAvgPrice,
-                referencePrice());
+                locBuyPrice());
     }
 
     public int calcLateBuyQuantity() {
-        return lateBuyQuantity(unitAmount(), referencePrice());
+        return lateBuyQuantity(unitAmount(), locBuyPrice());
     }
 
     // 전후반 공통 LOC 매도 수량 — 후반 calcMocSellQuantity와 계산식은 같지만 별개 주문(LOC vs MOC)

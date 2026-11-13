@@ -518,9 +518,9 @@ class BacktestEngineTest {
         assertThat(late.position(4).currentRound()).isCloseTo(2.1999920, within(1e-6));
         assertThat(late.position(4).isEarlyStage()).isFalse();
         assertThat(late.legs()).containsExactly("INFINITE_LATE_REF_BUY", "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03", "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");
-        // 후반 매수 = 250.01 ÷ 기준가 90.30 내림 = 2주. offset = 0.15×(1−2×2.199992/4) = −0.0149994(반올림 안 함) → 91.67 × 0.9850006 = 90.29500.. → 90.30 (반 센트 경계에서 5e-6 위 — 단위금액 반올림 250.01 때문)
+        // 후반 매수 = 250.01 ÷ LOC 매수가 90.29(별지점 90.30 − 0.01) 내림 = 2주. offset = 0.15×(1−2×2.199992/4) = −0.0149994(반올림 안 함) → 91.67 × 0.9850006 = 90.29500.. → 별지점 90.30 (반 센트 경계에서 5e-6 위 — 단위금액 반올림 250.01 때문)
         assertThat(late.orders().getFirst().quantity()).isEqualTo(2);
-        assertThat(late.orders().getFirst().price()).isEqualByComparingTo("90.30");
+        assertThat(late.orders().getFirst().price()).isEqualByComparingTo("90.29");
 
         // 5일차 종가 80에 캡(85×1.05=89.25) 보정 매수 3주 체결 → 예수금 450 − 240 = 210 + 9주×80 = 930
         assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("930");
@@ -604,12 +604,12 @@ class BacktestEngineTest {
         // 2분할이면 리버스모드 MOC 매도 수량 = holdings ÷ (2/2) = 전량이라 리버스모드 상태 그대로 청산에 도달한다
         // nextReverseMode()는 holdings=0이면 "유지"를 반환하므로, 새 사이클이 일반모드로 시작되는 건 rotateCycle()의 리셋 덕분이다
         BacktestEngine.Output output = infiniteEngine.run(List.of(
-                flat("2024-01-01", 100), flat("2024-01-02", 100), flat("2024-01-03", 100),
+                flat("2024-01-01", 100), flat("2024-01-02", 100), flat("2024-01-03", 99),
                 flat("2024-01-04", 95), flat("2024-01-05", 90)
         ), infiniteCommand("2024-01-01", "1000", 2));
 
-        // 1일차 매수 5주(@100, 캡 보정분 포함)가 2일차 체결 → 1.0회차(후반) 매수 5주 @100이 3일차 체결
-        // 3일차: 10주·평단 100·예수금 0 → 단위금액 500.00 > 0 → 리버스모드 진입, 전량(10주) MOC 매도
+        // 1일차 매수 5주(@100, 캡 보정분 포함)가 2일차 체결 → 1.0회차(후반) 매수 5주 @99.99(별지점 100 − 0.01)가 3일차 종가 99에 체결
+        // 3일차: 10주·평단 99.50·예수금 5 → 단위금액 500.00 > 5 → 리버스모드 진입, 전량(10주) MOC 매도
         Recorded liquidating = recorder.on("2024-01-03");
         assertThat(liquidating.inputs().isReverseMode()).isTrue();
         assertThat(liquidating.inputs().isFirstReverseDay()).isTrue();
@@ -627,10 +627,10 @@ class BacktestEngineTest {
         assertThat(restarted.legs()).containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY",
                         "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03");
 
-        // 자산은 시드로 리셋되지 않고 그대로 이월된다 — 예수금 0 + 매도대금 950 = 950.00
-        assertThat(restarted.balance().deposit()).isEqualByComparingTo("950");
-        // 5일차: 새 사이클 매수 5주가 종가 90에 체결 → 예수금 500 + 5주×90 = 950.00
-        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("950");
+        // 자산은 시드로 리셋되지 않고 그대로 이월된다 — 예수금 5 + 매도대금 950 = 955.00
+        assertThat(restarted.balance().deposit()).isEqualByComparingTo("955");
+        // 5일차: 새 사이클 매수가 종가 90에 체결돼도 총자산은 예수금 + 보유×90 = 955.00
+        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("955");
         assertThat(output.warnings()).isEmpty();
     }
 
@@ -1115,7 +1115,7 @@ class BacktestEngineTest {
 
         // 청산되면_새_사이클이_리버스모드_해제_상태로_시작된다와 같은 경로 — 01-04에 10주 전량 체결로 청산
         BacktestEngine.Output output = infiniteEngine.run(List.of(
-                flat("2024-01-01", 100), flat("2024-01-02", 100), flat("2024-01-03", 100),
+                flat("2024-01-01", 100), flat("2024-01-02", 100), flat("2024-01-03", 99),
                 flat("2024-01-04", 95), flat("2024-01-05", 90)
         ), command);
 
@@ -1123,8 +1123,8 @@ class BacktestEngineTest {
                 .doesNotContainKeys(LocalDate.parse("2024-01-04"), LocalDate.parse("2024-01-05"));
         assertThat(output.cycleCount()).isEqualTo(1);
         assertThat(output.warnings()).containsExactly("2024-01-04: 사이클이 종료되어 이후 매매를 중단했습니다(사이클 종료 후 재시작 안 함).");
-        // 매도대금 950이 그대로 남는다
-        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("950");
+        // 예수금 5 + 매도대금 950이 그대로 남는다
+        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("955");
     }
 
     @Test

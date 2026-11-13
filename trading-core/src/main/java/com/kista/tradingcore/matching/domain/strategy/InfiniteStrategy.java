@@ -46,7 +46,7 @@ public class InfiniteStrategy {
         // base 주문 없이 correction leg만 남은 비정상 상태(부분 저장 실패 등) — 재산정 근거가 없어 보정 없이 원본 유지
         if (baseOrders.isEmpty()) return buyOrders;
 
-        // 원래 BUY 주문의 가격 순서: buy①=averagePrice(또는 currentPrice), buy②=referencePrice
+        // 원래 BUY 주문의 가격 순서: buy①=averagePrice(또는 currentPrice), buy②=locBuyPrice(별지점 − 0.01)
         // 전반이면 ①②(매수②는 0주라 없을 수 있다), 후반이면 단일 LOC
         List<PlannedOrder> newBuys = !position.isEarlyStage()
                 ? computeLateBuys(tradeDate, position, baseOrders.getFirst(), cap, unitAmount)
@@ -77,7 +77,7 @@ public class InfiniteStrategy {
         return trimCorrectionsToBudget(result, position.deposit());
     }
 
-    // 후반 단일 LOC 매수: unitAmount/referencePrice
+    // 후반 단일 LOC 매수: unitAmount/locBuyPrice(별지점 − 0.01)
     private List<PlannedOrder> computeLateBuys(LocalDate tradeDate, InfinitePosition position, PlannedOrder orig, BigDecimal cap, BigDecimal unitAmount) {
         BigDecimal cappedPrice = orig.price().min(cap);
         int quantity = InfinitePosition.lateBuyQuantity(unitAmount, cappedPrice);
@@ -87,7 +87,7 @@ public class InfiniteStrategy {
         return buys;
     }
 
-    // 전반: buy①(averagePrice 기반), buy②(referencePrice 기반, 원본에 없을 수 있음)
+    // 전반: buy①(averagePrice 기반), buy②(locBuyPrice 기반, 원본에 없을 수 있음)
     // DB 조회 순서가 보장되지 않으므로 ①②는 순서가 아니라 leg로 식별한다 — ①②로 식별되지 않는 행은 무시하고 없는 자리는 포지션 기준으로 다시 만든다
     private List<PlannedOrder> computeEarlyBuys(LocalDate tradeDate, InfinitePosition position, List<PlannedOrder> baseOrders, BigDecimal cap, BigDecimal unitAmount) {
         PlannedOrder buy1 = baseOrders.stream().filter(o -> AVG_LEGS.contains(o.orderLeg())).findFirst().orElse(null);
@@ -95,7 +95,7 @@ public class InfiniteStrategy {
         // 매수①이 없으면(REF만 남은 경우) 평단가 LOC로 다시 만든다
         BigDecimal avgPrice = buy1 != null ? buy1.price() : position.averagePrice();
         OrderType avgType = buy1 != null ? buy1.orderType() : LOC;
-        BigDecimal refPrice = buy2 != null ? buy2.price() : position.referencePrice();
+        BigDecimal refPrice = buy2 != null ? buy2.price() : position.locBuyPrice();
         OrderType refType = buy2 != null ? buy2.orderType() : LOC;
 
         BigDecimal cappedAvg = avgPrice.min(cap);
@@ -146,10 +146,10 @@ public class InfiniteStrategy {
         buys.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, BUY, buyQuantity1,
                 position.averagePrice(), EARLY_AVG_LEG));
 
-        // LOC 매수 ② — 기준가 기준 (매수①이 unitAmount를 다 쓰면 0주 → 미생성)
+        // LOC 매수 ② — 별지점 − 0.01 (매수①이 unitAmount를 다 쓰면 0주 → 미생성)
         int buyQuantity2 = position.calcEarlyBuyQuantityByRefPrice(buyQuantity1);
         if (buyQuantity2 > 0) buys.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, BUY, buyQuantity2,
-                position.referencePrice(), EARLY_REF_LEG));
+                position.locBuyPrice(), EARLY_REF_LEG));
 
         // 보정 주문은 BUY만 담긴 시점에 붙인다 — base BUY가 없으면 보정도 없다
         List<PlannedOrder> orders = withCorrections(tradeDate, position, buys);
@@ -167,11 +167,11 @@ public class InfiniteStrategy {
                         BigDecimal.ZERO, AT_OPEN, "INFINITE_MOC_SELL"));
             }
         } else {
-            // LOC 매수 — 기준가 기준
+            // LOC 매수 — 별지점 − 0.01
             int buyQuantity = position.calcLateBuyQuantity();
             if (buyQuantity >= 1) {
                 orders.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, BUY, buyQuantity,
-                        position.referencePrice(), "INFINITE_LATE_REF_BUY"));
+                        position.locBuyPrice(), "INFINITE_LATE_REF_BUY"));
             }
 
             orders = withCorrections(tradeDate, position, orders);
@@ -181,10 +181,10 @@ public class InfiniteStrategy {
     }
 
     private void addCommonSellOrders(List<PlannedOrder> orders, InfinitePosition position, LocalDate tradeDate) {
-        // LOC 매도 (기준가 + 0.01) — 마감 배치에서 매수와 같은 position으로 접수 (장중 추가·인출로 T가 바뀌어도 매도·매수 기준가가 맞물린다)
+        // LOC 매도 (별지점, 매수는 별지점 − 0.01) — 마감 배치에서 매수와 같은 position으로 접수 (장중 추가·인출로 T가 바뀌어도 매도·매수 기준가가 맞물린다)
         int locSellQuantity = position.calcLocSellQuantity();
         if (locSellQuantity >= 1) {
-            BigDecimal locSellPrice = position.referencePrice().add(InfinitePosition.TICK_SIZE);
+            BigDecimal locSellPrice = position.referencePrice();
             orders.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, SELL, locSellQuantity,
                     locSellPrice, "INFINITE_LOC_SELL"));
         }
