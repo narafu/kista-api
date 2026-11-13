@@ -2,6 +2,8 @@
 
 작성 2026-11-13 (Fable). 근거는 `findings/17-unassigned-modules.md`(finance·admin·stats·notify)와 `findings/18-crosscutting.md`(보안·설정·이벤트·오류 처리·미사용 코드), 그리고 코드 직접 확인(`JwtAuthFilter`, `TradingStatsService.buildPoints`, `InvestmentIndexCalculator`). 기준 커밋 `1db0d8db1`.
 
+> **2026-11-14 갱신**: 코인 지표·바이낸스·업비트는 삭제된다(`15-crypto-removal.md`). stats 절의 코인 지표 View 직행과 `CryptoMarketIndicatorsOpenApiCustomizer`, 설정 정리의 `binance.base-url`·`upbit`·`CMC_API_KEY`, 알림의 "코인 체결" 표기 갈래는 하지 않는다. `TossPriceApi`의 세션 판정 복제는 14의 T5에서 사라진다.
+
 지침서 01~10이 직접 다루지 않은 9개 영역을 본 결과다. 영역마다 "01·02·05의 일반 처방으로 줄어드는 것"은 다시 처방하지 않는다. 그 처방을 적용한 뒤에도 남는 **그 영역만의 문제**와, **손댈 필요가 없다는 판정**을 근거와 함께 적는다.
 
 ## 0. 한눈에

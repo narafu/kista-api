@@ -2,6 +2,8 @@
 
 작성 2026-11-12 (Fable). 근거 측정: `findings/03-parallel-structures.md` C·D절과 비일관 5번, `findings/05-frozen-decisions.md` S-25·C-02·C-30. 직접 읽은 코드(조기 마감 커밋 `9e542baf7`~`d3d78b0b3` 반영 상태): `TradingCloseScheduler`(239줄), `TradingOpenScheduler`(111), `TradingBatchResumer`(144), `TradingService`(485), `DstInfo`(161), `SessionTradeDates`, `KstTradeDates`, `MarketSessionTimes`, `CryptoDcaRunner`·`CryptoDcaScheduler`·`CryptoDcaRoundExecutor`.
 
+> **2026-11-14 갱신**: 코인 매매를 전부 삭제한다(`15-crypto-removal.md`). 2-6절, T6, D2의 "코인 틱 핑은 그대로"는 대상이 없다. `CLOSE_REPORT` 창 시작은 `closeAt + 20분`으로 바뀐다(`14-market-data-provider.md` D3 — 무료 통합 시세가 15분 지연). 접수 직전 현재가 재조회(`reloadPlacementPrices`)는 T2·T3 뒤에 지운다(14의 T7).
+
 **이 지침서는 실제 주문 경로를 바꾼다. 세 레포 지침서 중 위험이 가장 크다.** 단계마다 운영 배포 후 2거래일을 관찰하고 다음으로 간다.
 
 ## 1. 현재 구조와 문제
@@ -83,7 +85,7 @@ static Decision decide(BatchStep step, Optional<MarketSession> session, TradingB
 | `OPEN_PLACE` | `openAt` | `closeAt − 30분` | Reserve | Run | Missed "[개장 재개 누락]" |
 | `CLOSE_PLACE` 자동 | `closeAt − 31분`(조기 발화 허용 1분) | `closeAt − 10분` | Reserve | Run | Missed "[재개 불가] 접수 마감 경과" |
 | `CLOSE_PLACE` 수동 | `closeAt − 90분` | `closeAt − 10분` | Missed "[마감 접수 불가]" | Run | 같음 |
-| `CLOSE_REPORT` | `closeAt + 10분` | 그 거래일의 KST 자정 | Reserve | Run | Missed "[마감 리포트 누락] 거래일 경과" |
+| `CLOSE_REPORT` | `closeAt + 10분`(14 D3 승인 시 `+ 20분`) | 그 거래일의 KST 자정 | Reserve | Run | Missed "[마감 리포트 누락] 거래일 경과" |
 
 공통: 세션 없음 → Skip(휴장). phase가 그 단계의 완료 값 이상 → Skip. `CLOSE_REPORT`는 phase가 PLACED일 때만 Run. phase가 PLACING이면 `Run(warnInterrupted = true)`로 "[재개 경고] 접수 도중 중단 — 이중 접수 확인 필요" 알림을 낸다.
 
@@ -125,6 +127,8 @@ TradingBatchScheduler (adapter/in/schedule, 약 120줄)
 
 ### 2-6. DCA 파이프라인: 실행기는 둘로 두고 같은 부분만 합친다
 
+**(2026-11-14 폐기 — 코인 실행기는 15에서 삭제한다. 아래는 기록용.)**
+
 주식과 코인은 실행 모양이 다르다. 주식은 세션에 묶인 접수 → 마감 리포트이고, 코인은 24시간 시장에서 시장가 주문 → 폴링 동기화다. 실행기를 하나로 합치면 "세션이 있는가"를 묻는 분기가 실행기 안에 생긴다. **기각한다.**
 
 합치는 것:
@@ -147,7 +151,7 @@ TradingBatchScheduler (adapter/in/schedule, 약 120줄)
 | # | 내용 | 권고 |
 |---|---|---|
 | D1 | 개장 배치의 대상 전략 확정 시각. 지금은 22:00(cron 발화 때 `findAllActive`)이라 22:00~개장 사이에 등록·재개한 전략은 그날 밤 AT_OPEN 주문이 없다(`DstInfo.openBatchMissedAt`이 UI에 알림). 단계 모델에서는 `openAt`에 확정하는 것이 자연스럽다 | **`openAt`으로 옮긴다.** 사용자에게 유리한 방향의 동작 변경이다. `openBatchMissedAt`의 기준도 `openAt`으로 바꾼다. 22:00 유지를 원하면 `OPEN_PLACE`가 "22:00 시점 ACTIVE였던 전략"을 알 방법이 필요해 스냅샷 저장이 추가된다 |
-| D2 | 하트비트를 하루 1회로(2-5). healthchecks.io 체크 일정 변경 필요 | 진행. 체크 3개(개장·마감·코인) 중 개장·마감을 하나로 합친다. 코인 틱 핑은 그대로 |
+| D2 | 하트비트를 하루 1회로(2-5). healthchecks.io 체크 일정 변경 필요 | 진행. 체크 3개(개장·마감·코인) 중 개장·마감을 하나로 합친다. 코인 틱 핑은 그대로 **(2026-11-14: 코인 체크는 15에서 삭제. 체크는 하나가 된다.)** |
 | D3 | 조기 마감일·평일 휴장일의 수동 실행 차단 구간이 달라진다(2-4) | 진행. 지금 동작이 틀린 쪽 |
 
 D1·D3은 실행을 막지 않는다. 결정 전에는 22:00 스냅샷 없이 `openAt` 확정으로 구현하되 배포 전에 사용자 확인을 받는다.
@@ -191,7 +195,7 @@ D1·D3은 실행을 막지 않는다. 결정 전에는 22:00 스냅샷 없이 `o
 | T3 | (04 단계 B 뒤) 개장 배치를 `OPEN_PLACE` 단계로. cron 22:00 → `openAt` 예약. D1 확인 | Opus | 2거래일. AT_OPEN 주문 접수 시각·건수 대조 |
 | T4 | 스케줄러 3개를 `TradingBatchScheduler` 하나로. `TradingBatchResumer` 삭제. 기존 스케줄러 테스트는 T1의 표가 대체하는지 대응표로 확인한 뒤 삭제 | Opus | 2거래일 + 장중이 아닌 시각에 배포 재기동 1회, 접수 후~리포트 전 재기동 1회를 **의도적으로** 해 본다 |
 | T5 | 시각 모델 통일: `DstInfo`·`KstTradeDates` 삭제, 수동 실행 차단 구간을 세션 기반으로(D3), `TradingCycleResponse`의 `openBatchMissedAt` 기준 변경 | Opus | 1거래일 |
-| T6 | 코인: `BatchContextFactory` 공용화, 입력 수집 대조표와 통합 여부 결정(2-6), C-30 확인 | Opus 판정, Sonnet 적용 | 코인 틱 1일 |
+| T6 | **(2026-11-14 삭제 — 15)** 코인: `BatchContextFactory` 공용화, 입력 수집 대조표와 통합 여부 결정(2-6), C-30 확인 | Opus 판정, Sonnet 적용 | 코인 틱 1일 |
 | T7 | 뒷정리: 체크포인트 값 `STARTED`·`PLANNED` 제거, 락 TTL 조정, 호출처 1곳이 된 헬퍼 인라인, 하트비트 하루 1회(D2 결정 뒤) | Sonnet | 1거래일 |
 | T8 | 문서: `workflow-batch.md`·`scheduler-time-table.md`를 2-1·2-2의 표로 다시 쓰고(각 30줄 이하), `flows.yml`의 개장·마감 흐름과 `lifecycles`의 배치 phase 전이를 고친다. `docker-infra.md`의 재개 서술 | Sonnet | 없음 |
 

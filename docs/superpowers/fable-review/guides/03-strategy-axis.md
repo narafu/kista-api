@@ -2,6 +2,8 @@
 
 작성 2026-11-12 (Fable). 근거 측정: `findings/03-parallel-structures.md` A·E절, `findings/04-test-bloat.md` B절, `findings/05-frozen-decisions.md` S-11·C-07·C-08·C-44. 직접 읽은 코드: `CycleOrderStrategy`, `CycleOrderComputer`, `StrategyCreationPersister`, `Strategy`.
 
+> **2026-11-14 갱신**: 코인 DCA 파이프라인은 삭제된다(`15-crypto-removal.md`). 이 문서의 `Crypto*` 언급(`CryptoDcaRunner:58`, "코인 DCA 파이프라인" 문장)은 대상이 없다.
+
 ## 1. 현재 구조와 문제
 
 전략 종류는 4개(INFINITE·VR·PRIVACY·DCA)다. 종류별로 다른 것은 주문 계산만이 아닌데, 다형성은 주문 계산과 등록 정책 두 곳에만 있다.

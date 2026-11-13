@@ -2,6 +2,8 @@
 
 작성 2026-11-11, **전면 개정 2026-11-12** (Fable). 이 문서는 Fable 없이 Opus/Sonnet이 실행하는 것을 전제로 쓴다.
 
+> **2026-11-14 갱신**: X6의 호출처 목록에서 `CryptoDcaRunner`가 빠진다(`15-crypto-removal.md`). 단계 R에서 `MarketDataPort`와 Alpaca 어댑터를 `market` 모듈로 옮긴다(`14-market-data-provider.md` 4-1절). 단계 P의 선행인 04 단계 A는 KIS만 다룬다.
+
 근거(구현 전에 해당 절을 직접 읽는다):
 - `findings/09-process-local-state.md` — trading 코드가 여러 프로세스에서 돌 때 깨지는 것 전수
 - `findings/10-merge-collisions.md` — 두 애플리케이션을 한 컨텍스트에 올릴 때의 충돌 전수(빈, 설정, JPA, Flyway, Modulith·EPR, 보안, 예외 처리기, 경계 코드 3자 매핑표, `shared.kernel` 전수, 빌드, 배포 파일)

@@ -221,3 +221,21 @@ fida에 확인:
 | F5 | infra `docs/superpowers/specs/2026-10-02-deploy-reconcile-design.md`를 `docs/design.md`로 줄인다(사용자 승인됨, infra 05 T6 — 01~05 실행이 끝난 뒤). infra가 파일을 옮기는 날 링크를 바꾼다 | `deploy/server/README.md:113`, `docs/architecture-map.md:154`, `.github/workflows/server-deploy.yml:5` | `deploy/server/README.md:41`, `.github/workflows/server-deploy.yml:115` | infra 05 2-4, T6 |
 | F6 | infra를 설명하는 문서의 어긋난 서술(A절·infra 02 8절 목록에 없던 것): `.gpg`·`scripts/env.sh`·`ENV_PASSPHRASE`·`.env.example`(sops 전환), `scripts/backup.sh`·`0 2 * * *`(경로·주기), `/opt/kista-api/caddy` 마운트(→ `/opt/kista-infra/routes`), 앱 `.env`의 `API_DOMAIN`·`UI_DOMAIN`, "롤백은 헬스 재검증 없음", App 설치 범위, 수동 롤백 명령 3벌 | ✅(2026-11-13, fable-api) `deploy/server/README.md`·`docs/agents/docker-infra.md`·`docs/architecture-map.md` 수정. 백업 서술은 infra README 링크로 바꿔 F7의 api 몫도 함께 끝냈다 | 같음 | infra 05 9절 |
 | F7 | 백업 주기를 매시간으로 바꾼다(사용자 승인됨, infra 04 T3). `docs/agents/docker-infra.md`의 백업 서술은 infra README 링크로 | `docs/agents/docker-infra.md:160-170` | | infra 04 2-4 |
+
+## G. 추가 검토 2차(지침서 14·15)에서 나온 레포 간 항목 (2026-11-14, fable-api)
+
+원본은 `guides/14-market-data-provider.md`(공용 시세를 Alpaca로)와 `guides/15-crypto-removal.md`(크립토 전부 삭제)다. 사용자가 2026-11-13 밤에 방향을 정했고 세부 결정(14 D1~D5, 15 C1~C5)은 답을 기다린다. **G1~G3은 ui가 먼저 배포해야 api가 삭제할 수 있다.**
+
+| # | 내용 | api | ui·infra | 원본 |
+|---|---|---|---|---|
+| G1 | 코인 화면 제거. ui가 걷을 것: 위젯 `crypto-market-indicators`(`GET /api/crypto-market-indicators`), 계좌 상세의 코인 포트폴리오(`/crypto-portfolio`·`/crypto-prices`), 계좌 등록의 업비트·바이낸스 선택과 허용 IP 안내, 전략 생성·DCA 설정의 코인 분기(BTC·ETH, 시장가, 실행 시각 `executionHour`, 최소 주문 금액), USDT 표기 분기, `BROKER_IP_NOT_ALLOWED` 처리, 관리자 설정의 `allowedIp`. api 쪽 grep 집계로는 ui 160파일에 859회 언급이 있다(`findings/20` 5-4절) | 15 T4는 ui 배포 뒤 | ui: 선행 작업 | 15 단계 U |
+| G2 | `/api/meta`에서 값이 빠진다: `brokers`의 `UPBIT`·`BINANCE`, `tickers`의 `BTC`·`ETH`, `orderTypes`의 `MARKET`, DCA의 허용 종목·주문 유형. 그 뒤 2차로 `brokers[].market`·`minOrderAmount`·`amountScale` 필드 자체를 지운다(15 C4) | 15 T4, T6 | ui: 1차는 값이 없어도 깨지지 않는지 확인, 2차는 필드 참조를 먼저 제거 | 15 2-2절 |
+| G3 | `GET /api/market/fear-greed` 응답에서 `crypto` 필드가 사라진다(CNN만 남는다) | 15 T4 | ui: `widgets/fear-greed-card`에서 먼저 제거 | 15 2-2절 |
+| G4 | 벤치마크 비교 응답의 환율이 토스 실시간 값에서 하루 1회 갱신되는 참고 환율(Frankfurter)로 바뀐다. 출처 라벨이 `TOSS_INVEST`에서 바뀌고 환율 기준일이 함께 내려간다 | 14 T4 | ui: 출처 라벨을 값으로 분기하고 있으면 수정, "참고 환율(기준일)" 문구 | 14 4-3절 |
+| G5 | `GET /api/market/candles`는 비인증 공개 엔드포인트다. 시세 공급자 약관(재배포 제한) 때문에 로그인 필요로 바꾸려 한다. ui가 로그인 전 화면에서 차트를 쓰는지 알려 달라 | 14 D2 뒤 | ui: 회신 | 14 0절 D2 |
+| G6 | 차트 일봉의 출처가 토스에서 Alpaca로 바뀐다. 조정 방식은 지금과 같게 유지한다. 값이 달라지는 것이 확인되면 이 행에 적는다 | 14 T3 | ui: 변경 없음(예정) | 14 9절 |
+| G7 | 마감 리포트와 그 알림이 마감+10분에서 마감+20분으로 늦어진다. 화면에 리포트 예정 시각을 적은 곳이 있으면 고친다. infra `trading-guard.sh`의 시각 창(F3)이 리포트 종료 시각을 포함하는지 확인한다 | 14 T3 | ui·infra: 확인 | 14 D3 |
+| G8 | 운영 secret에서 뺄 키: `TOSS_ADMIN_CLIENT_ID`·`TOSS_ADMIN_CLIENT_SECRET`(14 T5 배포 뒤), `CMC_API_KEY`·`HEARTBEAT_CRYPTO_URL`·업비트 관련 키(15 T4 배포 뒤). 배포 전에 빼면 기동이 실패할 수 있으니 순서를 지킨다. healthchecks.io의 코인 체크 삭제와 토스 관리자 키 폐기는 사용자 작업이다 | 배포 완료를 이 행에 표시 | infra: sops 파일에서 제거 | 14 8절, 15 3절 |
+
+fable-ui·fable-infra 세션이 떠 있지 않아(2026-11-14 새벽) SendMessage로 알리지 못했다. 다음에 그 세션을 열면 이 절부터 읽는다.
+
