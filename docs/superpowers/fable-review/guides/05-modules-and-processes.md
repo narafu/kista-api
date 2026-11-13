@@ -103,7 +103,9 @@ T `TradingExceptionHandler`가 `@Order(HIGHEST_PRECEDENCE)`에 `@ExceptionHandle
 - 같은 뜻의 쌍(`AdminBrokerCredentialException`↔`BrokerCredentialException` 등 3쌍)은 단계 X에서 정리한다. 여기서는 건드리지 않는다.
 
 **P2. 중복 빈 정리** (Sonnet) — `findings/10` A절.
-`ClockConfig`·`RedisBlacklistAdapter`를 S로 옮겨 한 벌로(`JwtAuthFilter`가 `TokenBlacklistPort` 단일 빈을 요구한다). `fearGreedRestClient` 빈 이름 충돌(읽기 타임아웃 7s 대 5s)은 이름을 다르게. `AlpacaConfig`·`BinanceConfig`는 명시 이름 덕에 지금은 안 겹치지만 벌 수를 줄인다(Alpaca 3벌 → 1벌). `UserEventResubmitScheduler` 2벌은 P5에서.
+`RedisBlacklistAdapter`를 S로 옮겨 한 벌로(`JwtAuthFilter`가 `TokenBlacklistPort` 단일 빈을 요구한다). `fearGreedRestClient` 빈 이름 충돌(읽기 타임아웃 7s 대 5s)은 이름을 다르게. `UserEventResubmitScheduler` 2벌은 P5에서.
+- `ClockConfig`는 여기서 옮기지 않는다(Q-07). S에서 `Clock` 빈을 둘 수 있는 곳은 platform뿐인데 `platform_must_not_depend_on_other_modules`가 `shared.kernel.TimeZones` 참조를, `zoneId_of_must_only_be_called_in_TimeZones`가 `ZoneId.of` 직접 호출을 막는다. 가드를 풀거나 `TimeZones`를 옮길 만큼의 이득이 없다 — 두 프로세스인 동안은 충돌이 없고 본문이 같으므로 단계 M의 M9에서 T 쪽 한 벌을 지운다.
+- Alpaca 3벌 → 1벌도 여기서 하지 않는다. 빈 이름·properties FQCN이 모두 달라 충돌이 아니고(`findings/10` A1·A4), 합치려면 R benchmark와 T marketcalendar·stats가 함께 쓸 새 platform 타입이 필요하다. 단계 X·R에서 alpaca 소유 모듈이 정해질 때 한다.
 
 **P3. SQL을 search_path에 의존하지 않게** (Sonnet, 기계적·검수 Opus) — `findings/10` C절.
 합친 뒤에는 커넥션 풀이 하나라 search_path도 하나다. 그런데 `scheduler_locks`와 `event_publication`이 public·trading 두 스키마에 같은 이름으로 있다.
@@ -146,7 +148,7 @@ T `TradingExceptionHandler`가 `@Order(HIGHEST_PRECEDENCE)`에 `@ExceptionHandle
 | M6 | `scheduler_locks`: 한 테이블로. **`trading.scheduler_locks`를 쓴다**(매매 배치 재개가 잔여 락을 인수하므로 이쪽 행을 보존). R 잡 이름과 T 잡 이름이 겹치지 않는지 확인. `public.scheduler_locks`는 contract 단계에서 drop | C2 |
 | M7 | EPR 한 테이블: `public.event_publication`. 전환 절차는 4-3 | E-2 |
 | M8 | Modulith: 모델 1개. ID 충돌 `notify`·`web`은 T 쪽을 `trading-notify`·`trading-web`으로 개명(임시. 단계 R에서 최종 이름). `ModulithArchitectureTest` 2개를 1개로(모듈 19개). listener_id는 FQCN 기반이라 ID 개명과 무관 — **이 단계에서 패키지와 클래스 이름은 바꾸지 않는다** | E-1 |
-| M9 | 삭제: T `AppErrorStreamPublisher` + R `AppErrorStreamConsumer`(P6), `PlainDecimalSerializer` 중복 1벌 | E-3 |
+| M9 | 삭제: T `AppErrorStreamPublisher` + R `AppErrorStreamConsumer`(P6), `PlainDecimalSerializer` 중복 1벌, T `com.kista.tradingcore.ClockConfig`(P2에서 넘어옴 — R 것과 본문 동일. `main_code_must_not_read_system_clock_directly` 예외 목록에서 T FQCN도 지운다) | E-3, A3 |
 | M10 | `RoleRoutingGuard`·`RoleRoutes`(1-3) 추가. 이 단계의 엔진 경로 = 현재 Caddy `@trading`·`@scheduler` matcher와 `/api/internal/**` | K-2 |
 | M11 | 내부 HTTP는 **그대로 둔다.** web의 `INTERNAL_API_BASE_URL`은 `http://kista-worker:8080`. worker 자신이 내부 API를 부르는 경로가 있으면(구 kista-scheduler 잡) `http://localhost:8080` | H-1 |
 | M12 | 테스트 정리: `TradingApplicationContextLoadTest`·`SchedulerLockService*Test`의 `TradingApplication` 참조 교체, `RootDataJpaTestBase` 삭제 후 `DataJpaTestBase`로, `GradleModuleBoundaryTest`는 "T → R 의존 금지"만 남기고 "R → T 금지" 삭제. `InternalApiContractTest`는 단계 X까지 유지 | D-3, J절 |
