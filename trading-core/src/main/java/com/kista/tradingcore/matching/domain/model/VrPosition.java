@@ -62,7 +62,7 @@ public record VrPosition(
         return upperBand().divide(BigDecimal.valueOf(divisor), Currency.USD.amountScale(), HALF_UP);
     }
 
-    // --- V값 갱신 (실력공식) ---
+    // --- V값 갱신 (실력공식) — 근거: docs/reference/laor/vr-velog.md 3절(VR 5.0 기본공식 V + P/G + C가 아니라 실력공식을 쓴다, 지침서 08 F7) ---
 
     // V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)
     // 평가금 = holdings × 종가 (evaluation)

@@ -48,7 +48,7 @@
 
 ### 모듈 문서가 SSOT인 규칙 (해당 모듈 작업 시 자동 로드, 그 외엔 직접 Read)
 - Account ↔ Strategy 분리·전략 원장 상한, 런타임 매매 정책 적용 → `modules/tradingcore/trading.md`
-- 매매 공식·VR 공식(변경 금지 — 단위 테스트로 검증) → `modules/tradingcore/trading-formulas.md`
+- 매매 공식·VR 공식(단위 테스트로 고정 — 바꾸면 공식 문서와 테스트를 함께 고친다) → `modules/tradingcore/trading-formulas.md`
 - 런타임 설정 API 엔드포인트 규칙 → `modules/api/admin.md`
 
 ### 아키텍처 맵 flows.yml 동기화

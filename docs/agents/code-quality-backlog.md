@@ -534,7 +534,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - 재캡 입력이 부분 PLANNED(AVG PLACED)인 경우
 - 수정 방향: CQ-29~32를 고치면서 해당 테스트를 함께 넣는다. 반올림 경계는 단독으로 먼저 고정할 수 있다.
 - 상태: done(2026-11-06) — 테스트만 추가(프로덕션 변경 없음).
-  - 반올림 경계: `InfinitePositionTest.priceOffsetRate_roundingBoundary_20div`(9.70/9.75/9.76/10.00/11.00, 9.75가 `HALF_UP`→`HALF_EVEN` 변이를 잡음 확인).
+  - 반올림 경계: `InfinitePositionTest.priceOffsetRate_roundingBoundary_20div`(9.70/9.75/9.76/10.00/11.00, 9.75가 `HALF_UP`→`HALF_EVEN` 변이를 잡음 확인). — 2026-11-13 지침서 08 F1로 별% 반올림을 없애 이 테스트는 `earlyStage_boundaryIsHalfDivision_20div`(정확히 분할수/2 경계)로 교체됐다.
   - 30·40분할: `InfinitePositionTest.priceOffsetRate_zeroBoundary_movesWithDivisionCount`·`isFinalRound_boundary_30_40div`·`quantities_30div`·`quantities_40div`, `ReverseModePositionTest.sellQuantity_dividesByHalfDivisionCount`. `InfinitePosition.isFinalRound` 주석의 "⟺ currentRound > 19"는 20분할 전용 표현(실제 경계는 div−1) — 주석만 어긋남, 다음 InfinitePosition 수정 때 고친다.
   - 리버스 BUY cap 초과: CQ-30에서 cap 적용으로 바꾸며 `BuyOrderPriceCapperTest.reverseQuotaBuy_exceedingCap_capsPriceAndRecomputesQuantity`·`reverseQuotaBuy_withinCap_unchanged`로 대체.
   - PRIVACY 기준표 날짜 ≠ 거래일: `PrivacyTradeBaseJpaRepositoryDbTest`(실 DB, T−2·T만 있으면 T−1 조회 empty). `(release_date, ticker)` UNIQUE 제약 있음(trading V1).

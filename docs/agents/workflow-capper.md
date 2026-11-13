@@ -8,14 +8,15 @@ INFINITE/PRIVACY/VR 세 전략 모두 대상이며, 단일 진입점 `BuyOrderPr
 
 #### INFINITE 전략 (전후반 공통, StrategyType.INFINITE)
 - 신규 후보는 `prepareForAllocation`에서 cap 후 base BUY 재산정과 correction BUY 생성을 먼저 수행하며, 이 최종 BUY 총액이 원장 상한 판정 입력이 된다. 이 단계에서는 영속화하지 않는다.
-- 트리거: PLANNED BUY 주문가 중 하나라도 `currentPrice × 1.05`(`PriceCapPolicy`) 초과 시 가격 캡 후 수량 재산정 (`capIfNeeded(StrategyType.INFINITE, ...)`) — 재산정·보정 로직 자체는 `InfiniteCycleOrderStrategy.capBuyOrders()`가 `InfiniteStrategy.buildCappedBuyOrders()`에 위임 (아래 `computeEarlyBuys`/`computeLateBuys`/`CORRECTION_ORDER_COUNT`는 InfiniteStrategy 내부 심볼)
+- 트리거: PLANNED BUY 주문가 중 하나라도 `currentPrice × 1.05`(`PriceCapPolicy`) 초과 시 가격 캡 후 수량 재산정 (`capIfNeeded(StrategyType.INFINITE, ...)`) — 재산정·보정 로직 자체는 `InfiniteCycleOrderStrategy.capBuyOrders()`가 `InfiniteStrategy.buildCappedBuyOrders()`에 위임 (아래 `computeEarlyBuys`/`computeSingleBuy`/`CORRECTION_ORDER_COUNT`는 InfiniteStrategy 내부 심볼)
+- 첫 매수(보유 0): `computeSingleBuy` — base 중 가장 비싼 주문 가격.min(cap)으로 1회분 전액 수량을 다시 계산한 단일 LOC(`INFINITE_FIRST_BUY`). 배포 전 저장된 반반 주문(①②)이 남아 있어도 단일 LOC로 만든다
 - 전반(buyOrders 2건): `computeEarlyBuys` — cappedAvg/cappedRef 기준 buy①② 재산정, 동가 시 병합
-- 후반(buyOrders 1건): `computeLateBuys` — cappedPrice 기준 단일 LOC 수량 재산정
+- 후반(buyOrders 1건): `computeSingleBuy` — cappedPrice 기준 단일 LOC 수량 재산정
 - **cap을 두는 이유**: LOC 지정가가 실제 종가와 크게 벌어지면(경험상 15~20%, 증권사마다 다름) 증권사가 주문 실수로 보고 거부한다. 5%는 접수(장 마감 30분 전) 현재가 기준이라 남은 30분 추가 하락에 10~15% 여유를 둔 값이다. 대가는 마감 30분 내 5% 넘게 반등하면 원래 매수가보다 싸도 미체결이라는 점 — cap이 걸리는 날은 이미 급락한 날이라 추가 하락 쪽을 막는다(`PriceCapPolicy` 주석)
 - **리버스모드 쿼터매수 BUY**(`ReverseInfiniteStrategy.LOC_BUY_LEG`, CQ-30): 가격만 cap으로 낮추고 수량은 쿼터 예산(원장 예수금/4) ÷ cap으로 재산정한다(`ReverseModePosition.quotaBuyQuantity` — 별지점 경로와 공용). 일반모드 cap과 같은 예산 보존 방식이다. 리버스 plan도 cap용 `InfinitePosition`을 싣고 `OrderPlan.reverseMode=true`라, `capBuyOrders`가 일반모드 사다리 재구성보다 먼저 분기하고 미리보기는 `displayPosition()`(null)으로 회차·기준가를 내보내지 않는다. 별지점이 5거래일 종가 평균이라 급락 구간(리버스 진입 구간)에서 종가와 벌어지기 쉽다
   - 예산 소진 판정(`isQuotaBuyExhausted` → 동일 수량 MOC 매도 전환)은 계획 시점에 cap 전 가격(별지점 − 0.01)으로 정해진다 — cap 후 가격이면 1주를 살 수 있는 날도 MOC 매도로 간다(현행 유지)
 - **보정 주문 (전후반 공통)**: cap 경로 전용이 아니라 `InfiniteStrategy.buildOrders`가 일반모드 BUY(base) 바로 뒤에 상시 붙이고(isFinalRound·리버스 제외), cap 재산정 시 base와 함께 다시 계산한다. `CORRECTION_ORDER_COUNT`(=3)회 LOC 1주 추가
-  - 가격 = `K / (누적수량 + 1)` (FLOOR, scale=2) — `buildOrders`에서도 `trimCorrectionsToBudget`을 적용한다 — 매 회 직전까지 추가된 주문 수량 합산 기준
+  - 가격 = `unitAmount / (누적수량 + 1)` (FLOOR, scale=2) — `buildOrders`에서도 `trimCorrectionsToBudget`을 적용한다 — 매 회 직전까지 추가된 주문 수량 합산 기준
   - 누적수량이 0이면 해당 회차 skip
   - 접수는 보정 주문을 마지막에 한다(`TradingOrderExecutor.placeEach`가 `INFINITE_CORRECTION_*`를 뒤로 안정 정렬) — 증권사는 접수 시 지정가 × 수량 전체를 주문가능금액에서 묶으므로(체결은 단위금액 안에서 끝나도) 예수금이 모자라면 거절이 보정에만 생기고 base는 접수된다. 미리보기 `accountCashCheck.correctionBuyUsd`는 `requiredBuyUsd` 중 보정 주문 지정가 합계(신규 + 저장된 PLANNED, SUBMITTING 제외)다
   - 보정 합계가 원장 예수금(`position.deposit()`)을 넘으면 `InfiniteStrategy.trimCorrectionsToBudget`이 뒤쪽 보정(03→02→01)부터 생략 — base(수량·가격)는 불변, 지정가 합계가 원장 밖이면 원장 상한 판정이 BUY 전체를 매일 거절해 잔고가 그대로 남고 리버스모드(isFinalRound) 진입도 못 하는 교착이 되기 때문

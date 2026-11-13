@@ -49,7 +49,7 @@ Java 25 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 
 
 각 모듈 디렉토리의 `CLAUDE.md`가 `docs/agents/modules/<루트>/<ID>.md`를 import한다 — 그 모듈의 파일을 다루면 자동 로드된다. 여러 모듈을 동시에 설계하거나 own-type 신설을 검토할 때는 직접 Read:
 - `docs/agents/own-type-ledger.md` — own-type 허용 원장 (필수 Read)
-- `docs/agents/modules/tradingcore/trading-formulas.md` — 매매·VR 공식 (변경 금지 SSOT)
+- `docs/agents/modules/tradingcore/trading-formulas.md` — 매매·VR 공식 SSOT (문헌 규칙·KISTA 변형·고유 요소 — 바꾸면 문서와 테스트를 함께 고친다)
 
 ## 참고 문서 (필요시 Read)
 - **전체 구조 그림**: `docs/architecture-map.md`(Mermaid), 아키텍처 맵 `build/architecture-map/index.html`(`ArchitectureMapTest`가 생성, 원본 `src/test/resources/architecture/flows.yml`)
