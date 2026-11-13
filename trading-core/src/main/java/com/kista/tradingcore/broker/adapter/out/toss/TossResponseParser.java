@@ -3,6 +3,7 @@ package com.kista.tradingcore.broker.adapter.out.toss;
 import com.kista.tradingcore.broker.domain.model.toss.TossApiException;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 // Toss API 응답 문자열 파싱 공용 헬퍼 — 패키지 내부 전용
 final class TossResponseParser {
@@ -15,8 +16,9 @@ final class TossResponseParser {
     }
 
     // Toss 응답 정수 문자열 → int, null·공백 시 0
+    // 수량은 스펙상 decimal 문자열("10.5" 소수점 보유 가능) — 정수 주문 단위로 내림
     static int parseIntOrZero(String s) {
-        return s != null && !s.isBlank() ? Integer.parseInt(s) : 0;
+        return s != null && !s.isBlank() ? new BigDecimal(s.trim()).setScale(0, RoundingMode.DOWN).intValueExact() : 0;
     }
 
     // TossResult 언랩 — null 시 TossApiException (Toss API 응답 규약 위반)

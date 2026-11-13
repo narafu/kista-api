@@ -105,7 +105,7 @@ class TossHoldingsApi {
                     .flatMap(h -> {
                         Optional<StrategyTicker> tickerOpt = StrategyTicker.tryParse(h.symbol());
                         if (tickerOpt.isEmpty()) return Stream.empty();
-                        int quantity = Integer.parseInt(h.quantity());
+                        int quantity = TossResponseParser.parseIntOrZero(h.quantity());
                         if (quantity <= 0) return Stream.empty();
                         return Stream.of(new PresentBalanceResult.TossHolding(
                                 tickerOpt.get(), quantity,

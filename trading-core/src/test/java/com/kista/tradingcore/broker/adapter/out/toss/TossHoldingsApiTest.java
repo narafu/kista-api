@@ -286,4 +286,22 @@ class TossHoldingsApiTest {
 
         assertThat(tossHoldingsApi.getSellableQuantity(StrategyTicker.SOXL, ACCOUNT).quantity()).isZero();
     }
+
+    // 스펙 HoldingsItem.quantity는 format decimal 문자열 — 소수점 보유(예: "10.5")가 오면 정수 파싱이 보유 조회 전체를 죽였다
+    @Test
+    @DisplayName("소수 수량 보유는 정수 내림 — 1주 미만 종목은 보유 현황에서 제외")
+    void fractionalQuantity_isFlooredInsteadOfFailing() {
+        var soxl = new TossHoldingsApi.HoldingItem("SOXL", "10.5", "101", "100.33");
+        var tqqq = new TossHoldingsApi.HoldingItem("TQQQ", "0.3", "50", "55");
+        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(new TossResult<>(new TossHoldingsApi.HoldingsResponse(List.of(soxl, tqqq))));
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(new TossResult<>(new TossHoldingsApi.BuyableAmountResponse("100.00")));
+        when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(new TossResult<>(new TossHoldingsApi.ExchangeRateResult("1400.00", "1400.00")));
+
+        assertThat(tossHoldingsApi.getSellableQuantity(StrategyTicker.SOXL, ACCOUNT).quantity()).isEqualTo(10);
+        assertThat(tossHoldingsApi.getPresentBalance(ACCOUNT).items()).singleElement()
+            .satisfies(i -> assertThat(i.holdings()).isEqualTo(10));
+    }
 }

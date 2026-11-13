@@ -49,6 +49,14 @@ class TossResponseParserTest {
     }
 
     @Test
+    @DisplayName("parseIntOrZero — 스펙 decimal 문자열은 정수로 내림")
+    void parseIntOrZero_decimal_floors() {
+        assertThat(TossResponseParser.parseIntOrZero("10.5")).isEqualTo(10);
+        assertThat(TossResponseParser.parseIntOrZero("10.0000")).isEqualTo(10);
+        assertThat(TossResponseParser.parseIntOrZero("0.9")).isZero();
+    }
+
+    @Test
     @DisplayName("unwrap — wrapper가 null이면 TossApiException 발생")
     void unwrap_null_wrapper_throws() {
         assertThatThrownBy(() -> TossResponseParser.unwrap(null))
