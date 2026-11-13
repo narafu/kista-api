@@ -1,5 +1,6 @@
 package com.kista.api.benchmark.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.kista.api.benchmark.domain.model.BenchmarkAssetType;
 import com.kista.api.benchmark.domain.model.BenchmarkComparison;
@@ -20,18 +21,17 @@ import java.util.UUID;
 public record BenchmarkComparisonResponse(
         String scope,
         @JsonInclude(JsonInclude.Include.ALWAYS)
-        StrategyInfo strategy,
+        @Nullable StrategyInfo strategy,
         Benchmark benchmark,
         Period period,
         @JsonInclude(JsonInclude.Include.ALWAYS)
-        Summary summary,
+        @Nullable Summary summary,
         List<Point> points,
         @JsonInclude(JsonInclude.Include.ALWAYS)
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
-        CurrentExchangeRate currentExchangeRate,
+        @Nullable CurrentExchangeRate currentExchangeRate,
         Quality quality,
         @JsonInclude(JsonInclude.Include.NON_NULL)
-        @Schema(types = {"string", "null"}) String emptyReason
+        @Nullable String emptyReason
 ) {
     private static final String NOTICE_PREFIX = "전략 운용 기록 기반 근사치입니다. ";
     private static final String HOUSING_SURVEY_NOTICE = "벤치마크 시점은 KB Land 주간 조사일(매주 월요일) 기준입니다.";
@@ -42,17 +42,17 @@ public record BenchmarkComparisonResponse(
     @Schema(name = "HousingBenchmarkDefinition")
     public record Benchmark(
             String assetType,
-            @Schema(types = {"string", "null"}) String regionCode,
-            @Schema(types = {"string", "null"}) String regionName,
-            @Schema(types = {"string", "null"}) String symbol,
+            @Nullable String regionCode,
+            @Nullable String regionName,
+            @Nullable String symbol,
             String label,
-            @Schema(types = {"string", "null"}, format = "date") LocalDate sourceUpdatedDate
+            @Schema(format = "date") @Nullable LocalDate sourceUpdatedDate
     ) {}
 
     @Schema(name = "HousingBenchmarkPeriod")
     public record Period(
-            @Schema(types = {"string", "null"}, format = "date") LocalDate fromDate,
-            @Schema(types = {"string", "null"}, format = "date") LocalDate toDate,
+            @Schema(format = "date") @Nullable LocalDate fromDate,
+            @Schema(format = "date") @Nullable LocalDate toDate,
             int pointCount
     ) {}
 
@@ -62,8 +62,8 @@ public record BenchmarkComparisonResponse(
             BigDecimal benchmarkCumulativeReturn,
             BigDecimal excessReturn,
             // 90일 미만 구간은 연환산이 억제되어 null이 내려간다
-            @Schema(types = {"number", "null"}) BigDecimal investmentAnnualizedReturn,
-            @Schema(types = {"number", "null"}) BigDecimal benchmarkAnnualizedReturn,
+            @Nullable BigDecimal investmentAnnualizedReturn,
+            @Nullable BigDecimal benchmarkAnnualizedReturn,
             BigDecimal investmentMaxDrawdown,
             BigDecimal benchmarkMaxDrawdown
     ) {}
@@ -73,8 +73,8 @@ public record BenchmarkComparisonResponse(
             LocalDate baseDate,
             BigDecimal investmentIndex,
             BigDecimal benchmarkIndex,
-            @Schema(types = {"number", "null"}) BigDecimal investmentPeriodReturn,
-            @Schema(types = {"number", "null"}) BigDecimal benchmarkPeriodReturn
+            @Nullable BigDecimal investmentPeriodReturn,
+            @Nullable BigDecimal benchmarkPeriodReturn
     ) {}
 
     @Schema(name = "HousingBenchmarkCurrentExchangeRate")

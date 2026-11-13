@@ -13,6 +13,7 @@ import jakarta.validation.constraints.PositiveOrZero;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 // FIDA 주문 수신 — POST /api/internal/fida-orders body. 외부 FIDA 프로젝트도 호출하므로 JSON 필드명·shape을 바꾸지 말 것
 public record FidaOrderRequest(
@@ -20,7 +21,7 @@ public record FidaOrderRequest(
         @NotNull StrategyTicker ticker,                         // 거래 종목
         @NotNull @Positive BigDecimal currentCycleStart,        // 기준가
         @NotNull BigDecimal currentCycleRealizedPnl,            // 사이클 실현 수익($)
-        BigDecimal avgPrice,                                    // 평단가 (nullable)
+        @Nullable BigDecimal avgPrice,                                    // 평단가 (nullable)
         @PositiveOrZero int holdings,                           // 보유 수량
         @NotNull List<PlannedOrder> orders                      // 계획 주문 — 누락이면 400(빈 목록은 허용)
 ) {
@@ -35,9 +36,9 @@ public record FidaOrderRequest(
 
     // FIDA 계획 주문 1건
     public record PlannedOrder(
-            OrderDirection direction, // 매수/매도
-            OrderType orderType,      // LOC / MOC / LIMIT
-            Integer quantity,         // 주문 수량 (nullable — SELL "잔량 전부" 의미)
-            BigDecimal price          // 주문 가격
+            @Nullable OrderDirection direction, // 매수/매도
+            @Nullable OrderType orderType,      // LOC / MOC / LIMIT
+            @Nullable Integer quantity,         // 주문 수량 (nullable — SELL "잔량 전부" 의미)
+            @Nullable BigDecimal price          // 주문 가격
     ) {}
 }

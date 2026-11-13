@@ -1,5 +1,6 @@
 package com.kista.api.finance.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.kista.api.finance.domain.model.AssetClass;
 import com.kista.api.finance.domain.model.AssetSnapshotCommand;
 import com.kista.api.finance.domain.model.Market;
@@ -15,7 +16,7 @@ public record AssetSnapshotRequest(
         @Schema(description = "카테고리 ID (type=ASSET)")
         @NotNull UUID categoryId,
         @Schema(description = "계좌 ID (선택 — 전세임차보증금 등 계좌 없는 자산은 null)")
-        UUID accountId,
+        @Nullable UUID accountId,
         @Schema(description = "기준 날짜", example = "2026-08-01")
         @NotNull LocalDate entryDate,
         @Schema(description = "자산군", example = "EQUITY")
@@ -23,9 +24,9 @@ public record AssetSnapshotRequest(
         @Schema(description = "시장", example = "GLOBAL")
         @NotNull Market market,
         @Schema(description = "운용전략 (자유 입력, 선택 — 실제 자동매매 전략과 무관한 개인 메모)", example = "VR")
-        String strategy,
+        @Nullable String strategy,
         @Schema(description = "메모 (선택)")
-        String memo,
+        @Nullable String memo,
         @Schema(description = "금액 (원화 정수, 0 이상)", example = "1000000")
         @PositiveOrZero long amount
 ) {

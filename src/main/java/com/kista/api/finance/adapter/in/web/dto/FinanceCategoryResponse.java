@@ -1,5 +1,6 @@
 package com.kista.api.finance.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.kista.api.finance.domain.model.FinanceCategory;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -10,9 +11,9 @@ public record FinanceCategoryResponse(
         @Schema(description = "카테고리 고유 ID")
         UUID id,
         @Schema(description = "그룹 ID (시스템 전역 카테고리면 null)")
-        UUID groupId,
+        @Nullable UUID groupId,
         @Schema(description = "상위 카테고리 ID (L1이면 null)")
-        UUID parentId,
+        @Nullable UUID parentId,
         @Schema(description = "카테고리 타입", example = "EXPENSE")
         FinanceCategory.Type type,
         @Schema(description = "카테고리명", example = "식비")

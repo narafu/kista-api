@@ -1,9 +1,7 @@
 package com.kista.api.benchmark.adapter.in.web.dto;
 
-import com.kista.api.benchmark.adapter.in.web.openapi.HousingBenchmarkOpenApiCustomizer;
+import com.kista.shared.platform.openapi.NullMarkedRecordModelConverter;
 import io.swagger.v3.core.converter.ModelConverters;
-import io.swagger.v3.oas.models.Components;
-import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.media.Schema;
 import org.junit.jupiter.api.Test;
 
@@ -15,11 +13,15 @@ class BenchmarkComparisonResponseSchemaTest {
 
     @Test
     void openApi31_스키마는_실제_null_응답_필드를_nullable_union으로_생성한다() {
-        Map<String, Schema> schemas = ModelConverters.getInstance(true)
-                .readAll(BenchmarkComparisonResponse.class);
-        OpenAPI openApi = new OpenAPI().components(new Components().schemas(schemas));
-
-        new HousingBenchmarkOpenApiCustomizer().customise(openApi);
+        NullMarkedRecordModelConverter converter = new NullMarkedRecordModelConverter();
+        ModelConverters converters = ModelConverters.getInstance(true);
+        converters.addConverter(converter);
+        Map<String, Schema> schemas;
+        try {
+            schemas = converters.readAll(BenchmarkComparisonResponse.class);
+        } finally {
+            converters.removeConverter(converter); // 전역 싱글턴이라 다른 테스트에 남기지 않는다
+        }
 
         Schema<?> response = schemas.get("HousingBenchmarkComparisonResponse");
 

@@ -1,5 +1,6 @@
 package com.kista.api.admin.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -11,8 +12,8 @@ public record ClientErrorLogRequest(
         @Schema(description = "오류 유형 (error.name)")
         @NotBlank @Size(max = 255) String errorType,
         @Schema(description = "오류 메시지")
-        @Size(max = 2000) String message,
+        @Size(max = 2000) @Nullable String message,
         @Schema(description = "스택트레이스")
-        @Size(max = 8000) String stackTrace,
+        @Size(max = 8000) @Nullable String stackTrace,
         @Schema(description = "발생 위치 메타 (pathname, digest 등)")
-        Map<String, String> context) {}
+        @Nullable Map<String, String> context) {}

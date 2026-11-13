@@ -1,5 +1,6 @@
 package com.kista.api.admin.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.kista.shared.contract.account.AccountSummaryResponse;
 import com.kista.shared.contract.trading.OrderResponse;
 import com.kista.shared.contract.trading.StrategySummaryResponse;
@@ -16,17 +17,17 @@ public record AdminTradeResponse(
         @Schema(description = "주문 고유 ID")
         UUID id,
         @Schema(description = "계좌 소유자 사용자 ID")
-        UUID userId,
+        @Nullable UUID userId,
         @Schema(description = "소속 계좌 ID")
         UUID accountId,
         @Schema(description = "소속 전략 ID (조회 실패 시 null)")
-        UUID strategyId,
-        @Schema(description = "소속 전략 사이클 ID (리오더 예산 cycleRemaining 키, 사이클 미연결 시 null)", nullable = true)
-        UUID strategyCycleId,
+        @Nullable UUID strategyId,
+        @Schema(description = "소속 전략 사이클 ID (리오더 예산 cycleRemaining 키, 사이클 미연결 시 null)")
+        @Nullable UUID strategyCycleId,
         @Schema(description = "계좌 소유자 닉네임")
-        String ownerNickname,    // 계좌 소유자 닉네임
+        @Nullable String ownerNickname,    // 계좌 소유자 닉네임
         @Schema(description = "전략 종류 (조회 실패 시 null)", example = "INFINITE")
-        String strategyType,     // INFINITE | PRIVACY (null 가능)
+        @Nullable String strategyType,     // INFINITE | PRIVACY (null 가능)
         @Schema(description = "거래일 (KST)")
         LocalDate tradeDate,
         @Schema(description = "거래 종목", example = "SOXL")
@@ -44,13 +45,13 @@ public record AdminTradeResponse(
         @Schema(description = "주문 상태", example = "FILLED")
         String status,           // PLACED | FILLED | FAILED
         @Schema(description = "브로커 측 주문 ID")
-        String externalOrderId,
+        @Nullable String externalOrderId,
         @Schema(description = "체결 수량 (미체결 시 null)")
-        BigDecimal filledQuantity,
+        @Nullable BigDecimal filledQuantity,
         @Schema(description = "체결 가격 (미체결 시 null)")
-        BigDecimal filledPrice,
-        @Schema(description = "price·filledPrice 통화 (Currency name, 계좌를 찾지 못하면 null)", nullable = true, example = "USDT")
-        String currency
+        @Nullable BigDecimal filledPrice,
+        @Schema(description = "price·filledPrice 통화 (Currency name, 계좌를 찾지 못하면 null)", example = "USDT")
+        @Nullable String currency
 ) {
     public static AdminTradeResponse from(OrderResponse t, Map<UUID, AccountSummaryResponse> accountMap,
                                           Map<UUID, UserSummary> userMap,

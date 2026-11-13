@@ -1,5 +1,6 @@
 package com.kista.api.finance.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
@@ -12,7 +13,7 @@ public record AssetSnapshotResponse(
         @Schema(description = "자산 기록 고유 ID")
         UUID id,
         @Schema(description = "그룹 ID (없으면 개인 소유)")
-        UUID groupId,
+        @Nullable UUID groupId,
         @Schema(description = "카테고리 ID")
         UUID categoryId,
         @Schema(description = "최상위(L1) 카테고리 ID — 대출이면 순자산 계산 시 부채로 취급")
@@ -20,13 +21,13 @@ public record AssetSnapshotResponse(
         @Schema(description = "카테고리명")
         String categoryName,
         @Schema(description = "계좌 ID (없으면 null)")
-        UUID accountId,
+        @Nullable UUID accountId,
         @Schema(description = "계좌명 (없으면 null)")
-        String accountName,
+        @Nullable String accountName,
         @Schema(description = "계좌 기관 (계좌가 없거나 기관 미입력이면 null)")
-        String accountInstitution,
+        @Nullable String accountInstitution,
         @Schema(description = "계좌 소유자 (계좌가 없거나 소유자 미입력이면 null)")
-        String accountOwner,
+        @Nullable String accountOwner,
         @Schema(description = "기준 날짜", example = "2026-08-01")
         LocalDate entryDate,
         @Schema(description = "자산군", example = "EQUITY")
@@ -34,9 +35,9 @@ public record AssetSnapshotResponse(
         @Schema(description = "시장", example = "GLOBAL")
         String market,
         @Schema(description = "운용전략", example = "VR")
-        String strategy,
+        @Nullable String strategy,
         @Schema(description = "메모")
-        String memo,
+        @Nullable String memo,
         @Schema(description = "금액 (원화 정수)", example = "1000000")
         long amount
 ) {}

@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 public record StrategyOrdersResponse(
         @Schema(description = "전략의 주문 목록")
@@ -29,9 +30,9 @@ public record StrategyOrdersResponse(
             @Schema(description = "주문 상태", example = "PLACED")
             String status,
             @Schema(description = "체결 수량 (미체결이면 null)")
-            BigDecimal filledQuantity,
+            @Nullable BigDecimal filledQuantity,
             @Schema(description = "체결 가격 (미체결이면 null)")
-            BigDecimal filledPrice
+            @Nullable BigDecimal filledPrice
     ) {
         public static Item from(Order o) {
             return new Item(

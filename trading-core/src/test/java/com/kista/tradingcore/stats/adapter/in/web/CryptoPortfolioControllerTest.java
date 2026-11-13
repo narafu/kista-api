@@ -2,6 +2,7 @@ package com.kista.tradingcore.stats.adapter.in.web;
 
 import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.platform.PlatformJsonConfig;
 import com.kista.tradingcore.stats.application.usecase.CryptoPortfolioUseCase;
 import com.kista.tradingcore.stats.domain.model.CryptoPortfolio;
 import org.junit.jupiter.api.Test;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -27,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(CryptoPortfolioController.class)
 @Execution(ExecutionMode.SAME_THREAD)
+@Import(PlatformJsonConfig.class) // 슬라이스는 PlatformAutoConfiguration을 로드하지 않으므로 전역 JSON 설정만 가져온다
 class CryptoPortfolioControllerTest {
 
     @Autowired MockMvc mockMvc;

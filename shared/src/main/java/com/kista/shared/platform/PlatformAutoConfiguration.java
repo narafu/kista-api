@@ -5,6 +5,7 @@ import com.kista.shared.platform.crypto.AesCryptoService;
 import com.kista.shared.platform.internalapi.InternalApiClientConfig;
 import com.kista.shared.platform.internalapi.InternalApiProperties;
 import com.kista.shared.platform.metrics.MetricsConfig;
+import com.kista.shared.platform.openapi.NullMarkedRecordModelConverter;
 import com.kista.shared.platform.persistence.JpaAuditingConfig;
 import com.kista.shared.platform.redis.RedisPubSubConfig;
 import com.kista.shared.platform.scheduling.SchedulerJobRunner;
@@ -33,7 +34,7 @@ import org.springframework.core.Ordered;
         SecurityConfig.class, JwtDecoderConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class,
         RedisPubSubConfig.class, TelegramConfig.class, InternalApiClientConfig.class, MetricsConfig.class,
         AesCryptoService.class, AccountNoHasher.class, SchedulerJobRunner.class, SchedulerLockService.class,
-        JpaAuditingConfig.class,
+        JpaAuditingConfig.class, NullMarkedRecordModelConverter.class, PlatformJsonConfig.class,
 })
 public class PlatformAutoConfiguration {
 }

@@ -1,5 +1,6 @@
 package com.kista.api.admin.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.kista.shared.contract.trading.TradeCorrectionResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -20,7 +21,7 @@ public record AdminTradeCorrectionResponse(
         @Schema(description = "보정 후 최종 보유 수량")
         BigDecimal finalHoldings,
         @Schema(description = "보정 후 최종 평단가")
-        BigDecimal finalAvgPrice,
+        @Nullable BigDecimal finalAvgPrice,
         @Schema(description = "보정 후 최종 예수금 (USD)")
         BigDecimal finalDeposit,
         @Schema(description = "보정 후 전략 상태", example = "ACTIVE")
@@ -28,7 +29,7 @@ public record AdminTradeCorrectionResponse(
         @Schema(description = "보정으로 사이클이 종료됐는지 여부")
         boolean cycleEnded,
         @Schema(description = "사이클 종료일 (cycleEnded=false면 null)")
-        LocalDate cycleEndDate
+        @Nullable LocalDate cycleEndDate
 ) {
     public static AdminTradeCorrectionResponse from(TradeCorrectionResponse result) {
         return new AdminTradeCorrectionResponse(

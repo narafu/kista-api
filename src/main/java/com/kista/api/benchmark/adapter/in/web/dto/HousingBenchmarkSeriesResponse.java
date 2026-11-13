@@ -1,5 +1,6 @@
 package com.kista.api.benchmark.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.kista.api.benchmark.domain.model.HousingBenchmarkPrice;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -9,7 +10,7 @@ import java.util.List;
 import java.util.Objects;
 
 // 서울 아파트 5분위 매매평균가격 원본 시계열 (투자 성과와 무관)
-public record HousingBenchmarkSeriesResponse(List<Point> points, LocalDate sourceUpdatedDate) {
+public record HousingBenchmarkSeriesResponse(List<Point> points, @Nullable LocalDate sourceUpdatedDate) {
 
     @Schema(name = "HousingBenchmarkSeriesPoint")
     public record Point(

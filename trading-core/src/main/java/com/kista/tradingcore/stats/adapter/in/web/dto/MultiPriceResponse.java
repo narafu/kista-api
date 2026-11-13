@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 
 @Schema(description = "복수 종목 현재가 조회 응답")
 public record MultiPriceResponse(
@@ -16,7 +17,7 @@ public record MultiPriceResponse(
             @Schema(description = "종목 코드", example = "TQQQ")
             StrategyTicker ticker,
             @Schema(description = "현재가 (USD)", example = "120.50")
-            BigDecimal price
+            @Nullable BigDecimal price
     ) {}
 
     public static MultiPriceResponse from(Map<StrategyTicker, BigDecimal> priceMap) {

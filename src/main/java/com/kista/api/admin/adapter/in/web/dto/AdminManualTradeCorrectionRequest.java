@@ -1,5 +1,6 @@
 package com.kista.api.admin.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.kista.shared.contract.trading.TradeCorrectionRequest;
 import com.kista.shared.kernel.OrderDirection;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -42,9 +43,9 @@ public record AdminManualTradeCorrectionRequest(
             @Schema(description = "체결 가격")
             @NotNull @Positive BigDecimal price,
             @Schema(description = "브로커 측 원본 주문 ID (선택)")
-            String externalOrderId,
+            @Nullable String externalOrderId,
             @Schema(description = "메모 (선택)")
-            String memo
+            @Nullable String memo
     ) {
         public TradeCorrectionRequest.Fill toCommand() {
             return new TradeCorrectionRequest.Fill(

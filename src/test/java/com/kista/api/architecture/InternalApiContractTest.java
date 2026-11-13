@@ -86,7 +86,7 @@ class InternalApiContractTest {
         classes().that().resideInAPackage("com.kista.shared.contract..")
                 .should().onlyDependOnClassesThat().resideInAnyPackage(
                         "java..", "com.kista.shared.contract..", "com.kista.shared.kernel..",
-                        "com.fasterxml.jackson..", "tools.jackson..", "io.swagger..", "jakarta.validation..",
+                        "com.fasterxml.jackson..", "tools.jackson..", "io.swagger..", "jakarta.validation..", "org.jspecify..",
                         "org.springframework.modulith..") // package-info의 @ApplicationModule 선언
                 .check(classes);
     }

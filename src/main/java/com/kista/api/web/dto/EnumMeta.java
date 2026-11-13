@@ -1,6 +1,7 @@
 package com.kista.api.web.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import org.jspecify.annotations.Nullable;
 
 public record EnumMeta(
         @Schema(description = "enum name() 값", example = "KIS")
@@ -8,5 +9,5 @@ public record EnumMeta(
         @Schema(description = "한국어 표시 이름")
         String label,       // 한국어 표시 이름
         @Schema(description = "설명 (null 가능)")
-        String description  // 설명 (null 가능)
+        @Nullable String description  // 설명 (null 가능 — MetaController.toEnumMeta는 항상 null)
 ) {}

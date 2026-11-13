@@ -1,5 +1,6 @@
 package com.kista.api.admin.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.kista.shared.kernel.Broker;
 import com.kista.api.admin.domain.model.BenchmarkFieldSettings;
@@ -48,7 +49,7 @@ public record RuntimeSettingsResponse(
             @Schema(description = "증권사 신규 계좌 등록 허용 여부")
             boolean enabled,
             @Schema(description = "거래소 API 키에 등록할 서버 공인 IP (업비트만, 그 외 생략)", example = "168.107.63.152")
-            String allowedIp) { // 증권사 신규 등록 공개 설정
+            @Nullable String allowedIp) { // 증권사 신규 등록 공개 설정
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -68,15 +69,15 @@ public record RuntimeSettingsResponse(
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record FieldResponses(
             @Schema(description = "종목 생성 설정 (customizable/allowedValues/defaultValue)")
-            StrategyFieldSettings<?> ticker,
+            @Nullable StrategyFieldSettings<?> ticker,
             @Schema(description = "무한매수 분할 수 생성 설정")
-            StrategyFieldSettings<?> divisionCount,
+            @Nullable StrategyFieldSettings<?> divisionCount,
             @Schema(description = "VR 정기 입출금 방향 생성 설정")
-            StrategyFieldSettings<?> recurringMode,
+            @Nullable StrategyFieldSettings<?> recurringMode,
             @Schema(description = "VR 밴드 폭 생성 설정 (%)")
-            StrategyFieldSettings<?> bandWidth,
+            @Nullable StrategyFieldSettings<?> bandWidth,
             @Schema(description = "VR 롤오버 주기 생성 설정 (주 단위)")
-            StrategyFieldSettings<?> intervalWeeks
+            @Nullable StrategyFieldSettings<?> intervalWeeks
     ) { // 전략별 생성 필드 공개 설정 — 적용 안 되는 필드는 null 대신 생략
     }
 

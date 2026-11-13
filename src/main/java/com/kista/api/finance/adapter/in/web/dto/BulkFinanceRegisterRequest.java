@@ -1,5 +1,6 @@
 package com.kista.api.finance.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.kista.api.finance.domain.model.AssetClass;
 import com.kista.api.finance.domain.model.AssetSnapshotCommand;
 import com.kista.api.finance.domain.model.FinanceTransactionCommand;
@@ -17,17 +18,17 @@ import java.util.UUID;
 // 소스월→대상월 복제는 프론트(kista-ui)에서 각 항목의 entryDate/transactionDate를 대상월로 채워 보내는 방식으로
 // 처리하고, 이 API 자체는 순수 flat 배치 등록만 담당한다.
 public record BulkFinanceRegisterRequest(
-        @Valid @Size(max = 500) List<AssetItem> assets,
-        @Valid @Size(max = 500) List<TransactionItem> transactions
+        @Valid @Size(max = 500) @Nullable List<AssetItem> assets,
+        @Valid @Size(max = 500) @Nullable List<TransactionItem> transactions
 ) {
     public record AssetItem(
             @NotNull UUID categoryId,
-            UUID accountId, // null 허용 — 계좌 없는 자산
+            @Nullable UUID accountId, // null 허용 — 계좌 없는 자산
             @NotNull LocalDate entryDate,
             @NotNull AssetClass assetClass,
             @NotNull Market market,
-            String strategy,
-            String memo,
+            @Nullable String strategy,
+            @Nullable String memo,
             @PositiveOrZero long amount
     ) {
         public AssetSnapshotCommand toCommand() {
@@ -39,7 +40,7 @@ public record BulkFinanceRegisterRequest(
             @NotNull UUID categoryId,
             @NotNull LocalDate transactionDate,
             @PositiveOrZero long amount,
-            @Size(max = 255) String memo
+            @Size(max = 255) @Nullable String memo
     ) {
         public FinanceTransactionCommand toCommand() {
             return new FinanceTransactionCommand(categoryId, transactionDate, amount, memo);

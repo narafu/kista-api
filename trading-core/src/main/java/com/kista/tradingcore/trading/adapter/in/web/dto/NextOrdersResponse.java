@@ -18,26 +18,27 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 public record NextOrdersResponse(
         @Schema(description = "다음 매매 예정일 (KST 기준)")
         LocalDate tradeDate,
         @Schema(description = "INFINITE 전략 포지션 스냅샷 (PRIVACY 전략 또는 skip 시 null)")
-        PositionSnapshot position,                    // PRIVACY/skip 시 null
+        @Nullable PositionSnapshot position,                    // PRIVACY/skip 시 null
         @Schema(description = "생성 예정 주문 목록")
         List<OrderItem> orders,
         @Schema(description = "주문 생성 skip 사유 (정상이면 null, MARKET_CLOSED=다음 거래일 휴장)", example = "NO_PRIVACY_BASE")
-        NextOrdersPreview.SkipReason skipReason,      // 정상이면 null
+        NextOrdersPreview.@Nullable SkipReason skipReason,      // 정상이면 null
         @Schema(description = "오늘 이미 등록된 PLANNED·PLACED 주문 목록")
         List<TodayOrderItem> todayOrders,             // 오늘 이미 등록된 PLANNED·PLACED 주문
         @Schema(description = "계좌 내 타 전략의 당일 PLANNED BUY 합계 (USD)")
         BigDecimal otherStrategiesPlannedBuyUsd,       // 계좌 내 타 전략 당일 PLANNED BUY 합계
         @Schema(description = "전략 원장 대비 BUY 경고 (DCA·신규 BUY 없음·skip이면 null)")
-        LedgerCheckSummary ledgerCheck,
+        @Nullable LedgerCheckSummary ledgerCheck,
         @Schema(description = "계좌 주문가능 USD 대비 오늘 BUY 경고 — 계좌 단위(계좌 내 모든 전략 동일 값), 조회 시점 추정, 경고 전용. MOCK·코인·필요 BUY 없음·증권사 조회 실패면 null")
-        AccountCashCheckSummary accountCashCheck,
+        @Nullable AccountCashCheckSummary accountCashCheck,
         @Schema(description = "계좌 보유(판매 가능) 수량 대비 오늘 SELL 경고 — (계좌, 종목) 단위(같은 종목 전략 동일 값), 조회 시점 추정, 경고 전용. MOCK·코인·필요 SELL 없음·증권사 조회 실패면 null")
-        AccountHoldingsCheckSummary accountHoldingsCheck
+        @Nullable AccountHoldingsCheckSummary accountHoldingsCheck
 ) {
     public record PositionSnapshot(
             @Schema(description = "거래 종목")

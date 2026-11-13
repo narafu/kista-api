@@ -1,5 +1,6 @@
 package com.kista.api.admin.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.kista.shared.contract.privacy.PrivacyTradeBaseResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -21,7 +22,7 @@ public record AdminPrivacyBaseResponse(
         @Schema(description = "사이클 실현 손익 (USD)")
         BigDecimal currentCycleRealizedPnl,
         @Schema(description = "평단가 (nullable)")
-        BigDecimal avgPrice,
+        @Nullable BigDecimal avgPrice,
         @Schema(description = "보유 수량")
         int holdings,
         @Schema(description = "계획 주문 명세 목록")
@@ -33,7 +34,8 @@ public record AdminPrivacyBaseResponse(
                 v.currentCycleStart(), v.currentCycleRealizedPnl(), v.avgPrice(), v.holdings(), orders);
     }
 
-    // 주문 명세 행
+    // 주문 명세 행 — shared 계약 PrivacyTradeBaseResponse.OrderLine과 스키마명이 충돌해 별도 이름을 쓴다
+    @Schema(name = "AdminPrivacyBaseOrderLine")
     public record OrderLine(
             @Schema(description = "주문 명세 ID")
             UUID id,
@@ -44,7 +46,7 @@ public record AdminPrivacyBaseResponse(
             @Schema(description = "주문 가격")
             BigDecimal price,
             @Schema(description = "주문 수량 (nullable)")
-            Integer quantity) {
+            @Nullable Integer quantity) {
         public static OrderLine from(PrivacyTradeBaseResponse.OrderLine o) {
             return new OrderLine(o.id(), o.direction(), o.orderType(), o.price(), o.quantity());
         }

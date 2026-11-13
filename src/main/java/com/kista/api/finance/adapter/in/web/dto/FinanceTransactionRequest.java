@@ -1,5 +1,6 @@
 package com.kista.api.finance.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.kista.api.finance.domain.model.FinanceTransactionCommand;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -18,7 +19,7 @@ public record FinanceTransactionRequest(
         @Schema(description = "금액 (원화 정수 절대값, 0 이상)", example = "344000")
         @PositiveOrZero long amount,
         @Schema(description = "메모 (선택)")
-        @Size(max = 255) String memo
+        @Size(max = 255) @Nullable String memo
 ) {
     public FinanceTransactionCommand toCommand() {
         return new FinanceTransactionCommand(categoryId, transactionDate, amount, memo);

@@ -1,5 +1,6 @@
 package com.kista.api.market.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.kista.api.market.domain.model.FearGreedSnapshot;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -15,7 +16,7 @@ public record FearGreedResponse(
     // 소스별 현재값 + 추이 이력
     public record SourceView(
             @Schema(description = "최신 시점 값 (이력이 없으면 null)")
-            Point current,
+            @Nullable Point current,
             @Schema(description = "추이 이력 (오름차순 정렬)")
             List<Point> history) {}
 

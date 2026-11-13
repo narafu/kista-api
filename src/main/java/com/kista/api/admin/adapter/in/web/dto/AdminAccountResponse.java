@@ -1,5 +1,6 @@
 package com.kista.api.admin.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.kista.shared.contract.account.AccountSummaryResponse;
 import com.kista.api.user.domain.model.UserSummary;
 import com.kista.shared.contract.trading.StrategyResponse;
@@ -16,13 +17,13 @@ public record AdminAccountResponse(
         @Schema(description = "소유자 사용자 ID")
         UUID userId,
         @Schema(description = "소유자 닉네임")
-        String ownerNickname,   // User.nickname
+        @Nullable String ownerNickname,   // User.nickname
         @Schema(description = "계좌 별칭")
         String nickname,        // Account.nickname
         @Schema(description = "마스킹된 계좌번호", example = "****1234")
-        String accountNoMasked, // "****1234"
+        @Nullable String accountNoMasked, // "****1234"
         @Schema(description = "브로커 코드", example = "KIS")
-        String broker,          // Broker.name()
+        @Nullable String broker,          // Broker.name()
         @Schema(description = "계좌에 등록된 전략 목록")
         List<AdminStrategyResponse> strategies
 ) {

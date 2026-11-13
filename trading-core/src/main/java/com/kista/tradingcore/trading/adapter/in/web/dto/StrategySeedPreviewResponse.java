@@ -4,6 +4,7 @@ import com.kista.tradingcore.trading.domain.model.StrategySeedPreview;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
+import org.jspecify.annotations.Nullable;
 
 // 전략 등록/수정 폼의 최소시드·기준가 미리보기 응답
 // skipReason: 계산 불가 사유 (예: "NO_PRIVACY_BASE" — 기준매매표 미수신). 정상이면 null
@@ -11,13 +12,13 @@ public record StrategySeedPreviewResponse(
         @Schema(description = "거래 종목", example = "SOXL")
         String ticker,
         @Schema(description = "기준가 (계산 불가 시 null)")
-        BigDecimal basePrice,
+        @Nullable BigDecimal basePrice,
         @Schema(description = "최소 필요 투자금 (계산 불가 시 null)")
-        BigDecimal minSeed,
+        @Nullable BigDecimal minSeed,
         @Schema(description = "계산 불가 사유 (정상이면 null)", example = "NO_PRIVACY_BASE")
-        String skipReason,
+        @Nullable String skipReason,
         @Schema(description = "가용 예수금(계좌 통화 — 주식 USD·코인 KRW/USDT) = 주문 가능 현금(증권사 매수가능금액·거래소 견적 통화 잔고) − 계좌 전략 원장 예수금 합 (모의계좌·조회 실패면 null). 입력 예수금이 넘으면 경고만 한다")
-        BigDecimal availableCash
+        @Nullable BigDecimal availableCash
 ) {
     public static StrategySeedPreviewResponse from(StrategySeedPreview preview) {
         return new StrategySeedPreviewResponse(

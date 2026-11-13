@@ -5,6 +5,8 @@
 // 도메인 타입을 import할 수 없으므로 domain→contract 매핑은 소유 모듈의 컨트롤러/어댑터가 담당한다.
 // 필드 이름·타입을 바꾸면 wire 계약이 바뀐다(두 프로세스가 독립 배포되므로 expand/contract 순서를 지킬 것).
 // Type.OPEN이되 InternalApiContractTest·HexagonalArchitectureTest.contract_must_not_depend_on_other_modules가 outbound를 강제한다.
+// 이 패키지의 record는 기본 non-null — null 가능 컴포넌트만 @Nullable (OpenAPI required·nullable 도출 기준)
+@org.jspecify.annotations.NullMarked
 @org.springframework.modulith.ApplicationModule(
     id = "contract",
     type = org.springframework.modulith.ApplicationModule.Type.OPEN

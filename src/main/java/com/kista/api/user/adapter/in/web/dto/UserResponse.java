@@ -1,5 +1,6 @@
 package com.kista.api.user.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.kista.api.user.domain.model.User;
 import com.kista.shared.kernel.NotificationChannel;
 import com.kista.api.user.domain.model.UserSettings;
@@ -16,7 +17,7 @@ public record UserResponse(
         @Schema(description = "사용자 고유 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
         UUID id,
         @Schema(description = "닉네임", example = "홍길동")
-        String nickname,
+        @Nullable String nickname,
         @Schema(description = "계정 상태 (PENDING/ACTIVE/REJECTED)", example = "ACTIVE")
         UserStatus status,
         @Schema(description = "텔레그램 알림 설정 여부", example = "true")
@@ -24,13 +25,13 @@ public record UserResponse(
         @Schema(description = "역할 (USER/ADMIN)", example = "USER")
         UserRole role,
         @Schema(description = "텔레그램 봇 username (null이면 미연결)", example = "narafu_kista_bot")
-        String telegramBotUsername,
+        @Nullable String telegramBotUsername,
         @Schema(description = "알림 채널 (TELEGRAM/FCM/ALL/NONE)", example = "TELEGRAM")
         NotificationChannel notificationChannel,
         @Schema(description = "알림 타입별 on/off (예: {\"TRADING_ALERT\": true})")
         Map<String, Boolean> notificationPrefs,
         @Schema(description = "반려 사유 (REJECTED 상태에서만 의미, null 가능)")
-        String rejectReason,
+        @Nullable String rejectReason,
         @Schema(description = "자산 등록 폼 운용전략 추천 목록")
         List<String> strategySuggestions
 ) {

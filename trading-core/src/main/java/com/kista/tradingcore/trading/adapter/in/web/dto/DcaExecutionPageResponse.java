@@ -10,17 +10,18 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 // DCA 회차 이력 페이지 응답 (spec 7.3)
 public record DcaExecutionPageResponse(List<Item> content, int page, int size, long totalElements) {
 
     @Schema(name = "DcaExecutionItem")
     public record Item(String ruleKey, OrderDirection direction, // 규칙 키·방향 (기록 시점 값 — 항상 채움)
-                       LocalDate kstTradeDate, LocalDate usSessionDate, String status, String skipReason, String detail,
-                       BigDecimal referencePrice, BigDecimal quantity,
-                       OrderSummary order) {}
+                       LocalDate kstTradeDate, LocalDate usSessionDate, String status, @Nullable String skipReason, @Nullable String detail,
+                       @Nullable BigDecimal referencePrice, @Nullable BigDecimal quantity,
+                       @Nullable OrderSummary order) {}
 
-    public record OrderSummary(UUID id, String status, BigDecimal filledQuantity, BigDecimal filledPrice) {}
+    public record OrderSummary(UUID id, String status, @Nullable BigDecimal filledQuantity, @Nullable BigDecimal filledPrice) {}
 
     public static DcaExecutionPageResponse from(DcaExecutionPage p) {
         return new DcaExecutionPageResponse(p.content().stream().map(DcaExecutionPageResponse::item).toList(),

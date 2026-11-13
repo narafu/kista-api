@@ -56,6 +56,8 @@ dependencies {
     // com.kista.shared.contract 요청 record의 Bean Validation·Swagger 어노테이션 — 소비 프로세스(root/trading-core)가 런타임 구현을 가진다
     compileOnly("jakarta.validation:jakarta.validation-api")
     compileOnly(libs.swagger.annotations)
+    // platform.openapi NullMarkedRecordModelConverter — springdoc을 가진 소비 프로세스(root/trading-core)가 런타임 구현을 가진다
+    compileOnly(libs.swagger.core)
 
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
@@ -69,6 +71,10 @@ dependencies {
     testFixturesImplementation(libs.spring.boot.starter.data.jpa)
     testFixturesImplementation(libs.spring.boot.starter.data.jpa.test)
     testFixturesImplementation(libs.spring.boot.starter.security)
+    // NullMarkedRecordSpecGuard — @NullMarked record 탐색(ArchUnit)·스펙 JSON 파싱·@Schema(name) 판독
+    testFixturesImplementation(libs.archunit.junit5)
+    testFixturesImplementation("tools.jackson.core:jackson-databind")
+    testFixturesImplementation(libs.swagger.annotations)
 }
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {

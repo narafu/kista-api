@@ -8,21 +8,22 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
 import java.time.LocalDate;
+import org.jspecify.annotations.Nullable;
 
 public record AccountRequest(
         @Schema(description = "계좌 별명", example = "내 메인 계좌")
         @NotBlank String nickname,
         @Schema(description = "계좌번호 — KIS: XXXXXXXX-XX (예: 74420614-01), Toss: XXX-XX-XXXXXX (예: 131-01-001931), MOCK: 생략 가능(서버 자동 생성), UPBIT·MERITZ·BINANCE: 받지 않음(오면 무시)", example = "74420614-01")
         @Pattern(regexp = "\\d{8}-\\d{2}|\\d{3}-\\d{2}-\\d{6}", message = "계좌번호는 KIS XXXXXXXX-XX 또는 Toss XXX-XX-XXXXXX 형식이어야 합니다")
-        String accountNo,
+        @Nullable String accountNo,
         @Schema(description = "API 앱 키 (KIS App Key / Toss Client ID / 업비트 Access Key / 메리츠 App Key / 바이낸스 API Key)", example = "PSxxxxxxxxxx")
-        String appKey,
+        @Nullable String appKey,
         @Schema(description = "API 앱 시크릿 (KIS App Secret / Toss Client Secret / 업비트 Secret Key / 메리츠 App Secret / 바이낸스 Secret Key)")
-        String secretKey,
+        @Nullable String secretKey,
         @Schema(description = "증권사 — null이면 KIS 기본값 적용", example = "KIS", allowableValues = {"KIS", "TOSS", "MOCK", "UPBIT", "MERITZ", "BINANCE"})
-        Broker broker,
+        @Nullable Broker broker,
         @Schema(description = "API 키 만료일(KST, 선택) — KIS·토스·메리츠만, 비우면 등록·교체 시점 + 1년 추정", example = "2027-11-10")
-        LocalDate apiKeyExpiresOn
+        @Nullable LocalDate apiKeyExpiresOn
 ) {
     public RegisterAccountCommand toRegisterCommand() {
         // accountNo를 그대로 저장 — KIS: "74420614-01", TOSS: "131-01-001931"

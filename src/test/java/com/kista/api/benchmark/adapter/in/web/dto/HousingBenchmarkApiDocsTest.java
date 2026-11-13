@@ -2,8 +2,8 @@ package com.kista.api.benchmark.adapter.in.web.dto;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import com.kista.api.benchmark.adapter.in.web.openapi.HousingBenchmarkOpenApiCustomizer;
 import com.kista.shared.platform.PlatformAutoConfiguration;
+import com.kista.shared.platform.openapi.NullMarkedRecordModelConverter;
 import com.kista.tradingcore.stats.adapter.in.web.dto.EquityCurveResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration;
@@ -51,7 +51,8 @@ class HousingBenchmarkApiDocsTest {
         assertNullableReferenceUnion(
                 properties.path("currentExchangeRate"),
                 "HousingBenchmarkCurrentExchangeRate");
-        assertThat(response.path("required")).anySatisfy(required ->
+        // @Nullable 컴포넌트는 required가 아니다
+        assertThat(response.path("required")).noneSatisfy(required ->
                 assertThat(required.asString()).isEqualTo("currentExchangeRate"));
         assertThat(schemas.path("HousingBenchmarkCurrentExchangeRate")
                 .path("properties").path("source").path("enum"))
@@ -126,7 +127,7 @@ class HousingBenchmarkApiDocsTest {
             EventPublicationAutoConfiguration.class, // DataSource 없는 최소 컨텍스트라 Modulith EPR도 함께 제외
             PlatformAutoConfiguration.class // :shared 인프라(보안·JWT·JPA Auditing) — 스키마 문서 검증엔 불필요
     }, excludeName = "org.springframework.modulith.events.jdbc.JdbcEventPublicationAutoConfiguration") // package-private이라 클래스 참조 불가, 이름으로 제외
-    @Import({SchemaController.class, HousingBenchmarkOpenApiCustomizer.class})
+    @Import({SchemaController.class, NullMarkedRecordModelConverter.class}) // PlatformAutoConfiguration을 빼므로 컨버터를 명시 등록
     static class TestApplication {}
 
     @RestController

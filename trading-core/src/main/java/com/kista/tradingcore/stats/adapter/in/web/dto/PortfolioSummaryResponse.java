@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 import static java.math.BigDecimal.ZERO;
 
@@ -36,7 +37,7 @@ public record PortfolioSummaryResponse(
             @Schema(description = "평가손익률 (%)")
             BigDecimal profitRate,     // evlu_pfls_rt1: 평가손익률 %
             @Schema(description = "해외거래소코드", example = "AMEX")
-            String exchangeCode        // ovrs_excg_cd: 해외거래소코드
+            @Nullable String exchangeCode        // ovrs_excg_cd: 해외거래소코드
     ) {}
 
     // 계좌 전체 요약 — PresentBalanceResult output3 필드

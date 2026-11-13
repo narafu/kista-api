@@ -13,25 +13,26 @@ import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 // DCA 규칙 응답 1건 — DcaResponse.rules (요청 필드 + 확정 ruleKey + 규칙별 다음·최근 회차)
 public record DcaRuleResponse(
         String ruleKey,                   // 확정 규칙 키
         OrderDirection direction,
-        DcaFrequency frequency, DayOfWeek dayOfWeek, Integer dayOfMonth,
+        DcaFrequency frequency, @Nullable DayOfWeek dayOfWeek, @Nullable Integer dayOfMonth,
         OrderType orderType,
-        Integer executionHour,            // 코인 실행 시각 (KST, 주식 null)
+        @Nullable Integer executionHour,            // 코인 실행 시각 (KST, 주식 null)
         Sizing sizing,                    // 규모
         DcaShortfallPolicy shortfall,     // 가용 부족 정책
         List<DcaConditionResponse> conditions, // 추가 조건(AND), 입력 순서
-        NextExecution nextExecution,      // 보정 반영 판정 예정일 (null 가능)
-        LastExecution lastExecution       // 이 규칙의 최근 회차 (null 가능)
+        @Nullable NextExecution nextExecution,      // 보정 반영 판정 예정일 (null 가능)
+        @Nullable LastExecution lastExecution       // 이 규칙의 최근 회차 (null 가능)
 ) {
-    public record Sizing(DcaSizingType type, BigDecimal amount, BigDecimal percent) {}
+    public record Sizing(DcaSizingType type, @Nullable BigDecimal amount, @Nullable BigDecimal percent) {}
 
     public record NextExecution(LocalDate usSessionDate, LocalDate kstTradeDate) {}
 
-    public record LastExecution(LocalDate kstTradeDate, String status, String skipReason) {}
+    public record LastExecution(LocalDate kstTradeDate, String status, @Nullable String skipReason) {}
 
     static DcaRuleResponse from(DcaSummary.RuleSummary s) {
         DcaRule r = s.rule();

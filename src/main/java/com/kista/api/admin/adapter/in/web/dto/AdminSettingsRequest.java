@@ -1,5 +1,6 @@
 package com.kista.api.admin.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.kista.shared.kernel.Broker;
 import com.kista.api.admin.domain.model.BenchmarkFieldSettings;
 import com.kista.api.admin.domain.model.BenchmarkSettings;
@@ -31,7 +32,7 @@ public record AdminSettingsRequest(
         @Schema(description = "전략별 신규 생성 정책 설정 (key=StrategyType)")
         @NotNull Map<StrategyType, @Valid StrategyRequest> strategies,
         @Schema(description = "ETF 벤치마크 비교 자산 설정 (생략 시 기존 값 유지)")
-        @Valid BenchmarkRequest benchmarks
+        @Valid @Nullable BenchmarkRequest benchmarks
 ) {
     // currentBrokers: 현재 저장된 증권사 정책 — 요청에 없는 증권사 키는 현재 값을 유지하고(구 UI 호환), allowedIp는 항상 현재 값을 유지한다
     public RuntimeSettingsBundle toDomain(Map<Broker, BrokerSettings> currentBrokers) {
@@ -99,15 +100,15 @@ public record AdminSettingsRequest(
 
     public record FieldRequests(
             @Schema(description = "종목 생성 필드 설정")
-            @Valid FieldRequest<StrategyTicker> ticker,
+            @Valid @Nullable FieldRequest<StrategyTicker> ticker,
             @Schema(description = "무한매수 분할 수 필드 설정 (INFINITE 전용)")
-            @Valid FieldRequest<Integer> divisionCount,
+            @Valid @Nullable FieldRequest<Integer> divisionCount,
             @Schema(description = "VR 정기 입출금 방향 필드 설정 (VR 전용)")
-            @Valid FieldRequest<RecurringMode> recurringMode,
+            @Valid @Nullable FieldRequest<RecurringMode> recurringMode,
             @Schema(description = "VR 밴드 폭 필드 설정 (%, VR 전용)")
-            @Valid FieldRequest<BigDecimal> bandWidth,
+            @Valid @Nullable FieldRequest<BigDecimal> bandWidth,
             @Schema(description = "VR 롤오버 주기 필드 설정 (주 단위, VR 전용)")
-            @Valid FieldRequest<Integer> intervalWeeks
+            @Valid @Nullable FieldRequest<Integer> intervalWeeks
     ) { // 전략별 관리자 생성 필드 입력
         StrategyFieldSettings<StrategyTicker> tickerValue() { return require(ticker, "ticker").toDomain(); }
 

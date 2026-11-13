@@ -2,7 +2,6 @@ package com.kista.tradingcore.stats.adapter.in.web.dto;
 
 import com.kista.shared.kernel.StrategyTicker;
 import io.swagger.v3.oas.annotations.media.Schema;
-import tools.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -21,6 +20,6 @@ public record CryptoPricesResponse(
 
     public record CryptoPrice(
             @Schema(description = "종목", example = "BTC") String ticker,
-            @Schema(description = "현재가 (KRW)", example = "150000000") @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal price
+            @Schema(description = "현재가 (KRW)", example = "150000000") BigDecimal price
     ) {}
 }

@@ -8,25 +8,23 @@ import com.kista.tradingcore.stats.domain.model.DatedValuation;
 import com.kista.tradingcore.stats.domain.model.DatedValue;
 import io.swagger.v3.oas.annotations.media.Schema;
 
-import static io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED;
-import tools.jackson.databind.annotation.JsonSerialize;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 // 코인 시장 지표 응답 — 도메인 구조 미러링, 섹션 실패 시 null (부분 응답).
 // 중첩 스키마명은 CryptoMarketIndicators 접두사로 고유화 — 일반명(TickerResponse 등)이 다른 DTO와 겹치면 springdoc이 개명해
-// CryptoMarketIndicatorsOpenApiCustomizer가 대상을 놓친다
+// 스키마 충돌 가드(NullMarkedRecordSpecGuard)가 대상을 놓친다
 public record CryptoMarketIndicatorsResponse(
-        @Schema(description = "조립 시각", requiredMode = REQUIRED) Instant asOf,
-        @Schema(description = "테더 프리미엄 (실패 시 null)", nullable = true, requiredMode = REQUIRED) PremiumResponse usdtPremium,
-        @Schema(description = "종목별 지표", requiredMode = REQUIRED) List<TickerResponse> tickers,
-        @Schema(description = "BTC 반감기 카운트다운 (실패 시 null)", nullable = true, requiredMode = REQUIRED) HalvingResponse halving,
-        @Schema(description = "BTC 도미넌스 — BTC 시가총액 비중 (%) (CMC 키 없음·실패 시 null)", nullable = true, requiredMode = REQUIRED) DailyIndicatorResponse btcDominance,
-        @Schema(description = "알트코인 시즌 지수 0~100 (CMC — 상위 100 알트 중 90일간 BTC를 이긴 비율, 75↑ 알트 시즌·25↓ 비트코인 시즌). 이력은 비공식 API라 실패 시 빈 배열 (현재값 조회 실패 시 null)", nullable = true, requiredMode = REQUIRED) DailyIndicatorResponse altcoinSeason,
-        @Schema(description = "Hash Ribbons — 해시레이트(EH/s) 30·60일 이동평균, CAPITULATION: sma30 < sma60(채굴자 항복), buySignal: 항복→회복 전환 후 BTC 10일 SMA > 20일 SMA가 되는 첫날 (실패 시 null)", nullable = true, requiredMode = REQUIRED) HashRibbonsResponse hashRibbons
+        @Schema(description = "조립 시각") Instant asOf,
+        @Schema(description = "테더 프리미엄 (실패 시 null)") @Nullable PremiumResponse usdtPremium,
+        @Schema(description = "종목별 지표") List<TickerResponse> tickers,
+        @Schema(description = "BTC 반감기 카운트다운 (실패 시 null)") @Nullable HalvingResponse halving,
+        @Schema(description = "BTC 도미넌스 — BTC 시가총액 비중 (%) (CMC 키 없음·실패 시 null)") @Nullable DailyIndicatorResponse btcDominance,
+        @Schema(description = "알트코인 시즌 지수 0~100 (CMC — 상위 100 알트 중 90일간 BTC를 이긴 비율, 75↑ 알트 시즌·25↓ 비트코인 시즌). 이력은 비공식 API라 실패 시 빈 배열 (현재값 조회 실패 시 null)") @Nullable DailyIndicatorResponse altcoinSeason,
+        @Schema(description = "Hash Ribbons — 해시레이트(EH/s) 30·60일 이동평균, CAPITULATION: sma30 < sma60(채굴자 항복), buySignal: 항복→회복 전환 후 BTC 10일 SMA > 20일 SMA가 되는 첫날 (실패 시 null)") @Nullable HashRibbonsResponse hashRibbons
 ) {
     public static CryptoMarketIndicatorsResponse from(CryptoMarketIndicators m) {
         return new CryptoMarketIndicatorsResponse(m.asOf(),
@@ -49,30 +47,30 @@ public record CryptoMarketIndicatorsResponse(
 
     @Schema(name = "CryptoMarketIndicatorsPremium")
     public record PremiumResponse(
-            @Schema(description = "현재 테더 프리미엄 (%)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal current,
-            @Schema(description = "일자별 추이", requiredMode = REQUIRED) List<DatedValueResponse> history
+            @Schema(description = "현재 테더 프리미엄 (%)") BigDecimal current,
+            @Schema(description = "일자별 추이") List<DatedValueResponse> history
     ) {}
 
     @Schema(name = "CryptoMarketIndicatorsCoinbasePremium")
     public record CoinbasePremiumResponse(
-            @Schema(description = "현재 코인베이스 프리미엄 (%) — (코인베이스 <코인>-USD ÷ (바이낸스 <코인>USDT × 코인베이스 USDT-USD) − 1) × 100", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal current,
-            @Schema(description = "일자별 추이 (UTC 일봉 종가, 진행 중 봉 제외)", requiredMode = REQUIRED) List<DatedValueResponse> history
+            @Schema(description = "현재 코인베이스 프리미엄 (%) — (코인베이스 <코인>-USD ÷ (바이낸스 <코인>USDT × 코인베이스 USDT-USD) − 1) × 100") BigDecimal current,
+            @Schema(description = "일자별 추이 (UTC 일봉 종가, 진행 중 봉 제외)") List<DatedValueResponse> history
     ) {}
 
     @Schema(name = "CryptoMarketIndicatorsDailyIndicator")
     public record DailyIndicatorResponse(
-            @Schema(description = "현재 값", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal current,
-            @Schema(description = "일자별 추이", requiredMode = REQUIRED) List<DatedValueResponse> history
+            @Schema(description = "현재 값") BigDecimal current,
+            @Schema(description = "일자별 추이") List<DatedValueResponse> history
     ) {}
 
     @Schema(name = "CryptoMarketIndicatorsDatedHashRibbon")
     public record DatedHashRibbonResponse(
-            @Schema(description = "기준 일자", requiredMode = REQUIRED) LocalDate date,
-            @Schema(description = "일 평균 해시레이트 (EH/s)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal hashrateEh,
-            @Schema(description = "30일 이동평균 (이력 30일 미만이면 null)", nullable = true, requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal sma30,
-            @Schema(description = "60일 이동평균 (이력 60일 미만이면 null)", nullable = true, requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal sma60,
-            @Schema(description = "CAPITULATION: sma30 < sma60 (채굴자 항복), RECOVERY: 그 외 (sma60 없으면 null)", nullable = true, requiredMode = REQUIRED) DatedHashRibbon.State state,
-            @Schema(description = "매수 신호 — CAPITULATION → RECOVERY 전환 후 BTC 종가 10일 SMA > 20일 SMA가 처음 충족되는 날(전환일에 이미 충족이면 그날, 아니면 이후 RECOVERY 유지 중 첫 충족일, 다시 CAPITULATION이면 취소)", requiredMode = REQUIRED) boolean buySignal
+            @Schema(description = "기준 일자") LocalDate date,
+            @Schema(description = "일 평균 해시레이트 (EH/s)") BigDecimal hashrateEh,
+            @Schema(description = "30일 이동평균 (이력 30일 미만이면 null)") @Nullable BigDecimal sma30,
+            @Schema(description = "60일 이동평균 (이력 60일 미만이면 null)") @Nullable BigDecimal sma60,
+            @Schema(description = "CAPITULATION: sma30 < sma60 (채굴자 항복), RECOVERY: 그 외 (sma60 없으면 null)") DatedHashRibbon.@Nullable State state,
+            @Schema(description = "매수 신호 — CAPITULATION → RECOVERY 전환 후 BTC 종가 10일 SMA > 20일 SMA가 처음 충족되는 날(전환일에 이미 충족이면 그날, 아니면 이후 RECOVERY 유지 중 첫 충족일, 다시 CAPITULATION이면 취소)") boolean buySignal
     ) {
         static DatedHashRibbonResponse from(DatedHashRibbon r) {
             return new DatedHashRibbonResponse(r.date(), r.hashrateEh(), r.sma30(), r.sma60(), r.state(), r.buySignal());
@@ -81,33 +79,33 @@ public record CryptoMarketIndicatorsResponse(
 
     @Schema(name = "CryptoMarketIndicatorsHashRibbons")
     public record HashRibbonsResponse(
-            @Schema(description = "최신 점 (history 마지막과 같음)", requiredMode = REQUIRED) DatedHashRibbonResponse current,
-            @Schema(description = "일자별 추이", requiredMode = REQUIRED) List<DatedHashRibbonResponse> history
+            @Schema(description = "최신 점 (history 마지막과 같음)") DatedHashRibbonResponse current,
+            @Schema(description = "일자별 추이") List<DatedHashRibbonResponse> history
     ) {}
 
     @Schema(name = "CryptoMarketIndicatorsHalving")
     public record HalvingResponse(
-            @Schema(description = "현재 BTC 블록 높이", requiredMode = REQUIRED) long currentHeight,
-            @Schema(description = "다음 반감기 블록 높이 (210,000 배수)", requiredMode = REQUIRED) long nextHalvingHeight,
-            @Schema(description = "남은 블록 수", requiredMode = REQUIRED) long blocksRemaining,
-            @Schema(description = "예상 반감기 시각 (조립 시각 + 남은 블록 × 10분, 추정치)", requiredMode = REQUIRED) Instant estimatedAt
+            @Schema(description = "현재 BTC 블록 높이") long currentHeight,
+            @Schema(description = "다음 반감기 블록 높이 (210,000 배수)") long nextHalvingHeight,
+            @Schema(description = "남은 블록 수") long blocksRemaining,
+            @Schema(description = "예상 반감기 시각 (조립 시각 + 남은 블록 × 10분, 추정치)") Instant estimatedAt
     ) {}
 
     @Schema(name = "CryptoMarketIndicatorsDatedValue")
     public record DatedValueResponse(
-            @Schema(description = "기준 일자", requiredMode = REQUIRED) LocalDate date,
-            @Schema(description = "값", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal value
+            @Schema(description = "기준 일자") LocalDate date,
+            @Schema(description = "값") BigDecimal value
     ) {}
 
     @Schema(name = "CryptoMarketIndicatorsTicker")
     public record TickerResponse(
-            @Schema(description = "종목", example = "BTC", requiredMode = REQUIRED) String ticker,
-            @Schema(description = "김치 프리미엄 (실패 시 null)", nullable = true, requiredMode = REQUIRED) KimchiPremiumResponse kimchiPremium,
-            @Schema(description = "펀딩비 (실패 시 null)", nullable = true, requiredMode = REQUIRED) FundingRateResponse fundingRate,
-            @Schema(description = "미결제약정 (실패 시 null)", nullable = true, requiredMode = REQUIRED) OpenInterestResponse openInterest,
-            @Schema(description = "장기 밸류에이션 — 직전 완성 일봉 종가 기준 (실패 시 null)", nullable = true, requiredMode = REQUIRED) ValuationResponse valuation,
-            @Schema(description = "롱/숏 계좌 비율 — 계좌 수(사람) 기준, 포지션 규모(돈) 기준인 펀딩비와 다름 (실패 시 null)", nullable = true, requiredMode = REQUIRED) LongShortRatioResponse longShortRatio,
-            @Schema(description = "테더 보정 코인베이스 프리미엄 — 미국 현물 수요 (실패 시 null)", nullable = true, requiredMode = REQUIRED) CoinbasePremiumResponse coinbasePremium
+            @Schema(description = "종목", example = "BTC") String ticker,
+            @Schema(description = "김치 프리미엄 (실패 시 null)") @Nullable KimchiPremiumResponse kimchiPremium,
+            @Schema(description = "펀딩비 (실패 시 null)") @Nullable FundingRateResponse fundingRate,
+            @Schema(description = "미결제약정 (실패 시 null)") @Nullable OpenInterestResponse openInterest,
+            @Schema(description = "장기 밸류에이션 — 직전 완성 일봉 종가 기준 (실패 시 null)") @Nullable ValuationResponse valuation,
+            @Schema(description = "롱/숏 계좌 비율 — 계좌 수(사람) 기준, 포지션 규모(돈) 기준인 펀딩비와 다름 (실패 시 null)") @Nullable LongShortRatioResponse longShortRatio,
+            @Schema(description = "테더 보정 코인베이스 프리미엄 — 미국 현물 수요 (실패 시 null)") @Nullable CoinbasePremiumResponse coinbasePremium
     ) {
         static TickerResponse from(CryptoMarketIndicators.TickerIndicators t) {
             var kp = t.kimchiPremium();
@@ -133,15 +131,15 @@ public record CryptoMarketIndicatorsResponse(
 
     @Schema(name = "CryptoMarketIndicatorsPremiumPair")
     public record PremiumPairResponse(
-            @Schema(description = "공식 환율 기준 김프 (%, 환율 장애 시 null)", nullable = true, requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal official,
-            @Schema(description = "테더 기준 김프 (%)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal tether
+            @Schema(description = "공식 환율 기준 김프 (%, 환율 장애 시 null)") @Nullable BigDecimal official,
+            @Schema(description = "테더 기준 김프 (%)") BigDecimal tether
     ) {}
 
     @Schema(name = "CryptoMarketIndicatorsDatedPremiumPair")
     public record DatedPremiumPairResponse(
-            @Schema(description = "기준 일자", requiredMode = REQUIRED) LocalDate date,
-            @Schema(description = "공식 환율 기준 김프 (%, 환율 없는 날 null)", nullable = true, requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal official,
-            @Schema(description = "테더 기준 김프 (%)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal tether
+            @Schema(description = "기준 일자") LocalDate date,
+            @Schema(description = "공식 환율 기준 김프 (%, 환율 없는 날 null)") @Nullable BigDecimal official,
+            @Schema(description = "테더 기준 김프 (%)") BigDecimal tether
     ) {
         static DatedPremiumPairResponse from(DatedPremiumPair p) {
             return new DatedPremiumPairResponse(p.date(), p.official(), p.tether());
@@ -150,36 +148,36 @@ public record CryptoMarketIndicatorsResponse(
 
     @Schema(name = "CryptoMarketIndicatorsKimchiPremium")
     public record KimchiPremiumResponse(
-            @Schema(description = "현재 김프", requiredMode = REQUIRED) PremiumPairResponse current,
-            @Schema(description = "일자별 추이", requiredMode = REQUIRED) List<DatedPremiumPairResponse> history
+            @Schema(description = "현재 김프") PremiumPairResponse current,
+            @Schema(description = "일자별 추이") List<DatedPremiumPairResponse> history
     ) {}
 
     @Schema(name = "CryptoMarketIndicatorsFundingRate")
     public record FundingRateResponse(
-            @Schema(description = "현재 펀딩비 (비율, 예: 0.0001)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal current,
-            @Schema(description = "다음 펀딩 시각", requiredMode = REQUIRED) Instant nextFundingTime,
-            @Schema(description = "일평균 추이", requiredMode = REQUIRED) List<DatedValueResponse> history
+            @Schema(description = "현재 펀딩비 (비율, 예: 0.0001)") BigDecimal current,
+            @Schema(description = "다음 펀딩 시각") Instant nextFundingTime,
+            @Schema(description = "일평균 추이") List<DatedValueResponse> history
     ) {}
 
     @Schema(name = "CryptoMarketIndicatorsOpenInterestPoint")
     public record OpenInterestPointResponse(
-            @Schema(description = "기준 일자", requiredMode = REQUIRED) LocalDate date,
-            @Schema(description = "미결제약정 명목가 (USD)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal valueUsd
+            @Schema(description = "기준 일자") LocalDate date,
+            @Schema(description = "미결제약정 명목가 (USD)") BigDecimal valueUsd
     ) {}
 
     @Schema(name = "CryptoMarketIndicatorsOpenInterest")
     public record OpenInterestResponse(
-            @Schema(description = "일자별 추이", requiredMode = REQUIRED) List<OpenInterestPointResponse> history
+            @Schema(description = "일자별 추이") List<OpenInterestPointResponse> history
     ) {}
 
     @Schema(name = "CryptoMarketIndicatorsDatedValuation")
     public record DatedValuationResponse(
-            @Schema(description = "기준 일자 (UTC 일봉)", requiredMode = REQUIRED) LocalDate date,
-            @Schema(description = "그날 종가 (USDT)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal close,
-            @Schema(description = "200주 이동평균 (USDT, 1400일 단순평균 — 이력 1400일 미만이면 null)", nullable = true, requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal wma200,
-            @Schema(description = "종가 / 200주 이동평균 배수 (200주 이동평균이 null이면 null)", nullable = true, requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal wma200Multiple,
-            @Schema(description = "Mayer Multiple — 종가 / 200일 이동평균 (이력 200일 미만이면 null)", nullable = true, requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal mayerMultiple,
-            @Schema(description = "최고 종가(ATH) 대비 하락률 (%, 0 이하)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal athDrawdownPercent
+            @Schema(description = "기준 일자 (UTC 일봉)") LocalDate date,
+            @Schema(description = "그날 종가 (USDT)") BigDecimal close,
+            @Schema(description = "200주 이동평균 (USDT, 1400일 단순평균 — 이력 1400일 미만이면 null)") @Nullable BigDecimal wma200,
+            @Schema(description = "종가 / 200주 이동평균 배수 (200주 이동평균이 null이면 null)") @Nullable BigDecimal wma200Multiple,
+            @Schema(description = "Mayer Multiple — 종가 / 200일 이동평균 (이력 200일 미만이면 null)") @Nullable BigDecimal mayerMultiple,
+            @Schema(description = "최고 종가(ATH) 대비 하락률 (%, 0 이하)") BigDecimal athDrawdownPercent
     ) {
         static DatedValuationResponse from(DatedValuation v) {
             return new DatedValuationResponse(v.date(), v.close(), v.wma200(), v.wma200Multiple(), v.mayerMultiple(), v.athDrawdownPercent());
@@ -188,15 +186,15 @@ public record CryptoMarketIndicatorsResponse(
 
     @Schema(name = "CryptoMarketIndicatorsValuation")
     public record ValuationResponse(
-            @Schema(description = "현재 값 — 실시간이 아니라 직전 완성 일봉 기준 (history 마지막 점과 같음)", requiredMode = REQUIRED) DatedValuationResponse current,
-            @Schema(description = "일자별 추이 (각 일자는 그날까지의 일봉으로만 계산)", requiredMode = REQUIRED) List<DatedValuationResponse> history
+            @Schema(description = "현재 값 — 실시간이 아니라 직전 완성 일봉 기준 (history 마지막 점과 같음)") DatedValuationResponse current,
+            @Schema(description = "일자별 추이 (각 일자는 그날까지의 일봉으로만 계산)") List<DatedValuationResponse> history
     ) {}
 
     @Schema(name = "CryptoMarketIndicatorsDatedLongShortRatio")
     public record DatedLongShortRatioResponse(
-            @Schema(description = "기준 일자", requiredMode = REQUIRED) LocalDate date,
-            @Schema(description = "롱 포지션 계좌 비율 (0~1)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal longAccount,
-            @Schema(description = "롱 계좌 수 / 숏 계좌 수", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal longShortRatio
+            @Schema(description = "기준 일자") LocalDate date,
+            @Schema(description = "롱 포지션 계좌 비율 (0~1)") BigDecimal longAccount,
+            @Schema(description = "롱 계좌 수 / 숏 계좌 수") BigDecimal longShortRatio
     ) {
         static DatedLongShortRatioResponse from(DatedLongShortRatio r) {
             return new DatedLongShortRatioResponse(r.date(), r.longAccount(), r.longShortRatio());
@@ -205,8 +203,8 @@ public record CryptoMarketIndicatorsResponse(
 
     @Schema(name = "CryptoMarketIndicatorsLongShortRatio")
     public record LongShortRatioResponse(
-            @Schema(description = "최신 롱 포지션 계좌 비율 (0~1, 계좌 수 기준)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal longAccount,
-            @Schema(description = "최신 롱 계좌 수 / 숏 계좌 수", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal longShortRatio,
-            @Schema(description = "일자별 추이 (최근 30일 고정)", requiredMode = REQUIRED) List<DatedLongShortRatioResponse> history
+            @Schema(description = "최신 롱 포지션 계좌 비율 (0~1, 계좌 수 기준)") BigDecimal longAccount,
+            @Schema(description = "최신 롱 계좌 수 / 숏 계좌 수") BigDecimal longShortRatio,
+            @Schema(description = "일자별 추이 (최근 30일 고정)") List<DatedLongShortRatioResponse> history
     ) {}
 }

@@ -6,6 +6,7 @@ import com.kista.tradingcore.stats.domain.model.StrategyTypeStats;
 
 import java.math.BigDecimal;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 public record StatsSummaryResponse(
         BigDecimal totalRealizedPnl,
@@ -17,7 +18,7 @@ public record StatsSummaryResponse(
     public record TypeStats(
             String type, String typeDescription,
             int closedCycleCount, int activeCycleCount,
-            BigDecimal winRate, BigDecimal avgReturnRate, BigDecimal avgDurationDays,
+            @Nullable BigDecimal winRate, @Nullable BigDecimal avgReturnRate, @Nullable BigDecimal avgDurationDays,
             BigDecimal realizedPnl, BigDecimal unrealizedPnl
     ) {
         static TypeStats from(StrategyTypeStats s) {

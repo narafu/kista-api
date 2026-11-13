@@ -1,5 +1,6 @@
 package com.kista.api.finance.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.kista.api.finance.domain.model.FinanceAccount;
 import com.kista.api.finance.domain.model.FinanceAccountCommand;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -16,13 +17,13 @@ public record FinanceAccountRequest(
         @NotBlank String name,
         @Schema(description = "계좌번호 (선택, 숫자만)")
         @Pattern(regexp = "^\\d*$", message = "계좌번호는 숫자만 입력할 수 있습니다")
-        String accountNo,
+        @Nullable String accountNo,
         @Schema(description = "메모 (선택)")
-        String memo,
+        @Nullable String memo,
         @Schema(description = "기관 (선택, 자유 입력)", example = "토스증권")
-        @Size(max = 50) String institution,
+        @Size(max = 50) @Nullable String institution,
         @Schema(description = "소유자 (선택, 자유 입력)", example = "본인")
-        @Size(max = 50) String owner
+        @Size(max = 50) @Nullable String owner
 ) {
     public FinanceAccountCommand toCommand() {
         // 빈 문자열은 null로 정규화 — 그대로 두면 hash("")가 결정론적이라 계좌번호 미입력자끼리 전역 중복 오탐 발생

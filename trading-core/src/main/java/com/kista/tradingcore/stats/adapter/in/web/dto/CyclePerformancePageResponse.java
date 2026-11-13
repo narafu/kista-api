@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 public record CyclePerformancePageResponse(
         List<Item> items,
@@ -17,10 +18,10 @@ public record CyclePerformancePageResponse(
 ) {
     @Schema(name = "CyclePerformanceItem")
     public record Item(
-            UUID cycleId, UUID accountId, String strategyType, String ticker,
-            LocalDate startDate, LocalDate endDate,
-            BigDecimal startAmount, BigDecimal endAmount,
-            BigDecimal pnl, BigDecimal returnRate, Integer durationDays, boolean closed
+            UUID cycleId, UUID accountId, String strategyType, @Nullable String ticker,
+            LocalDate startDate, @Nullable LocalDate endDate,
+            BigDecimal startAmount, @Nullable BigDecimal endAmount,
+            @Nullable BigDecimal pnl, @Nullable BigDecimal returnRate, Integer durationDays, boolean closed
     ) {
         static Item from(CyclePerformance p) {
             return new Item(p.cycleId(), p.accountId(), p.strategyType().name(),

@@ -1,5 +1,6 @@
 package com.kista.api.benchmark.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.kista.api.benchmark.domain.model.HousingPriceIndex;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -9,7 +10,7 @@ import java.util.List;
 import java.util.Objects;
 
 // 아파트 주간 매매가격지수 원본 시계열 (투자 성과와 무관)
-public record HousingPriceIndexSeriesResponse(List<Point> points, LocalDate sourceUpdatedDate) {
+public record HousingPriceIndexSeriesResponse(List<Point> points, @Nullable LocalDate sourceUpdatedDate) {
 
     @Schema(name = "HousingPriceIndexSeriesPoint")
     public record Point(LocalDate baseDate, BigDecimal indexValue) {}

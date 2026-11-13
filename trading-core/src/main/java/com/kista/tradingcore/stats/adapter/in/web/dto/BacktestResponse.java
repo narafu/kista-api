@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 public record BacktestResponse(
         List<Point> points,
@@ -22,7 +23,7 @@ public record BacktestResponse(
 
     @Schema(name = "BacktestSummary")
     public record Summary(BigDecimal finalAsset, BigDecimal totalInvested, BigDecimal totalReturnRate,
-                          BigDecimal cagr, BigDecimal mdd, int tradeCount, int cycleCount) {}
+                          @Nullable BigDecimal cagr, BigDecimal mdd, int tradeCount, int cycleCount) {}
 
     public static BacktestResponse from(BacktestResult result) {
         List<Point> points = result.points().stream()

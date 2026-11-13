@@ -1,5 +1,6 @@
 package com.kista.api.admin.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.kista.api.admin.domain.model.AppErrorLog;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -14,11 +15,11 @@ public record ErrorLogResponse(
         @Schema(description = "예외 클래스 단순명")
         String errorType,
         @Schema(description = "예외 메시지")
-        String message,
+        @Nullable String message,
         @Schema(description = "전체 스택트레이스")
-        String stackTrace,
+        @Nullable String stackTrace,
         @Schema(description = "발생 위치 메타데이터")
-        Map<String, String> context,
+        @Nullable Map<String, String> context,
         @Schema(description = "기록 일시")
         Instant createdAt
 ) {

@@ -1,5 +1,6 @@
 package com.kista.api.finance.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.kista.api.finance.domain.model.FinanceGroupMember;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -9,7 +10,7 @@ public record FinanceGroupMemberResponse(
         @Schema(description = "사용자 ID")
         UUID userId,
         @Schema(description = "닉네임")
-        String nickname,
+        @Nullable String nickname,
         @Schema(description = "그룹 내 역할", example = "OWNER")
         String role
 ) {

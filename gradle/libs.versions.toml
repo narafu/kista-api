@@ -3,6 +3,7 @@ spring-boot              = "4.1.1"
 spring-dependency-mgmt   = "1.1.7"
 archunit                 = "1.5.1"
 springdoc                = "3.1.1"
+swagger                  = "2.2.55" # springdoc 3.1.1이 끌어오는 swagger-core 버전과 동일
 lombok                   = "1.18.48"
 firebase-admin           = "9.11.0"
 gson                     = "2.14.0"
@@ -25,7 +26,8 @@ spring-boot-starter-flyway     = { module = "org.springframework.boot:spring-boo
 flyway-postgresql              = { module = "org.flywaydb:flyway-database-postgresql" }
 
 # API Documentation
-swagger-annotations            = { module = "io.swagger.core.v3:swagger-annotations-jakarta", version = "2.2.55" } # shared contract 패키지의 @Schema용(springdoc 3.1.1이 끌어오는 버전과 동일)
+swagger-annotations            = { module = "io.swagger.core.v3:swagger-annotations-jakarta", version.ref = "swagger" } # shared contract 패키지의 @Schema용
+swagger-core                   = { module = "io.swagger.core.v3:swagger-core-jakarta", version.ref = "swagger" } # shared platform.openapi ModelConverter용(런타임은 springdoc이 공급)
 springdoc-openapi-webmvc-ui    = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
 
 # Observability

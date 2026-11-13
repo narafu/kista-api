@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 // FIDA 주문 수신 응답 — 저장된 마스터 ID + 요청 echo. 외부 FIDA 프로젝트도 소비하므로 필드명·shape 유지
 public record FidaOrderResponse(
@@ -21,7 +22,7 @@ public record FidaOrderResponse(
         @Schema(description = "사이클 실현 손익 (USD)")
         BigDecimal currentCycleRealizedPnl,
         @Schema(description = "평단가 (nullable)")
-        BigDecimal avgPrice,
+        @Nullable BigDecimal avgPrice,
         @Schema(description = "보유 수량")
         int holdings,
         @Schema(description = "저장된 계획 주문 목록")
@@ -33,7 +34,7 @@ public record FidaOrderResponse(
             @Schema(description = "주문 유형", example = "LOC")
             String orderType,
             @Schema(description = "주문 수량 (nullable, SELL 방향은 null 허용 — 남은 전부 매도)")
-            Integer quantity,
+            @Nullable Integer quantity,
             @Schema(description = "주문 가격")
             BigDecimal price
     ) {}

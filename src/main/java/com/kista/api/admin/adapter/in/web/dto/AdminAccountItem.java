@@ -1,5 +1,6 @@
 package com.kista.api.admin.adapter.in.web.dto;
 
+import org.jspecify.annotations.Nullable;
 import com.kista.shared.contract.account.AccountSummaryResponse;
 import com.kista.shared.kernel.AccountNumberMasker;
 import com.kista.api.user.domain.model.UserSummary;
@@ -15,15 +16,15 @@ public record AdminAccountItem(
         @Schema(description = "소유자 사용자 ID")
         UUID userId,
         @Schema(description = "소유자 닉네임 (사용자 조회 실패 시 \"(알 수 없음)\")")
-        String ownerNickname,
+        @Nullable String ownerNickname,
         @Schema(description = "계좌 별칭")
         String nickname,
         @Schema(description = "마스킹된 계좌번호", example = "****1234")
-        String accountNoMasked,
+        @Nullable String accountNoMasked,
         @Schema(description = "원본 계좌번호 (ADMIN 전용)", example = "12345678-01")
-        String accountNo,
+        @Nullable String accountNo,
         @Schema(description = "브로커 코드", example = "KIS")
-        String broker
+        @Nullable String broker
 ) {
     public static AdminAccountItem from(AccountSummaryResponse a, Map<UUID, UserSummary> userMap) {
         UserSummary user = a.userId() != null ? userMap.get(a.userId()) : null;

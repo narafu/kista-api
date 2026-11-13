@@ -9,6 +9,7 @@ import com.kista.shared.kernel.StrategyTicker;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 // 주문 1건 — trading-core 내부 API(/api/internal/trading/orders 등) 응답
 public record OrderResponse(
@@ -24,7 +25,7 @@ public record OrderResponse(
         BigDecimal quantity,        // 주문 수량 (주식 정수 값·코인 소수)
         BigDecimal price,           // 주문 가격
         OrderStatus status,         // 주문 상태
-        String externalOrderId,     // 증권사 부여 주문 번호
-        BigDecimal filledQuantity,  // 체결 수량 (null=미확인)
-        BigDecimal filledPrice      // 체결 가중평균가 (null=미체결)
+        @Nullable String externalOrderId,     // 증권사 부여 주문 번호
+        @Nullable BigDecimal filledQuantity,  // 체결 수량 (null=미확인)
+        @Nullable BigDecimal filledPrice      // 체결 가중평균가 (null=미체결)
 ) {}

@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 public record TradingCycleResponse(
         @Schema(description = "거래 사이클 고유 ID")
@@ -23,32 +24,32 @@ public record TradingCycleResponse(
         @Schema(description = "거래 종목", example = "TQQQ")
         String ticker,
         @Schema(description = "초기 입금액", example = "2000.00")
-        BigDecimal initialDeposit,
+        @Nullable BigDecimal initialDeposit,
         @Schema(description = "사이클 시작일 (미래면 시작예정일 — 시작예정일 밤 미국장부터 매매 시작)", example = "2026-08-01")
-        LocalDate startDate,
+        @Nullable LocalDate startDate,
         @Schema(description = "연속 사이클 정책", example = "NONE")
         String cycleSeedType,
         @Schema(description = "분할 수 (INFINITE 전략만 non-null)", example = "20")
-        Integer divisionCount,
+        @Nullable Integer divisionCount,
         @Schema(description = "리버스모드 활성 여부 (소진 후 모드)", example = "false")
         boolean isReverseMode,
         @Schema(description = "현재 회차 (INFINITE 전략만, 이력 없으면 null)", example = "3.5")
-        Double currentRound,
+        @Nullable Double currentRound,
         @Schema(description = "최신 포지션 보유 수량", example = "0")
-        Integer currentHoldings,
+        @Nullable Integer currentHoldings,
         @Schema(description = "VR 전략 상세 (VR 전략만 non-null)")
         @JsonInclude(JsonInclude.Include.NON_NULL)
-        VrSummary vr,
+        @Nullable VrSummary vr,
         @Schema(description = "DCA 전략 상세 (DCA 전략만 non-null)")
         @JsonInclude(JsonInclude.Include.NON_NULL)
-        DcaResponse dca,
+        @Nullable DcaResponse dca,
         @Schema(description = "진행 중인 사이클 존재 여부 — false면 사이클 없음 또는 최신 사이클 종료(투자금 추가 불가, NO_ACTIVE_CYCLE과 동일 기준)", example = "true")
         boolean cycleInProgress,
         @Schema(description = "최신 포지션 장부 예수금 (계좌 통화 — 주식 USD·코인 KRW/USDT, 포지션 없으면 null) — 투자금 인출 최대 기준(체결 전·장중 취소된 매수 주문 금액은 인출 시 추가로 제외)", example = "1500.00")
-        BigDecimal ledgerDeposit,
+        @Nullable BigDecimal ledgerDeposit,
         @Schema(description = "등록 응답 전용 — 오늘 시작인데 오늘 개장 배치(22:00 KST, 월~금) 이후 등록돼 오늘 밤 장 시작 주문(INFINITE 지정가 매도·VR 사다리)이 자동 생성되지 않으면 true(PRIVACY는 항상 false, 미국 휴장일엔 거짓 양성 가능). 등록 외 응답에선 생략")
         @JsonInclude(JsonInclude.Include.NON_NULL)
-        Boolean todayOpenBatchMissed
+        @Nullable Boolean todayOpenBatchMissed
 ) {
     // VR 전략 응답 요약 DTO
     public record VrSummary(
@@ -63,7 +64,7 @@ public record TradingCycleResponse(
             @Schema(description = "pool 상한 금액 (USD)")
             BigDecimal poolLimit,
             @Schema(description = "현재 pool(예수금, USD) — 최신 포지션 기준, 개장값(initialDeposit)과 다름")
-            BigDecimal currentPool,
+            @Nullable BigDecimal currentPool,
             @Schema(description = "pool 상한 비율(0~1) — 현재 사이클 고정 스냅샷", example = "0.75")
             BigDecimal poolLimitRate,
             @Schema(description = "실력공식 경사 계수 (G) — 현재 사이클 고정 스냅샷", example = "10")

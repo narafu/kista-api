@@ -1,8 +1,10 @@
 package com.kista.shared.contract.notify;
 
 import com.kista.shared.kernel.Currency;
+import com.kista.shared.platform.PlatformJsonConfig;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -12,7 +14,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class TradeEventMessageTest {
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = plainMapper(); // 앱 전역 설정(PlatformJsonConfig) 그대로 적용
+
+    private static ObjectMapper plainMapper() {
+        JsonMapper.Builder builder = JsonMapper.builder();
+        new PlatformJsonConfig().plainBigDecimalCustomizer().customize(builder);
+        return builder.build();
+    }
 
     @Test
     void serializesFractionalQuantityAsPlainNumber() {
