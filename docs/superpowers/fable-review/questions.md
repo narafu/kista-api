@@ -59,7 +59,7 @@
 - 답: 사용자 결정(2026-11-13) — 선택지 ① 그대로 둔다. 지침서 08 7절 T4 기록에 반영
 
 ### Q-05 S2 배포 승인 — 진행 중 INFINITE 전략의 변경 전후 주문(T7)
-- 상태: 사용자 결정 필요
+- 상태: 답변됨
 - 묶음·태스크: S2 / 지침서 08 T7
 - 걸린 곳: 08 4절 T7 "진행 중인 전략에 대해 변경 전후 다음 거래일 주문 미리보기를 나란히 뽑아 사용자에게 보여준다". 승인 전에는 배포를 요청하지 않는다.
 - 근거: 운영 DB 읽기 전용 조회(2026-11-13, `ssh kista-server`)로 진행 중 INFINITE 2건(USD 20분할, 둘 다 일반모드, 11-12 마감 원장·종가 58.90)을 얻었다. "전"은 `fb21cf047`(S2 이전)을 별도 worktree로 빌드해, "후"는 `1050a42e3`까지의 커널로 `InfiniteStrategy.buildOrders`를 직접 돌렸다. cap 61.85는 현재가 = 종가 58.90 가정(실제는 접수 직전 현재가로 다시 계산).
@@ -90,10 +90,10 @@
   두 건 모두 수량·최종회차·리버스 진입 판정은 같고 LOC 가격만 바뀐다. 보유 0 전략이 없어 첫 매수 변경(F4)은 지금 해당 없음(새 사이클부터 적용).
 - 선택지: ① 승인 — T1~T4(`66213af3c`~`1050a42e3`)를 한 번에 배포한다. 지침서는 T1~T3이라 했지만 T4도 주문 코드 변경이다. 시점은 마감 리포트 뒤·22:00 개장 배치 전. 직전에 그 거래일의 INFINITE BUY 주문(PLANNED·SUBMITTING·PLACED)과 열린 AT_OPEN `INFINITE_MOC_SELL`이 0건인지 SELECT로 확인한다(배포 전 저장된 옛 가격 행이 하루 유지되거나 옛 반반 행·옛 MOC와 이중 주문이 나는 것을 막기 위해). ② 보류 — 커밋은 로컬에 둔다(push 안 함).
 - 멈춘 범위: 배포만 멈춤. S2 구현·테스트·문서는 끝났다.
-- 답:
+- 답: 사용자 결정(2026-11-13) — 선택지 ① 승인. 지침서 08의 4절 배포 시점 문장과 7절 "T7 배포 승인" 개정 — T1~T4 한 번에, 마감 리포트 뒤·22:00 전, 직전 0건 SELECT 확인. push는 사용자 요청 시, `d2f40a341`
 
 ### Q-06 P5 스트림 직접 호출이 EPR 재시도와 같은 보장을 주지 않는다
-- 상태: 사용자 결정 필요
+- 상태: 답변됨
 - 묶음·태스크: S5 / 지침서 05 3절 P5
 - 걸린 곳: 10절 중단 조건 "P5에서 스트림 복구가 EPR 재시도와 같은 보장을 주지 않는다", P5 "보장이 부족하면 중단하고 보고한다".
 - 근거: 지금은 `UserEventStreamBridge` → `UserEventRepublisher`(@Transactional) 재발행이 커밋되면 메시지를 ack하고, 그 뒤 `TradingUserCascadeListener`·`UserNotifyProfileSyncListener`(AFTER_COMMIT) 실패는 `trading.event_publication`에 FAILED로 남는다. 컨슈머가 유스케이스·포트를 직접 부르게 바꾸면 실패가 스트림 컨슈머로 올라오는데, 이 경로는 세 가지가 다르다.
@@ -106,10 +106,10 @@
   2. 지침서대로 직접 호출하되 스트림 정책을 EPR 수준으로 올린다: poison은 역직렬화 실패만, `maxDeliveries` 무제한, 첫 실패 관리자 알림 훅 추가. 내구성 차이(3)는 남는다.
   3. P5를 단계 M으로 미룬다. 합병 커밋에서 스트림을 통째로 지우고 R 발행을 T 리스너가 직접 받게 하면(findings/10 E-3) 지금의 재발행 경로가 사라지며 EPR 보장은 그대로다. 그때까지는 순환이 생길 일이 없다(지금은 두 프로세스).
 - 멈춘 범위: P5만 멈춤. S5의 P1·P2·P7은 계속 진행.
-- 답:
+- 답: 사용자 결정(2026-11-13) — 선택지 3. 지침서 05의 3절 P5·단계 P 완료 판정, 4-1절 M9, 4-2절, 10절 개정 — 단계 P에서는 손대지 않고 M9에서 스트림 경로를 통째로 지운다(T 리스너 두 개는 남겨 EPR 보장 유지), `d2f40a341`
 
 ### Q-07 P2 ClockConfig를 S로 옮기면 기존 가드 두 개와 부딪힌다
-- 상태: 미답
+- 상태: 답변됨
 - 묶음·태스크: S5 / 지침서 05 3절 P2
 - 걸린 곳: P2 "`ClockConfig`·`RedisBlacklistAdapter`를 S로 옮겨 한 벌로". `RedisBlacklistAdapter`는 옮겼다(trading-core 클래스 삭제, `PlatformAutoConfiguration`이 `@ConditionalOnMissingBean(TokenBlacklistPort)`로 platform `RedisTokenBlacklistReader`를 올림). `ClockConfig`는 옮기지 못했다.
 - 근거: `Clock` 빈 본문은 `Clock.system(TimeZones.KST)`인데 S에서 이 빈을 둘 수 있는 곳은 `shared.platform`뿐이다(`shared.kernel`은 Spring 없는 JDK 전용). 그런데 `HexagonalArchitectureTest.platform_must_not_depend_on_other_modules`(`:99`)가 platform → `shared.kernel.TimeZones` 참조를 막고, `zoneId_of_must_only_be_called_in_TimeZones`(`:136`)가 platform에서 `ZoneId.of("Asia/Seoul")`을 직접 쓰는 것도 막는다. `main_code_must_not_read_system_clock_directly`의 예외 목록도 두 `ClockConfig` FQCN(`:179-180`)이다.
@@ -117,4 +117,4 @@
   1. 단계 M으로 미룬다. 합칠 때 둘 중 하나를 지우면 끝난다(본문이 같다, findings/10 A3). 지금은 두 프로세스라 충돌이 없다.
   2. 가드를 고친다: `TimeZones`를 `shared.platform.time`으로 옮기거나(전 코드 import 변경) platform 예외를 하나 추가하고 `ClockConfig`를 platform으로 옮긴다.
 - 멈춘 범위: P2의 Clock 항목만. 블랙리스트·`fearGreedRestClient` 개명은 진행했다. Alpaca 3벌 → 1벌은 하지 않았다 — 충돌이 아니고(findings/10 A1·A4, 빈 이름·properties FQCN이 모두 다름) 합치려면 R benchmark와 T marketcalendar·stats가 함께 쓸 새 platform 타입이 필요해 단계 X/R에서 alpaca 소유 모듈이 정해질 때 하는 편이 낫다.
-- 답:
+- 답: (Fable) 지침서 05의 3절 P2와 4-1절 M9 개정 — 선택지 ①. `ClockConfig`는 P2에서 빼고 M9에서 T 쪽 한 벌 삭제(가드 예외 목록의 T FQCN도 함께), Alpaca 3벌 → 1벌은 단계 X·R로 이동, `ee2027ca0`
