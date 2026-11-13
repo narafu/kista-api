@@ -91,3 +91,30 @@
 - 선택지: ① 승인 — T1~T4(`66213af3c`~`1050a42e3`)를 한 번에 배포한다. 지침서는 T1~T3이라 했지만 T4도 주문 코드 변경이다. 시점은 마감 리포트 뒤·22:00 개장 배치 전. 직전에 그 거래일의 INFINITE BUY 주문(PLANNED·SUBMITTING·PLACED)과 열린 AT_OPEN `INFINITE_MOC_SELL`이 0건인지 SELECT로 확인한다(배포 전 저장된 옛 가격 행이 하루 유지되거나 옛 반반 행·옛 MOC와 이중 주문이 나는 것을 막기 위해). ② 보류 — 커밋은 로컬에 둔다(push 안 함).
 - 멈춘 범위: 배포만 멈춤. S2 구현·테스트·문서는 끝났다.
 - 답:
+
+### Q-06 P5 스트림 직접 호출이 EPR 재시도와 같은 보장을 주지 않는다
+- 상태: 사용자 결정 필요
+- 묶음·태스크: S5 / 지침서 05 3절 P5
+- 걸린 곳: 10절 중단 조건 "P5에서 스트림 복구가 EPR 재시도와 같은 보장을 주지 않는다", P5 "보장이 부족하면 중단하고 보고한다".
+- 근거: 지금은 `UserEventStreamBridge` → `UserEventRepublisher`(@Transactional) 재발행이 커밋되면 메시지를 ack하고, 그 뒤 `TradingUserCascadeListener`·`UserNotifyProfileSyncListener`(AFTER_COMMIT) 실패는 `trading.event_publication`에 FAILED로 남는다. 컨슈머가 유스케이스·포트를 직접 부르게 바꾸면 실패가 스트림 컨슈머로 올라오는데, 이 경로는 세 가지가 다르다.
+  1. 재시도 기간: 지금은 `UserEventResubmitScheduler`(T, `adapter/in/schedule/UserEventResubmitScheduler.java:36`)가 10분마다 **무기한** 재발행한다. 스트림은 `UserEventStreamConsumer.MAX_DELIVERIES=24`(5분 × 24 ≈ 2시간) 뒤 포기(ack)하고 관리자에게 알린다.
+  2. 조용히 버려지는 예외: `UserEventStreamConsumer.ackOnFailure`가 `JacksonException`·`IllegalArgumentException`·`NullPointerException`을 poison으로 보고 바로 ack한다. 이 경로는 `RedisStreamSubscriber.handle`(`:123`)에서 warn 한 줄만 남기고 `onGiveUp`(관리자 알림)을 부르지 않는다. 지금은 정리 로직이 IAE·NPE를 던져도 EPR이 재시도하고 첫 실패에 관리자 알림을 보낸다(`UserEventResubmitScheduler.java:51`).
+  3. 내구성: 지금은 ack 이후 처리가 Postgres 행과 재기동 시 재발행(`deploy/server/docker-compose.yml:60` kista-trading `REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART=true`)에 기대고, 바꾸면 Redis pending 목록에만 기댄다.
+  `maxDeliveries`·`ackOnFailure`를 조정해 맞추는 것은 새 보장을 설계하는 일이라 하지 않았다.
+- 선택지:
+  1. 컨슈머가 `UserDeletedEvent`·`UserNotifyProfileChangedEvent`(shared.kernel) 대신 **trading 내부 전용 이벤트**(예: `TradingUserErasureRequested`)를 재발행한다. R의 `UserEventStreamPublisher`는 이 타입을 듣지 않으므로 합병 후에도 순환이 생기지 않고 EPR 재시도·재기동 재발행 보장이 그대로 남는다. 리스너 메서드 파라미터 타입이 바뀌어 EPR listener_id·event_type이 달라지므로 배포 직전 미완료 행 0건을 확인해야 한다(docker-infra.md "배포 직전 EPR 정리 런북"). `UserEventResubmitScheduler`(T) 필터 대상도 새 타입으로 바뀐다.
+  2. 지침서대로 직접 호출하되 스트림 정책을 EPR 수준으로 올린다: poison은 역직렬화 실패만, `maxDeliveries` 무제한, 첫 실패 관리자 알림 훅 추가. 내구성 차이(3)는 남는다.
+  3. P5를 단계 M으로 미룬다. 합병 커밋에서 스트림을 통째로 지우고 R 발행을 T 리스너가 직접 받게 하면(findings/10 E-3) 지금의 재발행 경로가 사라지며 EPR 보장은 그대로다. 그때까지는 순환이 생길 일이 없다(지금은 두 프로세스).
+- 멈춘 범위: P5만 멈춤. S5의 P1·P2·P7은 계속 진행.
+- 답:
+
+### Q-07 P2 ClockConfig를 S로 옮기면 기존 가드 두 개와 부딪힌다
+- 상태: 미답
+- 묶음·태스크: S5 / 지침서 05 3절 P2
+- 걸린 곳: P2 "`ClockConfig`·`RedisBlacklistAdapter`를 S로 옮겨 한 벌로". `RedisBlacklistAdapter`는 옮겼다(trading-core 클래스 삭제, `PlatformAutoConfiguration`이 `@ConditionalOnMissingBean(TokenBlacklistPort)`로 platform `RedisTokenBlacklistReader`를 올림). `ClockConfig`는 옮기지 못했다.
+- 근거: `Clock` 빈 본문은 `Clock.system(TimeZones.KST)`인데 S에서 이 빈을 둘 수 있는 곳은 `shared.platform`뿐이다(`shared.kernel`은 Spring 없는 JDK 전용). 그런데 `HexagonalArchitectureTest.platform_must_not_depend_on_other_modules`(`:99`)가 platform → `shared.kernel.TimeZones` 참조를 막고, `zoneId_of_must_only_be_called_in_TimeZones`(`:136`)가 platform에서 `ZoneId.of("Asia/Seoul")`을 직접 쓰는 것도 막는다. `main_code_must_not_read_system_clock_directly`의 예외 목록도 두 `ClockConfig` FQCN(`:179-180`)이다.
+- 선택지:
+  1. 단계 M으로 미룬다. 합칠 때 둘 중 하나를 지우면 끝난다(본문이 같다, findings/10 A3). 지금은 두 프로세스라 충돌이 없다.
+  2. 가드를 고친다: `TimeZones`를 `shared.platform.time`으로 옮기거나(전 코드 import 변경) platform 예외를 하나 추가하고 `ClockConfig`를 platform으로 옮긴다.
+- 멈춘 범위: P2의 Clock 항목만. 블랙리스트·`fearGreedRestClient` 개명은 진행했다. Alpaca 3벌 → 1벌은 하지 않았다 — 충돌이 아니고(findings/10 A1·A4, 빈 이름·properties FQCN이 모두 다름) 합치려면 R benchmark와 T marketcalendar·stats가 함께 쓸 새 platform 타입이 필요해 단계 X/R에서 alpaca 소유 모듈이 정해질 때 하는 편이 낫다.
+- 답:
