@@ -20,12 +20,12 @@ class CnnFearGreedIndexAdapter implements FearGreedIndexPort {
 
     private static final String URL = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata";
 
-    private final RestClient fearGreedRestClient;
+    private final RestClient tradingFearGreedRestClient;
 
     @Override
     public Optional<BigDecimal> latest() {
         return BrokerCallGuard.tryGet("[DCA] CNN 공포탐욕지수", () -> {
-            CnnResponse response = fearGreedRestClient.get().uri(URL).retrieve().body(CnnResponse.class);
+            CnnResponse response = tradingFearGreedRestClient.get().uri(URL).retrieve().body(CnnResponse.class);
             if (response == null || response.current() == null || response.current().score() == null) {
                 log.warn("[DCA] CNN 공포탐욕지수 현재값 없음");
                 return null;

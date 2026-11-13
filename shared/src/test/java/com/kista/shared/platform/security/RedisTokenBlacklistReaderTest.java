@@ -1,4 +1,4 @@
-package com.kista.tradingcore.trading.adapter.out.security;
+package com.kista.shared.platform.security;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -11,10 +11,10 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-class RedisBlacklistAdapterTest {
+class RedisTokenBlacklistReaderTest {
 
     private final StringRedisTemplate redisTemplate = Mockito.mock(StringRedisTemplate.class);
-    private final RedisBlacklistAdapter adapter = new RedisBlacklistAdapter(redisTemplate);
+    private final RedisTokenBlacklistReader adapter = new RedisTokenBlacklistReader(redisTemplate);
 
     @Test
     void isBlacklisted_root와_동일_키_네임스페이스_사용() {

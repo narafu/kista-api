@@ -1,5 +1,6 @@
 package com.kista.api;
 
+import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.shared.platform.web.ExceptionReporter;
 import com.kista.shared.platform.web.ProblemDetailExceptionHandler;
 import org.junit.jupiter.api.Test;
@@ -53,6 +54,8 @@ class ApplicationContextLoadTest {
         // 예외 advice·오류 보고는 프로세스당 하나 — 보고 빈이 없으면 advice가 조용히 보고를 건너뛴다
         assertThat(context.getBeanNamesForType(ProblemDetailExceptionHandler.class)).hasSize(1);
         assertThat(context.getBeanNamesForType(ExceptionReporter.class)).hasSize(1);
+        // JwtAuthFilter가 요구하는 블랙리스트 포트도 하나 — trading-core는 platform 조건부 빈, root는 user 어댑터
+        assertThat(context.getBeanNamesForType(TokenBlacklistPort.class)).hasSize(1);
         // root 테스트 classpath에 trading-core가 있어도 컨텍스트에 섞이지 않는다
         assertThat(Arrays.stream(context.getBeanDefinitionNames())
                 .map(context::getType)

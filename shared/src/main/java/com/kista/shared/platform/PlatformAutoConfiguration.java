@@ -13,14 +13,19 @@ import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.shared.platform.security.InternalTokenAuthFilter;
 import com.kista.shared.platform.security.JwtAuthFilter;
 import com.kista.shared.platform.security.JwtDecoderConfig;
+import com.kista.shared.platform.security.RedisTokenBlacklistReader;
 import com.kista.shared.platform.security.SecurityConfig;
+import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.shared.platform.telegram.TelegramConfig;
 import com.kista.shared.platform.telegram.TelegramProperties;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureOrder;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.Ordered;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 // :shared 인프라 빈 등록 — 앱(root·trading-core)은 com.kista.shared를 컴포넌트 스캔하지 않는다.
 // HIGHEST_PRECEDENCE: Boot 자동구성의 @ConditionalOnMissingBean(기본 SecurityFilterChain·JwtDecoder 등)보다
@@ -37,4 +42,11 @@ import org.springframework.core.Ordered;
         JpaAuditingConfig.class, NullMarkedRecordModelConverter.class, PlatformJsonConfig.class,
 })
 public class PlatformAutoConfiguration {
+
+    // 블랙리스트 읽기 포트 — 앱에 TokenBlacklistPort 빈이 없을 때만(trading-core) 올린다. root는 쓰기를 더한 user.RedisBlacklistAdapter가 있다
+    @Bean
+    @ConditionalOnMissingBean(TokenBlacklistPort.class)
+    RedisTokenBlacklistReader redisTokenBlacklistReader(StringRedisTemplate redisTemplate) {
+        return new RedisTokenBlacklistReader(redisTemplate);
+    }
 }

@@ -5,10 +5,10 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import java.time.Instant;
 import java.util.UUID;
 
-// 토큰 블랙리스트 Redis 읽기 공용 구현(비-빈 베이스) — root(user)와 trading-core가 같은 Redis 키 네임스페이스를 공유한다.
-// 빈으로 등록하지 않는다: TokenBlacklistPort 빈이 프로세스당 정확히 1개여야 JwtAuthFilter 주입이 모호해지지 않는다
-// (root는 user.RedisBlacklistAdapter, trading-core는 trading.RedisBlacklistAdapter가 각각 서브클래스 빈)
-public abstract class RedisTokenBlacklistReader implements TokenBlacklistPort {
+// 토큰 블랙리스트 Redis 읽기 공용 구현 — root(user)와 trading-core가 같은 Redis 키 네임스페이스를 공유한다.
+// TokenBlacklistPort 빈은 프로세스당 정확히 1개여야 JwtAuthFilter 주입이 모호해지지 않는다 — 그래서 PlatformAutoConfiguration이
+// 앱에 TokenBlacklistPort 빈이 없을 때만(trading-core) 이 클래스를 빈으로 올리고, root는 쓰기를 더한 서브클래스 user.RedisBlacklistAdapter를 쓴다
+public class RedisTokenBlacklistReader implements TokenBlacklistPort {
 
     protected static final String KEY_PREFIX = "blacklist:user:";          // userId 단위 블랙리스트 키 접두사
     protected static final String KEY_PREFIX_JTI = "blacklist:jti:";       // jti 단위 블랙리스트 키 접두사
@@ -16,7 +16,7 @@ public abstract class RedisTokenBlacklistReader implements TokenBlacklistPort {
 
     protected final StringRedisTemplate redisTemplate; // 서브클래스의 쓰기 메서드도 공유
 
-    protected RedisTokenBlacklistReader(StringRedisTemplate redisTemplate) {
+    public RedisTokenBlacklistReader(StringRedisTemplate redisTemplate) {
         this.redisTemplate = redisTemplate;
     }
 

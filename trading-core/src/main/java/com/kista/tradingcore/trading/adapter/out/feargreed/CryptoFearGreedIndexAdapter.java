@@ -21,12 +21,12 @@ class CryptoFearGreedIndexAdapter implements CryptoFearGreedIndexPort {
 
     private static final String URL = "https://api.alternative.me/fng/?limit=1";
 
-    private final RestClient fearGreedRestClient;
+    private final RestClient tradingFearGreedRestClient;
 
     @Override
     public Optional<BigDecimal> latest() {
         return BrokerCallGuard.tryGet("[DCA] 코인 공포탐욕지수", () -> {
-            AltResponse response = fearGreedRestClient.get().uri(URL).retrieve().body(AltResponse.class);
+            AltResponse response = tradingFearGreedRestClient.get().uri(URL).retrieve().body(AltResponse.class);
             if (response == null || response.data() == null || response.data().isEmpty()) {
                 log.warn("[DCA] 코인 공포탐욕지수 값 없음");
                 return null;
