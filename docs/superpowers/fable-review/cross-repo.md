@@ -114,7 +114,7 @@ ui에만 있던 규칙(서버가 검증하지 않아 지금은 우회 가능한 
 - 계약 원본은 kista 쪽이다(지침서 05 X5 이후 privacy 모듈 `api` 패키지). fida는 응답에서 `id`만 읽도록 줄인다(fida guides/02 태스크 3). 접점은 `POST /api/internal/fida-orders` 1개, 요청 7필드 + 응답 `id`.
 - kista-api 쪽 할 일 (지침서 05 X5에 함께 넣는다):
   1. `ContractWireFormatTest`에 응답 `id` 필드명을 고정하는 단언 추가(fida가 읽는 유일한 응답 필드).
-  2. `FidaOrderRequest.orders`에 `@NotNull` 추가. 지금은 null이면 `PrivacyTradeValidationService.inspect`·`saveBaseWithOrders`의 `orders().stream()`에서 NPE → 500 가능(코드 추론, 재현 안 함). 400이 되게 하고 테스트로 고정.
+  2. ✅(2026-11-13, S1 세션, `820203d13`) `FidaOrderRequest.orders`에 `@NotNull` 추가. 지금은 null이면 `PrivacyTradeValidationService.inspect`·`saveBaseWithOrders`의 `orders().stream()`에서 NPE → 500 가능(코드 추론, 재현 안 함). 400이 되게 하고 테스트로 고정.
   3. fida가 보내는 `tradeDate`(매매표 제목의 M/D)를 kista는 `releaseDate`(발행일, 거래일 D-1)로 저장한다. 두 날짜의 의미를 kista 쪽에서 확정해 계약 타입 주석에 남긴다.
   4. fida의 `requireSubmittable()`은 kista `PrivacyTradeValidationService`와 일부 겹치지만 400 사전 차단이라 fida에 유지. 기준 규칙은 kista.
 - 같은 호스트로 옮긴 뒤 fida의 `KISTA_URL`을 내부 주소로 바꾸면 Caddy 경로 의존(2026-09-17 404 사고 원인)이 사라진다. fida 앱 컨테이너는 kista-worker에 닿아야 하고 playwright 컨테이너는 data_net에 넣지 않는다 — 네트워크 설계는 fable-infra.
