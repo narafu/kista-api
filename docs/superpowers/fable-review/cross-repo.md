@@ -101,6 +101,37 @@ ui 지침서 04 "서버 오류의 분담"의 전제다. ui는 실패 토스트�
 - `fieldErrors[].field`는 요청 바디의 필드 경로다. Spring 기본 표기(`orders[0].price`) 그대로 보내면 된다. ui가 `orders.0.price`로 바꾼다.
 - ui는 폼 필드 이름을 요청 바디 필드 이름과 같게 짓는다. 이름이 맞지 않는 `fieldErrors`는 폼 버튼 위 한 줄로 보인다. api가 필드 이름을 ui에 맞출 필요는 없다.
 
+### fable-ui 요청 (2026-11-13, 2차) — ui 지침서 10(기능 재심)·11(미덮임 영역)에서 나온 것
+
+원본: `kista-ui/docs/superpowers/fable-review/guides/10-feature-review.md`, `11-uncovered-areas.md`. **ui 지침서 10의 항목은 전부 사용자 결정 전이다.** 아래 "결정 대기"는 사용자가 승인하기 전에는 api 태스크로 만들지 않는다. "api 판단 요청"은 결정과 무관하게 api의 답이 필요하다.
+
+api 판단 요청(답이 ui 지침서의 방향을 정한다):
+
+| # | 요청 | ui 근거 | ui 쪽 효과 |
+|---|---|---|---|
+| U1 | AT 클레임에 `status`·`role`을 넣고, 상태가 바뀌면 옛 AT를 거절해 갱신을 요구한다(역할의 `TOKEN_STALE_ROLE`과 같은 방식) | ui 11의 1절 (나). `kista-ui/proxy.ts:35-64`의 상태·역할 캐시 쿠키와 무효화 규칙 4개가 이 정보가 토큰 밖에 있어서 생겼다 | 캐시 쿠키 2개, `/api/auth/me` 호출 2곳, Route Handler 2개, 약 200줄 삭제 |
+| U2 | `/api/auth/status-stream`(승인 대기 SSE)을 지워도 되는가. ui는 `/api/auth/me` 주기 조회(30초 + 화면 복귀 시)로 바꾸려 한다 | ui 11의 2절. 운영 가입 승인 1건(6월) | SSE Route Handler 1개, 구독 1개 삭제. 서버 엔드포인트 삭제는 api 판단 |
+| U3 | T6 상태 플래그가 "그 종류가 지원하지 않는 동작"과 "지금은 못 하는 동작(사유)"을 구분하는가(`allowedActions`에도 `blockedActions`에도 없으면 미지원) | ui 10의 B2. 지금은 조건이 안 맞는 버튼이 사유 없이 숨는다 | 버튼을 항상 보이고 비활성 + 사유로 통일 |
+| U4 | PRIVACY 기준표(378건)를 관리자가 손으로 넣는 대신 서버가 산출하거나 가져올 수 있는가 | ui 11의 11절. `/admin/privacy-trades` 화면이 1,925줄(관리자 화면의 36%) | 가능하면 화면 대부분이 필요 없다 |
+| U5 | 화면이 부르지 않는 엔드포인트의 처리: `/api/accounts/{accountId}/daily-trades`(유저 범위 `/api/daily-trades`로 대체됨), `/api/admin/accounts/{accountId}/strategies/{strategyId}/trade-dates`는 삭제 후보. `/api/admin/trades/manual-fills`, `/api/admin/scheduler/{open,close}`는 화면을 만들지 서버에서 지울지 사용자 결정(ui D6) | ui 10의 A9. `findings/n-feature-inventory.md` 3-1절 | — |
+| U6 | 페이지형 목록이 기간을 프리셋 이름으로 받는가(`range=3M`). PRIVACY 목록은 이미 `range`를 받는다 | ui 11의 6절. ui에 기간 프리셋 체계가 3벌이고 KST·UTC가 섞여 있다 | 받으면 ui의 날짜 범위 계산이 사라진다 |
+| U7 | 사용자 응답의 `rejectReason` 필드(`MeResponse` 추정)는 반려 사유 기능 폐기(2026-11-12) 뒤에도 남아 있다 | ui 10의 B4 | 서버 필드 삭제 후보 |
+
+결정 대기(사용자가 ui 지침서 10의 결정 목록에서 승인하면 요청이 된다):
+
+| ui 결정 | 승인 시 api에 필요한 것 |
+|---|---|
+| D2 `/admin/pending` 병합 | 관리자 사용자 목록의 `status` 필터 파라미터(T4 관리자 묶음에 포함) |
+| D8 "보관" 전략 | 메타의 전략 상태 라벨 변경, 또는 보관 해제 엔드포인트 |
+| D9 VR 투자금 경로 통일 | VR 투자금 추가·인출을 재설정 요청에서 분리(다른 종류와 같은 엔드포인트) |
+| D10 DCA 다음 주문 예정 | DCA 다음 실행 예정(일자·규칙별 금액·건너뛸 조건) 응답 |
+| D13 내보내기 | 가계부 거래·자산 기록의 `text/csv` 응답(목록과 같은 필터 파라미터) |
+| D14 삭제 실행 취소 | 가계부 5종의 복구 엔드포인트(`POST …/{id}/restore`). 집계(T8)가 복구를 반영해야 한다 |
+| D15 가져오기, D16 반복 거래 | "미리보기 → 확정" 엔드포인트(지침서 10의 2-6절 일괄 등록과 같은 모양) |
+| D6 운영 도구 화면 | 없음(엔드포인트가 이미 있다). 삭제로 결정되면 서버 삭제 |
+
+infra 요청(fable-infra에 전달함): Caddy access log 켜기(ui D17 — 화면 사용 흔적을 볼 수단이 없다), 보안 헤더(HSTS·`X-Content-Type-Options`·frame 제한·`Referrer-Policy`)가 Caddy와 Next 설정 어디에도 없어 보인다(ui 11의 10-3, 운영 응답은 확인하지 않음).
+
 ## C. 인스턴스 구성 (fable-infra, 사용자 결정 2026-11-12)
 
 상세: `kista-infra/docs/superpowers/fable-review/guides/03-instance-topology.md`.
