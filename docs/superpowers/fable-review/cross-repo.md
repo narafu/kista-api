@@ -186,3 +186,17 @@ fida에 확인:
 
 - `findings/09`의 "`fallbackExecution` 리스너는 EPR 기록 없음"은 틀렸다. Spring Modulith 2.1.1은 `fallbackExecution` 리스너도 `event_publication`에 기록한다(`findings/18` C절, `PersistentApplicationEventMulticaster:116-145`). 05의 판단(스트림 경로를 먼저 끊는다, EPR 한 테이블)은 바뀌지 않는다.
 - 04 단계 A의 업비트 삭제 범위에서 `tradingcore/stats/adapter/out/upbit`(코인 시장 지표의 김치 프리미엄 시세)는 뺀다. 브로커 어댑터가 아니다(12의 3-4).
+
+## F. infra 추가 검토(지침서 04·05)에서 나온 레포 간 항목 (2026-11-13, fable-infra)
+
+원본은 kista-infra `docs/superpowers/fable-review/guides/04-ops-safety-net.md`·`05-script-workflow-structure.md`다. 둘 다 구현 전이고 사용자 결정 대기 항목이 있다(04 8절, 05 7절).
+
+| # | 내용 | api | ui | 원본 |
+|---|---|---|---|---|
+| F1 | fable-ui 요청 2건(B절 2차 끝 문단)의 답. 보안 헤더는 infra `Caddyfile`의 공용 스니펫 `(site)`에 두고 앱 스니펫의 사이트 블록이 `import site <앱>` 한 줄로 받는다. `next.config.ts`에는 두지 않는다(CSP만 앱 몫). 접근 로그는 같은 스니펫에 넣는 형태·보존 30일·한계를 적었고 켤지는 ui D17이다. 순서: infra가 `(site)`를 먼저 배포 → 앱 스니펫이 import. 반대면 caddy reload가 실패해 reconcile이 롤백한다 | `deploy/server/caddy/kista-api.caddy`에 import 1줄, `CaddyRoutingTest`가 import 줄을 허용하는지 확인 | `deploy/server/caddy/kista-ui.caddy`에 import 1줄 | infra 04 2-8, T9 |
+| F2 | 접근 로그의 한계: Next 프리페치(`?_rsc=`)도 요청으로 잡혀 화면 조회 수보다 많이 나온다. 정확한 조회 수가 목적이면 앱 계측이 맞다 | | D17 판단 재료 | infra 04 2-8 |
+| F3 | 매매 시각 창 계약: 개장·마감 스케줄러 cron을 바꾸면 infra `.github/scripts/trading-guard.sh:13-14`의 시각 창도 바꾼다(사본이다) | 스케줄러 cron 변경 시 | | infra 04 3절 |
+| F4 | redis는 무인증이다. 조건은 `data_net`에 kista-api role만 붙는 것이다. 새 서비스를 `data_net`에 붙이지 않는다 | compose 변경 시 | | infra 04 3절 |
+| F5 | infra `docs/superpowers/specs/2026-10-02-deploy-reconcile-design.md`를 `docs/design.md`로 줄이는 안(사용자 승인 전). 승인되면 링크를 바꾼다 | `deploy/server/README.md:113`, `docs/architecture-map.md:154`, `.github/workflows/server-deploy.yml:5` | `deploy/server/README.md:41`, `.github/workflows/server-deploy.yml:115` | infra 05 2-4, T6 |
+| F6 | infra를 설명하는 문서의 어긋난 서술(A절·infra 02 8절 목록에 없던 것): `.gpg`·`scripts/env.sh`·`ENV_PASSPHRASE`·`.env.example`(sops 전환), `scripts/backup.sh`·`0 2 * * *`(경로·주기), `/opt/kista-api/caddy` 마운트(→ `/opt/kista-infra/routes`), 앱 `.env`의 `API_DOMAIN`·`UI_DOMAIN`, "롤백은 헬스 재검증 없음", App 설치 범위, 수동 롤백 명령 3벌 | 줄 번호 표는 infra 05 9절 | 같음 | infra 05 9절 |
+| F7 | 백업 주기를 매시간으로 바꾸는 안(사용자 결정 전). 정해지면 `docs/agents/docker-infra.md`의 백업 서술은 infra README 링크로 | `docs/agents/docker-infra.md:160-170` | | infra 04 2-4 |
