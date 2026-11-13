@@ -34,6 +34,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyTicker;
@@ -512,14 +513,14 @@ class BacktestEngineTest {
                 "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03",
                 "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");
 
-        // 4일차: 캡 보정 매수 2주가 종가 85에 체결 → 6주·평단 91.67(550÷6 scale 2)·예수금 450 → 매입금 550 ÷ 250.00 = 2.2회차 (≥ 2.0) → 후반
+        // 4일차: 캡 보정 매수 2주가 종가 85에 체결 → 6주·평단 91.67(550÷6 scale 2)·예수금 450 → 매입금 550.02 ÷ 단위금액 250.01((450+550.02)/4 = 250.005 → 250.01) = 2.19999회차 (≥ 2.0) → 후반
         Recorded late = recorder.on("2024-01-04");
-        assertThat(late.position(4).currentRound()).isEqualTo(2.2);
+        assertThat(late.position(4).currentRound()).isCloseTo(2.1999920, within(1e-6));
         assertThat(late.position(4).isEarlyStage()).isFalse();
         assertThat(late.legs()).containsExactly("INFINITE_LATE_REF_BUY", "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03", "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");
-        // 후반 매수 = 단위금액 250.00 ÷ 기준가 89.84 내림 = 2주 (기준가 = 평단 91.67 × (1 − 0.02) = 89.8366, offset = 0.15×(1−2×2.2/4) = −0.015 → −0.02)
+        // 후반 매수 = 250.01 ÷ 기준가 90.30 내림 = 2주. offset = 0.15×(1−2×2.199992/4) = −0.0149994(반올림 안 함) → 91.67 × 0.9850006 = 90.29500.. → 90.30 (반 센트 경계에서 5e-6 위 — 단위금액 반올림 250.01 때문)
         assertThat(late.orders().getFirst().quantity()).isEqualTo(2);
-        assertThat(late.orders().getFirst().price()).isEqualByComparingTo("89.84");
+        assertThat(late.orders().getFirst().price()).isEqualByComparingTo("90.30");
 
         // 5일차 종가 80에 캡(85×1.05=89.25) 보정 매수 3주 체결 → 예수금 450 − 240 = 210 + 9주×80 = 930
         assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("930");
@@ -584,7 +585,7 @@ class BacktestEngineTest {
         assertThat(back.inputs().isReverseMode()).isFalse();
         assertThat(back.inputs().starPointPrice()).isNull();
         // 일반모드 주문 다리로 복귀 — 5주·평단 87.7778·예수금 510 → 단위금액 (510 + 438.89)/4 = 237.22, 1.85회차라 전반
-        assertThat(back.position(4).currentRound()).isEqualTo(1.85);
+        assertThat(back.position(4).currentRound()).isCloseTo(1.8501033, within(1e-6));
         assertThat(back.legs()).containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY",
                 "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03",
                 "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");

@@ -18,6 +18,8 @@ public record InfinitePosition(
     public static final int SELL_QUARTER_DIVISOR = 4;
     // 미국 주식 호가단위 (센트) — LOC 매도 지정가 보정 등에 공통 사용
     public static final BigDecimal TICK_SIZE = new BigDecimal("0.01");
+    // 회차·별% 같은 비율의 중간 자릿수 — 금액 자릿수(amountScale)와 별개
+    private static final int RATIO_SCALE = 10;
 
     // --- 기본 도메인 속성 조회 ---
 
@@ -49,9 +51,9 @@ public record InfinitePosition(
                 .divide(BigDecimal.valueOf(divisionCount), Currency.USD.amountScale(), HALF_UP);
     }
 
+    // 화면·로그용 회차 — 판정은 roundDecimal()을 쓴다
     public double currentRound() {
-        return holdings() == 0 ? 0.0
-                : purchaseAmount().divide(unitAmount(), Currency.USD.amountScale(), HALF_UP).doubleValue();
+        return roundDecimal().doubleValue();
     }
 
     // static 헬퍼: DB 저장값(CyclePosition)만으로 회차 계산 — KIS 실시간 조회 없이 StrategyDetail 조립 시 사용
@@ -61,15 +63,24 @@ public record InfinitePosition(
         BigDecimal purchaseAmount = avgPrice.multiply(BigDecimal.valueOf(holdings));
         BigDecimal unitAmount = deposit.add(purchaseAmount)
                 .divide(BigDecimal.valueOf(divisionCount), Currency.USD.amountScale(), HALF_UP);
-        return purchaseAmount.divide(unitAmount, Currency.USD.amountScale(), HALF_UP).doubleValue();
+        return roundOf(purchaseAmount, unitAmount).doubleValue();
     }
 
+    // 회차(T) = 매입액 ÷ unitAmount — 비율이라 금액 자릿수로 반올림하지 않는다
+    private BigDecimal roundDecimal() {
+        return holdings() == 0 ? BigDecimal.ZERO : roundOf(purchaseAmount(), unitAmount());
+    }
+
+    private static BigDecimal roundOf(BigDecimal purchaseAmount, BigDecimal unitAmount) {
+        return purchaseAmount.divide(unitAmount, RATIO_SCALE, HALF_UP);
+    }
+
+    // 별% = targetProfitRate × (1 − 2T/분할수) — 비율이라 반올림하지 않고 별지점(가격)에서만 2자리로 반올림한다
     public BigDecimal priceOffsetRate() {
-        // 2는 전체 분할수의 절반(currentRound=divisionCount/2)에서 priceOffsetRate=0이 되도록 하는 계수
-        double roundFactor = 2.0 * currentRound() / divisionCount;
-        return ticker.getTargetProfitRate()
-                .multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(roundFactor)))
-                .setScale(Currency.USD.amountScale(), HALF_UP);
+        BigDecimal roundFactor = roundDecimal().multiply(BigDecimal.TWO)
+                .divide(BigDecimal.valueOf(divisionCount), RATIO_SCALE, HALF_UP);
+        // 꼬리 0만 떼어 응답·로그가 0E-12 대신 0으로 나가게 한다 — 값은 그대로
+        return ticker.getTargetProfitRate().multiply(BigDecimal.ONE.subtract(roundFactor)).stripTrailingZeros();
     }
 
     public BigDecimal referencePrice() {
@@ -84,12 +95,12 @@ public record InfinitePosition(
 
     // --- TDA 지향: 비즈니스 조건 판단 메서드 (Tell, Don't Ask) ---
 
-    // 전반(priceOffsetRate>0) / 후반(priceOffsetRate≤0) — priceOffsetRate scale=2 반올림이라 currentRound 경계 직전(SOXL 20분할 ≥9.76)도 후반으로 판정된다
+    // 전반(T < 분할수/2) / 후반(T ≥ 분할수/2) — 경계 T=분할수/2는 후반
     public boolean isEarlyStage() {
-        return priceOffsetRate().compareTo(BigDecimal.ZERO) > 0;
+        return roundDecimal().multiply(BigDecimal.TWO).compareTo(BigDecimal.valueOf(divisionCount)) < 0;
     }
 
-    // 마지막 회차(매도 소진 구간) — unitAmount > deposit ⟺ currentRound > 19, 또는 기준가 1주도 원장을 넘어 매수 불가
+    // 마지막 회차(매도 소진 구간) — unitAmount > deposit ⟺ currentRound > 분할수 − 1, 또는 기준가 1주도 원장을 넘어 매수 불가
     public boolean isFinalRound() {
         return unitAmount().compareTo(deposit()) > 0 || referencePrice().compareTo(deposit()) > 0;
     }

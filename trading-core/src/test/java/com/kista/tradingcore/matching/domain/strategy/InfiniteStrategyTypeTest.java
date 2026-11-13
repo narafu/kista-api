@@ -205,7 +205,7 @@ class InfiniteStrategyTypeTest {
     @DisplayName("buildOrders 후반 소액 예수금: 1주 미만 계산이어도 LOC매수 1주 보장")
     void buildOrders_backHalf_smallDeposit_guaranteesMinimumOneShare() {
         // averagePrice=48.31, holdings=10, deposit=455.90 → totalAssets=939.00, unitAmount=46.95, currentRound≈10.29 (후반)
-        // referencePrice=48.31, late buy qty=floor(46.95/48.31)=0 이어도 최소 1주
+        // 별% = 0.15 × (1 − 2×10.2897/20) = −0.4345% → referencePrice=48.10, late buy qty=floor(46.95/48.10)=0 이어도 최소 1주
         AccountBalance balance = new AccountBalance(10, new BigDecimal("48.31"),
                 new BigDecimal("455.90"));
         InfinitePosition position = new InfinitePosition(balance, StrategyTicker.MAGX, new BigDecimal("48.00"), 20);
@@ -214,7 +214,7 @@ class InfiniteStrategyTypeTest {
 
         assertThat(orders).hasSize(6); // 보정 3건 상시 부착
         assertThat(orders.getFirst()).matches(o -> o.orderType() == LOC && o.direction() == BUY
-                && o.quantity() == 1 && o.price().compareTo(new BigDecimal("48.31")) == 0);
+                && o.quantity() == 1 && o.price().compareTo(new BigDecimal("48.10")) == 0);
         assertThat(orders.get(4)).matches(o -> o.orderType() == LOC && o.direction() == SELL && o.quantity() == 2);
         assertThat(orders.get(5)).matches(o -> o.orderType() == LIMIT && o.direction() == SELL && o.quantity() == 8
                 && o.price().compareTo(new BigDecimal("55.56")) == 0);

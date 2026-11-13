@@ -37,9 +37,9 @@ class InfinitePositionTest {
     }
 
     @Test
-    @DisplayName("holdings=10: currentRound=1.33, priceOffsetRate=0.17 (SOXL)")
+    @DisplayName("holdings=10: currentRound=1.333…, priceOffsetRate=0.17333… (SOXL) — 비율은 반올림하지 않는다")
     void case_q10() {
-        // averagePrice=20, purchaseAmount=200, totalAssets=3000, unitAmount=150.00, currentRound=200/150=1.33
+        // averagePrice=20, purchaseAmount=200, totalAssets=3000, unitAmount=150.00, currentRound=200/150=1.333…
         AccountBalance balance = new AccountBalance(10, new BigDecimal("20"), new BigDecimal("2800"));
         InfinitePosition pos = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("19"), 20);
 
@@ -47,12 +47,41 @@ class InfinitePositionTest {
         assertThat(pos.holdings()).isEqualTo(10);
         assertThat(pos.purchaseAmount()).isEqualByComparingTo("200");
         assertThat(pos.totalAssets()).isEqualByComparingTo("3000");
-        assertThat(pos.currentRound()).isCloseTo(1.33, within(0.01));
+        assertThat(pos.currentRound()).isCloseTo(1.3333333, within(1e-6));
+        // 화면용 static 헬퍼도 같은 회차를 낸다(UI 회차와 주문 판정이 어긋나지 않게)
+        assertThat(InfinitePosition.calcCurrentRound(new BigDecimal("20"), 10, new BigDecimal("2800"), 20))
+                .isEqualTo(pos.currentRound());
         assertThat(pos.unitAmount()).isEqualByComparingTo("150.00");
-        assertThat(pos.priceOffsetRate()).isEqualByComparingTo("0.17"); // 0.20 × (1 - 2×1.33/20) = 0.1734 → scale=2 반올림 0.17
+        assertThat(pos.priceOffsetRate()).isCloseTo(new BigDecimal("0.1733333"), within(new BigDecimal("1e-6"))); // 0.20 × (1 - 2×1.333…/20)
         assertThat(pos.deposit()).isEqualByComparingTo("2800");
-        assertThat(pos.referencePrice()).isEqualByComparingTo("23.40"); // 20 × (1+0.17) = 23.40
+        assertThat(pos.referencePrice()).isEqualByComparingTo("23.47"); // 20 × 1.17333… = 23.4667 → 가격만 2자리 반올림
         assertThat(pos.targetPrice()).isEqualByComparingTo("24.00");
+    }
+
+    // 문헌 계산기 검증값(docs/reference/quantstack/infinite-buying-v4.md B3): TQQQ 40분할, 평단 50
+    // unitAmount가 500으로 떨어지도록 (보유, 예수금)을 잡는다 — T = 매입액 ÷ 500
+    // T=20(분할수/2)은 문헌 계산기 표가 전반전, 사이트 주문 카드가 후반전으로 다르게 처리한다(E절 1번) — KISTA는 후반으로 둔다
+    @ParameterizedTest(name = "T={0}: 별%={3}, 별지점={4}, 전반={5}")
+    @CsvSource({
+            "1,  10,  19500, 0.1425,  57.13, true",
+            "10, 100, 15000, 0.075,   53.75, true",
+            "20, 200, 10000, 0,       50.00, false",
+            "21, 210, 9500,  -0.0075, 49.63, false",
+            "30, 300, 5000,  -0.075,  46.25, false",
+            "40, 400, 0,     -0.15,   42.50, false"
+    })
+    @DisplayName("별%·별지점: 문헌 계산기 값(TQQQ 40분할, 평단 50)과 일치한다")
+    void starPoint_matchesReferenceCalculator(int round, int holdings, int deposit, String rate, String starPoint,
+                                              boolean early) {
+        InfinitePosition pos = new InfinitePosition(
+                new AccountBalance(holdings, new BigDecimal("50"), new BigDecimal(deposit)),
+                StrategyTicker.TQQQ, new BigDecimal("50"), 40);
+
+        assertThat(pos.unitAmount()).isEqualByComparingTo("500.00");
+        assertThat(pos.currentRound()).isEqualTo(round);
+        assertThat(pos.priceOffsetRate()).isEqualByComparingTo(rate);
+        assertThat(pos.referencePrice()).isEqualByComparingTo(starPoint);
+        assertThat(pos.isEarlyStage()).isEqualTo(early);
     }
 
     @Test
@@ -178,14 +207,14 @@ class InfinitePositionTest {
 
     @ParameterizedTest(name = "20분할 holdings={0} → currentRound={2}, priceOffsetRate={3}, early={4}")
     @CsvSource({
-            "970, 1030, 9.70, 0.01, true",    // 0.006 → 0.01
-            "975, 1025, 9.75, 0.01, true",    // 정확히 0.005 — HALF_UP이면 0.01 (HALF_EVEN이면 0.00)
-            "976, 1024, 9.76, 0.00, false",   // 0.0048 → 0.00 후반
-            "1000, 1000, 10.00, 0.00, false", // 정확히 0
-            "1100, 900, 11.00, -0.02, false"  // 음수
+            "976, 1024, 9.76, 0.0048, true",   // 별%를 2자리로 반올림하던 때는 0.00으로 후반 판정됐다
+            "999, 1001, 9.99, 0.0002, true",
+            "1000, 1000, 10.00, 0, false",     // 정확히 분할수/2 — 후반
+            "1001, 999, 10.01, -0.0002, false",
+            "1100, 900, 11.00, -0.02, false"
     })
-    @DisplayName("priceOffsetRate 반올림 경계: 20분할 SOXL(0.20) 9.70/9.75/9.76/10.00/11.00회차")
-    void priceOffsetRate_roundingBoundary_20div(int holdings, int deposit, String round, String rate, boolean early) {
+    @DisplayName("전·후반 경계는 정확히 분할수/2 회차다 (20분할 SOXL 0.20)")
+    void earlyStage_boundaryIsHalfDivision_20div(int holdings, int deposit, String round, String rate, boolean early) {
         InfinitePosition pos = posAtAvg1(holdings, deposit, 20);
 
         assertThat(pos.currentRound()).isEqualTo(Double.parseDouble(round));
@@ -195,10 +224,10 @@ class InfinitePositionTest {
 
     @ParameterizedTest(name = "{0}분할 holdings={1} → currentRound={3}, rate={4}, early={5}")
     @CsvSource({
-            "30, 1400, 1600, 14.00, 0.01, true",   // 0.0133 → 0.01 (15회차 직전 전반)
-            "30, 1500, 1500, 15.00, 0.00, false",  // 15회차 경계 후반
-            "40, 1900, 2100, 19.00, 0.01, true",   // 0.01 (20회차 직전 전반)
-            "40, 2000, 2000, 20.00, 0.00, false"   // 20회차 경계 후반
+            "30, 1400, 1600, 14.00, 0.0133333333, true", // 0.20 × (1 - 28/30) — 15회차 직전 전반
+            "30, 1500, 1500, 15.00, 0, false",           // 15회차 경계 후반
+            "40, 1900, 2100, 19.00, 0.01, true",         // 0.20 × (1 - 38/40) — 20회차 직전 전반
+            "40, 2000, 2000, 20.00, 0, false"            // 20회차 경계 후반
     })
     @DisplayName("priceOffsetRate 0 경계가 분할수/2 회차로 이동한다 (30분할 15, 40분할 20)")
     void priceOffsetRate_zeroBoundary_movesWithDivisionCount(int div, int holdings, int deposit, String round,
@@ -207,7 +236,7 @@ class InfinitePositionTest {
 
         assertThat(pos.unitAmount()).isEqualByComparingTo("100.00"); // totalAssets=100×div
         assertThat(pos.currentRound()).isEqualTo(Double.parseDouble(round));
-        assertThat(pos.priceOffsetRate()).isEqualByComparingTo(rate);
+        assertThat(pos.priceOffsetRate()).isCloseTo(new BigDecimal(rate), within(new BigDecimal("1e-9")));
         assertThat(pos.isEarlyStage()).isEqualTo(early);
     }
 
