@@ -1,5 +1,6 @@
-# kista-api 도메인 라우팅 — kista-api 레포 소유. kista-infra reconcile.sh가 config SHA의 이 파일을 /opt/kista-api/caddy/에 설치하고
-# caddy reload한다(kista-infra Caddyfile이 `import /etc/caddy/apps/kista-api/*.caddy`로 읽음).
+# kista-api 도메인 라우팅 — kista-api 레포 소유. kista-infra reconcile.sh가 config SHA의 이 파일을 /opt/kista-infra/routes/kista-api.caddy에 설치하고
+# caddy reload한다(kista-infra Caddyfile이 `import /etc/caddy/routes/...`로 읽음). upstream 공용 설정(keepalive off·lb_try·health 주기)은
+# kista-infra Caddyfile의 `(upstream)` snippet이 소유한다 — 여기서는 `import upstream <health_uri>`만 쓴다.
 # 라우팅이 컨트롤러 경로와 어긋나 404가 나던 사고(2026-09-16 2단 경로, 2026-09-17 fida-orders)를 막기 위해
 # CaddyRoutingTest가 아래 @scheduler·@trading regex를 trading-core·root 컨트롤러 경로와 대조한다 — 경로 추가 시 테스트가 알려준다.
 {$API_DOMAIN} {
@@ -8,11 +9,7 @@
 	@scheduler path_regexp ^/api/admin/scheduler/.+$
 	handle @scheduler {
 		reverse_proxy kista-scheduler:8080 {
-			lb_try_duration 120s
-			lb_try_interval 500ms
-			health_uri /actuator/health/liveness
-			health_interval 10s
-			health_timeout 5s
+			import upstream /actuator/health/liveness
 		}
 	}
 	# trading-core(kista-trading) 공개 경로. path matcher의 `**`는 2단 이상 깊이에서 매치 실패(caddy v2.9.1 실측)라 path_regexp 사용.
@@ -21,25 +18,12 @@
 	@trading path_regexp ^/api/(trading-cycles(/.*)?|accounts(/.*)?|backtest|crypto-market-indicators|daily-trades|orders(/.*)?|stats/(summary|equity-curve|cycles)|internal/fida-orders)$
 	handle @trading {
 		reverse_proxy kista-trading:8080 {
-			lb_try_duration 120s
-			lb_try_interval 500ms
-			health_uri /actuator/health/liveness
-			health_interval 10s
-			health_timeout 5s
+			import upstream /actuator/health/liveness
 		}
 	}
 	handle {
 		reverse_proxy kista-api:8080 {
-			# upstream keep-alive 끔 — blue/green 교체 때 옛 컨테이너가 graceful 종료로 닫은 유휴 연결을 재사용하면 POST가 재시도 없이 502(EOF)가 난다
-			# (2026-10-02 첫 교체 실측 1건). 요청마다 새 연결이면 종료 중 컨테이너는 connection refused(dial 오류)라 method 무관하게 재시도된다
-			transport http {
-				keepalive off
-			}
-			lb_try_duration 120s
-			lb_try_interval 500ms
-			health_uri /actuator/health/liveness
-			health_interval 10s
-			health_timeout 5s
+			import upstream /actuator/health/liveness
 		}
 	}
 }
