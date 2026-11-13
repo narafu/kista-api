@@ -16,13 +16,14 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 - `deposit` = 통합주문가능금액 (KIS `TTTC2101R` `itgr_ord_psbl_amt`, 미국 행 필터링) — 원화 자동 환전 포함, totalAssets 계산에 사용
 - `currentRound`는 floor 없이 소수점 허용
 - **전반/후반 분기**: `currentRound < divisionCount/2` → 전반, 그 외(경계 포함) → 후반
+- **첫 매수(holdings==0)**: LOC 매수 1건(unitAmount/가격, 가격 = min(전일종가 × (1+targetProfitRate) − 0.01, 원장 예수금) — 원장 상한은 최소 1주 보장 수량이 원장을 넘어 교착되지 않게, leg `INFINITE_FIRST_BUY`, 최소 1주) — 1회분 전액. 접수 전 cap(현재가 × 1.05)이 가격을 낮추고 수량을 다시 계산한다. 매도 없음
 - **전반**: LOC 매수①(unitAmount/2/averagePrice, 평단가, 내림 결과가 0이어도 최소 1주) + LOC 매수②((unitAmount − averagePrice×매수①수량)/locBuyPrice, 별지점 − 0.01 — 잔여가 0 이하면 매수② 없음, 아니면 최소 1주) + LOC 매도(holdings/4, referencePrice = 별지점) + 지정가 매도(holdings-holdings/4, targetPrice)
 - **후반 unitAmount>deposit 또는 referencePrice>deposit**(리버스 진입 조건도 같은 isFinalRound 판정): MOC 매도(holdings/4)만 / **후반 unitAmount≤deposit 그리고 referencePrice≤deposit**: LOC 매수(unitAmount/locBuyPrice, locBuyPrice = 별지점 − 0.01) + LOC 매도 + 지정가 매도
 - isFinalRound(리버스 진입)에 isEarlyStage 가드가 필요 없는 이유: holdings ≥ 1·원장 ≥ 0이면 전반부에서는 성립하지 않는다(전반 ⇒ 원장 > 매입액 ≥ 평단, 기준가 ≤ 평단×(1+targetProfitRate))
 
 ### 보정 주문 (INFINITE 가격 캡 경로)
 ```
-BUY 가격이 cap(currentPrice × 1.05, PriceCapPolicy)을 넘으면 cap 기준으로 전반(①②)/후반(단일 LOC)을 position.isEarlyStage()로 분기해 재산정한 뒤 보정 3건을 붙인다
+BUY 가격이 cap(currentPrice × 1.05, PriceCapPolicy)을 넘으면 cap 기준으로 첫 매수(보유 0, 단일 LOC — base 중 가장 비싼 주문 기준)/전반(①②)/후반(단일 LOC)으로 나눠 재산정한 뒤 보정 3건을 붙인다
 보정 i(1~3) = LOC 매수 1주, 가격 = unitAmount ÷ (누적수량 + 1)  (scale=2, FLOOR — (누적수량+1)×가격 ≤ unitAmount), leg INFINITE_CORRECTION_01~03, 누적수량 0이면 생략
 ```
 - 전반 재산정: cappedAvg = 첫 base 가격.min(cap), cappedRef = (매수② 가격, 매수②가 없던 날은 locBuyPrice = 별지점 − 0.01).min(cap). 동가면 q1+q2 병합(`INFINITE_EARLY_MERGED_BUY`), 분리 시 q2 > 0일 때만 매수② 추가

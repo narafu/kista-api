@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
@@ -27,11 +28,14 @@ public class InfiniteStrategy {
     static final String EARLY_AVG_LEG = "INFINITE_EARLY_AVG_BUY";
     static final String EARLY_REF_LEG = "INFINITE_EARLY_REF_BUY";
     static final String EARLY_MERGED_LEG = "INFINITE_EARLY_MERGED_BUY";
+    // 첫 매수(보유 0) 단일 LOC leg — 1회분 전액
+    static final String FIRST_BUY_LEG = "INFINITE_FIRST_BUY";
     // 매수① 자리로 식별하는 leg(병합 포함)
     private static final Set<String> AVG_LEGS = Set.of(EARLY_AVG_LEG, EARLY_MERGED_LEG);
 
     // 전략 계산 — 전반/후반 분기 후 주문 목록 반환
     public List<PlannedOrder> buildOrders(InfinitePosition position, LocalDate tradeDate) {
+        if (position.holdings() == 0) return buildFirstBuyOrders(position, tradeDate);
         return position.isEarlyStage()
                 ? buildEarlyStageOrders(position, tradeDate)
                 : buildLateStageOrders(position, tradeDate);
@@ -47,10 +51,18 @@ public class InfiniteStrategy {
         if (baseOrders.isEmpty()) return buyOrders;
 
         // 원래 BUY 주문의 가격 순서: buy①=averagePrice(또는 currentPrice), buy②=locBuyPrice(별지점 − 0.01)
-        // 전반이면 ①②(매수②는 0주라 없을 수 있다), 후반이면 단일 LOC
-        List<PlannedOrder> newBuys = !position.isEarlyStage()
-                ? computeLateBuys(tradeDate, position, baseOrders.getFirst(), cap, unitAmount)
-                : computeEarlyBuys(tradeDate, position, baseOrders, cap, unitAmount);
+        // 첫 매수(보유 0)·후반이면 단일 LOC, 전반이면 ①②(매수②는 0주라 없을 수 있다)
+        // 첫 매수는 base 중 가장 비싼 주문을 기준으로 한다 — 배포 전에 저장된 반반 주문(①②)이 남아 있어도 전액 단일 LOC로 다시 만든다
+        List<PlannedOrder> newBuys;
+        if (position.holdings() == 0) {
+            PlannedOrder highest = baseOrders.stream().max(Comparator.comparing(PlannedOrder::price)).orElseThrow();
+            newBuys = computeSingleBuy(tradeDate, position, highest, cap, unitAmount, FIRST_BUY_LEG);
+        } else if (!position.isEarlyStage()) {
+            PlannedOrder orig = baseOrders.getFirst();
+            newBuys = computeSingleBuy(tradeDate, position, orig, cap, unitAmount, orig.orderLeg());
+        } else {
+            newBuys = computeEarlyBuys(tradeDate, position, baseOrders, cap, unitAmount);
+        }
 
         return withCorrections(tradeDate, position, newBuys);
     }
@@ -77,13 +89,14 @@ public class InfiniteStrategy {
         return trimCorrectionsToBudget(result, position.deposit());
     }
 
-    // 후반 단일 LOC 매수: unitAmount/locBuyPrice(별지점 − 0.01)
-    private List<PlannedOrder> computeLateBuys(LocalDate tradeDate, InfinitePosition position, PlannedOrder orig, BigDecimal cap, BigDecimal unitAmount) {
+    // 첫 매수·후반 단일 LOC 매수: unitAmount/min(원래 가격, cap)
+    private List<PlannedOrder> computeSingleBuy(LocalDate tradeDate, InfinitePosition position, PlannedOrder orig,
+                                                BigDecimal cap, BigDecimal unitAmount, String orderLeg) {
         BigDecimal cappedPrice = orig.price().min(cap);
         int quantity = InfinitePosition.lateBuyQuantity(unitAmount, cappedPrice);
         List<PlannedOrder> buys = new ArrayList<>();
         if (quantity > 0) buys.add(PlannedOrder.of(
-                tradeDate, position.ticker(), orig.orderType(), BUY, quantity, cappedPrice, orig.orderLeg()));
+                tradeDate, position.ticker(), orig.orderType(), BUY, quantity, cappedPrice, orderLeg));
         return buys;
     }
 
@@ -137,6 +150,17 @@ public class InfiniteStrategy {
 
         newBuys.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, BUY, 1, adjustedOrderPrice,
                 PlannedOrder.leg("INFINITE_CORRECTION", correctionIndex)));
+    }
+
+    // 첫 매수(보유 0): 1회분 전액을 별지점(전일종가 × (1+목표수익률)) − 0.01 단일 LOC로 — 체결 확률을 높이는 큰수 가격, 접수 전 cap이 현재가 × 1.05로 낮춘다
+    // 매도는 보유가 없어 없다
+    // 가격은 원장 예수금을 넘지 않는다 — 최소 1주 보장 수량이 원장을 넘으면 매수 전체가 거절돼 보유 0에서 교착된다(1주 가드는 전일종가 기준)
+    private List<PlannedOrder> buildFirstBuyOrders(InfinitePosition position, LocalDate tradeDate) {
+        BigDecimal price = position.locBuyPrice().min(position.deposit());
+        List<PlannedOrder> buys = new ArrayList<>();
+        buys.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, BUY,
+                InfinitePosition.lateBuyQuantity(position.unitAmount(), price), price, FIRST_BUY_LEG));
+        return withCorrections(tradeDate, position, buys);
     }
 
     private List<PlannedOrder> buildEarlyStageOrders(InfinitePosition position, LocalDate tradeDate) {

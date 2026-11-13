@@ -427,13 +427,13 @@ class BacktestEngineTest {
         ), infiniteCommand("2024-01-01", "1000", 4));
 
         assertThat(output.warnings()).isEmpty();
-        // 1일차: 기준가 100 → unitAmount=1000/4=250.00, 기준가=100×1.15=115.00 → 전반 매수 2건 (115는 접수 전 캡 105로 보정)
+        // 1일차: 기준가 100 → unitAmount=1000/4=250.00, 별지점=100×1.15=115.00 → 첫 매수 단일 LOC @114.99 (접수 전 캡 105로 보정 → floor(250/105)=2주)
         assertThat(recorder.on("2024-01-01").inputs().prevClosePrice()).isEqualByComparingTo("100");
         assertThat(recorder.on("2024-01-01").legs())
-                .containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY",
+                .containsExactly("INFINITE_FIRST_BUY",
                         "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03");
 
-        // 2일차 종가 100에 LOC 매수 2건(@100 / 캡 105) 체결 → 예수금 800, 2주
+        // 2일차 종가 100에 첫 매수 2주(캡 105) 체결 → 예수금 800, 2주
         // 3일차 종가 90에 2일차 LOC 매수 2건(@100 / 109→캡 105) 체결 → 예수금 620, 4주 → 620 + 4×90 = 980
         // 3일차 계획(기준가 90, 캡 94.50): 매수 @95·@98.80은 캡 94.50으로 보정 → 4일차 종가 95 > 94.50 미체결,
         // LOC 매도 @98.81·지정가 매도 @109.25도 미체결 → 620 + 4×95 = 1000
@@ -443,7 +443,7 @@ class BacktestEngineTest {
                         p -> assertThat(p).isEqualByComparingTo("1000"),
                         p -> assertThat(p).isEqualByComparingTo("980"),
                         p -> assertThat(p).isEqualByComparingTo("1000"));
-        assertThat(output.tradeCount()).isEqualTo(4);
+        assertThat(output.tradeCount()).isEqualTo(3); // 첫 매수 1건 + 2일차 매수 2건
         assertThat(output.cycleCount()).isEqualTo(1);
     }
 
@@ -624,7 +624,7 @@ class BacktestEngineTest {
         assertThat(restarted.inputs().isReverseMode()).isFalse();
         assertThat(restarted.inputs().isFirstReverseDay()).isFalse();
         assertThat(restarted.inputs().starPointPrice()).isNull();
-        assertThat(restarted.legs()).containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY",
+        assertThat(restarted.legs()).containsExactly("INFINITE_FIRST_BUY",
                         "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03");
 
         // 자산은 시드로 리셋되지 않고 그대로 이월된다 — 예수금 5 + 매도대금 950 = 955.00

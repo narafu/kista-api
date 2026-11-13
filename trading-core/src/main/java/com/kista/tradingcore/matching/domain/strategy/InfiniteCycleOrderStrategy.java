@@ -32,7 +32,7 @@ import com.kista.shared.kernel.StrategyTicker;
 public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
 
     // 사이클 재등록 최소금액 계수 — 현재가 × (divisionCount × 2)
-    // 평단가 매수 + LOC 매수 각 최소 1주 보장
+    // 1회분(unitAmount = 시드 ÷ 분할수)이 전일종가의 2배 — 첫 매수 단일 LOC(최대 전일종가 × 1.2)도 1주 이상 들어간다
     private static final double MIN_DEPOSIT_FACTOR = 2.0;
 
     private final InfiniteStrategy infiniteStrategy;
@@ -68,7 +68,8 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
         boolean earlyComplete = atCloseLegs.contains(InfiniteStrategy.EARLY_AVG_LEG)
                 && atCloseLegs.contains(InfiniteStrategy.EARLY_REF_LEG);
         boolean earlyMergedComplete = atCloseLegs.contains(InfiniteStrategy.EARLY_MERGED_LEG);
-        boolean lateComplete = atCloseLegs.contains("INFINITE_LATE_REF_BUY");
+        boolean lateComplete = atCloseLegs.contains("INFINITE_LATE_REF_BUY")
+                || atCloseLegs.contains(InfiniteStrategy.FIRST_BUY_LEG);
         boolean correctionComplete = atCloseLegs.contains("INFINITE_CORRECTION_01")
                 && atCloseLegs.contains("INFINITE_CORRECTION_02")
                 && atCloseLegs.contains("INFINITE_CORRECTION_03")

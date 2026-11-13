@@ -68,6 +68,13 @@ class InfiniteCycleOrderStrategyTest {
     }
 
     @Test
+    @DisplayName("AT_CLOSE 첫 매수 FIRST_BUY + 보정 3건이면 true")
+    void atClose_firstBuy_withCorrections_true() {
+        var orders = with(corrections(), closeBuy(InfiniteStrategy.FIRST_BUY_LEG));
+        assertThat(strategy.canSkipOrderComputation(orders, AT_CLOSE)).isTrue();
+    }
+
+    @Test
     @DisplayName("AT_CLOSE 매수 leg만 있고 보정이 하나 빠지면 false")
     void atClose_missingCorrection_false() {
         var orders = List.of(closeBuy(InfiniteStrategy.EARLY_AVG_LEG), closeBuy(InfiniteStrategy.EARLY_REF_LEG),
