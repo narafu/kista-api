@@ -113,7 +113,7 @@ flowchart LR
     API & SCH & TRD --> TG
     API & SCH & TRD --> GRAF
     TRD --> HC
-    PG -.->|"cron 02:00 KST backup.sh<br/>pg_dump → GPG"| OBJ
+    PG -.->|"cron backup.sh<br/>pg_dump → GPG"| OBJ
 ```
 
 - 외부 호출 방향은 L0과 같고, 운영 관측(`GRAFANA_CLOUD_OTLP_*`, `heartbeat.*`는 trading-core만)과 백업 경로를 더했다
@@ -132,7 +132,7 @@ flowchart LR
         REC["reconcile.yml<br/>SHA·이미지 검증 · 신선도 병합<br/>config SHA로 bundle 구성"]
         STATE[("state/#lt;app#gt;.yml<br/>config · roles SHA")]
         SD["server-deploy.yml<br/>infra compose · .env 적용<br/>매매 시간대 창 차단"]
-        SEC[("secrets/*.env.gpg<br/>kista-api · kista-ui · infra")]
+        SEC[("secrets/*.env (sops+age)<br/>kista-api · kista-ui · infra")]
     end
 
     subgraph SRV["kista-api-server"]
@@ -146,13 +146,13 @@ flowchart LR
     REC -->|SSH| RSH
     GHCR -->|"compose pull (public)"| RSH
     RSH -->|성공| STATE
-    SEC -->|"ENV_PASSPHRASE 복호화"| SD
+    SEC -->|"SOPS_AGE_KEY 복호화"| SD
     SD -->|SSH| AINF --> ENV
     AINF -->|".env 변경 시 current 재적용"| RSH
 ```
 
 - 앱 배포 설계: `kista-infra/docs/superpowers/specs/2026-10-02-deploy-reconcile-design.md` · 앱 쪽 판정: `.github/scripts/detect-deploy-scope.sh`(변경 경로별 role 선택)
-- 시크릿: 운영 `.env` 3종은 `kista-infra/secrets/`에 GPG 대칭 암호화로만 존재(`scripts/env.sh edit`→커밋, 서버 `.env` 직접 수정 금지) — 배포 키 목록 `kista-infra/.env.example`. OCI 백업 PEM은 서버 `/opt/kista-infra/oci_backup_key.pem`에만. GitHub Secrets: kista-infra(`ENV_PASSPHRASE`·`SERVER_*`·`TELEGRAM_*`), 앱 레포(`INFRA_APP_CLIENT_ID` 변수 + `INFRA_APP_PRIVATE_KEY`)
+- 시크릿: 운영 `.env` 3종은 `kista-infra/secrets/`에 sops + age 암호화로만 존재(`sops edit secrets/<이름>.env`→커밋, 서버 `.env` 직접 수정 금지) — 앱 키 목록은 이 저장소 루트 `.env.example`. OCI 백업 PEM은 서버 `/opt/kista-infra/oci_backup_key.pem`에만. GitHub Secrets: kista-infra(`SOPS_AGE_KEY`·`SERVER_*`·`TELEGRAM_*`), 앱 레포(`INFRA_APP_CLIENT_ID` 변수 + `INFRA_APP_PRIVATE_KEY`)
 - 호스트 단위 reconcile 락으로 앱끼리·infra 재적용과 교체가 겹치지 않는다. 수동 복구(exit 2)·서버 재구축 순서 → `kista-infra/README.md`
 
 ## L1 빌드·스키마 경계

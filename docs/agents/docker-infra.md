@@ -14,14 +14,14 @@
 - **Flyway 마이그레이션 backward-compat 필수(root 마이그레이션 한정 — trading-core `migration-trading`은 독립)**: kista-api·kista-scheduler는 같은 요청에서 함께 교체되지만 그 사이(그리고 롤백 시)에 한쪽만 새 이미지인 구간이 있다. 컬럼 추가는 nullable/DEFAULT, 드롭·리네임은 두 배포로 나눠 코드가 참조를 먼저 끊는다(expand/contract). 이 조건을 못 지키는 마이그레이션은 두 role을 같은 커밋에서 함께 배포 **롤백 주의**: 신규 마이그레이션이 포함된 배포는 `validate-on-migrate: true`라 이전 이미지로 롤백하면 기동 실패할 수 있다(이력 테이블은 root `flyway_schema_history_api`·trading `flyway_schema_history_trading`으로 서비스별). 스키마 재편 이행 릴리스(`kista`→`trading` 등 스키마 이름 변경)는 옛 이미지의 `@Table(schema=...)`가 즉시 깨지고 헬스게이트 자동 롤백도 무력화되므로 **자동 롤백이 불가능**하다 — 수동 SSH 런북 `deploy/server/schema-reorg/RUNBOOK.md`(정방향·역방향 SQL 포함)를 따른다.
 - **바이낸스 배포·롤백 주의**: kista-api·kista-trading 동시 배포 필수, BINANCE 정책·계좌 생성 후엔 trading 이전 이미지 롤백 불가 → `binance-api.md` "배포·롤백"
 - **이벤트·리스너 패키지 이동 커밋 배포 전 필수 체크**: `event_publication` 고아 row 정리 — 절차·SQL은 아래 "배포 직전 EPR 정리 런북" (규칙 배경은 `flyway.md`)
-- 배포 파일: `deploy/server/docker-compose.yml`(kista-api + kista-scheduler + kista-trading 3-role — caddy·redis는 kista-infra 레포가 전담), `deploy/server/README.md`(초기 서버 설정·롤백 runbook·커트오버 체크리스트 전체 — 상세 절차는 이 README 참고)
+- 배포 파일: `deploy/server/docker-compose.yml`(kista-api + kista-scheduler + kista-trading 3-role — caddy·redis는 kista-infra 레포가 전담), `deploy/server/README.md`(초기 서버 설정·롤백 runbook 전체 — 상세 절차는 이 README 참고)
 - `kista-infra`(private, `/opt/kista-infra/`) 레포가 caddy(양 도메인 리버스 프록시)·postgres·redis·백업 cron을 전담한다. `shared_net`(caddy↔kista-api/kista-ui)·`data_net`(postgres·redis↔kista-api만, kista-ui 미가입) 두 개의 external Docker 네트워크로 앱↔인프라 경계를 분리한다. kista-api-server(A)가 caddy·postgres·redis·kista-api·kista-ui를 올인원으로 호스팅하고 DB는 자체호스팅 postgres(`postgres:5432/kistadb`)다. fida-server만 별도 인스턴스.
 - **현재 인스턴스는 OCI `VM.Standard.A1.Flex`(Ampere arm64), 2 OCPU, 12GB RAM, 부트 볼륨 50GB, Ubuntu 24.04** — 워크플로 `platforms` 값(`linux/arm64`)과 인스턴스 아키텍처가 항상 일치해야 하며, 인스턴스를 다른 아키텍처로 재생성하면 `server-deploy.yml`의 `platforms` 값도 함께 변경 필요
 - **OCI 볼륨은 in-place 축소 불가, OCPU·메모리는 가능** — 볼륨을 줄여야 하면 재생성이 유일한 방법(free-tier 리전 스토리지 200GB 공유 주의) — 아래 무중단 재생성 노하우 참고. 반면 OCPU·메모리는 Flexible shape 속성이라 `oci compute instance update --shape-config '{"ocpus":N,"memoryInGBs":M}'`로 살아있는 인스턴스에서 바로 변경 가능(적용에 재부팅 필요, IP·볼륨 유지) — 재생성 없이 스펙만 조정할 땐 이 경로를 우선 검토
 - **예약 공인 IP 재할당으로 무중단 호스트 교체**: 공인 IP를 처음부터 Reserved(에페메럴 아님)로 할당해두면, 인스턴스 재생성(스펙 변경·볼륨 축소 등) 시 새 인스턴스를 임시 공인 IP로 완전히 기동·스모크 테스트한 뒤 `oci network public-ip update --private-ip-id <새 인스턴스 private-ip-ocid>`로 예약 IP만 재할당하면 된다 — 도메인·DNS·GitHub Secret(`SERVER_HOST`)·카카오 OAuth·CORS 전부 무변경. old 인스턴스는 외부 검증 통과 전까지 종료하지 않는 것이 핵심 안전장치(문제 발생 시 예약 IP를 old로 즉시 되돌려 롤백)
 - Caddy가 80/443만 외부에 공개하고 HTTPS를 종료해 `kista-api:8080`으로 reverse proxy — 서버 방화벽에서 `8080`은 절대 공개하지 않는다
-- GitHub Secrets/Variables: GitHub App `kista-infra-dispatch`(kista-infra·kista-api·kista-ui에 설치, Contents read/write·Statuses write — 이 레포 워크플로는 kista-infra 대상 `contents: write` 토큰만 받고, statuses 쓰기는 kista-infra `reconcile.yml`이 한다) — Actions 변수 `INFRA_APP_CLIENT_ID` + secret `INFRA_APP_PRIVATE_KEY`, 워크플로가 실행마다 `actions/create-github-app-token`으로 1시간짜리 설치 토큰 발급(장기 PAT 없음) — 서버 SSH secret은 kista-infra에만 있다. 이 레포의 Actions는 `.env`를 렌더링하지 않는다. `/opt/kista-api/.env`는 `kista-infra` 레포의 배포 워크플로가 `secrets/kista-api.env.gpg`를 복호화해 매 배포마다 렌더링·덮어쓰고, 내용이 바뀌면 `reconcile.sh kista-api current`로 재적용한다
-- `.env` 필수 키는 `deploy/server/README.md`의 ".env 내용" 섹션 참고 — `API_DOMAIN`은 헬스체크 대상 도메인을 문서화하는 값일 뿐, kista-infra Caddy의 실제 라우팅은 kista-infra 자신의 `.env`(`infra.env.gpg`)에 담긴 `API_DOMAIN` 값을 따로 참조한다(둘은 같은 값이지만 소스가 다름)
+- GitHub Secrets/Variables: GitHub App `kista-infra-dispatch`(kista-infra·kista-api·kista-ui에 설치, Contents read/write·Statuses write — 이 레포 워크플로는 kista-infra 대상 `contents: write` 토큰만 받고, statuses 쓰기는 kista-infra `reconcile.yml`이 한다) — Actions 변수 `INFRA_APP_CLIENT_ID` + secret `INFRA_APP_PRIVATE_KEY`, 워크플로가 실행마다 `actions/create-github-app-token`으로 1시간짜리 설치 토큰 발급(장기 PAT 없음) — 서버 SSH secret은 kista-infra에만 있다. 이 레포의 Actions는 `.env`를 렌더링하지 않는다. `/opt/kista-api/.env`는 `kista-infra` 레포의 배포 워크플로가 `secrets/kista-api.env`(sops + age)를 복호화해 매 배포마다 렌더링·덮어쓰고, 내용이 바뀌면 `reconcile.sh kista-api current`로 재적용한다
+- `.env` 필수 키는 `deploy/server/README.md`의 ".env 내용" 섹션 참고 — `API_DOMAIN`은 앱 `.env`에 없다. kista-infra 자신의 `.env`(`secrets/infra.env`)에만 있고 Caddy 라우팅이 그 값을 쓴다
 - **Redis는 자체 호스팅**(kista-infra 레포의 `docker-compose.yml`의 `redis` 서비스, AOF 영속성) — 단일 인스턴스라 "모든 운영 인스턴스가 같은 Redis를 봐야 함" 제약이 자동 충족된다. `REDIS_URL`은 `docker-compose.yml`에 `redis://redis:6379`로 하드코딩되어 있어 `.env` 설정 불필요
 
 ### .env 파일 멀티라인 값 금지
@@ -86,18 +86,18 @@ gh workflow run "Server Deploy" --repo narafu/kista-api          # 수동 재배
 
 - **가동 여부**: UptimeRobot(무료) → `https://api.kista-app.com/actuator/health` 5분 간격 외부 체크, 알림 채널(이메일/텔레그램) 연결
 - **스케줄러 미실행 감지(dead-man's switch)**: healthchecks.io(무료) — `HeartbeatPort`/`HeartbeatAdapter`가 `TradingOpenScheduler`(월~금 22:30 KST)·`TradingCloseScheduler`(화~토 04:30 KST) 정상 완료 시에만 ping(배치가 예외로 실패하면 미발송 — `SchedulerJobRunner.run`의 완료 여부). `CryptoDcaScheduler`(10분 주기 코인 DCA 틱)도 틱 완료 시 `pingCrypto()`(계좌별 실패는 러너가 관리자 알림으로 따로 처리하고 핑은 보냄). `HEARTBEAT_OPEN_URL`/`HEARTBEAT_CLOSE_URL`/`HEARTBEAT_CRYPTO_URL` 미설정 시 핑 생략(배포 안전) — healthchecks.io 콘솔에서 각 체크 예상 주기 등록 필요
-- **메트릭 가시성**: Grafana Cloud OTLP push — 호스팅 위치 무관하게 `micrometer-registry-otlp`가 앱에서 직접 `management.otlp.metrics.export.url`로 60초 간격 push (`GRAFANA_CLOUD_OTLP_*` 환경변수, kista-infra의 `secrets/kista-api.env.gpg`로 관리 — 값 목록은 저장소 루트 `.env.example` 참고)
+- **메트릭 가시성**: Grafana Cloud OTLP push — 호스팅 위치 무관하게 `micrometer-registry-otlp`가 앱에서 직접 `management.otlp.metrics.export.url`로 60초 간격 push (`GRAFANA_CLOUD_OTLP_*` 환경변수, kista-infra의 `secrets/kista-api.env`로 관리 — 값 목록은 저장소 루트 `.env.example` 참고)
   - 대시보드 JSON: `deploy/grafana/kista-api-dashboard.json` — Grafana Cloud 계정 유실 시 재구성용, Dashboards → New → Import로 재적용
   - **Import 시 주의**: 대시보드 JSON Model 편집창(Settings → JSON Model)은 계정이 이미 v2 스키마(`elements`/`layout`)로 마이그레이션된 경우 구버전 `panels`/`gridPos` JSON을 거부함(`Missing property "elements"` 등) — 기존 대시보드를 고치려 하지 말고 **Import로 새로 생성** 후 기존 것 삭제
   - Grafana Cloud 메트릭 이름은 Micrometer 관례와 다를 수 있음 — 예: 업타임은 `process_uptime_seconds`가 아니라 **`process_uptime_milliseconds`**(단위도 ms). 확인 방법: Explore에서 `{application="kista-api"}`로 전체 시리즈 조회 후 이름 확인
 
 ### 서버(OCI) 환경변수 설정
-환경변수는 전부 kista-infra 레포의 GPG 암호화 시크릿으로 관리한다.
+환경변수는 전부 kista-infra 레포의 sops + age 암호화 시크릿으로 관리한다(절차·필요 도구는 `kista-infra/secrets/README.md`).
 ```bash
 cd ../kista-infra
-./scripts/env.sh edit kista-api      # 복호화 → 편집 → 저장 시 자동 재암호화 → commit/push하면 다음 배포에 반영
+sops edit secrets/kista-api.env      # $EDITOR로 열기 → 저장 시 바뀐 값만 재암호화 → commit/push하면 다음 배포에 반영
 ```
-- 필수/선택 키 전체 목록은 `kista-infra/.env.example` 참고(JWT_SIGNING_KEY·AES_ENCRYPTION_KEY·ADMIN_KAKAO_IDS·INTERNAL_API_TOKEN·INTERNAL_API_BASE_URL·카카오 OAuth·텔레그램 봇·DB_URL/USERNAME/PASSWORD·CORS_ALLOWED_ORIGINS·HEARTBEAT_*_URL·GRAFANA_CLOUD_OTLP_* 등)
+- 필수/선택 키 전체 목록은 이 저장소 루트 `.env.example` 참고(JWT_SIGNING_KEY·AES_ENCRYPTION_KEY·ADMIN_KAKAO_IDS·INTERNAL_API_TOKEN·INTERNAL_API_BASE_URL·카카오 OAuth·텔레그램 봇·DB_URL/USERNAME/PASSWORD·CORS_ALLOWED_ORIGINS·HEARTBEAT_*_URL·GRAFANA_CLOUD_OTLP_* 등)
 - `INTERNAL_API_BASE_URL`(root가 trading-core `/api/internal/**`를 호출할 base URL — kista-api·kista-scheduler만 설정, 기본값 `http://localhost:8081`)은 root→trading-core 단방향이다. kista-trading에는 두지 않는다 — trading-core는 root를 호출하지 않으며(`GradleModuleBoundaryTest.tradingCoreMustNotCallRootInternalApi`), 이 값이 없으면 `InternalApiClientConfig` 빈 자체가 등록되지 않는다(`@ConditionalOnProperty`). trading-core→root 방향 전달은 Redis Stream(`stream:app.error`·`stream:user.push-notification.requested`, 컨슈머 그룹 `root`)뿐. root·trading-core 배포 순서 제약은 없다: trading-core가 먼저 떠도 스트림에 쌓였다가 root 기동 후 소비된다. 스트림 보존 상한은 MAXLEN 10,000건(`RedisStreamConfig.PUSH_NOTIFICATION_MAXLEN`, root 하루 다운 가정, 초과 시 오래된 것부터 근사 트리밍) — 그 이내에서만 유실 없음. root→trading-core 방향(`stream:user.deleted`·`stream:user.notify-profile.changed`, 그룹 `trading-core`)도 platform `RedisStreamSubscriber` 서브클래스(`UserDeletedStreamConsumer`/`UserNotifyProfileStreamConsumer`)가 소비한다 — 컨슈머 이름은 `trading-core-<UUID>`(인스턴스별 고유), 복구 전용은 `trading-core-recovery`(스트림별 pending이라 두 컨슈머가 같은 이름이어도 충돌 없음), root는 `root-<UUID>`/`root-push-<UUID>`
 - `SPRING_PROFILES_ACTIVE=prod`는 `deploy/server/docker-compose.yml`의 `environment:`에 고정
 - 편집한 시크릿은 push해야 서버에 반영된다 — kista-infra 배포 워크플로가 `/opt/kista-api/.env`를 렌더링·덮어쓰고 내용이 바뀌면 `reconcile.sh kista-api current`로 재적용한다(위 GitHub Secrets 항목)
@@ -156,20 +156,12 @@ UPDATE trading.orders SET status = 'FAILED' WHERE id = '<id>' AND status = 'SUBM
 
 ## 백업/복구 런북
 
-### DB 백업 (자체호스팅 postgres)
-DB는 자체호스팅 postgres(`kista-postgres` 컨테이너, A 서버)이며 `kista-infra` 레포의 `scripts/backup.sh`가 유일한 백업 경로다.
+DB는 자체호스팅 postgres(`kista-postgres` 컨테이너)이고 백업 경로는 `kista-infra`의 `bin/backup.sh` 하나다(pg_dump → GPG → OCI Object Storage). 주기·설정·수동 실행·복원 명령은 `kista-infra/README.md` "백업/복구"가 원본이다 — 여기에 사본을 두지 않는다. Supabase는 영구 삭제돼 다른 복구 경로가 없다.
 
-- `kista-infra`의 `scripts/backup.sh`: `docker exec kista-postgres pg_dump -U kista kistadb -Fc` → `gpg --symmetric`(`BACKUP_ENCRYPTION_KEY`) → `oci os object put`(Object Storage, Always Free 20GB), 30일 롤링 삭제
-- 서버 cron: `0 2 * * * /opt/kista-infra/scripts/backup.sh` (매일 02:00 KST, 매매·pg 부하 없는 시각)
-- `oci` CLI는 `/usr/local/bin/oci` 심볼릭 링크로 설치(원본 `/home/ubuntu/bin/oci`) — cron 기본 PATH에 `/home/ubuntu/bin`이 없어 심볼릭 링크로 우회
-- 수동 백업: 서버에서 `/opt/kista-infra/scripts/backup.sh` 직접 실행
-- Supabase는 영구 삭제됨 — 롤백 경로 없음, 백업/복구는 전적으로 위 `kista-infra` Object Storage 경로에 의존
-
-### 복구
-1. 서버에서 다운로드+복호화: `/opt/kista-infra/scripts/backup.sh --restore kistadb-YYYYMMDD-HHMMSS.dump.gpg` (오브젝트명은 `oci os object list --bucket-name "$OCI_BUCKET_NAME" --namespace "$OCI_NAMESPACE" --all`로 확인)
-2. 스크립트가 출력하는 `/tmp/kista-infra-restore/<오브젝트명>.dump`를 `docker cp`로 `kista-postgres:/tmp/backup.dump`에 넣고 `docker exec kista-postgres pg_restore -U kista -d kistadb --clean --if-exists /tmp/backup.dump` (재해 복구로 DB 자체가 없으면 먼저 `createdb -U kista kistadb`). 복구 후 평문 덤프 삭제
-3. 복원 후 두 이력 테이블 `flyway_schema_history_api`(root)·`flyway_schema_history_trading`(trading)의 최신 버전이 각각 배포 코드의 `db/migration`·`db/migration-trading` 버전과 일치하는지 확인 — 불일치 시 앱 기동 실패. 옛 공용 `public.flyway_schema_history`는 스키마 재편 롤백 증거로 보존된 테이블이라 검증 대상이 아니다
-4. 앱 재기동 후 `/actuator/health` 200 확인 + 텔레그램 시작 알림 수신 확인
+### 복구 뒤 앱 쪽 확인
+1. 복원 명령은 `kista-infra/README.md` "백업/복구"를 따른다
+2. 복원 후 두 이력 테이블 `flyway_schema_history_api`(root)·`flyway_schema_history_trading`(trading)의 최신 버전이 각각 배포 코드의 `db/migration`·`db/migration-trading` 버전과 일치하는지 확인 — 불일치 시 앱 기동 실패. 옛 공용 `public.flyway_schema_history`는 스키마 재편 롤백 증거로 보존된 테이블이라 검증 대상이 아니다
+3. 앱 재기동 후 `/actuator/health` 200 확인 + 텔레그램 시작 알림 수신 확인
 
 ### 키 백업 (분실 시 복구 불가 — DB 백업과 별도 보관 필수)
 - `AES_ENCRYPTION_KEY` — 분실 시 accounts의 암호화 컬럼(계좌번호·API 키) 전체 복호화 불가 → 사용자 재등록 필요
