@@ -56,7 +56,8 @@ public class InfiniteStrategy {
         List<PlannedOrder> newBuys;
         if (position.holdings() == 0) {
             PlannedOrder highest = baseOrders.stream().max(Comparator.comparing(PlannedOrder::price)).orElseThrow();
-            newBuys = computeSingleBuy(tradeDate, position, highest, cap, unitAmount, FIRST_BUY_LEG);
+            // 계획 때와 같은 원장 상한 — 옛 행(상한 없는 가격)이나 계획 뒤 인출로 1주가 원장을 넘지 않게
+            newBuys = computeSingleBuy(tradeDate, position, highest, firstBuyCeiling(position, cap), unitAmount, FIRST_BUY_LEG);
         } else if (!position.isEarlyStage()) {
             PlannedOrder orig = baseOrders.getFirst();
             newBuys = computeSingleBuy(tradeDate, position, orig, cap, unitAmount, orig.orderLeg());
@@ -147,6 +148,8 @@ public class InfiniteStrategy {
         }
 
         BigDecimal adjustedOrderPrice = unitAmount.divide(BigDecimal.valueOf(totalQuantity + 1), Currency.USD.amountScale(), RoundingMode.FLOOR);
+        // 1회분이 너무 작아 내림 결과가 0원이면 생략 — 0원 LOC는 증권사가 매번 거절한다
+        if (adjustedOrderPrice.signum() <= 0) return;
 
         newBuys.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, BUY, 1, adjustedOrderPrice,
                 PlannedOrder.leg("INFINITE_CORRECTION", correctionIndex)));
@@ -156,11 +159,16 @@ public class InfiniteStrategy {
     // 매도는 보유가 없어 없다
     // 가격은 원장 예수금을 넘지 않는다 — 최소 1주 보장 수량이 원장을 넘으면 매수 전체가 거절돼 보유 0에서 교착된다(1주 가드는 전일종가 기준)
     private List<PlannedOrder> buildFirstBuyOrders(InfinitePosition position, LocalDate tradeDate) {
-        BigDecimal price = position.locBuyPrice().min(position.deposit());
+        BigDecimal price = firstBuyCeiling(position, position.locBuyPrice());
         List<PlannedOrder> buys = new ArrayList<>();
         buys.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, BUY,
                 InfinitePosition.lateBuyQuantity(position.unitAmount(), price), price, FIRST_BUY_LEG));
         return withCorrections(tradeDate, position, buys);
+    }
+
+    // 첫 매수 가격 상한 = min(limit, 원장 예수금) — 원장이 0 이하면 상한을 걸지 않는다(가격 0으로 나누지 않고 원장 상한 판정의 예산 거절로 넘긴다)
+    private static BigDecimal firstBuyCeiling(InfinitePosition position, BigDecimal limit) {
+        return position.deposit().signum() > 0 ? limit.min(position.deposit()) : limit;
     }
 
     private List<PlannedOrder> buildEarlyStageOrders(InfinitePosition position, LocalDate tradeDate) {

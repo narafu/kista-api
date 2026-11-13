@@ -637,6 +637,44 @@ class InfiniteStrategyTypeTest {
     }
 
     @Test
+    @DisplayName("첫 매수(보유 0) cap 경로도 원장 상한: 상한 없이 저장된 옛 행이 와도 1주가 원장을 넘지 않는다")
+    void firstBuy_capped_alsoCappedByDeposit() {
+        // SOXL 20분할, 전일종가 100, 원장 110 → 옛 행 119.99, cap 126 → min(119.99, 126, 110) = 110 × 1주
+        InfinitePosition position = new InfinitePosition(new AccountBalance(0, null, new BigDecimal("110")),
+                StrategyTicker.SOXL, new BigDecimal("100"), 20);
+        List<PlannedOrder> legacy = List.of(
+                PlannedOrder.of(TODAY, StrategyTicker.SOXL, LOC, BUY, 1, new BigDecimal("119.99"), InfiniteStrategy.FIRST_BUY_LEG));
+
+        List<PlannedOrder> result = strategy.buildCappedBuyOrders(position, TODAY, legacy, new BigDecimal("126.00"));
+
+        assertThat(result).singleElement().matches(o -> o.quantity() == 1 && o.price().compareTo(new BigDecimal("110")) == 0);
+    }
+
+    @Test
+    @DisplayName("보정 주문 가격이 0원으로 내림되면 생략한다 — 0원 LOC는 증권사가 매번 거절한다")
+    void correction_zeroPrice_omitted() {
+        // 원장 0.20, 전일종가 100 → unitAmount 0.01, 첫 매수 0.20×1주(= 원장), 보정 0.01/2 = 0.00 → 생략(넣으면 합계가 원장 이내라 trim에도 안 걸린다)
+        InfinitePosition position = new InfinitePosition(new AccountBalance(0, null, new BigDecimal("0.20")),
+                StrategyTicker.SOXL, new BigDecimal("100"), 20);
+
+        List<PlannedOrder> orders = strategy.buildOrders(position, TODAY);
+
+        assertThat(orders).allMatch(o -> o.price().signum() > 0);
+    }
+
+    @Test
+    @DisplayName("첫 매수(보유 0) 원장 0: 예외 없이 별지점−0.01 1주 — 원장 상한 판정의 예산 거절로 넘긴다")
+    void firstBuy_zeroDeposit_doesNotDivideByZero() {
+        InfinitePosition position = new InfinitePosition(new AccountBalance(0, null, BigDecimal.ZERO),
+                StrategyTicker.SOXL, new BigDecimal("100"), 20);
+
+        List<PlannedOrder> orders = strategy.buildOrders(position, TODAY);
+
+        assertThat(orders).singleElement().matches(o -> InfiniteStrategy.FIRST_BUY_LEG.equals(o.orderLeg())
+                && o.quantity() == 1 && o.price().compareTo(new BigDecimal("119.99")) == 0);
+    }
+
+    @Test
     @DisplayName("첫 매수(보유 0) cap: 배포 전에 저장된 반반 주문(①②)이 와도 가장 비싼 주문 기준 단일 LOC로 다시 만든다")
     void firstBuy_capped_legacySplitRows_becomeSingleOrder() {
         // TQQQ 40분할, 전일종가 50 → unitAmount 500. 옛 행: ① 50 / ② 57.50, cap 52.50 → min(57.50, 52.50)=52.50, floor(500/52.50)=9
