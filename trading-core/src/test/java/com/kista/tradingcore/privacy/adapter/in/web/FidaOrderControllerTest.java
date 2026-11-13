@@ -95,6 +95,21 @@ class FidaOrderControllerTest {
     }
 
     @Test
+    void placeFidaOrder_null_orders_returns_400_without_executing() throws Exception {
+        // orders 누락 — 검증이 없으면 서비스의 orders().stream()에서 NPE로 500이 된다(cross-repo D절)
+        FidaOrderCommand req = new FidaOrderCommand(
+                LocalDate.now(), StrategyTicker.SOXL, new BigDecimal("500.00"),
+                BigDecimal.ZERO, new BigDecimal("25.50"), 10, null);
+
+        mockMvc.perform(post("/api/internal/fida-orders")
+                        .header("X-Internal-Token", VALID_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest());
+        org.mockito.Mockito.verifyNoInteractions(privacy);
+    }
+
+    @Test
     void placeFidaOrder_unauthenticated_returns_401() throws Exception {
         mockMvc.perform(post("/api/internal/fida-orders")
                         .contentType(MediaType.APPLICATION_JSON)

@@ -22,7 +22,7 @@ public record FidaOrderRequest(
         @NotNull BigDecimal currentCycleRealizedPnl,            // 사이클 실현 수익($)
         BigDecimal avgPrice,                                    // 평단가 (nullable)
         @PositiveOrZero int holdings,                           // 보유 수량
-        List<PlannedOrder> orders                               // 계획 주문
+        @NotNull List<PlannedOrder> orders                      // 계획 주문 — 누락이면 400(빈 목록은 허용)
 ) {
     // quantity=null은 "남은 전부 매도"를 의미 — SELL 방향에서만 허용
     @JsonIgnore
