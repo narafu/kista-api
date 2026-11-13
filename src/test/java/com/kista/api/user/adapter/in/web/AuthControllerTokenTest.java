@@ -83,7 +83,7 @@ class AuthControllerTokenTest {
 
         mockMvc.perform(post("/api/auth/refresh")
                         .cookie(new jakarta.servlet.http.Cookie("refresh_token", "badToken")))
-                .andExpect(status().isUnauthorized()); // GlobalExceptionHandler: InvalidRefreshTokenException → 401
+                .andExpect(status().isUnauthorized()); // ProblemDetailExceptionHandler: InvalidRefreshTokenException → 401
     }
 
     @Test

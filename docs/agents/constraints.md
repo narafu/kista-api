@@ -16,7 +16,7 @@
 ### 신규 파일 배치
 신규 코드는 해당 서브프로젝트 루트의 애그리게이트 모듈(`com.kista.api.<module>`·`com.kista.tradingcore.<module>`, 공용은 `com.kista.shared.<module>`) 안에 `domain/model` + `application/{usecase,port/output,service}` + `adapter/{in,out}` 구조로 추가한다. 모듈별 NamedInterface 공개 범위·internal 패키지는 `docs/agents/modules/<루트>/<ID>.md`가 SSOT.
 - broker 외부에서 필요한 기능은 `com.kista.tradingcore.broker.application.port.output`에 신규 `*Port`를 만들어 노출한다(`adapter/out/*`은 비공개)
-- 여러 모듈을 집계하는 inbound 관심사(크로스모듈 컨트롤러·전역 `@ControllerAdvice`)는 `com.kista.api.web`, trading-core 전역 web 관심사(`TradingExceptionHandler`)는 `com.kista.tradingcore.web`에 둔다. 특정 애그리게이트 컨트롤러는 그 모듈의 `adapter/in/web`
+- 여러 모듈을 집계하는 inbound 관심사(크로스모듈 컨트롤러)는 `com.kista.api.web`, trading-core 전역 web 관심사(`TradingSecurityPolicy`·`TradingExceptionReporter`)는 `com.kista.tradingcore.web`에 둔다. 예외 advice는 `platform.web.ProblemDetailExceptionHandler` 하나뿐이고 예외 매핑은 소유 모듈 `adapter/in/web/*ProblemDetails`가 기여한다. 특정 애그리게이트 컨트롤러는 그 모듈의 `adapter/in/web`
 - persistence base entity·대칭키 암호화·스케쥴러 공통 골격은 `com.kista.shared.platform`에 둔다. 주문생성 알고리즘 커널(전략 계산·position 값객체·`PlannedOrder`·`AccountBalance`)은 `com.kista.tradingcore.matching`(`"kernel"`)에 둔다. 가드: `HexagonalArchitectureTest.platform_must_not_depend_on_other_modules`·`matching_must_not_depend_on_other_modules`
 - 같은 하위 패키지 이름(`domain/strategy` 등)을 모듈마다 다른 의미로 재사용하지 않는다(matching `domain/strategy`=주문생성 전략, trading `domain/creation`=등록 정책). 값 타입은 `domain/model/<x>`, 도메인 로직과 그 값이 한 하위 도메인이면 한 패키지로 둔다(stats `domain/backtest`)
 - `@Configuration`·`@TransactionalEventListener` 리스너·`@Scheduled`는 `application/service`에 두지 않는다(설정=`<module>/config`, 저장 트리거 리스너=`adapter/in/event`, 스케쥴러=`adapter/in/schedule`). 기존 예외: `TradingStatsService`의 캐시 무효화 `@EventListener`(TradingReportReady·StrategyCapitalChanged 두 이벤트를 받고, 트랜잭션 동기화가 활성이면 afterCommit에 비운다. `@TransactionalEventListener`를 쓰지 않는 이유는 메모리 캐시 무효화에 EPR `event_publication` 행이 남지 않게 하기 위해서다)
@@ -39,12 +39,12 @@
 ### adapter/out 간 JpaRepository 접근
 - `*JpaRepository`는 package-private(가드 `persistence_jpa_repositories_must_be_package_private`) — 다른 패키지 adapter가 DB 조작이 필요하면 아웃바운드 포트(`application/port/output/`)를 거친다
 
-### GlobalExceptionHandler 자동 예외 처리
-- Controller에서 catch/rethrow 금지 — advice별 `MAPPINGS` 테이블이 예외→HTTP 매핑 SSOT이고 같은 예외를 `@ExceptionHandler`에 중복 나열하지 않는다.
+### 예외 응답 자동 처리 (공용 advice)
+- Controller에서 catch/rethrow 금지 — advice는 프로세스당 `ProblemDetailExceptionHandler` 하나(새 `@RestControllerAdvice` 금지), 예외→HTTP 매핑은 예외 소유 모듈의 `ProblemDetailMappingContributor`가 SSOT이고 같은 예외를 두 곳이 기여하면 기동 실패한다.
 - ProblemDetail `detail`은 사용자에게 보여줄 한국어 문장이며 내부 정보(URL·응답 바디·계좌번호·영어 프레임워크 메시지)를 싣지 않는다. application·domain의 IAE/ISE 리터럴은 "~니다."로 끝난다(가드 `ExceptionMessageFormatTest`).
 - `ErrorCode` 상수 이름 변경·삭제 금지(kista-ui 계약).
 
-→ 상세: `docs/agents/modules/api/web.md` "GlobalExceptionHandler 자동 예외 처리"
+→ 상세: `docs/agents/modules/api/web.md` "예외 응답 자동 처리 (공용 advice)"
 
 ### 모듈 문서가 SSOT인 규칙 (해당 모듈 작업 시 자동 로드, 그 외엔 직접 Read)
 - Account ↔ Strategy 분리·전략 원장 상한, 런타임 매매 정책 적용 → `modules/tradingcore/trading.md`

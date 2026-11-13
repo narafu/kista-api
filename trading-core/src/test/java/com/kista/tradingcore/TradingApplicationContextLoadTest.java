@@ -1,5 +1,7 @@
 package com.kista.tradingcore;
 
+import com.kista.shared.platform.web.ExceptionReporter;
+import com.kista.shared.platform.web.ProblemDetailExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -30,5 +32,8 @@ class TradingApplicationContextLoadTest {
     void 트레이딩_컨텍스트는_JPA_리포지토리_전부와_보안_필터체인_하나를_갖는다() {
         assertThat(context.getBeanNamesForType(JpaRepository.class)).hasSize(TRADING_JPA_REPOSITORIES);
         assertThat(context.getBeanNamesForType(SecurityFilterChain.class)).hasSize(1);
+        // 예외 advice·오류 보고는 프로세스당 하나 — 보고 빈이 없으면 advice가 조용히 보고를 건너뛴다
+        assertThat(context.getBeanNamesForType(ProblemDetailExceptionHandler.class)).hasSize(1);
+        assertThat(context.getBeanNamesForType(ExceptionReporter.class)).hasSize(1);
     }
 }

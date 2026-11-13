@@ -116,7 +116,7 @@ public class AuthController {
         return UserResponse.from(user, settings);
     }
 
-    // REJECTED(24h)/PENDING(1h) 쿨다운 후 재신청 — CooldownException→429, IllegalStateException→400은 GlobalExceptionHandler 처리
+    // REJECTED(24h)/PENDING(1h) 쿨다운 후 재신청 — CooldownException→429, IllegalStateException→400은 ProblemDetailExceptionHandler 처리
     @Operation(summary = "승인 재신청", description = "거절(24시간) 또는 대기(1시간) 쿨다운 이후 재신청 가능.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "재신청 성공"),

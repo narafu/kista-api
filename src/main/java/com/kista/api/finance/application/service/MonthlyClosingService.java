@@ -34,7 +34,7 @@ class MonthlyClosingService implements MonthlyClosingUseCase {
     @Override
     public MonthlyClosing setCompleted(UUID userId, String month, boolean completed) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
-        // 형식·범위(월 01~12) 동시 검증 — 실패 시 DateTimeParseException → GlobalExceptionHandler가 400으로 매핑
+        // 형식·범위(월 01~12) 동시 검증 — 실패 시 DateTimeParseException → ProblemDetailExceptionHandler가 400으로 매핑
         YearMonth.parse(month, MONTH_FORMATTER);
         // userId는 영구 소유자 축 — 마감 해제해도 null로 되돌리지 않고 항상 실제 userId를 넘긴다.
         // currentGroupId가 있으면 그룹 마감, 없으면 개인 마감이 된다.

@@ -20,7 +20,7 @@ class TradingCommandHttpAdapter implements TradingCommandPort {
     // 빈 매칭됨 — 타입이 RestClient로 동일해 @Qualifier 대신 이름 일치로 주입)
     private final RestClient internalApiWriteRestClient;
 
-    // trading 쪽 GlobalExceptionHandler(전역 공유)가 매핑한 상태코드(404·400)를 admin이 매핑하는 표준 예외로 되돌린다 —
+    // trading 쪽 ProblemDetailExceptionHandler(전역 공유)가 매핑한 상태코드(404·400)를 admin이 매핑하는 표준 예외로 되돌린다 —
     // 없으면 admin 쪽에서 매핑되지 않는 HttpClientErrorException으로 흘러 500(catch-all)으로 뭉개진다.
     @Override
     public TradeCorrectionResponse correctManualFills(TradeCorrectionRequest command) {

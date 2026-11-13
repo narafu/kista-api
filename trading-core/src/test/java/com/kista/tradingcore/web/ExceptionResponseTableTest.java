@@ -54,7 +54,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // 오류 보고(AppErrorRaisedEvent)가 나가는지 고정한다. 처리기 클래스를 참조하지 않아 처리기 구조를 바꿔도 같은 표로 검증한다
 @WebMvcTest(controllers = ExceptionResponseTableTest.ThrowingController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(ExceptionResponseTableTest.ThrowingController.class)
+@Import({ExceptionResponseTableTest.ThrowingController.class, TradingExceptionReporter.class})
 @RecordApplicationEvents
 @Execution(ExecutionMode.SAME_THREAD)
 class ExceptionResponseTableTest {

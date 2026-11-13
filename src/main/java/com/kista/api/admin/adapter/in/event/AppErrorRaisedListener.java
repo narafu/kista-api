@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-// root 프로세스 안에서 발행된 AppErrorRaisedEvent(GlobalExceptionHandler 500 · TelegramAdapter.notifyError)를
+// root 프로세스 안에서 발행된 AppErrorRaisedEvent(ProblemDetailExceptionHandler 500 · TelegramAdapter.notifyError)를
 // app_error_logs에 저장하는 인바운드 이벤트 어댑터 — 옛 ErrorLogAspect(NotifyPort 포인트컷)를 대체한다.
 // trading-core 발행분은 Redis Stream 경로(adapter/in/redis/AppErrorStreamConsumer)가 같은 포트로 저장한다.
 // 동기 @EventListener인 이유: 발행 지점이 트랜잭션 밖인 경우가 많아 @TransactionalEventListener는 이벤트를 버린다.

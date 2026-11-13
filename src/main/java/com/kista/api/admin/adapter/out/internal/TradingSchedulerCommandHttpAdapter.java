@@ -14,7 +14,7 @@ class TradingSchedulerCommandHttpAdapter implements TradingSchedulerCommandPort 
     private final RestClient internalApiRestClient;
 
     // 순수 트리거(도메인 예외 없음) — 401(INTERNAL_API_TOKEN 미설정)·5xx는 admin의
-    // GlobalExceptionHandler catch-all(500 + saveErrorLog)로 떨어지는 것이 적절해 의도적으로
+    // ProblemDetailExceptionHandler catch-all(500 + saveErrorLog)로 떨어지는 것이 적절해 의도적으로
     // onStatus 매핑을 추가하지 않는다
     @Override
     public void triggerOpen() {

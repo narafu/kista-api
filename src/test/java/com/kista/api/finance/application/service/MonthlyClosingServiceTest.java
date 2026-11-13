@@ -69,7 +69,7 @@ class MonthlyClosingServiceTest {
     }
 
     @Test
-    @DisplayName("잘못된 형식('2026-13')은 DateTimeParseException을 그대로 전파 (400 매핑은 GlobalExceptionHandler 책임)")
+    @DisplayName("잘못된 형식('2026-13')은 DateTimeParseException을 그대로 전파 (400 매핑은 ProblemDetailExceptionHandler 책임)")
     void setCompleted_malformedMonth_invalidRange_propagatesParseException() {
         assertThatThrownBy(() -> monthlyClosingService.setCompleted(userId, "2026-13", true))
                 .isInstanceOf(DateTimeParseException.class);

@@ -35,7 +35,7 @@ class InvestmentPointsHttpAdapter implements InvestmentPointsPort {
                         .queryParamIfPresent("to", Optional.ofNullable(to))
                         .build())
                 .retrieve()
-                // trading 쪽 GlobalExceptionHandler가 매핑한 상태코드를 원래 예외 타입으로 되돌린다 —
+                // trading 쪽 ProblemDetailExceptionHandler가 매핑한 상태코드를 원래 예외 타입으로 되돌린다 —
                 // 없으면 SecurityException/NoSuchElementException/IllegalArgumentException이 api
                 // 쪽에서 매핑되지 않는 HttpClientErrorException으로 흘러 500(catch-all)로 뭉개진다.
                 // ProblemDetail.detail의 원 메시지를 그대로 옮겨 담는다(고정 문구로 뭉개지 않음).

@@ -241,7 +241,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - Meritz는 `MeritzHttpClient.java:133`과 `MeritzAuthApi.java:85` 양쪽에서 변환한다.
   - KIS와 Toss는 인증 API(`KisAuthApi.java:107-167`, `TossAuthApi.java:118-145`)에서만 변환한다. 일반 호출의 429는 `KisApiException`/`TossApiException`으로 나간다.
 - 기준 패턴: 벤더 rate limit은 어댑터 HTTP 계층에서 `BrokerRateLimitException`으로 변환한다(3사 다수).
-- 근거: `BrokerCallGuard.isBrokerTyped`와 `BrokerRouter.java:138-142`(`adminFirst`)는 `BrokerRateLimitException`만 429로 보존한다. 그래서 KIS·Toss 일반 호출의 429는 다른 경로로 처리된다. `TradingExceptionHandler`에서 `BrokerApiException` 하위가 어떤 상태로 매핑되는지는 미확인이다.
+- 근거: `BrokerCallGuard.isBrokerTyped`와 `BrokerRouter.java:138-142`(`adminFirst`)는 `BrokerRateLimitException`만 429로 보존한다. 그래서 KIS·Toss 일반 호출의 429는 다른 경로로 처리된다. `BrokerProblemDetails`(공용 advice 기여)에서 `BrokerApiException` 하위가 어떤 상태로 매핑되는지는 미확인이다.
 - 예상 효과: 관리자·사용자 응답에서 rate limit을 일관되게 식별한다.
 - 위험: 중간. 주문 POST 재시도 정책과 얽힌다. KIS는 주문 POST를 재시도하지 않는다. 확정 기각된 "KisAuthApi/TossAuthApi catch 공통화"와는 대상(인증 vs 일반 호출)이 다르다.
 - 가드: `KisHttpClientTest`·`TossHttpClientTest`에 "429/EGW00201 → BrokerRateLimitException" 단언을 넣었다. `constraints.md` "브로커 호출 실패 정책"에 HTTP 클라이언트 변환 규칙을 추가했다.

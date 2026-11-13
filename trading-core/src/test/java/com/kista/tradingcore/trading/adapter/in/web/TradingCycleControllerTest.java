@@ -146,7 +146,7 @@ class TradingCycleControllerTest {
 
         mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
                         .with(csrf()).with(authentication(userToken(USER_ID))))
-                .andExpect(status().isNotFound()); // 404 — GlobalExceptionHandler 처리
+                .andExpect(status().isNotFound()); // 404 — ProblemDetailExceptionHandler 처리
     }
 
     @Test

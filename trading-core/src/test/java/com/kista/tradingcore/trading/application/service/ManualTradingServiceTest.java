@@ -74,7 +74,7 @@ class ManualTradingServiceTest {
     @Mock VrStrategy vrStrategy; // VrCycleOrderStrategy 조립용
     @Mock PrivacyBaseGuard privacyBaseGuard; // PRIVACY 기준표 장전 점검
     @Mock MarketCalendarPort marketCalendarPort; // 휴장일 수동 실행 차단
-    @Mock ApplicationEventPublisher eventPublisher; // 4xx 예외라 GlobalExceptionHandler가 저장 안 하는 외부 API 실패를 직접 기록
+    @Mock ApplicationEventPublisher eventPublisher; // 4xx 예외라 ProblemDetailExceptionHandler가 저장 안 하는 외부 API 실패를 직접 기록
 
     ManualTradingService service;
     TradingPriceFetcher priceFetcher;

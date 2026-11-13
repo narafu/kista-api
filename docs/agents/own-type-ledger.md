@@ -4,7 +4,7 @@
 
 **프로세스 경계를 넘는 wire 타입(내부 API 요청·응답·Redis payload)은 own-type으로 복제하지 않고 `com.kista.shared.contract`에 둔다**(→ `docs/agents/modules/shared/contract.md`, 강제는 `InternalApiContractTest`). 공유 어휘 enum(`MarketSession` 등)은 sharedkernel.
 
-**남아 있는 (a) 성격 own-type — 표지 예외**: `AdminBrokerCredentialException`/`AdminBrokerRateLimitException`/`AdminPrivacyTradeConflictException`(root `com.kista.api.admin.domain.model`) — trading-core 내부 API의 HTTP 상태코드(422/429/409)를 admin `GlobalExceptionHandler`가 매핑할 수 있는 예외로 되돌리는 표지 클래스. 값 타입이 아니라 예외라 contract 대상이 아니다.
+**남아 있는 (a) 성격 own-type — 표지 예외**: `AdminBrokerCredentialException`/`AdminBrokerRateLimitException`/`AdminPrivacyTradeConflictException`(root `com.kista.api.admin.domain.model`) — trading-core 내부 API의 HTTP 상태코드(422/429/409)를 root 공용 advice(`ProblemDetailExceptionHandler`, 매핑은 admin `AdminProblemDetails`)가 매핑할 수 있는 예외로 되돌리는 표지 클래스. 값 타입이 아니라 예외라 contract 대상이 아니다.
 
 **(b) 외부 계약 분리로 의도적 허용된 복제** (원장에 남는 것):
 - DTO 이중복제: `CycleHistoryPageResponse`/`CycleHistoryResponse`(tradingcore.stats/trading) — 각기 다른 HTTP 엔드포인트의 JSON 응답 계약. 통합 시 한 모듈의 엔드포인트 필드 추가가 다른 모듈 응답 스키마에 전이됨

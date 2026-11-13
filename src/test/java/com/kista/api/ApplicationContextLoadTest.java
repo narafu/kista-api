@@ -1,5 +1,7 @@
 package com.kista.api;
 
+import com.kista.shared.platform.web.ExceptionReporter;
+import com.kista.shared.platform.web.ProblemDetailExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -48,6 +50,9 @@ class ApplicationContextLoadTest {
         assertThat(context.getBeanNamesForType(JpaRepository.class)).hasSize(ROOT_JPA_REPOSITORIES);
         // shared 자동구성 순서 회귀 가드 — Boot 기본 필터 체인이 함께 등록되면 2개가 된다
         assertThat(context.getBeanNamesForType(SecurityFilterChain.class)).hasSize(1);
+        // 예외 advice·오류 보고는 프로세스당 하나 — 보고 빈이 없으면 advice가 조용히 보고를 건너뛴다
+        assertThat(context.getBeanNamesForType(ProblemDetailExceptionHandler.class)).hasSize(1);
+        assertThat(context.getBeanNamesForType(ExceptionReporter.class)).hasSize(1);
         // root 테스트 classpath에 trading-core가 있어도 컨텍스트에 섞이지 않는다
         assertThat(Arrays.stream(context.getBeanDefinitionNames())
                 .map(context::getType)

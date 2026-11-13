@@ -106,7 +106,7 @@ public class AccountController {
         accountUseCase.delete(id, userId);
     }
 
-    // 자격증명 연결 테스트 — 실패 시 BrokerCredentialException → GlobalExceptionHandler → 422
+    // 자격증명 연결 테스트 — 실패 시 BrokerCredentialException → ProblemDetailExceptionHandler → 422
     @Operation(summary = "API 연결 테스트", description = "appKey/appSecret으로 OAuth 토큰 발급을 시도해 자격증명을 검증합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "연결 성공"),
@@ -116,7 +116,7 @@ public class AccountController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void testConnection(
             @RequestBody TestConnectionRequest request) {
-        // broker 기본값은 서비스가 결정 — 실패 시 BrokerCredentialException → GlobalExceptionHandler → 422
+        // broker 기본값은 서비스가 결정 — 실패 시 BrokerCredentialException → ProblemDetailExceptionHandler → 422
         accountUseCase.test(request.broker(), request.appKey(), request.appSecret());
     }
 }

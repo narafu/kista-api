@@ -86,7 +86,7 @@ class BacktestService implements BacktestUseCase {
         return new BacktestResult(output.points(), summarize(output), output.cycleStartDates(), List.copyOf(warnings));
     }
 
-    // --- 검증 (전부 IllegalArgumentException → GlobalExceptionHandler 400) ---
+    // --- 검증 (전부 IllegalArgumentException → ProblemDetailExceptionHandler 400) ---
 
     private void validate(BacktestCommand command) {
         // DCA는 엔진이 지원하지 않는다 — 과거 일봉(외부 API)을 조회하기 전에 거절

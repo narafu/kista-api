@@ -106,7 +106,7 @@ class FinanceGroupControllerTest {
                 .andExpect(jsonPath("$[0].nickname").doesNotExist());
     }
 
-    // 컨트롤러가 예외를 삼키지 않고 GlobalExceptionHandler(@RestControllerAdvice)가 SecurityException을
+    // 컨트롤러가 예외를 삼키지 않고 ProblemDetailExceptionHandler(@RestControllerAdvice)가 SecurityException을
     // 403으로 매핑한다 — @WebMvcTest 슬라이스는 @RestControllerAdvice 빈을 기본으로 로드하므로 별도 @Import 불필요.
     @Test
     void listMembers_nonMember_returns403() throws Exception {

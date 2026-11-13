@@ -11,13 +11,11 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.format.DateTimeParseException;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.function.Consumer;
 
-// root GlobalExceptionHandler와 trading-core TradingExceptionHandler가 공유하는 예외→ProblemDetail 매핑 유틸 —
-// 두 advice가 각자 복제하던 JDK/Spring 범용 예외 테이블·클래스 계층 탐색·클라이언트 이탈 판정·검증 메시지 집계를 한 벌로 통합한다.
+// 공용 advice(ProblemDetailExceptionHandler)와 모듈 기여(ProblemDetailMappingContributor)가 쓰는 예외→ProblemDetail 매핑 유틸 —
+// JDK/Spring 범용 예외 테이블·클래스 계층 탐색·클라이언트 이탈 판정·검증 메시지 집계.
 @Slf4j
 public final class ProblemDetailMappings {
 
@@ -49,20 +47,13 @@ public final class ProblemDetailMappings {
 
     private ProblemDetailMappings() {}
 
-    // GENERIC + 프로세스 고유 매핑 병합 — 중복 키는 specific 우선, 결과는 불변 맵
-    public static Map<Class<? extends Exception>, Mapping> withGeneric(Map<Class<? extends Exception>, Mapping> specific) {
-        Map<Class<? extends Exception>, Mapping> merged = new HashMap<>(GENERIC);
-        merged.putAll(specific);
-        return Map.copyOf(merged);
-    }
-
     // 클래스 계층 탐색 — @ExceptionHandler는 서브클래스도 매치하므로(assignability 기준) 테이블 조회도 exact-class가 아닌
     // 상위 클래스 탐색이어야 등록된 예외의 향후 서브클래스가 매칭된다. 매핑 없으면 null — 호출부가 500 폴백 여부를 결정한다
-    public static Mapping resolve(Exception ex, Map<Class<? extends Exception>, Mapping> mappings) {
+    public static <V> V resolve(Exception ex, Map<Class<? extends Exception>, V> table) {
         Class<?> cls = ex.getClass();
         while (cls != null && Exception.class.isAssignableFrom(cls)) {
             @SuppressWarnings("unchecked")
-            Mapping m = mappings.get((Class<? extends Exception>) cls);
+            V m = table.get((Class<? extends Exception>) cls);
             if (m != null) return m;
             cls = cls.getSuperclass();
         }
@@ -78,26 +69,6 @@ public final class ProblemDetailMappings {
             if (msg != null && (msg.contains("Broken pipe") || msg.contains("Connection reset by peer"))) return true;
         }
         return false;
-    }
-
-    // 두 advice의 catch-all 공통 본문 — 매핑 테이블 → 클라이언트 이탈 → 미매핑 500 순으로 처리한다.
-    // 매핑이 먼저인 이유: 이탈 판정은 cause 체인 메시지 기준이라, 외부 호출의 connection reset을 감싼 도메인 예외(바로주문 실패 등)가
-    // 이탈로 오판돼 고정 문구 응답을 잃지 않게 한다. 이탈 판정은 미매핑(=오류 보고 대상) 예외의 보고 오염만 막으면 된다.
-    // 이벤트 발행은 platform이 shared.kernel을 참조할 수 없어 호출자가 넘기는 onUnmapped Consumer(보고·로그 담당)에 남긴다
-    public static ProblemDetail catchAll(Exception ex, Map<Class<? extends Exception>, Mapping> mappings, Consumer<Exception> onUnmapped) {
-        // 매핑 테이블 조회 — 클래스 계층 탐색으로 서브클래스도 상위 매핑 적용, 매핑 있으면 해당 응답(오류 보고 없음)
-        Mapping m = resolve(ex, mappings);
-        if (m != null) {
-            return toProblem(m, ex);
-        }
-        // 클라이언트가 응답 수신 전 연결을 끊으면 직렬화·응답 쓰기가 실패해 catch-all로 떨어진다 — 기록 없이 종료
-        if (isClientDisconnect(ex)) {
-            log.debug("클라이언트 연결 끊김으로 응답 미완: {}", ex.getMessage());
-            return problem(HttpStatus.SERVICE_UNAVAILABLE, "Client Disconnected", "");
-        }
-        // 매핑 없는 미처리 예외 — 호출자가 보고·로그를 수행한 뒤 500
-        onUnmapped.accept(ex);
-        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", "예기치 않은 오류가 발생했습니다.");
     }
 
     // 매핑 → ProblemDetail — fixedDetail 우선(원본 메시지는 debug 로그), code 있으면 확장 프로퍼티로 싣는다

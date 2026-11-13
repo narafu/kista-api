@@ -1,7 +1,10 @@
 package com.kista.api.web;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationEventPublisher;
+import com.kista.shared.platform.web.ExceptionReporter;
+import com.kista.shared.platform.web.ProblemDetailExceptionHandler;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.test.web.servlet.MockMvc;
@@ -12,6 +15,7 @@ import org.springframework.web.context.request.async.AsyncRequestTimeoutExceptio
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -38,10 +42,10 @@ class SseAsyncExceptionHandlingTest {
 
     @Test
     void asyncRequestTimeout_before_first_send_sets_503_without_body() throws Exception {
-        ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+        ExceptionReporter reporter = mock(ExceptionReporter.class);
         TestSseController controller = new TestSseController();
         MockMvc mockMvc = standaloneSetup(controller)
-                .setControllerAdvice(new GlobalExceptionHandler(eventPublisher))
+                .setControllerAdvice(new ProblemDetailExceptionHandler(List.of(), reporterProvider(reporter)))
                 .build();
 
         // SseEmitterRegistry.connect() 재현 — emitter.send() 호출 없이 반환하므로 응답이 아직 커밋되지 않는다.
@@ -59,14 +63,14 @@ class SseAsyncExceptionHandlingTest {
 
         assertThat(dispatched.getResolvedException()).isSameAs(exception);
         assertThat(dispatched.getResponse().getContentAsString()).isEmpty();
-        verifyNoInteractions(eventPublisher);
+        verifyNoInteractions(reporter);
     }
 
     private static void assertAsyncLifecycleErrorIsHandledWithoutResponseBody(Exception exception) throws Exception {
-        ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+        ExceptionReporter reporter = mock(ExceptionReporter.class);
         TestSseController controller = new TestSseController();
         MockMvc mockMvc = standaloneSetup(controller)
-                .setControllerAdvice(new GlobalExceptionHandler(eventPublisher))
+                .setControllerAdvice(new ProblemDetailExceptionHandler(List.of(), reporterProvider(reporter)))
                 .build();
 
         MvcResult result = mockMvc.perform(get("/test/sse"))
@@ -86,7 +90,14 @@ class SseAsyncExceptionHandlingTest {
                 .isEqualTo("event:ping\ndata:connected\n\n")
                 .doesNotContain("problem+json")
                 .doesNotContain("Internal Server Error");
-        verifyNoInteractions(eventPublisher);
+        verifyNoInteractions(reporter);
+    }
+
+    // 목 보고 빈 하나를 담은 ObjectProvider — advice 생성자 인자
+    private static ObjectProvider<ExceptionReporter> reporterProvider(ExceptionReporter reporter) {
+        DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+        beanFactory.registerSingleton("reporter", reporter);
+        return beanFactory.getBeanProvider(ExceptionReporter.class);
     }
 
     @Controller

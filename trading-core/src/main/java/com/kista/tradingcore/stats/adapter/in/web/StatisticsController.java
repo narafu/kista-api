@@ -83,7 +83,7 @@ public class StatisticsController {
             @RequestParam List<StrategyTicker> tickers) {
         List<StrategyTicker> distinct = tickers.stream().distinct().toList();
         if (distinct.isEmpty() || distinct.size() > 10) {
-            throw new IllegalArgumentException("tickers는 1~10개여야 합니다"); // GlobalExceptionHandler → 400
+            throw new IllegalArgumentException("tickers는 1~10개여야 합니다"); // ProblemDetailExceptionHandler → 400
         }
         Map<StrategyTicker, BigDecimal> result = accountStatistics.getPrices(accountId, userId, distinct);
         return MultiPriceResponse.from(result);

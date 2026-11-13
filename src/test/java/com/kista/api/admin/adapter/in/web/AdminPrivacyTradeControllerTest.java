@@ -141,7 +141,7 @@ class AdminPrivacyTradeControllerTest {
     }
 
     // 같은 (releaseDate, ticker)에 내용이 다른 데이터가 이미 있으면 서비스가 AdminPrivacyTradeConflictException을
-    // 던진다 — GlobalExceptionHandler(MAPPINGS에 등록된 own-type)가 이를 409로 변환하는 전체 왕복을 검증한다.
+    // 던진다 — ProblemDetailExceptionHandler(MAPPINGS에 등록된 own-type)가 이를 409로 변환하는 전체 왕복을 검증한다.
     // PrivacyQueryHttpAdapterTest는 내부 API 409 응답 -> 예외 변환 절반만 검증하므로 이 테스트가 나머지 절반을 메운다.
     @Test
     void createBase_충돌하면_409를_반환한다() throws Exception {

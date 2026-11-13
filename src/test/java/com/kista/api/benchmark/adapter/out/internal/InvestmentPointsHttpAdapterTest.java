@@ -115,9 +115,9 @@ class InvestmentPointsHttpAdapterTest {
         assertThat(recorded.getTarget()).doesNotContain("granularity");
     }
 
-    // trading 쪽 GlobalExceptionHandler가 SecurityException/NoSuchElementException/
+    // trading 쪽 ProblemDetailExceptionHandler가 SecurityException/NoSuchElementException/
     // IllegalArgumentException을 403/404/400으로 매핑한다 — 어댑터가 이를 원래 예외 타입으로
-    // 되돌리지 못하면 api의 GlobalExceptionHandler가 매핑하지 못하는 HttpClientErrorException으로
+    // 되돌리지 못하면 api의 ProblemDetailExceptionHandler가 매핑하지 못하는 HttpClientErrorException으로
     // 흘러 500(catch-all)이 된다.
     @Test
     void _403_응답은_SecurityException으로_변환된다() {

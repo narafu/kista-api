@@ -129,7 +129,7 @@ class AdminTradeControllerTest {
     void listStrategyTradeDates_다른_계좌의_전략이면_404() throws Exception {
         UUID wrongAccountId = UUID.randomUUID();
         UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
-        // 서비스가 accountId 불일치 시 NoSuchElementException을 던지도록 stub — GlobalExceptionHandler가 404로 매핑
+        // 서비스가 accountId 불일치 시 NoSuchElementException을 던지도록 stub — ProblemDetailExceptionHandler가 404로 매핑
         when(adminQuery.listStrategyTradeDates(wrongAccountId, strategyId))
                 .thenThrow(new java.util.NoSuchElementException("전략이 해당 계좌에 속하지 않습니다"));
 

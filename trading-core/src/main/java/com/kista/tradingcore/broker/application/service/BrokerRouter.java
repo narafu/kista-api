@@ -33,7 +33,7 @@ class BrokerRouter implements PortfolioPort, MarginPort, SellableQuantityPort,
         this.adapters = adapters.stream().collect(Collectors.toMap(BrokerAdapterPort::supports, Function.identity()));
     }
 
-    // 지원하지 않으면 IllegalArgumentException — GlobalExceptionHandler → 400
+    // 지원하지 않으면 IllegalArgumentException — ProblemDetailExceptionHandler → 400
     private BrokerCapabilitiesPort of(BrokerAccountRef account) {
         BrokerCapabilitiesPort adapter = adapters.get(account.broker());
         if (adapter == null) {

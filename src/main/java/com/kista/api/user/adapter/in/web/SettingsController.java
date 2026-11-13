@@ -31,7 +31,7 @@ public class SettingsController {
     private final UserProfileUseCase userProfileUseCase;
     private final UserSettingsUseCase userSettingsUseCase; // 잔고검증/알림타입/운영전략 추천 목록 — user_settings·user_notification_prefs 테이블
 
-    // 텔레그램 봇 설정 (botToken, chatId 저장 + getMe로 username 검증) — IllegalArgumentException→400 GlobalExceptionHandler 처리
+    // 텔레그램 봇 설정 (botToken, chatId 저장 + getMe로 username 검증) — IllegalArgumentException→400 ProblemDetailExceptionHandler 처리
     @Operation(summary = "텔레그램 설정 저장", description = "텔레그램 봇 토큰과 채팅 ID를 AES-256 암호화하여 저장. body: {\"botToken\": \"...\", \"chatId\": \"...\"}")
     @ApiResponse(responseCode = "204", description = "저장 성공")
     @ApiResponse(responseCode = "400", description = "유효하지 않은 Bot Token")
@@ -51,7 +51,7 @@ public class SettingsController {
         userProfileUseCase.removeTelegram(userId);
     }
 
-    // 알림 채널 변경 (TELEGRAM / FCM / ALL 중 선택) — IllegalArgumentException→400 GlobalExceptionHandler 처리
+    // 알림 채널 변경 (TELEGRAM / FCM / ALL 중 선택) — IllegalArgumentException→400 ProblemDetailExceptionHandler 처리
     @Operation(summary = "알림 채널 변경", description = "TELEGRAM / FCM / ALL 중 선택. body: {\"channel\": \"FCM\"}")
     @ApiResponse(responseCode = "204", description = "변경 성공")
     @PatchMapping("/notification-channel")

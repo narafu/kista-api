@@ -31,7 +31,7 @@ class MarketHolidayService implements MarketUseCase {
 
     @Override
     public List<DailyCandleResponse> getDailyCandles(String symbol, LocalDate from, LocalDate to) {
-        // 역전 기간은 400 (GlobalExceptionHandler의 IllegalArgumentException 매핑)
+        // 역전 기간은 400 (ProblemDetailExceptionHandler의 IllegalArgumentException 매핑)
         if (from.isAfter(to)) throw new IllegalArgumentException("시작일은 종료일보다 늦을 수 없습니다.");
         // 공개 엔드포인트 — 기간 상한으로 요청당 Toss 페이징 호출 수를 묶는다(5년 ≈ 7회)
         if (from.isBefore(to.minusYears(MAX_RANGE_YEARS)))

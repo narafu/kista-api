@@ -24,7 +24,7 @@ public record User(
 ) {
     public static final NotificationChannel DEFAULT_CHANNEL = NotificationChannel.NONE; // 신규 유저 기본값
 
-    // 재신청 쿨다운 미경과 시 발생 — GlobalExceptionHandler에서 429(Retry-After) 매핑
+    // 재신청 쿨다운 미경과 시 발생 — ProblemDetailExceptionHandler에서 429(Retry-After) 매핑
     public static class CooldownException extends RuntimeException {
         private final Instant retryAfter; // 재신청 가능 시각
 
@@ -36,7 +36,7 @@ public record User(
         public Instant getRetryAfter() { return retryAfter; }
     }
 
-    // 이미 ACTIVE인 사용자 재승인 시 발생 — GlobalExceptionHandler에서 409 매핑
+    // 이미 ACTIVE인 사용자 재승인 시 발생 — ProblemDetailExceptionHandler에서 409 매핑
     public static class AlreadyActiveException extends IllegalStateException {
         public AlreadyActiveException() {
             super("이미 승인된 사용자입니다.");

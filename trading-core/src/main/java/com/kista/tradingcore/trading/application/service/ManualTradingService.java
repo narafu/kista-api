@@ -44,7 +44,7 @@ class ManualTradingService {
     private final TradingOrderPlanner orderPlanner;            // 원장 통과분 PLANNED 저장 — TradingCandidatePlanner와 동일 패턴(브리핑 필드 목록 누락분, 배치와 동일하게 재주입)
     private final TradingOrderExecutor orderExecutor;
     private final AccountBudgetLock budgetLock;              // 원장 판정+저장 구간 계좌 직렬화 — 배치 원장 판정·재캡과 같은 락
-    private final ApplicationEventPublisher eventPublisher; // live 잔고 조회 실패 시 관리자 알림 이벤트 (4xx라 GlobalExceptionHandler가 미기록)
+    private final ApplicationEventPublisher eventPublisher; // live 잔고 조회 실패 시 관리자 알림 이벤트 (4xx라 ProblemDetailExceptionHandler가 미기록)
     private final MarketCalendarPort marketCalendarPort;   // 휴장일 수동 실행 차단 — 배치가 접수하지 않는 죽은 PLANNED·휴장일 즉시 접수 방지
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
@@ -159,7 +159,7 @@ class ManualTradingService {
     }
 
     // 바로주문 조회 실패 응답 변환 — 증권사 타입 예외는 다른 화면과 동일하게 503/422/429로 그대로 전파
-    // (503은 TradingExceptionHandler가 app_error_logs에 기록), 그 외 예외는 500(ManualTradingFailedException) + 관리자 알림
+    // (503은 ProblemDetailExceptionHandler가 app_error_logs에 기록), 그 외 예외는 500(ManualTradingFailedException) + 관리자 알림
     // 비트랜잭션 호출자는 이벤트가 즉시(fallbackExecution) 발송된다
     private static RuntimeException queryFailure(ApplicationEventPublisher eventPublisher, Exception e) {
         if (BrokerCallGuard.isBrokerTyped(e)) return (RuntimeException) e;

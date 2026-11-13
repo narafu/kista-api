@@ -1,1 +1,2 @@
 com.kista.shared.platform.PlatformAutoConfiguration
+com.kista.shared.platform.web.ProblemDetailAutoConfiguration

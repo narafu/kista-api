@@ -83,8 +83,8 @@ class TradingCommandHttpAdapterTest {
     }
 
     // --- 실패 모드 변환 ---
-    // trading-core 쪽 GlobalExceptionHandler(전역 공유)가 매핑한 상태코드를 admin의
-    // GlobalExceptionHandler가 다시 매핑할 수 있는 원래 예외 타입으로 되돌려야 한다.
+    // trading-core 쪽 ProblemDetailExceptionHandler(전역 공유)가 매핑한 상태코드를 admin의
+    // ProblemDetailExceptionHandler가 다시 매핑할 수 있는 원래 예외 타입으로 되돌려야 한다.
 
     @Test
     void correctManualFills_404_응답은_NoSuchElementException으로_변환된다() {

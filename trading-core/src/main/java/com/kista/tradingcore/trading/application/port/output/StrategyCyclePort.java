@@ -20,7 +20,7 @@ public interface StrategyCyclePort {
     // 전략의 현재 사이클 — deleted_at IS NULL 중 createdAt 최신 1건
     Optional<StrategyCycle> findLatestByStrategyId(UUID strategyId);
 
-    // 전략의 현재 활성 사이클 조회, 없으면 NoSuchElementException(404, GlobalExceptionHandler) — 구 CycleLookups.requireLatestCycle
+    // 전략의 현재 활성 사이클 조회, 없으면 NoSuchElementException(404, ProblemDetailExceptionHandler) — 구 CycleLookups.requireLatestCycle
     default StrategyCycle requireLatestByStrategyId(UUID strategyId) {
         return findLatestByStrategyId(strategyId)
                 .orElseThrow(() -> new NoSuchElementException("활성 사이클 없음: strategyId=" + strategyId));

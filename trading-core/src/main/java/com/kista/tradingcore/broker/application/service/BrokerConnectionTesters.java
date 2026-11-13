@@ -22,7 +22,7 @@ public class BrokerConnectionTesters {
         log.info("BrokerConnectionTesters 초기화: {}", testers.keySet());
     }
 
-    // 미지원 증권사면 IllegalArgumentException → GlobalExceptionHandler 400
+    // 미지원 증권사면 IllegalArgumentException → ProblemDetailExceptionHandler 400
     public BrokerConnectionTestPort of(Broker broker) {
         return Optional.ofNullable(testers.get(broker))
                 .orElseThrow(() -> new IllegalArgumentException("지원하지 않는 증권사입니다."));

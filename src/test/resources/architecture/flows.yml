@@ -1516,7 +1516,7 @@ flows:
         desc: >-
           처리되지 않은 예외(500)와 관리자 알림 발송(notifyError)은 오류 보고 이벤트를 발행한다. 이벤트를 받은 리스너가 같은 프로세스에서 곧바로 오류 로그 행을 저장한다.
           알림은 관리자 텔레그램으로도 나간다. 이미 매핑된 4xx 예외는 오류 로그에 남기지 않는다.
-        code: [GlobalExceptionHandler#handleAll, TelegramAdapter#notifyError, AppErrorRaisedListener#on, AppErrorLogPersistenceAdapter#save]
+        code: [ProblemDetailExceptionHandler#handleAll, ApiExceptionReporter#report, TelegramAdapter#notifyError, AppErrorRaisedListener#on, AppErrorLogPersistenceAdapter#save]
         state: "app_error_logs → 행 추가"
         fail: 저장 실패는 삼키고 경고 로그만 남겨 원래 응답을 막지 않는다. 스택트레이스는 앞 30줄만 저장한다.
 
@@ -1527,7 +1527,7 @@ flows:
         desc: >-
           kista-trading의 미처리 예외와 매매 관리자 알림도 같은 오류 보고 이벤트를 만든다. kista-trading은 kista-api를 호출하지 않으므로
           이벤트를 Redis Stream(stream:app.error)에 넣는다. 매매 배치 실패 알림은 관리자 텔레그램으로 나간다.
-        code: [TradingExceptionHandler#handleGeneric, TradingNotifyAdapter#notifyError, TradingAlertNotifier#onTradingError, AppErrorStreamPublisher#onAppErrorRaised]
+        code: [TradingExceptionReporter#report, TradingNotifyAdapter#notifyError, TradingAlertNotifier#onTradingError, AppErrorStreamPublisher#onAppErrorRaised]
         fail: Redis에 넣기 실패하면 경고 로그만 남기고 삼킨다(오류 로그 유실 가능).
 
       - id: consume
