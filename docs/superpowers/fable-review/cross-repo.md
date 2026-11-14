@@ -264,3 +264,12 @@ fable-ui·fable-infra 세션이 떠 있지 않아(2026-11-14 새벽) SendMessage
 | 10 T4·13 U8·15 단계 U의 배포 | 규칙을 맞췄다(ui 로드맵 4-4): 모양이 바뀌는 것은 같은 날, 서버가 지울 것은 ui 먼저. ui 실행 세션이 준비되면 해당 행에 "ui 준비됨(커밋 해시)"을 적는다 |
 | 10 T8 가계부 집계 명세 | 다른 명세는 없다. ui 지침서 05의 2-1절 입출력을 그대로 쓴다 |
 
+## H. S12(13 U1 중 PENDING 차단 제외) 실행에서 나온 ui 영향 (2026-11-15, fable-api 실행 세션)
+
+ui 코드 변경은 필요 없다. ui가 부르는 `/api/auth` 경로 6개(`kakao/callback`·`refresh`·`logout`·`me`·`approval-requests`·`status-stream`)의 인가 결과는 그대로다.
+
+- `POST /api/auth/logout`: RT 쿠키가 없거나 그 RT가 이미 회전·삭제됐어도 `Authorization`의 AT가 유효하면 그 AT(jti)를 막는다. 전에는 RT가 DB에 있을 때만 막았다. 로그아웃 뒤 같은 AT로 부르면 401 `TOKEN_BLACKLISTED`다(코드는 기존 것).
+- `/api/auth/**` 중 공개는 `POST kakao/callback`·`POST refresh`·`POST logout`뿐이다. 그 밖의 경로는 토큰이 없으면 401이다(전에는 없는 경로가 404, 메서드가 틀리면 405였다). ui가 새 비로그인 경로를 `/api/auth` 아래에 원하면 api의 `RootSecurityPolicy` 공개 목록에 더해야 한다.
+- **ui 요청(로그아웃 때 AT가 실제로 막히려면)**: ui 프록시 `app/api/auth/logout/route.ts:18-27`은 RT 쿠키만 보내고 `Authorization`을 보내지 않는다(RT가 없으면 api를 부르지도 않는다). 그래서 로그아웃해도 AT의 jti는 한 번도 블랙리스트에 들어가지 않았고, 그 파일의 주석 "AT 블랙리스트 등재"는 사실과 다르다. api는 이제 AT만 와도 막으므로 ui가 `Authorization: Bearer <AT 쿠키>`를 함께 보내면 된다. 순서가 있다: 지금은 만료된 AT를 실으면 `JwtAuthFilter`가 컨트롤러 전에 401로 끊어 RT 삭제까지 건너뛴다(`RootSecurityPolicyTest.authRoutes_invalidTokenStays401WithErrorBody`가 고정한 기존 동작). 그래서 ① api가 먼저 `POST /api/auth/logout`을 무효 토큰 익명 통과 목록(`anonymousFallbackMatchers`)에 넣고 ② 그 배포 뒤 ui가 AT를 싣는다. ①은 이번 범위(13 5절의 5건) 밖이라 하지 않았다 — 사용자 승인 대기.
+- PENDING 차단(`role` 클레임 제거, 허용 경로 9개)은 이번에 하지 않았다. E절·G절 회신의 내용은 그대로 유효하다.
+

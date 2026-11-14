@@ -89,7 +89,7 @@ public class AuthController {
         String rawRt = cookieHelper.extract(request);
         String jti = null;
         Instant atExpiresAt = null;
-        // AT가 있으면 파싱하여 jti + exp 추출 — 실패해도 RT 삭제만으로 로그아웃 효과
+        // AT가 있으면 파싱하여 jti + exp 추출 — 실패하면 RT 삭제만 한다
         String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             try {
@@ -100,9 +100,8 @@ public class AuthController {
                 // AT 파싱 실패는 무시 — RT 삭제만으로도 로그아웃 효과
             }
         }
-        if (rawRt != null) {
-            tokenUseCase.logout(rawRt, jti, atExpiresAt);
-        }
+        // RT 쿠키가 없어도 호출한다 — 제시된 AT의 jti는 차단해야 한다
+        tokenUseCase.logout(rawRt, jti, atExpiresAt);
         response.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.clear().toString());
     }
 

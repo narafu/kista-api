@@ -67,7 +67,8 @@ class AuthControllerTokenTest {
                         .cookie(new jakarta.servlet.http.Cookie("refresh_token", "someRawRt")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("newAt"))
-                .andExpect(header().exists(HttpHeaders.SET_COOKIE));
+                // 쿠키 수명은 RT의 DB 만료(TokenConstants.RT_TTL, 5일)와 같다
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, org.hamcrest.Matchers.containsString("Max-Age=432000")));
     }
 
     @Test
@@ -98,6 +99,18 @@ class AuthControllerTokenTest {
     void logout_noCookie_returns204() throws Exception {
         mockMvc.perform(post("/api/auth/logout"))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void logout_noCookieWithAccessToken_stillBlocksJti() throws Exception {
+        Instant expiresAt = Instant.now().plusSeconds(600);
+        given(jwtDecoder.decode("validAt")).willReturn(Jwt.withTokenValue("validAt").header("alg", "ES256")
+                .subject(USER_ID.toString()).jti("jti-logout").issuedAt(Instant.now()).expiresAt(expiresAt).build());
+
+        mockMvc.perform(post("/api/auth/logout").header(HttpHeaders.AUTHORIZATION, "Bearer validAt"))
+                .andExpect(status().isNoContent());
+
+        org.mockito.Mockito.verify(tokenUseCase).logout(null, "jti-logout", expiresAt);
     }
 
     @Test

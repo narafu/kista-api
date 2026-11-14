@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// SecurityConfig + RootSecurityPolicy 조합의 root 라우트 인가 결과 — 규칙 순서(구체 경로가 /api/auth/** permitAll보다 먼저)를 잠근다
+// SecurityConfig + RootSecurityPolicy 조합의 root 라우트 인가 결과 — 공개 경로는 명시한 것뿐이고 나머지 /api/auth/**는 인증이 필요하다
 @WebMvcTest(RootSecurityPolicyTest.ProbeController.class)
 @Import({SecurityConfig.class, RootSecurityPolicy.class, JwtAuthFilter.class, InternalTokenAuthFilter.class,
         RootSecurityPolicyTest.ProbeController.class})
@@ -65,6 +65,18 @@ class RootSecurityPolicyTest {
 
         @PostMapping("/api/auth/logout")
         String logout() { return "logout"; }
+
+        @PostMapping("/api/auth/kakao/callback")
+        String kakaoCallback() { return "login"; }
+
+        @PostMapping("/api/auth/refresh")
+        String refresh() { return "refresh"; }
+
+        @GetMapping("/api/auth/status-stream")
+        String statusStream() { return "status"; }
+
+        @PostMapping({"/api/auth/dev-token", "/api/auth/dev-approve/{userId}"})
+        String dev() { return "dev"; }
 
         @PostMapping("/api/client-errors")
         String clientErrors() { return "ok"; }
@@ -107,9 +119,16 @@ class RootSecurityPolicyTest {
     }
 
     @Test
-    void authWildcard_anonymousIs200_butWithdrawIs401() throws Exception {
-        mockMvc.perform(get("/api/auth/probe")).andExpect(status().isOk());
+    void authRoutes_onlyListedPathsAreOpen() throws Exception {
+        for (String open : new String[]{"/api/auth/kakao/callback", "/api/auth/refresh", "/api/auth/logout",
+                "/api/auth/dev-token", "/api/auth/dev-approve/00000000-0000-0000-0000-000000000001"}) {
+            mockMvc.perform(post(open)).andExpect(status().isOk());
+        }
+        // 목록에 없는 /api/auth 경로는 새로 생겨도 기본이 인증 필요다
+        mockMvc.perform(get("/api/auth/probe")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/auth/status-stream")).andExpect(status().isUnauthorized());
         mockMvc.perform(delete("/api/auth/me")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/auth/refresh")).andExpect(status().isUnauthorized()); // 메서드 불일치
     }
 
     @Test

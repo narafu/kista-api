@@ -12,6 +12,7 @@ import com.kista.api.user.application.port.output.RefreshTokenPort;
 import com.kista.api.user.application.port.output.UserPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,7 +29,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 class TokenService implements TokenUseCase {
 
-    private static final Duration RT_TTL = Duration.ofDays(5); // 리프레시 토큰 유효 기간
+    private static final Duration RT_TTL = TokenConstants.RT_TTL; // 리프레시 토큰 유효 기간
     private static final Duration AT_TTL = TokenConstants.AT_TTL; // AT 수명 — 블랙리스트 등재 기간
     // RTR 동시 경쟁 허용 윈도우 — 이 안에 회전된 RT를 재제시하면 동시 요청 패자로 허용
     static final Duration RT_GRACE = Duration.ofSeconds(60);
@@ -101,18 +102,18 @@ class TokenService implements TokenUseCase {
     }
 
     @Override
-    public void logout(String rawRefreshToken, String jti, Instant atExpiresAt) {
-        String hash = sha256Hex(rawRefreshToken);
-        refreshTokenPort.findByTokenHash(hash).ifPresent(rt -> {
-            refreshTokenPort.deleteByTokenHash(hash);
-            // AT jti만 차단 — 재로그인 후 새 AT는 영향 없음
-            if (jti != null && atExpiresAt != null) {
-                Duration remaining = Duration.between(Instant.now(clock), atExpiresAt);
-                if (remaining.isPositive()) {
-                    blacklistPort.addJti(jti, remaining);
-                }
+    public void logout(@Nullable String rawRefreshToken, @Nullable String jti, @Nullable Instant atExpiresAt) {
+        if (rawRefreshToken != null) {
+            String hash = sha256Hex(rawRefreshToken);
+            refreshTokenPort.findByTokenHash(hash).ifPresent(rt -> refreshTokenPort.deleteByTokenHash(hash));
+        }
+        // RT 쿠키가 없거나 이미 회전·삭제됐어도 제시된 AT는 차단한다 — jti만 막으므로 재로그인 후 새 AT는 영향 없음
+        if (jti != null && atExpiresAt != null) {
+            Duration remaining = Duration.between(Instant.now(clock), atExpiresAt);
+            if (remaining.isPositive()) {
+                blacklistPort.addJti(jti, remaining);
             }
-        });
+        }
     }
 
     @Override

@@ -287,3 +287,11 @@ fable-ui 요청 반영(2026-11-13, `cross-repo.md` B절 U1·U2): ① 토큰에 `
 - U1의 PENDING 차단은 kista-ui가 승인 대기 사용자의 허용 경로 목록을 줘야 한다(`cross-repo.md` E절). 목록이 없으면 PENDING 차단만 빼고 나머지(로그아웃 jti 차단, 내부 토큰 상수 시간 비교, 공개 경로 명시)를 한다. **목록은 왔다(2026-11-14, `cross-repo.md` G절 끝 "ui 회신"의 13 U1 행, 경로 9개).** `GET /api/auth/status-stream`은 ui가 먼저 지우는 경로라 ui 배포 전까지는 허용 목록에 둔다.
 
 배포: U8(오류 상태 코드 409·502)은 kista-ui가 400에 기대는 곳이 없다는 확인이 `cross-repo.md`에 있을 때만 한다. 없으면 하지 않는다. **확인은 왔다(2026-11-14, 같은 표의 13 U8 행: 400 분기 0건).** 조건이 하나 붙는다: ui의 "서버 재시작 안내"가 502·503을 상태 코드로 묶으므로, 증권사 오류의 502는 응답 본문의 `ErrorCode`로 재시작과 구분돼야 한다. 502로 바꾸는 예외가 `ErrorCode` 없이 나가면 U8을 배포하지 않는다(기존 상수 이름은 바꾸지 않고, 맞는 것이 없으면 새 상수를 더한다). U1은 인증 경로라 배포 뒤 로그인·토큰 갱신·로그아웃을 운영에서 한 번씩 해 본다(사용자에게 요청).
+
+U1 실행 결과(2026-11-15, S12 — PENDING 차단 제외):
+
+- 작은 수정 5건을 했다. 5절 표의 줄 번호는 실행 시점에 `AuthController:108-110`, `InternalTokenAuthFilter:43`, `RootSecurityPolicy:28-36`, `TokenService:31`·`RefreshTokenCookieHelper:14`, `SecurityConfig:55-58`이었다.
+- 로그아웃 jti: 표가 적은 "RT 쿠키 없이 로그아웃"에 더해, RT 쿠키가 있어도 DB에 그 RT가 없으면(이미 회전·삭제) jti를 막지 않던 것(`TokenService.logout`의 `ifPresent` 안쪽)도 같이 고쳤다.
+- 공개 경로 명시: 공개는 `POST /api/auth/{kakao/callback,refresh,logout}`과 local 전용 `POST /api/auth/dev-*`·`dev-approve/*`뿐이다. 목록에 없는 `/api/auth/**`는 `anyRequest().authenticated()`가 받는다(전에는 없는 경로가 404, 지금은 토큰 없으면 401). `/api/trades/stream` 줄은 `anyRequest`와 같은 결과라 지웠다.
+- **PENDING 차단은 남았다.** 넣을 때 `RootSecurityPolicy`에 승인 대기 허용 경로(`cross-repo.md` G절 "ui 회신"의 13 U1 행)를 `authenticated()`로 적고 `SecurityConfig`의 마지막 규칙을 `hasAnyRole`로 바꾼다. 공개 목록은 이미 명시형이라 그대로 둔다.
+- 범위 밖으로 남긴 것(사용자 승인 대기, `cross-repo.md` H절): ui 로그아웃 프록시가 `Authorization`을 보내지 않아 jti 차단이 실제로는 한 번도 일어나지 않는다. ui가 AT를 싣기 전에 api가 `POST /api/auth/logout`을 `anonymousFallbackMatchers`에 넣어야 한다(지금은 만료 AT가 실리면 `JwtAuthFilter`가 401로 끊어 RT 삭제를 건너뛴다. `RootSecurityPolicyTest.authRoutes_invalidTokenStays401WithErrorBody`가 그 동작을 고정하고 있어 테스트 기대값도 함께 바뀐다).

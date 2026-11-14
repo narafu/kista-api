@@ -14,6 +14,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.List;
 
 @Slf4j
@@ -40,7 +42,9 @@ public class InternalTokenAuthFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         String token = request.getHeader(InternalApiProperties.TOKEN_HEADER);
-        if (internalApiToken.isBlank() || !internalApiToken.equals(token)) {
+        // 상수 시간 비교 — 일치한 접두사 길이가 응답 시간으로 새지 않게 한다
+        if (internalApiToken.isBlank() || token == null || !MessageDigest.isEqual(
+                internalApiToken.getBytes(StandardCharsets.UTF_8), token.getBytes(StandardCharsets.UTF_8))) {
             log.warn("내부 API 인증 실패: uri={}", request.getRequestURI());
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             return;

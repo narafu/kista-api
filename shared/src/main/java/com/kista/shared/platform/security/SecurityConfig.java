@@ -52,9 +52,9 @@ public class SecurityConfig {
                     policies.orderedStream().forEach(policy -> policy.contribute(auth));
                     auth.anyRequest().authenticated();
                 })
-                // InternalTokenAuthFilter는 JWT 필터보다 먼저 실행 (내부 API는 JWT 불필요)
+                // 실행 순서는 JwtAuthFilter → InternalTokenAuthFilter다(아래 두 줄이 jwt를 internal 앞에 끼운다).
+                // 내부 호출은 Bearer 없이 와서 JWT 필터를 그대로 지나고, 내부 필터는 /api/internal/** 밖에서 건너뛴다
                 .addFilterBefore(internalTokenFilter, UsernamePasswordAuthenticationFilter.class)
-                // JWT 필터를 Spring Security 체인 내부에만 등록
                 .addFilterBefore(jwtFilter, InternalTokenAuthFilter.class)
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((req, res, e) ->

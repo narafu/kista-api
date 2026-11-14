@@ -60,7 +60,7 @@ class TokenServiceTest {
         assertThat(saved.tokenHash()).isEqualTo(TokenService.sha256Hex(rawToken));
         assertThat(saved.id()).isNull();
         assertThat(saved.rotatedAt()).isNull(); // 신규 발급 — 미회전
-        assertThat(saved.expiresAt()).isAfter(Instant.now(clock).plus(Duration.ofHours(119)));
+        assertThat(saved.expiresAt()).isEqualTo(Instant.now(clock).plus(Duration.ofDays(5))); // 쿠키 maxAge와 같은 값
     }
 
     // 정상 갱신: 미회전 RT → markRotated + 새 RT 발급
@@ -187,6 +187,26 @@ class TokenServiceTest {
 
         verify(refreshTokenPort).deleteByTokenHash(hash);
         verify(blacklistPort, never()).addJti(any(), any()); // jti 없으면 블랙리스트 생략
+    }
+
+    @Test
+    void logout_withoutRefreshToken_stillBlacklistsJti() {
+        String jti = UUID.randomUUID().toString();
+
+        tokenService.logout(null, jti, Instant.now(clock).plusSeconds(3600)); // RT 쿠키 없이 AT만 제시
+
+        verify(blacklistPort).addJti(eq(jti), any());
+        verify(refreshTokenPort, never()).deleteByTokenHash(any());
+    }
+
+    @Test
+    void logout_unknownRefreshToken_stillBlacklistsJti() {
+        String jti = UUID.randomUUID().toString();
+        given(refreshTokenPort.findByTokenHash(any())).willReturn(Optional.empty());
+
+        tokenService.logout("alreadyRotatedOrGone", jti, Instant.now(clock).plusSeconds(3600));
+
+        verify(blacklistPort).addJti(eq(jti), any());
     }
 
     @Test

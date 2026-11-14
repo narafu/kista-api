@@ -11,9 +11,9 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 // root 프로세스(kista-api·kista-scheduler) 고유 공개/인증 라우트 규칙 — platform.security.SecurityConfig가
-// 공통 규칙(/api/internal/**, /api/admin/**) 뒤에 이 정책을 적용한다. 규칙 순서는 첫 매치 우선이라
-// 구체 경로(status-stream·me·approval-requests)를 /api/auth/** permitAll보다 먼저 둔다.
-// principal을 읽는 /api/auth 핸들러(me·approval-requests 등)는 permitAll이면 토큰 없을 때 principal이 null로 들어와 500이 되므로 authenticated로 둔다.
+// 공통 규칙(/api/internal/**, /api/admin/**) 뒤에 이 정책을 적용한다. 여기에는 공개 경로만 적는다 —
+// 적지 않은 경로는 SecurityConfig의 anyRequest().authenticated()가 받으므로 규칙 순서에 기대지 않고,
+// /api/auth 아래에 새 핸들러가 생겨도 기본이 인증 필요다.
 @Component
 public class RootSecurityPolicy implements SecurityRoutePolicy {
 
@@ -28,16 +28,14 @@ public class RootSecurityPolicy implements SecurityRoutePolicy {
     public void contribute(AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry registry) {
         registry.requestMatchers("/telegram/webhook").permitAll();
         registry.requestMatchers(CLIENT_ERRORS).permitAll();
-        registry.requestMatchers("/api/auth/status-stream").authenticated(); // 상태 SSE 연결은 인증 필수
-        registry.requestMatchers("/api/trades/stream").authenticated(); // 매매 SSE 연결은 인증 필수
-        registry.requestMatchers(HttpMethod.DELETE, "/api/auth/me").authenticated(); // 회원 탈퇴는 인증 필수
-        registry.requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated(); // 내 정보 — principal 필수(없으면 getById(null) 500)
-        registry.requestMatchers(HttpMethod.POST, "/api/auth/approval-requests").authenticated(); // 승인 재신청 — principal 필수
-        registry.requestMatchers("/api/auth/**").permitAll();
+        // 토큰 없이 불러야 하는 인증 경로 — 로그인·갱신(RT 쿠키)·로그아웃
+        registry.requestMatchers(HttpMethod.POST, "/api/auth/kakao/callback", "/api/auth/refresh", "/api/auth/logout").permitAll();
+        // DevAuthController(local 프로파일 전용) — 그 밖의 프로파일에는 핸들러가 없어 404
+        registry.requestMatchers(HttpMethod.POST, "/api/auth/dev-*", "/api/auth/dev-approve/*").permitAll();
         registry.requestMatchers(MARKET, META, RUNTIME_CONFIG).permitAll();
     }
 
-    // /api/auth/**는 permitAll이지만 /me 등이 principal을 읽어 넣지 않는다 — 무효 토큰은 계속 401(TOKEN_* body)
+    // 공개 인증 경로(로그인·갱신·로그아웃)는 넣지 않는다 — 무효 토큰은 계속 401(TOKEN_* body)
     @Override
     public List<RequestMatcher> anonymousFallbackMatchers() {
         return List.of(CLIENT_ERRORS, MARKET, META, RUNTIME_CONFIG);

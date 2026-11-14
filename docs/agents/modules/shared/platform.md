@@ -12,12 +12,12 @@
 
 ### 보안·필터 (SecurityConfig·JWT·내부 인증·CORS)
 - **필터 이중 등록 방지**: `@Component` Filter + `addFilterBefore()` 조합은 `FilterRegistrationBean.setEnabled(false)` 필수. `SecurityConfig`에 새 Filter를 추가하면 `@Import(SecurityConfig.class)`를 쓰는 **모든** `@WebMvcTest`에도 그 Filter를 `@Import`한다(누락 시 `NoSuchBeanDefinitionException`이 다른 테스트까지 전파)
-- **내부 인증**: `/api/internal/**`는 `X-Internal-Token`을 `INTERNAL_API_TOKEN`과 대조하고(`hasRole("INTERNAL")`, `InternalTokenAuthFilter`는 JWT 필터보다 먼저) 빈값이면 기동 실패한다. `@WebMvcTest` 패턴: `@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})` + `@TestPropertySource(properties = "internal.api.token=test-token")` + `.header("X-Internal-Token", "test-token")` (`FidaOrderControllerTest` 참고)
+- **내부 인증**: `/api/internal/**`는 `X-Internal-Token`을 `INTERNAL_API_TOKEN`과 대조하고(`hasRole("INTERNAL")`, `InternalTokenAuthFilter`는 JWT 필터 뒤) 빈값이면 기동 실패한다. `@WebMvcTest` 패턴: `@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})` + `@TestPropertySource(properties = "internal.api.token=test-token")` + `.header("X-Internal-Token", "test-token")` (`FidaOrderControllerTest` 참고)
 - **JWT(ES256)**: `JwtAuthFilter`는 principal을 `UUID`로 저장하고 catch 절은 `Exception`이다(`JwtException`만 잡으면 NPE·IAE가 익명 사용자 → 403). `JwtDecoder` @Bean은 `JwtDecoderConfig`에 분리한다(`SecurityConfig`에 두면 `JwtAuthFilter` 순환 참조로 기동 실패)
 - **인증 실패 코드**: `SecurityConfig`에 `.exceptionHandling()` + `authenticationEntryPoint`를 반드시 설정한다(미설정 시 401 대신 403)
 - **CORS**: `CORS_ALLOWED_ORIGINS` 빈 목록이면 기동 실패(trading-core만 비-prod 기본값 `http://localhost:3000`). allowedMethods에 **PATCH 필수**(미포함 시 전략 중지/재개 등 PATCH 403)
 - **라우트 규칙 순서(첫 매치 우선)**: 공통 permitAll → `/api/internal/**` → `/api/admin/**` → 셸 기여 `SecurityRoutePolicy` → `anyRequest().authenticated()` — 셸 정책이 admin/internal을 permitAll로 뚫지 못하게. 프로세스 고유 permitAll은 `SecurityConfig`에 쓰지 말고 셸 정책으로 기여한다 (가드: `SecurityConfigOrderingTest`). permitAll 경로를 검증하는 `@WebMvcTest`는 해당 정책도 `@Import`
-- **익명 폴백**: `SecurityRoutePolicy.anonymousFallbackMatchers()` 경로에서만 무효 Bearer를 401 대신 익명으로 통과시킨다(만료 AT 쿠키가 남은 비로그인 사용자의 강제 로그아웃 방지). principal을 읽는 permitAll 경로(`/api/auth/**`의 `/me` 등)는 넣지 않는다
+- **익명 폴백**: `SecurityRoutePolicy.anonymousFallbackMatchers()` 경로에서만 무효 Bearer를 401 대신 익명으로 통과시킨다(만료 AT 쿠키가 남은 비로그인 사용자의 강제 로그아웃 방지). 공개 인증 경로(로그인·갱신·로그아웃)는 넣지 않는다
 - ADMIN 권한 관리(seed·`/api/admin/**`·audit_logs) → `docs/agents/modules/api/admin.md`
 
 ### AES-256 암호화 위치·컬럼 크기
