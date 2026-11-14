@@ -166,7 +166,7 @@ ui 쪽 변경 참고: ui 지침서 10의 태스크 3·D4(크립토 지표 조건
 
 - **지침서 10개 전부 작성 완료**: 00 로드맵, 01 헥사고날, 02 영속·DTO, 03 전략 축, 04 브로커, 05 통합·모듈, 06 배치 오케스트레이션, 07 테스트 전략, 08 매매 공식, 09 문서·불필요 파일, 10 UI 계약. 원칙 문서 `ui-api-principles.md`.
 - 남은 Fable 작업: 없음(검토 단계 종료). 이후는 실행 세션(Opus/Sonnet)이 `guides/00-roadmap.md`의 묶음을 골라 진행한다.
-- **사용자 답을 기다리는 것**: ① 09 8절 승인 A~G(문서·파일 삭제 — S8의 시작 조건) ② 06 3절 D1~D3(개장 대상 확정 시각, 하트비트 하루 1회, 수동 실행 차단 구간. 실행을 막지는 않고 배포 전 확인).
+- **사용자 답을 기다리는 것**: ① ~~09 8절 승인 A~G~~ 승인됨, S8 완료(2026-11-14) ② 06 3절 D1~D3(개장 대상 확정 시각, 하트비트 하루 1회, 수동 실행 차단 구간. 실행을 막지는 않고 배포 전 확인).
 - 이번 세션에서 코드로 확인한 것(06): 거래일 경계 규칙이 호출처마다 다르다(세션 기반 `SessionTradeDates` vs 04:30 고정 `DstInfo.nextTradeDate` — 조기 마감일 02:30~04:30 구간에서 답이 갈린다). `TradingService.executeBatch(contexts)`(주문 시각 대기 경로)는 스케줄러 호출처가 없어 보인다. `DstInfo`에 DST 고정 시각표와 세션 기반 두 모델이 공존한다.
 - 09 작성 중 확인: `V1__init.sql` 2개의 주석이 `deploy/server/schema-reorg/`를 가리킨다 — 디렉토리를 지워도 이 주석은 고치면 안 된다(체크섬). `findings/06`의 "Java 소스 `CQ-` 인용 0건"은 틀렸다(테스트 `@DisplayName`·주석·`V17` 마이그레이션에 있다. 그대로 둔다).
 - 진행 중 서브에이전트: 없음.
@@ -255,7 +255,7 @@ findings 09가 "같은 trading 코드가 web·worker 두 프로세스에서 돌 
 | 06 | 배치 오케스트레이션: 단계 3개(자지 않는 배치), 판정표 순수 함수, 스케줄러 하나, 시각 모델 하나, DCA 실행기는 둘 유지 | findings 03 C·D, 스케줄러·`TradingService`·`DstInfo` 직접 확인 | **작성 완료(2026-11-13)** `guides/06-batch-orchestration.md`. 사용자 결정 D1~D3 대기(실행은 막지 않음) |
 | 07 | 테스트 전략: 종류 4개(규칙·흐름·저장·계약), 규칙을 아래로, fixture 단일화, 보안·오류 상태는 정책 테스트 한 곳 | findings 04 | **작성 완료(2026-11-13)** `guides/07-test-strategy.md`. T1만 지금 시작 가능 |
 | 08 | 매매 공식 대조 판정 | docs/reference/quantstack, findings 08, 커널 코드 직접 확인 | **작성 완료** `guides/08-formulas.md`. **사용자 결정 F1·F3·F4·F6·F7·F8 대기**. F1(별%를 금액 자릿수로 반올림)은 결함 판정 |
-| 09 | 문서 구조 개편과 불필요 파일 삭제: 남기는 기준 2문, `decisions.md` 한 곳, 크기 예산 CI 가드, archive 5.6MB 삭제 | findings 06, cross-repo A5·A6·결정 2·6 | **작성 완료(2026-11-13)** `guides/09-docs-and-dead-files.md`. **사용자 승인 A~G 대기** |
+| 09 | 문서 구조 개편과 불필요 파일 삭제: 남기는 기준 2문, `decisions.md` 한 곳, 크기 예산 CI 가드, archive 5.6MB 삭제 | findings 06, cross-repo A5·A6·결정 2·6 | **작성 완료(2026-11-13)** `guides/09-docs-and-dead-files.md`. 승인 A~G 받음, **단계 1(S8) 실행 완료(2026-11-14)** — 로드맵 S8 칸 |
 | 10 | UI 계약: 스펙 required·BigDecimal(T1·T2 최우선), 목록 규약(객체 봉투, 커서 1종), 메타 통합, 상태 플래그, 오류 문구, 가계부 집계 | cross-repo B, ui-api-principles.md, findings 07 | **작성 완료** `guides/10-ui-contract.md`. T8(가계부 집계)은 fable-ui 명세 대기 |
 
 재심은 주제별로 한다: findings 05에서 그 주제에 걸리는 결정만 꺼내 지침서에 재심 결과를 적는다.

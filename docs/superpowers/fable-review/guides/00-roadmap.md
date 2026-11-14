@@ -46,7 +46,7 @@
 
 | 묶음 | 내용 | 지침서 | 모델 | 주의 |
 |---|---|---|---|---|
-| **S8** | 문서 단계 1: `decisions.md` 작성 → archive·backlog·history·schema-reorg 삭제 → 작은 수정 → 모듈 문서·항상 로드 문서 축소 → 크기 예산 가드 | 09 4절, T1~T7 | Opus(T1·T4·T6), Sonnet(나머지) | **사용자 승인(09 8절 A~G) 뒤.** 가장 먼저 하는 편이 좋다(뒤따르는 세션 전부의 자동 로드 비용이 준다). 문서를 건드리는 다른 묶음과 동시에 돌리지 않는다 |
+| **S8** ✅ 완료(2026-11-14, 배포할 코드 변경 없음 — gson 직접 의존 제거·index.html 삭제는 다음 배포에 같이 나감) | **결과**: T1 `c2484085a`(decisions.md), T2·T3·T6 `ac278e583`(archive 179파일 등 삭제, 태그 `archive/docs-2026-11` 로컬만 — push는 사용자 요청 시, 항상 로드 5파일 45.4→25.5KB, 리소스 CLAUDE.md → `.claude/rules/flyway.md`), T3 코드 `74d59302e`(gson 핀 제거 → BOM 2.13.2, mockwebserver 카탈로그, index.html 삭제, 메리츠·토스 주석 — Q-10), T4 `3cdf3866b`·`7fae356ae`·`2f0059277`(trading 35→6.3KB, stats 20→4.3KB, platform 18→7.4KB, platform의 거래일 경계 드리프트 수정), T5 `7b8b9e9d2`(모듈 10개 예산 충족, 벤더 문서 `docs/agents/vendors/`), T7 `9ae228828`(예산 가드 bats). T8: memory 재론 금지 5파일 → `reference_decisions_and_fable_review.md` 포인터 1개, 로컬 잔재(`bin/`·`logs/*.tmp`·`trading-core/logs/`·빈 worktrees 디렉토리·레포 밖 `ARCHITECTURE.md`) 삭제, `.superpowers/`는 미추적 SDD 기록이 있어 남김(사용자 판단). 전체 테스트·bats 32건 통과, jar에 CLAUDE.md 0. T9는 N11(단계 2 마감). 원래 내용: 문서 단계 1: `decisions.md` 작성 → archive·backlog·history·schema-reorg 삭제 → 작은 수정 → 모듈 문서·항상 로드 문서 축소 → 크기 예산 가드 | 09 4절, T1~T7 | Opus(T1·T4·T6), Sonnet(나머지) | **사용자 승인(09 8절 A~G) 뒤.** 가장 먼저 하는 편이 좋다(뒤따르는 세션 전부의 자동 로드 비용이 준다). 문서를 건드리는 다른 묶음과 동시에 돌리지 않는다 |
 | **S9** | 테스트 fixture 치환과 생성자 가드 | 07 T1 | Sonnet | 테스트 파일 전반을 건드린다. S3·S6과 동시에 돌리지 않는다 |
 | **S10** | 배치 판정표와 표 기반 테스트(기존 코드 불변) → 마감 리포트 단계 분리 | 06 T1·T2 | Opus | T2는 주문 경로. 매매 시간대 밖 배포, 2거래일 관찰 |
 
