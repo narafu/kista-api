@@ -17,7 +17,7 @@
 - 업비트: 04는 "매매 어댑터만 삭제, 김치 프리미엄용 공개 시세는 남긴다"였다. 지표가 사라지므로 `stats/adapter/out/upbit`도 지운다. **업비트 삭제 전체를 이 지침서로 옮긴다**(04 단계 A에는 KIS만 남는다).
 - 04의 2-6절(코인 거래소 포트 정리)·단계 E의 코인 부분, 06의 2-6절·T6·D2의 코인 틱 핑, 12의 B3·D4·F7·F8, 13의 코인 지표 View 직행은 대상이 사라진다.
 
-답을 기다리는 것:
+**확정(2026-11-14, 사용자)**: C1은 사용자가 ETH 전략을 내리는 시점에 맞춘다(시점은 사용자가 정하고 직접 내린다). C2~C5는 권고대로. 추가 지침: **DCA 종목에 BITO·EETH를 넣는다**(2-4절, T0). 아래 표는 처음 낸 권고다.
 
 | # | 내용 | 권고 |
 |---|---|---|
@@ -27,7 +27,7 @@
 | C4 | `/api/meta`의 `brokers[].market`·`minOrderAmount`·`amountScale`과 `Market` enum. 코인이 빠지면 시장이 미국 주식 하나다 | `Market` enum과 메타 필드를 지운다(단계 B). kista-ui가 그 필드를 먼저 걷어야 한다 |
 | C5 | `ErrorCode.BROKER_IP_NOT_ALLOWED` 삭제. `constraints.md`의 "ErrorCode 상수 삭제 금지"의 예외다 | 삭제. 코인 거래소 허용 IP 전용이고 kista-ui의 사용처도 함께 사라진다 |
 
-C1의 사전 작업이 끝나기 전에는 단계 A 이후를 시작하지 않는다. 단계 P·U와 전수표 작성은 지금 해도 된다.
+C1의 사전 작업이 끝나기 전에는 단계 A 이후를 시작하지 않는다. 단계 P·U와 전수표 작성, T0(종목 추가)은 지금 해도 된다. T0을 먼저 배포해야 사용자가 ETH 전략을 내리기 전에 EETH DCA로 옮길 수 있다.
 
 ## 1. 현재 구조와 범위
 
@@ -82,6 +82,28 @@ C1의 사전 작업이 끝나기 전에는 단계 A 이후를 시작하지 않�
 - `accounts.account_no` NULL 허용, `api_key_expires_at`(메리츠·토스가 쓴다).
 - `AssetClass.CRYPTO`(C3), `platform`의 `crypto` 패키지(AES 암호화, 이름만 같다).
 
+### 2-4. 추가: DCA 종목 BITO·EETH (2026-11-14 사용자 지침)
+
+둘 다 미국 상장 ETF(NYSE Arca)라 주식 DCA 경로를 그대로 탄다. 코인 코드와 무관하고 삭제보다 먼저 배포한다.
+
+고칠 곳(전수, `QLD` grep 기준):
+
+| 파일 | 내용 |
+|---|---|
+| `shared/.../kernel/StrategyTicker.java` | 상수 2개. 모양은 `QLD(BigDecimal.ZERO, "…", Market.US_STOCK)`와 같다. 설명 문자열은 발행사의 현재 공식 명칭을 확인해 적는다 |
+| `shared/.../kernel/StrategyType.java:31` | DCA 허용 종목 `EnumSet`과 `:18` 주석. 다른 전략 종류에는 넣지 않는다 |
+| `shared/.../kernel/TradingPolicySettings.java:45` | DCA 허용 종목 기본값 |
+| `trading-core/.../meritz/MeritzExchangeRegistry.java` | 거래소 매핑. QLD(`"0066","AX"`)와 같을 가능성이 높지만 **메리츠 계좌로 두 종목의 현재가를 1회씩 조회해 확인한 뒤** 넣는다(`meritz-api.md:42`의 실측 목록도 갱신) |
+| `trading-core/.../kis/KisExchangeRegistry.java` | KIS가 아직 남아 있으면 AMEX 매핑(`"AMEX","AMS"`) 추가. 04 단계 A가 먼저 끝났으면 없다 |
+| 테스트 | `StrategyTypeCapabilityTest:69`, `TradingPolicySettingsTest:55,112`(둘 다 `containsExactly`), `MeritzExchangeRegistryTest:20` |
+| 문서 | `README.md:13`, `meritz-api.md:42` |
+
+자동으로 따라오는 것: `/api/meta`(`StrategyTicker.values()`), 토스(심볼이 enum 이름), Alpaca(심볼이 enum 이름. 두 종목 모두 `tradable`, 2026-11-14 실호출). 벤치마크의 ETF 목록(`EtfBenchmarkSymbol`)은 별개라 건드리지 않는다.
+
+**운영 정책은 자동으로 바뀌지 않는다.** 저장된 정책 JSON의 DCA 허용 종목 배열은 backfill 대상이 아니다(`TradingPolicySettingsPersistenceAdapter:60-85`는 빠진 enum 키만 채운다). 배포 뒤 사용자가 관리자 설정 화면에서 두 종목을 허용 목록에 넣는다. 화면에서 안 되면 `db/migration-trading`의 jsonb 수정 1건으로 한다.
+
+알아 둘 것: EETH는 거래가 적다(2026-11-13 통합 거래량 56,160주, `iex` 100주). 주문 가격의 기준이 되는 현재가는 계좌 증권사에서 읽으므로(지침서 14의 3-5절) 문제가 없고, 화면의 현재가는 15분 지연 통합 시세가 된다. 지침서 14의 전환(T3) 전에는 지금 경로(관리자 토스 시세)가 두 종목을 그대로 준다.
+
 ## 3. 순서
 
 DB에 남은 enum 문자열이 순서를 정한다. `@Enumerated(STRING)` 컬럼과 정책 JSON의 키는 상수가 사라지면 읽는 순간 예외가 난다.
@@ -91,7 +113,7 @@ DB에 남은 enum 문자열이 순서를 정한다. `@Enumerated(STRING)` 컬럼
 
 | 단계 | 내용 | 누가 |
 |---|---|---|
-| **P** 사전 | ① 사용자가 화면에서 ETH DCA 전략 삭제(미체결 취소 포함), 바이낸스·업비트 계좌 삭제 ② 관리자 설정에서 `BINANCE` 비활성, DCA 허용 종목에서 `BTC`·`ETH` 제거 ③ 운영 조회로 확인: 살아 있는 코인 계좌·전략 0, 코인 미체결 주문 0, 미완료 `event_publication` 중 코인 이벤트 0 ④ `git tag archive/crypto` | 사용자, 실행 세션(확인) |
+| **P** 사전 | (T0 배포 뒤, 사용자가 정한 시점에) ① 사용자가 화면에서 ETH DCA 전략 삭제(미체결 취소 포함), 바이낸스·업비트 계좌 삭제 ② 관리자 설정에서 `BINANCE` 비활성, DCA 허용 종목에서 `BTC`·`ETH` 제거 ③ 운영 조회로 확인: 살아 있는 코인 계좌·전략 0, 코인 미체결 주문 0, 미완료 `event_publication` 중 코인 이벤트 0 ④ `git tag archive/crypto` | 사용자, 실행 세션(확인) |
 | **U** UI | kista-ui가 코인 화면·위젯·메타 필드 참조를 걷고 배포한다(`cross-repo.md` G절). API는 아직 그대로라 순서가 안전하다 | fable-ui 실행 세션 |
 | **A** 삭제 | 통째 삭제(2-1) + 분기 제거(2-2, `Market` enum 제외) + Flyway 데이터 정리(4절)를 한 배포로 | 실행 세션 |
 | **B** 정리 | `Market` enum과 메타 필드 삭제(C4), `strategy_dca_rule.execution_hour` 컬럼 삭제 | 실행 세션 |
@@ -139,6 +161,7 @@ root 스키마는 바꿀 것이 없다. `kista_ref.fear_greed_snapshots`에는 C
 
 | # | 내용 | 모델 | 선행 |
 |---|---|---|---|
+| T0 | DCA 종목 BITO·EETH 추가(2-4절). 메리츠 거래소 코드 실측 → 코드·테스트·문서 → 배포 → 사용자가 관리자 설정에서 허용. 관찰: Mock 계좌로 두 종목 DCA 전략을 만들어 개장 배치 1회 | Sonnet | 없음 |
 | T1 | 전수표: `findings/20`의 목록을 지금 코드와 대조해 파일별 "삭제 / 분기 제거 / 유지"로 확정한다. 추가로 `Upbit|UPBIT|Binance|BINANCE|Crypto|crypto|USDT|BTC|ETH|코인|업비트|바이낸스`를 main·test·resources·docs·`flows.yml`·`.github`·`deploy`·`scripts`에서 grep해 빠진 것을 찾는다. `findings/20`의 "미확인" 3건 중 남은 것(사용자 삭제 cascade가 코인 계좌에서도 같은 경로인지)을 닫는다 | Sonnet | 없음 |
 | T2 | 6절 1번: 주식 DCA 테스트 분리·보강 | Opus | 없음 |
 | T3 | 단계 P ③의 운영 확인 조회(읽기 전용)와 결과 기록. 덤프와 삭제 SQL 초안을 사용자에게 제시(4절) | Opus | 사용자의 단계 P ①② |
@@ -156,6 +179,7 @@ root 스키마는 바꿀 것이 없다. `kista_ref.fear_greed_snapshots`에는 C
 - 코인만 쓰던 것인지 애매한 코드는 호출처를 grep해 주식 경로의 호출이 0이면 지운다. 1곳이라도 있으면 남기고 T1 전수표에 적는다.
 - 주석·로그 문구에만 남은 "코인" 언급은 같은 커밋에서 고친다.
 - 테스트 fixture(`TradingFixtures`)의 코인 헬퍼는 사용처가 0이 되면 지운다.
+- T0에서 메리츠 실측 코드가 QLD와 다르면 실측값을 쓴다. 조회가 실패하면(메리츠가 그 종목을 지원하지 않음) 그 종목을 넣지 않고 `questions.md`에 적는다.
 
 중단 조건(`questions.md`에 적고 멈춘다):
 

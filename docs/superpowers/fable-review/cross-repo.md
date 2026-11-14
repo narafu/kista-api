@@ -237,5 +237,9 @@ fida에 확인:
 | G7 | 마감 리포트와 그 알림이 마감+10분에서 마감+20분으로 늦어진다. 화면에 리포트 예정 시각을 적은 곳이 있으면 고친다. infra `trading-guard.sh`의 시각 창(F3)이 리포트 종료 시각을 포함하는지 확인한다 | 14 T3 | ui·infra: 확인 | 14 D3 |
 | G8 | 운영 secret에서 뺄 키: `TOSS_ADMIN_CLIENT_ID`·`TOSS_ADMIN_CLIENT_SECRET`(14 T5 배포 뒤), `CMC_API_KEY`·`HEARTBEAT_CRYPTO_URL`·업비트 관련 키(15 T4 배포 뒤). 배포 전에 빼면 기동이 실패할 수 있으니 순서를 지킨다. healthchecks.io의 코인 체크 삭제와 토스 관리자 키 폐기는 사용자 작업이다 | 배포 완료를 이 행에 표시 | infra: sops 파일에서 제거 | 14 8절, 15 3절 |
 
+| G9 | DCA 종목에 `BITO`·`EETH`가 추가된다(`/api/meta`의 `tickers`와 DCA 허용 종목). ui가 종목 목록·아이콘·설명을 하드코딩한 곳이 있으면 고친다. 메타만 쓰면 변경 없음 | 15 T0 | ui: 확인 | 15 2-4절 |
+
+2026-11-14 사용자 확정: 14 D1 Alpaca·D2~D3 권고대로, 주문 경로의 현재가는 계좌 증권사(14의 3-5절), 15 C2~C5 권고대로. G5(차트 엔드포인트 인증)는 ui 회신을 여전히 기다린다.
+
 fable-ui·fable-infra 세션이 떠 있지 않아(2026-11-14 새벽) SendMessage로 알리지 못했다. 다음에 그 세션을 열면 이 절부터 읽는다.
 

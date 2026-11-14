@@ -12,17 +12,17 @@
 - 토스는 다른 증권사처럼 주문 브로커로만 남긴다.
 - 공급자는 Twelve Data와 Alpaca 중에서 고른다.
 
-답을 기다리는 것(권고는 2·3절에 근거가 있다):
+**확정(2026-11-14, 사용자)**: D1 Alpaca, D2·D3 권고대로. D4·D5는 "권고대로"와 함께 온 추가 지침으로 고쳤다 — **주문 경로의 현재가는 Alpaca가 아니라 그 계좌의 증권사 시세 API로 읽는다**(3-5절). Alpaca는 화면(대시보드·차트·원장 합산·미리보기)과 확정된 값(전일 종가·확정 종가·일봉)에 쓴다. 아래 표는 처음 낸 권고이고, D4·D5 행은 3-5절이 대체한다.
 
 | # | 내용 | 권고 |
 |---|---|---|
 | D1 | 공급자 | **Alpaca.** 2절 |
 | D2 | 약관. 두 공급자 모두 무료 등급의 화면 표시가 문구상 걸린다(Twelve Data는 "internal non-display usage only", 외부 표시는 월 $149부터. Alpaca는 "cannot redistribute") | Alpaca로 가되 위험을 알고 받아들인다. 벤치마크 지수는 지금도 Alpaca 값을 화면에 보여 주고 있어 새로운 종류의 위험은 아니다. 비인증 공개 엔드포인트 `GET /api/market/candles`를 로그인 필요로 바꿀지는 fable-ui 확인 뒤 정한다(`cross-repo.md` G절) |
 | D3 | 확정 종가의 출처가 바뀐다. 운영 원장 종가 68건(2026-10-17~11-12)을 Alpaca 통합 일봉과 대조하면 SOXL·USD·QLD 49건은 전부 일치하고 **TQQQ는 19거래일 중 11일이 0.01~0.02달러 다르다**(`findings/21` 9절. 11-12 종가는 Alpaca와 Twelve Data가 서로 일치). 마감 리포트 시각은 마감+10분에서 **마감+20분**으로 늦춘다(무료 등급은 최근 15분 통합 시세를 주지 않는다) | 진행. 실계좌 체결은 증권사 체결 조회에서 오므로 종가는 평가금액·INFINITE 리버스 판정·VR 롤오버·Mock 체결 판정에만 쓰인다. 사용자가 말한 "근사치면 된다"의 범위 안이다 |
-| D4 | 접수 직전 현재가가 "증권사 실시간"에서 "IEX 실시간과 15분 지연 통합 시세 중 더 최근 체결"로 바뀐다 | 진행. 이 값은 BUY 가격 상한(현재가 × 1.05) 계산에만 쓰인다 |
-| D5 | 시세 출처를 하나로 줄이고 계좌 증권사 시세 폴백(메리츠 시세 API)을 지운다. Alpaca가 접수 창 내내 죽으면 그날 주문이 없다(관리자 알림은 간다) | 진행. 3-4절. 접수 창을 실제로 놓치는 일이 생기면 그때 메리츠 계좌 시세를 2차로 붙인다 |
+| D4 | ~~접수 직전 현재가가 "증권사 실시간"에서 "IEX 실시간과 15분 지연 통합 시세 중 더 최근 체결"로 바뀐다~~ | **개정**: 주문 경로의 현재가는 계좌 증권사 실시간 값이다(3-5절). 처음 권고의 근거 "BUY 가격 상한에만 쓰인다"는 틀렸다 — DCA BUY 기준가와 VR 기준가에도 쓰인다 |
+| D5 | ~~시세 출처를 하나로 줄이고 계좌 증권사 시세 폴백(메리츠 시세 API)을 지운다~~ | **개정**: 폴백 체인은 그대로 지운다. 메리츠·토스의 현재가 조회는 폴백이 아니라 주문 경로의 1차 출처로 남는다. 값마다 출처는 하나다(3-5절) |
 
-답이 없으면 권고대로 T1·T2(코드 추가와 병행 비교)까지 진행하고, T3(전환)은 D1·D3·D4·D5의 답을 받은 뒤 한다.
+사용자 결정은 전부 받았다. T3(전환)의 남은 조건은 T2 통과뿐이다.
 
 ## 1. 현재 구조와 문제
 
@@ -89,10 +89,42 @@ Alpaca를 권고하는 이유:
 | 겹 | 지금 | 판정 |
 |---|---|---|
 | 접수 직전 현재가 재조회(`reloadPlacementPrices`) | 자동 실행에서는 마감 30분 전에 발화해 대기가 0에 가깝다. 첫 조회 몇 초 뒤에 같은 값을 다시 읽는다. 의미가 있는 것은 수동 실행이 주문 시각까지 기다릴 때뿐이다 | 06 T2(마감 접수 단계에 잠이 없다) 뒤에 지운다. 단계 하나에 조회 하나 |
-| 출처 체인(관리자 토스 → 관리자 KIS → 계좌 어댑터 → 종목별 단건) | 출처가 여럿이라 생긴 구조다. 폴백이 운영에서 실제로 일어났다는 근거는 없다(`findings/19` 5-3절) | 출처 하나, 묶음 1회 호출, 어댑터 안에서 1회 재시도. 실패하면 대체값 없이 실패 |
+| 출처 체인(관리자 토스 → 관리자 KIS → 계좌 어댑터 → 종목별 단건) | 출처가 여럿이라 생긴 구조다. 폴백이 운영에서 실제로 일어났다는 근거는 없다(`findings/19` 5-3절) | 값마다 출처 하나(현재가는 계좌 증권사, 종가는 Alpaca. 3-5절), 어댑터 안에서 1회 재시도. 실패하면 대체값 없이 실패 |
 | 확정 종가가 없으면 현재가로 대체(토스·Mock 계좌 어댑터, `TossPriceApi.java:202-206`) | 일봉이 아직 안 나온 경우를 라이브 가격으로 메운다. 틀린 종가가 원장에 남는다 | 지운다. 확정 봉이 없으면 리포트 단계가 실패하고 다시 돈다 |
 
-체인을 지워도 되는 근거는 06의 단계 모델이다. 세 단계 모두 창이 있고(`OPEN_PLACE`는 개장~마감 30분 전, `CLOSE_PLACE`는 마감 31분 전~10분 전, `CLOSE_REPORT`는 그 거래일 KST 자정까지) 매시 `reconcile`이 끝나지 않은 단계를 다시 실행한다. 출처를 여러 개 두는 대신 같은 출처에 다시 묻는다. 06 이전 구조에서는 어댑터의 1회 재시도가 그 역할을 하고, 그래도 실패하면 지금 체인이 전부 실패했을 때와 같은 동작(종목 제외 + 관리자 알림)이 된다.
+체인을 지워도 되는 근거는 06의 단계 모델이다(현재가는 3-5절처럼 계좌 증권사에서 읽지만 다른 출처로 넘어가는 폴백은 없다). 세 단계 모두 창이 있고(`OPEN_PLACE`는 개장~마감 30분 전, `CLOSE_PLACE`는 마감 31분 전~10분 전, `CLOSE_REPORT`는 그 거래일 KST 자정까지) 매시 `reconcile`이 끝나지 않은 단계를 다시 실행한다. 출처를 여러 개 두는 대신 같은 출처에 다시 묻는다. 06 이전 구조에서는 어댑터의 1회 재시도가 그 역할을 하고, 그래도 실패하면 지금 체인이 전부 실패했을 때와 같은 동작(종목 제외 + 관리자 알림)이 된다.
+
+### 3-5. 주문할 때의 현재가는 그 계좌의 증권사에서 읽는다 (2026-11-14 사용자 지침, 채택)
+
+사용자 질문: Alpaca는 대시보드에 쓰고, 매매 배치가 주문할 때는 전략마다 그 사용자의 증권사 현재가 API를 부르면 어떤가. 사용자가 100명, 1,000명이어도 비용이 크지 않을 것 같다.
+
+**채택한다.** 근거(코드 확인 2026-11-14):
+
+1. **현재가는 상한 계산에만 쓰이지 않는다.** BUY 가격 상한(`BuyOrderPriceCapper:44-45,79`) 말고도 주식 DCA BUY 기준가가 max(전일 종가, 현재가)이고(`DcaCycleOrderStrategy.referencePriceForBuy`), VR 사다리·bootstrap의 기준가가 현재가다(`CycleOrderComputer.java:101-102`). 주문 가격을 정하는 값이다. INFINITE만 계획에 전일 종가를 쓰고 현재가는 상한에만 쓴다.
+2. **Alpaca 무료 현재가는 주문 가격의 기준으로 약하다.** `iex`는 통합 거래량의 1~2%이고 통합 시세는 15분 늦다. 개장 직후 15분은 하루 중 가장 많이 움직이는 구간이다. 새로 넣는 EETH는 2026-11-13 `iex` 일봉 거래량이 100주(통합 56,160주)이고 `iex` 종가 23.13 대 통합 23.33이었다. 증권사 값은 주문을 받는 바로 그곳의 실시간 값이다.
+3. **비용이 작다.** 호출 수는 Σ(계좌별 서로 다른 종목 수)다. 메리츠는 종목당 1회(`MeritzPriceApi`, 다건 조회 없음), 토스는 계좌당 1회(다건 200개)다. 지금 운영은 배치 단계당 6회 안팎이고, 계좌 1,000개에 종목 2개씩이어도 2,000회다. 한도(메리츠 10 TPS, 앱키별 110ms 간격)는 사용자 키마다 따로 걸리고 계좌 사이는 지금도 병렬이다(`TradingService.java:269`). 계좌마다 이미 잔고 조회와 주문 접수를 하고 있어 새 종류의 부하가 아니다. 확인하지 못한 것: 메리츠가 출발 IP 단위로도 제한하는지.
+4. **장애가 계좌 단위로 갇힌다.** 한 계좌의 시세 조회가 실패하면 그 계좌만 빠진다. 증권사 시세가 죽었으면 주문도 어차피 못 넣는다. Alpaca가 죽어도 현재가는 영향이 없다.
+
+값별 출처(값 하나에 출처 하나, 다른 출처로 넘어가는 폴백 없음):
+
+| 값 | 출처 | 쓰는 곳 |
+|---|---|---|
+| 주문 경로의 현재가 | 계좌 증권사(계좌 토큰). Mock 계좌는 증권사가 없으므로 Alpaca | 개장·마감 배치의 계획과 접수, 수동 실행(`ManualTradingService`), VR 재설정(`VrReconfigureService`) |
+| 전일 종가 | Alpaca | 배치 계획(INFINITE 0회차, DCA 기준가·조건), 미리보기, 이력 |
+| 확정 종가·일봉 | Alpaca | 마감 리포트, Mock 체결 판정, 차트, DCA 지표, 백테스트 |
+| 화면의 현재가 | Alpaca(60초 캐시) | 원장 합산(`AccountLedgerTotalsService`), 미리보기, Mock 잔고, 대시보드 |
+
+전일 종가를 증권사에서 읽지 않는 이유: 확정된 값이라 모든 사용자에게 같아야 하고(INFINITE 0회차 진입가가 계좌마다 달라지면 안 된다), 토스 현재가 응답에는 전일 종가가 없어 캔들 호출이 따로 필요하고, 하루 캐시라 개장 몇 시간 전부터 읽어 둘 수 있다. 메리츠 응답의 `prdy_clpr`는 쓰지 않는다.
+
+배치가 바뀌는 모양:
+
+- `loadPriceContext`: 전일 종가는 Alpaca에서 종목 전체를 1회, 현재가는 계좌별로 그 계좌 전략의 종목만 병렬 조회한다. 가격 맵의 키가 종목에서 (계좌, 종목)으로 바뀐다. `selectPriceAccount`(시세용 계좌 하나 고르기)는 사라진다.
+- 실패 처리는 지금과 같되 범위가 계좌다: 그 계좌의 그 종목 전략만 빠지고, 관리자 알림은 배치당 1건으로 묶는다("현재가 조회 실패: 계좌 N개 …").
+- `reloadPlacementPrices`도 T7 전까지는 같은 계좌별 조회를 쓴다.
+
+지금과 달라지는 것: 지금도 메리츠 계좌의 현재가는 결국 증권사 실시간 값이다(관리자 토스가 1차, 계좌 어댑터가 2차). 1차가 "관리자 토스"에서 "자기 계좌 증권사"로 바뀔 뿐이라 주문 가격의 성격은 그대로다. 그래서 처음의 D4(현재가 품질 변화)는 주문 경로에서 사라진다.
+
+기각: 증권사 현재가 실패 시 Alpaca로 넘어가기(체인이 다시 생기고, 증권사가 죽었으면 주문도 실패한다), 계좌 증권사에서 전일 종가까지 읽기(위 이유).
 
 ## 4. 목표 구조
 
@@ -108,7 +140,8 @@ public interface MarketDataPort {
 }
 ```
 
-- `BrokerPricePort`(8개 메서드), `AdminMarketPricePort`, `AdminPriceSource`, `CandlePort`, stats의 `HistoricalCandlePort`가 이 포트 하나로 합쳐진다. 시그니처의 세부(반환 타입 이름, `CandleQuery`의 모양)는 구현자가 기존 `Candle`·`PriceSnapshot` 타입을 재사용해 정한다.
+- `AdminMarketPricePort`, `AdminPriceSource`, `CandlePort`, stats의 `HistoricalCandlePort`가 이 포트 하나로 합쳐진다.
+- `BrokerPricePort`는 메서드 8개에서 **1개**로 줄어 남는다(3-5절): `Map<StrategyTicker, BigDecimal> currentPrices(BrokerAccountRef account, Collection<StrategyTicker> tickers)`. `BrokerRouter`는 관리자 우선 로직 없이 계좌의 브로커로만 보낸다. 메리츠는 `MeritzPriceApi`의 현재가 조회(종목별 반복), 토스는 `GET /api/v1/prices`를 **계좌 토큰**으로, Mock은 `MarketDataPort.latestPrices`에 위임한다. 주문 경로만 이 포트를 쓰고 화면 경로는 `MarketDataPort`를 쓴다. 시그니처의 세부(반환 타입 이름, `CandleQuery`의 모양)는 구현자가 기존 `Candle`·`PriceSnapshot` 타입을 재사용해 정한다.
 - 구현은 `broker/adapter/out/marketdata/`의 Alpaca 어댑터 하나다(`AdminMarketPriceAdapter`가 있는 자리). stats의 `AlpacaCandleAdapter`(78줄)를 이쪽으로 합친다.
 - 인터페이스를 두는 이유: 실제 외부 구현이 있고(지침서 01의 유지 조건), 테스트 대역과 Mock 브로커가 주입받는다.
 - 환율은 별도다. `ExchangeRatePort.getExchangeRate()`의 구현을 Frankfurter로 바꾼다(4-3절).
@@ -118,23 +151,24 @@ public interface MarketDataPort {
 | 값 | Alpaca 호출 | 캐시 |
 |---|---|---|
 | 현재가 | `GET /v2/stocks/snapshots?symbols=…`를 `feed=iex`와 `feed=delayed_sip`으로 한 번씩. 종목별로 `latestTrade.t`가 더 늦은 쪽의 `latestTrade.p`. 한쪽이 실패하면 다른 쪽만으로 답한다 | 종목별 60초(`TtlResultCache`) |
-| 전일 종가 | `GET /v2/stocks/bars?timeframe=1Day&feed=sip&adjustment=split&start=<세션일−10일>&end=<세션일−1일>`의 종목별 마지막 봉 종가 | (종목, 세션일) 키로 그날 내내. 실패는 저장하지 않는다 |
-| 확정 일봉 | 같은 엔드포인트, `start`=`end`=세션일, `adjustment=raw`. **마감+16분 이후에만 완결된다** | (종목, 세션일) 키로 그날 내내. 빈 결과는 저장하지 않는다 |
+| 전일 종가 | `GET /v2/stocks/bars?timeframe=1Day&feed=sip&adjustment=split&start=<세션일−10일>`(**`end` 없음**)에서 날짜가 세션일보다 앞인 마지막 봉의 종가 | (종목, 세션일) 키로 그날 내내. 실패는 저장하지 않는다 |
+| 확정 일봉 | 같은 엔드포인트, `start`=세션일, **`end` 없음**, `adjustment=raw`에서 날짜가 세션일인 봉. **마감+16분 이후에만 완결된다** | (종목, 세션일) 키로 그날 내내. 빈 결과는 저장하지 않는다 |
 | 차트 일봉 | 같은 엔드포인트 1회(최대 10,000봉), 조정 방식은 지금 토스 호출과 같게 | 종목별 1시간 |
 | DCA 지표 일봉 250봉 | 같은 엔드포인트, `adjustment=all`, 세션일 이전까지 | 호출 측의 세션당 1회 캐시(`DcaPlanInputCollector.closeCache`)를 그대로 쓴다 |
 | 환율 | Frankfurter 최신 환율 | 하루 |
 | 휴장일 | 변경 없음 | — |
 
 - `snapshot`의 `dailyBar`·`prevDailyBar`는 쓰지 않는다. 지연 피드에서 날짜 경계의 의미가 문서에 없다. 종가는 항상 날짜를 지정한 일봉 조회로 얻는다.
-- `feed=sip` 일봉은 무료 키로 끝 시각을 지정하지 않아도 된다(서버가 15분 전까지로 자른다. 2026-11-13 실호출 확인). `feed=delayed_sip`은 snapshot·latest 전용이고 bars에서는 400이다.
+- **`feed=sip` 일봉은 최근 세션을 읽을 때 `end`를 넣지 않는다.** 무료 키는 `end`가 최근 15분에 걸리면 403(`subscription does not permit querying recent SIP data`)이고, 날짜만 적은 `end`는 그날 끝으로 해석되는 것으로 보인다. 2026-11-14 00:21 UTC 실호출: `end=2026-11-13` 403, `start=end=2026-11-13` 403, `end` 생략 200(11-13 봉 포함), `end=2026-11-12` 200. `end`를 빼고 받은 뒤 봉의 날짜로 고른다. 과거 구간(차트·백테스트)은 `end`를 어제 이전으로 자르면 된다(`AlpacaCandleAdapter`의 `clampedTo`). `feed=delayed_sip`은 snapshot·latest 전용이고 bars에서는 400이다.
+- 위 표의 "현재가"는 화면 경로와 Mock 계좌용이다. 실계좌 주문 경로는 `BrokerPricePort.currentPrices`다(3-5절).
 - 전일 종가 캐시의 "실패도 저장"(`TossPriceApi.java:149-151`)은 옮기지 않는다.
 
 ### 4-3. 그 밖에 바뀌는 것
 
 - **마감 리포트 시각**: 마감+10분 → 마감+20분. 06 판정표의 `CLOSE_REPORT` 창 시작 상수와 지금 코드의 `waitUntilPostClose` 기준을 함께 바꾼다. 조기 마감일도 같은 규칙이다(세션의 `closeAt` 기준).
-- **`TradingPriceFetcher`**: 계좌 선택(`selectPriceAccount`), `PriceContext.priceAccount`, 묶음→단건 폴백 골격(`fetchWithFallback`)이 사라진다. 남는 것은 "현재가와 전일 종가를 읽어 `PriceSnapshot` 맵을 만들고 실패 종목을 알림 1건으로 묶는다"와 PRIVACY 기준 매매표 조회다(약 70줄).
+- **`TradingPriceFetcher`**: 계좌 선택(`selectPriceAccount`), `PriceContext.priceAccount`, 묶음→단건 폴백 골격(`fetchWithFallback`)이 사라진다. 남는 것은 "계좌별 현재가(증권사)와 종목별 전일 종가(Alpaca)를 읽어 (계좌, 종목) 키의 `PriceSnapshot` 맵을 만들고 실패를 알림 1건으로 묶는다"와 PRIVACY 기준 매매표 조회다(약 90줄). 전일 종가가 없을 때 현재가로 대체하고 알리는 지금 동작은 그대로 둔다.
 - **Mock 브로커**: `TossPriceApi` 직접 주입을 `MarketDataPort` 주입으로 바꾼다. 체결 판정은 `confirmedBars`의 OHLC를 쓰고, 확정 봉이 없을 때 현재가 단일값 봉으로 대체하던 분기(`MockBrokerAdapter.java:140-142`)는 지운다.
-- **사용자 요청 경로**(원장 합산 `AccountLedgerTotalsService.java:56`, 수동 실행, VR 재설정, 미리보기, Mock 잔고): 포트만 바꾼다. 60초 캐시가 요청마다 나가던 외부 호출을 막는다.
+- **사용자 요청 경로**: 주문을 내는 것(수동 실행, VR 재설정)은 `BrokerPricePort.currentPrices`로 자기 계좌 증권사에서 읽는다. 보여 주기만 하는 것(원장 합산 `AccountLedgerTotalsService.java:56`, 미리보기, Mock 잔고)은 `MarketDataPort`로 바꾼다. 60초 캐시가 요청마다 나가던 외부 호출을 막는다.
 - **토스 계좌 잔고의 원화 환산**(`TossHoldingsApi.java:64,91`): 관리자 토큰으로 부르던 토스 환율을 공용 환율 포트로 바꾼다(Fable 판단. 참고 환율이 되지만 운영에 토스 계좌 전략이 없다).
 - **벤치마크**: 환율 출처 라벨(`BenchmarkService.java:240`의 `"TOSS_INVEST"`)을 공급자에서 받는다. 하루 1회 갱신되는 참고 환율이라는 것을 응답의 날짜 필드로 드러낸다(`cross-repo.md` G절).
 - **벤치마크 지수 일봉**(`AlpacaIndexPriceAdapter`, `feed=iex`): `iex` 일봉 종가는 통합 종가와 다르다(6종목 중 5종목). `feed=sip`으로 바꾼다. `iex`를 고른 이유가 코드·커밋에 있으면 그 이유를 먼저 확인한다(T6).
@@ -143,11 +177,11 @@ public interface MarketDataPort {
 
 | 대상 | 줄(약) |
 |---|---|
-| `TossPriceApi`, `TossCandleApi`, `TossCandle`, `TossAdminPriceSource`, `UsdKrwRateCache`, `TossHoldingsApi`의 환율 부분 | 590 |
+| `TossCandleApi`, `TossCandle`, `TossAdminPriceSource`, `UsdKrwRateCache`, `TossHoldingsApi`의 환율 부분, `TossPriceApi`에서 현재가 다건 조회를 뺀 전부(전일 종가·확정 종가·세션 판정 복제·실패 캐시) | 540 |
 | `TossAuthApi`·`TossDistributedTokenCoordinator`의 관리자 부분, `TossHttpClient.getCommon`과 그 429 재시도, 설정 `toss.admin-client-id/secret` | 60 |
-| `TossBrokerAdapter`의 시세·캔들·환율 위임 | 60 |
-| `AdminMarketPriceAdapter`, `AdminPriceSource`, `AdminMarketPricePort`, `BrokerPricePort`, `CandlePort`, `BrokerRouter`의 시세 경로 | 170 |
-| `MeritzPriceApi`와 메리츠 어댑터의 시세 위임(D5) | 150 |
+| `TossBrokerAdapter`의 시세·캔들·환율 위임(현재가 위임 1개는 남는다) | 50 |
+| `AdminMarketPriceAdapter`, `AdminPriceSource`, `AdminMarketPricePort`, `BrokerPricePort`의 메서드 7개, `CandlePort`, `BrokerRouter`의 관리자 우선 경로 | 150 |
+| `MeritzPriceApi`에서 현재가 조회를 뺀 것(전일 종가·확정 종가·일봉)과 그 위임 | 90 |
 | `TradingPriceFetcher`의 폴백 골격과 계좌 선택 | 130 |
 | stats `AlpacaCandleAdapter`·`HistoricalCandlePort`(합침) | 90 |
 
@@ -158,14 +192,15 @@ KIS 관리자 소스(`KisAdminPriceSource`·`KisAdminTokenCoordinator` 187줄)�
 - **Twelve Data**: 2절.
 - **토스 유지**(2026-11-12 결정): 사용자가 뒤집었다. 키 갱신 부담이 이유다.
 - **메리츠 관리자 키**: 앱키가 계좌에 묶인다(04의 4절). 그대로 기각.
-- **출처 둘(Alpaca + 메리츠 계좌 시세 폴백)**: 지금 체인의 축소판이 남는다. 계좌를 인자로 받는 시그니처, 라우터, 계좌별 시세 어댑터가 전부 유지된다. 폴백이 일어난 근거가 없고 06의 단계 재실행이 같은 장애를 덮는다. D5.
+- **출처 둘을 폴백으로 잇기(Alpaca 실패 시 메리츠, 또는 그 반대)**: 지금 체인의 축소판이다. 폴백이 일어난 근거가 없고 06의 단계 재실행이 같은 장애를 덮는다. 3-5절은 폴백이 아니라 역할 분담이다(주문 경로의 현재가만 계좌 증권사).
 - **시세 저장 테이블 + 1시간 배치**: 3-1절.
 - **확정 종가만 증권사 값 유지**(04의 4-1절 판단): 실계좌 체결은 증권사 체결 조회에서 온다. 종가 차이가 영향을 주는 곳은 평가·판정·Mock이고 차이는 TQQQ에서 0.02달러 이내다. 관리자 키를 지우려면 이 값도 옮겨야 한다.
+- **주문 경로의 현재가까지 Alpaca로**(이 지침서의 첫 권고): 3-5절에서 뒤집었다.
 - **현재가를 `iex` 한 피드로만**: MAGX의 `iex` 최근 체결이 이틀 전 것이었다. 지연 통합 시세와 비교해 더 최근 것을 고르는 한 줄로 막는다.
 
 ## 6. 예상 감량과 위험
 
-- main 약 −1,250줄, +250줄(Alpaca 어댑터, 환율 최신값). 순 약 −1,000줄. test는 토스 시세·캔들·관리자 소스·폴백 골격 테스트가 함께 빠진다(측정하지 않았다. T5에서 센다).
+- main 약 −1,100줄, +250줄(Alpaca 어댑터, 환율 최신값). 순 약 −850줄(3-5절로 증권사 현재가 조회가 남아 첫 추정보다 150줄 덜 준다). test는 토스 시세·캔들·관리자 소스·폴백 골격 테스트가 함께 빠진다(측정하지 않았다. T5에서 센다).
 - 위험과 대응:
 
 | 위험 | 대응 |
@@ -173,14 +208,16 @@ KIS 관리자 소스(`KisAdminPriceSource`·`KisAdminTokenCoordinator` 187줄)�
 | `feed=delayed_sip`은 공식 문서에 무료 허용이 적혀 있지 않다(포럼 답변과 실호출로만 확인) | 한쪽 피드가 실패해도 다른 쪽으로 답하게 만든다(4-2절). 막히면 거래 적은 종목의 현재가가 묵는다 — 관리자 알림으로 드러나게 "최근 체결이 N분보다 오래됨" 경고를 남긴다 |
 | 마감+20분에 당일 통합 일봉이 완결되지 않을 수 있다(마감 직후 실측을 하지 못했다) | T2의 병행 비교로 확인한다. 안 되면 리포트 시각을 더 늦춘다 |
 | TQQQ 확정 종가 0.01~0.02달러 차이 | D3. VR 롤오버의 V′ 계산과 Mock 체결 판정이 그만큼 달라진다. 전환일 전후로 원장을 다시 계산하지 않는다 |
-| Alpaca 장애 | 단계 재실행(06). 06 이전에는 어댑터 1회 재시도 + 알림 |
+| Alpaca 장애 | 주문 경로에서는 전일 종가만 걸린다(하루 캐시라 개장 전에 읽어 둔 값이 있으면 영향 없음). 단계 재실행(06). 06 이전에는 어댑터 1회 재시도 + 알림 |
+| 토스 시세를 계좌 토큰으로 부를 수 있는지 실호출로 확인하지 못했다(스펙은 "계좌 정보 없이 액세스 토큰만으로 호출") | T1에서 토스 계좌로 1회 호출해 확인한다. 안 되면 토스 계좌는 Mock처럼 `MarketDataPort.latestPrices`를 쓴다(운영에 토스 전략 0) |
+| 계좌 수가 늘면 메리츠가 출발 IP 단위로 제한할 수 있다(미확인) | 계좌별 실패는 그 계좌만 빠지고 알림에 계좌 수가 찍힌다. 실제로 걸리면 계좌 병렬 수를 제한한다 |
 | 약관 | D2 |
 | 분할이 있는 날의 전일 종가 | `adjustment=split`. 토스 값과의 차이는 병행 비교 기간에 분할이 없으면 확인되지 않는다 — 분할 공시가 있는 주에는 전환하지 않는다 |
 
 ## 7. 동작 보존용 선행 테스트
 
-1. **어댑터 계약 테스트**(`MockRestServiceServer`): snapshot 두 피드에서 더 늦은 체결을 고르는지, 한쪽 실패 시 다른 쪽으로 답하는지, 일봉 빈 결과를 캐시하지 않는지, 전일 종가가 "세션일 직전 봉"인지(휴장일을 사이에 둔 경우 포함). 응답 JSON은 `findings/21` 8절의 실호출 형태로 만든다.
-2. **가격 컨텍스트 테스트**: `TradingPriceFetcherTest`의 시나리오(현재가 실패 종목 제외, 전일 종가 실패 시 현재가 대체, 알림 1건으로 묶기)를 새 포트 기준으로 옮긴다. 폴백 단계 테스트(관리자 → 계좌 → 단건)는 대상이 사라지므로 지운다.
+1. **어댑터 계약 테스트**(`MockRestServiceServer`): snapshot 두 피드에서 더 늦은 체결을 고르는지, 한쪽 실패 시 다른 쪽으로 답하는지, 일봉 빈 결과를 캐시하지 않는지, 전일 종가가 "세션일 직전 봉"인지(휴장일을 사이에 둔 경우, 응답에 세션일 봉이 섞여 온 경우 포함), 전일 종가·확정 일봉 요청에 `end` 인자가 없는지. 응답 JSON은 `findings/21` 8절의 실호출 형태로 만든다.
+2. **가격 컨텍스트 테스트**: `TradingPriceFetcherTest`의 시나리오(현재가 실패 종목 제외, 전일 종가 실패 시 현재가 대체, 알림 1건으로 묶기)를 새 포트 기준으로 옮긴다. 추가: 같은 종목을 가진 두 계좌 중 한 계좌의 현재가만 실패하면 그 계좌의 전략만 빠지는지, 계좌마다 자기 종목만 조회하는지. 폴백 단계 테스트(관리자 → 계좌 → 단건)는 대상이 사라지므로 지운다.
 3. **마감 리포트**: 확정 봉이 없으면 리포트가 완료로 기록되지 않고 다음 실행에서 다시 도는지(06 T2 뒤에는 단계 멱등 IT가 이것을 덮는다).
 4. 변이 확인: "더 늦은 체결 고르기"를 `iex` 고정으로 바꿔 실패하는지, 전일 종가의 `end`를 세션일로 바꿔 실패하는지.
 
@@ -190,11 +227,11 @@ KIS 관리자 소스(`KisAdminPriceSource`·`KisAdminTokenCoordinator` 187줄)�
 
 | # | 내용 | 모델 | 선행 | 배포·관찰 |
 |---|---|---|---|---|
-| T1 | `MarketDataPort`와 Alpaca 어댑터(4-1·4-2), 7절 1번 테스트. 기존 경로는 건드리지 않는다. `AlpacaProperties`는 trading-core에 이미 있는 것을 쓴다 | Opus 설계, Sonnet 구현 | 없음 | 없음 |
-| T2 | 병행 비교: 배치가 토스 값으로 동작하는 그대로, 같은 시점의 Alpaca 값을 조회해 `[시세 비교] ticker= kind= toss= alpaca= diffPct=` 로그를 남긴다(개장·마감의 현재가와 전일 종가, 마감+10분과 +20분의 확정 종가). 비교 호출의 실패는 배치에 영향을 주지 않는다(`BrokerCallGuard.tryGet`) | Sonnet | T1 | 3거래일. 통과 기준: 전일 종가 전부 일치, 현재가 차이 1% 이내, 확정 종가는 SOXL·USD·QLD 일치·TQQQ 0.02달러 이내, 마감+20분에 확정 봉이 조회됨. 결과를 `questions.md`에 표로 적는다 |
-| T3 | 전환: 소비처를 `MarketDataPort`로(4-3절), 마감 리포트 +20분, `TradingPriceFetcher` 축소, Mock 포트 주입, 7절 2·3번 테스트. T2의 비교 로그 코드 삭제 | Opus | T2 통과, D1·D3·D4·D5 | 2거래일. 접수 주문의 가격·수량, 리포트 시각과 종가, 알림을 전환 전날과 대조 |
+| T1 | `MarketDataPort`와 Alpaca 어댑터(4-1·4-2), 7절 1번 테스트. 기존 경로는 건드리지 않는다. `AlpacaProperties`는 trading-core에 이미 있는 것을 쓴다. 토스 `GET /api/v1/prices`를 계좌 토큰으로 1회 호출해 되는지 확인하고 결과를 `questions.md`에 적는다(읽기 전용) | Opus 설계, Sonnet 구현 | 없음 | 없음 |
+| T2 | 병행 비교: 배치가 토스 값으로 동작하는 그대로, 같은 시점의 새 출처 값을 조회해 `[시세 비교] ticker= kind= old= new= diffPct=` 로그를 남긴다(전일 종가와 마감+10분·+20분의 확정 종가는 Alpaca, 개장·마감의 현재가는 메리츠 계좌 하나의 증권사 값). 비교 호출의 실패는 배치에 영향을 주지 않는다(`BrokerCallGuard.tryGet`) | Sonnet | T1 | 3거래일. 통과 기준: 전일 종가 전부 일치, 현재가(관리자 토스 대 계좌 증권사) 차이 0.5% 이내, 확정 종가는 SOXL·USD·QLD 일치·TQQQ 0.02달러 이내, 마감+20분에 확정 봉이 조회됨. 결과를 `questions.md`에 표로 적는다 |
+| T3 | 전환: 주문 경로의 현재가를 계좌별 `BrokerPricePort.currentPrices`로(3-5절), 나머지 소비처를 `MarketDataPort`로(4-3절), 마감 리포트 +20분, `TradingPriceFetcher` 축소, Mock 포트 주입, 7절 2·3번 테스트. T2의 비교 로그 코드 삭제 | Opus | T2 통과 | 2거래일. 접수 주문의 가격·수량, 리포트 시각과 종가, 알림을 전환 전날과 대조 |
 | T4 | 환율: `ExchangeRatePort` 구현을 Frankfurter 최신값으로(기존 `FrankfurterFxRateAdapter`의 설정 재사용, 하루 캐시, 날짜 함께 반환), 벤치마크 라벨, 토스 잔고 환산. `cross-repo.md` G절 | Sonnet | 없음(T3과 독립) | 벤치마크 비교 화면 1회 확인 |
-| T5 | 삭제(4-4절): 토스 관리자 코드·설정, 관리자 소스 체인, 메리츠 시세(D5), 옛 포트. `.env.example`·`application*.yml`·`deploy/server/README.md`의 `TOSS_ADMIN_*`. 문서: `toss-api.md`, `workflow-ledger-price.md`의 "시세 출처", `flows.yml`, `README.md`, `modules/tradingcore/broker.md`·`stats.md`. 운영 secret에서 뺄 키를 `cross-repo.md`에 적는다 | Sonnet(전수표), Opus(검토) | T3 관찰 종료 | 1거래일 |
+| T5 | 삭제(4-4절): 토스 관리자 코드·설정, 관리자 소스 체인, 메리츠·토스 시세에서 현재가를 뺀 나머지, 옛 포트 메서드. `.env.example`·`application*.yml`·`deploy/server/README.md`의 `TOSS_ADMIN_*`. 문서: `toss-api.md`, `workflow-ledger-price.md`의 "시세 출처", `flows.yml`, `README.md`, `modules/tradingcore/broker.md`·`stats.md`. 운영 secret에서 뺄 키를 `cross-repo.md`에 적는다 | Sonnet(전수표), Opus(검토) | T3 관찰 종료 | 1거래일 |
 | T6 | 벤치마크 지수 일봉을 `feed=sip`으로. 이미 저장된 지수 값과 비교해 차이가 있으면 다시 받을지 `questions.md`로 올린다 | Sonnet | 없음 | 없음 |
 | T7 | `reloadPlacementPrices` 삭제, 개장 단계의 시세 조회를 한 번으로(3-3·3-4절) | Opus | **06 T2·T3** | 06의 관찰에 포함 |
 
@@ -218,7 +255,8 @@ KIS 관리자 소스(`KisAdminPriceSource`·`KisAdminTokenCoordinator` 187줄)�
 하지 말 것:
 
 - T2 없이 주문 경로의 가격 출처를 바꾸지 않는다.
-- 사용자 계좌 키로 공용 시세를 부르지 않는다.
+- 사용자 계좌 키로 **다른 사용자나 화면에 쓰일** 시세를 부르지 않는다. 계좌 키로 읽은 현재가는 그 계좌의 주문에만 쓴다(계좌 사이 캐시 공유 금지).
+- 증권사 현재가가 실패했을 때 Alpaca 값으로 주문 가격을 정하지 않는다.
 - 확정 봉이 없을 때 현재가로 대체하는 분기를 새 어댑터에 다시 만들지 않는다.
 - 토스 주문 브로커의 토큰·주문 코드를 이 작업에서 고치지 않는다(04 단계 C·D의 몫).
 - 시세 저장 테이블, 시간 배치, Twelve Data 어댑터를 만들지 않는다(D1이 Twelve Data로 나면 2절 끝 문단을 태스크로 풀어 이 지침서를 고친다).
