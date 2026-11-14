@@ -279,3 +279,11 @@ findings 09가 "같은 trading 코드가 web·worker 두 프로세스에서 돌 
 
 - fable-infra: 검토 완료(지침서 2개, 사용자 결정 반영).
 - fable-ui: 검토 완료(2026-11-14, 추가 요청 3차까지). 지침서 01~12와 `guides/00-roadmap.md`, 회신은 `cross-repo.md` G절 끝. 회신 대기 없음.
+
+## 실행 기록 2026-11-15 — S6 단계 A, S12
+
+- **S6 단계 A** `e72282b98`: `HexagonalArchitectureTest` 규칙 3개 삭제, 1개 축소(`application_must_not_depend_on_inbound_adapters`), 3개 신설. 제거 대기 인터페이스 134개(UseCase 52 + 포트 82)는 `src/test/resources/architecture/single-impl-interfaces.txt`. 규칙별 변이 확인 완료. 지침서와 다르게 한 것 세 가지(규칙 하나를 지우지 않고 좁힘, UseCase도 목록 가드에 포함, Redis 타입 추가)는 01의 9절 끝에 적었다. **단계 B(UseCase 인터페이스 제거, Sonnet)가 다음이다.**
+- **S12** `09011d9bf`: 13 5절의 작은 수정 5건. PENDING 차단은 하지 않았다. ui 영향과 요청은 `cross-repo.md` H절(ui 로그아웃 프록시가 AT를 보내지 않아 jti 차단이 실제로는 일어나지 않는다 — api가 로그아웃 경로를 무효 토큰 익명 통과에 넣은 뒤 ui가 AT를 싣는 순서, 사용자 승인 대기).
+- 검수: Opus 리뷰어 1회(두 묶음 합친 diff). 차단 결함 없음, 가드 구멍 4건과 문서 드리프트 1건을 커밋 전에 반영. 전체 테스트 1회 통과(리뷰 반영 뒤에는 architecture 테스트만 다시 돌렸다). push하지 않았다.
+- questions.md 추가 없음(중단 조건에 걸린 것 없음, 마지막 번호 Q-11 그대로).
+
