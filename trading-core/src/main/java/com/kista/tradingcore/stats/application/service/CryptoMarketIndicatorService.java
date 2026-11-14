@@ -40,7 +40,7 @@ import java.util.function.Supplier;
 class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
 
     static final int MAX_DAYS = 365; // 조회 가능 최대 기간(일)
-    static final Duration TTL = Duration.ofMinutes(10); // 캐시 유효 시간
+    static final Duration TTL = Duration.ofMinutes(10); // 캐시 유효 시간 — 코인 DCA와 Upbit 공개 시세 rate limit(429)을 공유해 캐시가 필수다
     static final Duration EMPTY_TTL = Duration.ofMinutes(1); // 전부 실패 결과 캐시 — 비인증 공개라 장애 중 요청마다 외부 재호출되는 것을 막는다
     private static final String CACHE_KEY = "crypto-market-indicators"; // 전역 단일 결과
     private static final String EMPTY_CACHE_KEY = CACHE_KEY + ":empty"; // 전부 실패 결과 — 정상 결과와 TTL이 달라 키 분리
