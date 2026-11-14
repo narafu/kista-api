@@ -120,6 +120,7 @@ record BrokerCapabilities(Broker broker, ExecutionPort execution, PortfolioPort 
 | B7 | 토스 | `verifyAccount`가 운영 토큰을 무효화한다(2-4절). **단계 C가 아니라 단계 D-2에서 고친다(Q-02)** | 중간 |
 | B8 | 바이낸스 | 수수료가 여러 자산으로 부과될 때 그대로 합산한다 | 낮음 |
 | B9 | 메리츠 | `EGW00202`를 REST 권한 오류로 분류한다. 스펙에서는 WebSocket 접두어 누락 코드다 | 낮음 |
+| B10 | 메리츠 | 접수 결과 불명(SUBMITTING 잔류) 주문을 조회로 확정하는 복구가 없다(12 B6·F4). 클라이언트 주문 키는 없지만 당일 목록에서 우리가 아는 `oder_no`를 뺀 행 가운데 종목·방향·유형·수량·가격이 같고 접수 시각이 선점 뒤인 것으로 **접수됨만** 확정할 수 있다. 후보 수가 SUBMITTING 수와 다르면 지금처럼 관리자 알림. 재전송은 하지 않는다. 설계와 한계는 `findings/26` 4절. **선행: 실계좌 실측 4건(접수 시각 시간대, 당일 목록 경계·페이지, 시장가·MOC 매도의 `aspr_type_code`, 가격 문자열) — 사용자 작업** | 중간(운영 수작업) |
 
 **B3 철회 메모**: 403을 429처럼 `BrokerRateLimitException`으로 바꾸는 안(`findings/12` M4)도 하지 않는다. `CryptoDcaRoundExecutor`의 주문 접수 경로에서 TRANSIENT는 "결과 불명"으로 취급돼 주문이 SUBMITTING으로 남고 예수금이 성공처럼 차감된다. 접수되지 않은 것이 확정인 403에는 맞지 않고, 보안 차단이면 풀릴 때까지 그 상태로 머문다. 지금 동작(그 회차 미주문 기록, 사용자에게 보임)이 더 정직하다. 호출량이 한도의 1% 미만이라 재시도로 얻는 것도 없다. 실행 세션은 403(JSON이 아닌 본문 포함) → `rejected=true`를 고정하는 테스트가 `BinanceHttpClient` 테스트에 없으면 1건 추가하고, `vendors/binance.md` 오류 매핑 표 4번 행 비고에 "403(WAF)은 매칭 엔진 전 차단이라 확정 거절"을 한 줄 적는다.
 
