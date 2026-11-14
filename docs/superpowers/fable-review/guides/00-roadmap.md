@@ -48,7 +48,7 @@
 |---|---|---|---|---|
 | **S8** ✅ 완료(2026-11-14, 미배포 — 빌드 파일·`src/main`·`trading-core/src/main`이 바뀌어 다음 push가 3 role을 모두 교체한다. 동작 변화는 gson 2.14.0→2.13.2(BOM)와 `/`(index.html 삭제 → 401)뿐이고 나머지는 주석이지만 주문 계획 파일 주석이 포함돼 매매 시간대 밖 push. 문서 예산 여유: 항상 로드 약 300B·dca 22B·web 14B·admin 6B — 문서를 늘리는 묶음(S6 등)은 같은 커밋에서 줄인다) | **결과**: T1 `c2484085a`(decisions.md), T2·T3·T6 `ac278e583`(archive 179파일 등 삭제, 태그 `archive/docs-2026-11` 로컬만 — push는 사용자 요청 시, 항상 로드 5파일 45.4→25.5KB, 리소스 CLAUDE.md → `.claude/rules/flyway.md`), T3 코드 `74d59302e`(gson 핀 제거 → BOM 2.13.2, mockwebserver 카탈로그, index.html 삭제, 메리츠·토스 주석 — Q-10), T4 `3cdf3866b`·`7fae356ae`·`2f0059277`(trading 35→6.3KB, stats 20→4.3KB, platform 18→7.4KB, platform의 거래일 경계 드리프트 수정), T5 `7b8b9e9d2`(모듈 10개 예산 충족, 벤더 문서 `docs/agents/vendors/`), T7 `9ae228828`(예산 가드 bats). T8: memory 재론 금지 5파일 → `reference_decisions_and_fable_review.md` 포인터 1개, 로컬 잔재(`bin/`·`logs/*.tmp`·`trading-core/logs/`·빈 worktrees 디렉토리·레포 밖 `ARCHITECTURE.md`) 삭제, `.superpowers/`는 미추적 SDD 기록이 있어 남김(사용자 판단). 전체 테스트·bats 32건 통과, jar에 CLAUDE.md 0. T9는 N11(단계 2 마감). 원래 내용: 문서 단계 1: `decisions.md` 작성 → archive·backlog·history·schema-reorg 삭제 → 작은 수정 → 모듈 문서·항상 로드 문서 축소 → 크기 예산 가드 | 09 4절, T1~T7 | Opus(T1·T4·T6), Sonnet(나머지) | **사용자 승인(09 8절 A~G) 뒤.** 가장 먼저 하는 편이 좋다(뒤따르는 세션 전부의 자동 로드 비용이 준다). 문서를 건드리는 다른 묶음과 동시에 돌리지 않는다 |
 | **S9** | 테스트 fixture 치환과 생성자 가드 | 07 T1 | Sonnet | 테스트 파일 전반을 건드린다. S3·S6과 동시에 돌리지 않는다 |
-| **S10** | 배치 판정표와 표 기반 테스트(기존 코드 불변) → 마감 리포트 단계 분리 | 06 T1·T2 | Opus | T2는 주문 경로. 매매 시간대 밖 배포, 2거래일 관찰 |
+| **S10** 🟡 T1 완료(2026-11-15, `be6956778`, 미배포 — 아무도 쓰지 않는 새 클래스라 동작 변화 없음). **T2는 남았다** | **T1 결과**: `trading.domain.model.TradingBatchStep.decide`와 `TradingBatchStepTest` 68행. 본문과 다르게 만든 것·T3·T4가 표를 붙일 때 확인할 차이는 06의 12절. 원래 내용: 배치 판정표와 표 기반 테스트(기존 코드 불변) → 마감 리포트 단계 분리 | 06 T1·T2 | Opus | T2는 주문 경로. 매매 시간대 밖 배포, 2거래일 관찰 |
 
 앞 묶음이 끝나야 한다:
 
@@ -83,7 +83,7 @@
 
 | 묶음 | 내용 | 지침서 | 모델 | 주의 |
 |---|---|---|---|---|
-| **S11** | `orders` 슬롯 유일 제약과 열린 사이클 유일 제약 | 11 T1 | Opus | 주문 경로. 저장 경로 전수 확인이 먼저. 매매 시간대 밖 배포. S1과 한 세션에 묶어도 된다 |
+| **S11** ✅ 완료(2026-11-15, `0cd178893`, 미배포 — **관찰 대기(배포일부터 2거래일)**) | **결과**: trading `V21`(`uq_orders_live_slot`·`uq_strategy_cycle_open`), flush 순서 수정 2곳(`cancelPlanned`·`markEnded`), `LedgerUniqueConstraintIT`. 키에 timing·direction을 넣었다(Q-11). 운영 위반 0건(2026-11-15). 배포는 매매 시간대 밖, 직전에 11의 9절 SQL 재확인, 관찰 항목은 11의 10절. 원래 내용: `orders` 슬롯 유일 제약과 열린 사이클 유일 제약 | 11 T1 | Opus | 주문 경로. 저장 경로 전수 확인이 먼저. 매매 시간대 밖 배포. S1과 한 세션에 묶어도 된다 |
 | **S12** | 보안: 로그아웃 jti 차단, 내부 토큰 상수 시간 비교, 공개 경로 명시, PENDING 차단(D0=(가)일 때) | 13 U1 | Opus | PENDING 차단은 ui가 승인 대기 경로 목록을 준 뒤(`cross-repo.md` E절) |
 | **S13** | 작은 정리: 미사용 코드(13 U2), Alpaca 일봉 페이지네이션(12 F1), `_ping`·낡은 주석(12 F2), `app_error_logs`의 `resolved_at`(11 T5), `owner_user_id`·EPR 완료 행 삭제 설정(11 T8) | 11·12·13 | Sonnet | S9(테스트 fixture)와 동시에 돌리지 않는다 |
 | **S14** | 조사만: 통계 곡선·지수 대조 테스트(13 U3), 메리츠·바이낸스의 접수 불명 주문 복구 가능성(12 F4), 알림 문구 스냅샷(13 U5의 첫 단계) | 12·13 | Opus | 코드 불변. 결과는 findings 25·26으로(19~21은 2차 검토, 22~24는 3차 요청이 썼다). 2026-11-14: F4의 바이낸스 부분은 하지 않는다(15) |
@@ -186,7 +186,7 @@ git grep -n "<단순명>" -- src/test/java/com/kista/api/architecture trading-co
 - **규칙 대상이 비게 된다**(`failOnEmptyShould=true`): 대상 클래스가 전부 사라지는 규칙은 규칙째 지운다(예: KIS 삭제 뒤 `kis_parser_must_not_depend_on_application_layer`).
 - **규칙의 뜻 자체와 부딪힌다**(의존 방향, 모듈 경계, 시간 기준): 규칙을 약화하거나 예외를 늘려서 통과시키지 않는다. 기본값은 "그 항목을 지침서가 가리킨 뒤 단계(대개 05 단계 M·R)로 미룬다"다(Q-07의 답). 미룰 뒤 단계가 없으면 그 항목만 멈추고 `questions.md`에 "사용자 결정 필요"로 적는다.
 - **새 가드를 넣는 태스크**: 지금 위반이 남아 있으면 `@Disabled`로 넣지 않는다. 치환을 끝낸 뒤 넣거나, 현재 위반 전체를 허용 목록에 넣고 켠다(07의 7절이 01의 단계 A-1 문장보다 우선한다).
-- 마이그레이션 번호는 지침서에 적힌 값을 믿지 않고 착수할 때 센다: `ls trading-core/src/main/resources/db/migration-trading src/main/resources/db/migration | sort -V | tail`. 2026-11-14 기준 다음 번호는 trading `V21`, root `V7`이고 지침서 04·11·13·14·15가 모두 여기서 번호를 가져간다. 먼저 커밋한 쪽이 번호를 갖는다.
+- 마이그레이션 번호는 지침서에 적힌 값을 믿지 않고 착수할 때 센다: `ls trading-core/src/main/resources/db/migration-trading src/main/resources/db/migration | sort -V | tail`. 2026-11-15 기준 다음 번호는 trading `V22`(V21은 S11), root `V7`이고 지침서 04·11·13·14·15가 모두 여기서 번호를 가져간다. 먼저 커밋한 쪽이 번호를 갖는다.
 
 ### 9-4. 배포와 승인
 
