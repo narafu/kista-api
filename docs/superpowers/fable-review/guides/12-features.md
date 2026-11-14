@@ -230,7 +230,7 @@ F5·F7의 삭제 범위 전수표는 04 단계 A(브로커 삭제)의 절차를 
 
 기본값(F4, 메리츠의 접수 불명 주문 복구 조사):
 
-- 스펙(`/Users/phs/Downloads/meritz_openapi_spec_20261112.json`)과 `docs/agents/meritz-api.md`만으로 조사한다. 실계좌 호출은 하지 않는다.
+- 스펙(`/Users/phs/Downloads/meritz_openapi_spec_20261112.json`)과 `docs/agents/vendors/meritz.md`만으로 조사한다. 실계좌 호출은 하지 않는다.
 - 주문 조회 API가 "우리가 보낸 그 요청"을 식별할 값(클라이언트 주문 키, 접수 시각과 수량·가격의 조합)을 주면 복구 설계를 04의 3절 표에 항목으로 더한다.
 - 주지 않으면 조사 결과만 findings 파일로 남기고 끝낸다. 지금 동작(접수 불명은 재전송하지 않고 관리자 알림)이 안전한 쪽이라 바꾸지 않는다.
 - 바이낸스는 보지 않는다(15).

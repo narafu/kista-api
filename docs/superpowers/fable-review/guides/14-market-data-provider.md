@@ -233,7 +233,7 @@ KIS 관리자 소스(`KisAdminPriceSource`·`KisAdminTokenCoordinator` 187줄)�
 | T2 | 병행 비교: 배치가 토스 값으로 동작하는 그대로, 같은 시점의 새 출처 값을 조회해 `[시세 비교] ticker= kind= old= new= diffPct=` 로그를 남긴다(전일 종가와 마감+10분·+20분의 확정 종가는 Alpaca, 개장·마감의 현재가는 메리츠 계좌 하나의 증권사 값). 비교 호출의 실패는 배치에 영향을 주지 않는다(`BrokerCallGuard.tryGet`) | Sonnet | T1 | 3거래일. 통과 기준: 전일 종가 전부 일치, 현재가(관리자 토스 대 계좌 증권사) 차이 0.5% 이내, 확정 종가는 SOXL·USD·QLD 일치·TQQQ 0.02달러 이내, 마감+20분에 확정 봉이 조회됨. 결과를 `questions.md`에 표로 적는다 |
 | T3 | 전환: 주문 경로의 현재가를 계좌별 `BrokerPricePort.currentPrices`로(3-5절), 나머지 소비처를 `MarketDataPort`로(4-3절), 마감 리포트 +20분, `TradingPriceFetcher` 축소, Mock 포트 주입, 7절 2·3번 테스트. T2의 비교 로그 코드 삭제 | Opus | T2 통과 | 2거래일. 접수 주문의 가격·수량, 리포트 시각과 종가, 알림을 전환 전날과 대조 |
 | T4 | 환율: `ExchangeRatePort` 구현을 Frankfurter 최신값으로(기존 `FrankfurterFxRateAdapter`의 설정 재사용, 하루 캐시, 날짜 함께 반환), 벤치마크 라벨, 토스 잔고 환산. `cross-repo.md` G절 | Sonnet | 없음(T3과 독립) | 벤치마크 비교 화면 1회 확인 |
-| T5 | 삭제(4-4절): 토스 관리자 코드·설정, 관리자 소스 체인, 메리츠·토스 시세에서 현재가를 뺀 나머지, 옛 포트 메서드. `.env.example`·`application*.yml`·`deploy/server/README.md`의 `TOSS_ADMIN_*`. 문서: `toss-api.md`, `workflow-ledger-price.md`의 "시세 출처", `flows.yml`, `README.md`, `modules/tradingcore/broker.md`·`stats.md`. 운영 secret에서 뺄 키를 `cross-repo.md`에 적는다 | Sonnet(전수표), Opus(검토) | T3 관찰 종료 | 1거래일 |
+| T5 | 삭제(4-4절): 토스 관리자 코드·설정, 관리자 소스 체인, 메리츠·토스 시세에서 현재가를 뺀 나머지, 옛 포트 메서드. `.env.example`·`application*.yml`·`deploy/server/README.md`의 `TOSS_ADMIN_*`. 문서: `vendors/toss.md`, `workflow-ledger-price.md`의 "시세 출처", `flows.yml`, `README.md`, `modules/tradingcore/broker.md`·`stats.md`. 운영 secret에서 뺄 키를 `cross-repo.md`에 적는다 | Sonnet(전수표), Opus(검토) | T3 관찰 종료 | 1거래일 |
 | T6 | 벤치마크 지수 일봉을 `feed=sip`으로. 이미 저장된 지수 값과 비교해 차이가 있으면 다시 받을지 `questions.md`로 올린다 | Sonnet | 없음 | 없음 |
 | T7 | `reloadPlacementPrices` 삭제, 개장 단계의 시세 조회를 한 번으로(3-3·3-4절) | Opus | **06 T2·T3** | 06의 관찰에 포함 |
 
@@ -299,7 +299,7 @@ KIS 관리자 소스(`KisAdminPriceSource`·`KisAdminTokenCoordinator` 187줄)�
 
 태스크별 기본값:
 
-- **T1의 토스 실호출**: 운영에 토스 전략이 없고 실행 세션은 실계좌를 부르지 않는다. 로컬 `application-local.yml`에 토스 계좌 키가 있고 사용자가 허락하면 로컬에서 1회 부른다. 아니면 하지 않고, 토스 계좌는 6절의 대체 경로(Mock처럼 `MarketDataPort.latestPrices`)로 만든다. 나중에 토스 전략이 생기면 그때 확인한다는 한 줄을 `toss-api.md`에 남긴다.
+- **T1의 토스 실호출**: 운영에 토스 전략이 없고 실행 세션은 실계좌를 부르지 않는다. 로컬 `application-local.yml`에 토스 계좌 키가 있고 사용자가 허락하면 로컬에서 1회 부른다. 아니면 하지 않고, 토스 계좌는 6절의 대체 경로(Mock처럼 `MarketDataPort.latestPrices`)로 만든다. 나중에 토스 전략이 생기면 그때 확인한다는 한 줄을 `vendors/toss.md`에 남긴다.
 - **T2의 "메리츠 계좌 하나"**: 운영에서 활성 전략이 있는 메리츠 계좌 중 생성이 가장 이른 것. 비교 호출은 그 계좌의 토큰으로 그 계좌가 가진 종목만 부른다.
 - **T2의 판정**: 통과 기준이 숫자라 실행 세션이 판정한다. 3거래일의 비교 로그를 표로 만들어 `questions.md`에 "자체 결정"으로 적고 T3으로 간다. 어긋나면 어긋난 값의 종류로 가른다: 전일 종가·확정 종가가 어긋나면 T3을 하지 않고 표를 사용자에게 보인다(D3에서 받아들이기로 한 TQQQ 0.02달러를 넘는 차이다). 현재가만 0.5%를 넘으면 조회 시각 차이인지 로그의 시각으로 확인하고, 시각 차이로 설명되면 통과다. 마감+20분에 확정 봉이 없으면 +30분으로 한 번 더 재고 그 값으로 4-3절의 상수를 정한다.
 - **T3의 배포**: 주문 가격의 출처가 바뀐다. 배포 전 확인표(로드맵 9-4)에 T2의 표와 "분할 공시가 있는 주가 아님"을 넣는다.

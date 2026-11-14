@@ -13,9 +13,9 @@
 - 클래스 식별 문자열은 `X.class.getSimpleName()`(리터럴·`getClass()` 금지)
 - Virtual Thread: `@Async`·`CompletableFuture` 금지, 대기는 `Thread.sleep()`
 - 시간: 거래일은 KST 단일 기준, 현재 시각은 `Clock` 주입, `ZoneId.of`는 `TimeZones`만, `UsTradeDates`는 허용 어댑터만(가드: `main_code_must_not_read_system_clock_directly` 외 2개) → `modules/shared/platform.md` "시간 기준 정책"
-- 파라미터 8개 이상이거나 같은 타입이 인접해 자리 바뀜이 통과할 수 있으면 record로 묶는다(기존 record 재사용)
+- 파라미터 8개 이상이거나 같은 타입이 인접해 자리 바뀜이 통과할 수 있으면 record로 묶는다(기존 `VrRampParams`·`ResolvedCreation` 등 재사용)
 - 계좌번호 마스킹은 `AccountNumberMasker.mask()`만. 상태 종속 민감 필드는 응답 DTO `from()`에서 조건부 마스킹 → `modules/api/user.md`
-- 수량 이름: 보유 `holdings`, 주문/체결 `quantity`, 복합 `orderedQuantity`/`filledQuantity`
+- 수량 이름: 보유 `holdings`, 주문/체결 `quantity`, 복합 `orderedQuantity`/`filledQuantity`(`orderedQty` 금지)
 - enum 메타는 `GET /api/meta` 단일 번들. UI에 enum 리터럴 하드코딩 금지
 
 ### 기본값·금액 자릿수
@@ -25,7 +25,7 @@
 
 ### 신규 파일 배치
 애그리게이트 모듈(`com.kista.<api|tradingcore|shared>.<module>`) 안에 `domain/model` + `application/{usecase,port/output,service}` + `adapter/{in,out}`. 공개 범위는 모듈 문서.
-- 인바운드 포트 `application/usecase/`, 아웃바운드 포트 `application/port/output/`의 `*Port`(`*Repository` 금지), 파라미터·반환 타입과 `*Command`(`*Request` 금지)는 `domain/model/`(가드: `outbound_port_interfaces_must_have_Port_suffix` 등)
+- 인바운드 포트 `application/usecase/`, 아웃바운드 포트 `application/port/output/`의 `*Port`(`*Repository` 금지), 파라미터·반환 타입과 `*Command`(`*Request` 금지)는 `domain/model/`(컨트롤러 DTO와 겹치는 타입도 옮기고 DTO에서 re-import)(가드: `outbound_port_interfaces_must_have_Port_suffix` 등)
 - broker 밖이 쓰는 기능은 `tradingcore.broker.application.port.output`의 `*Port`로(가드: `vendor_models_must_not_leak_outside_broker`)
 - 크로스모듈 컨트롤러는 `api.web`, trading-core 전역 web은 `tradingcore.web`, 그 외 컨트롤러는 모듈 `adapter/in/web`
 - 공용 인프라는 `shared.platform`, 주문생성 커널은 `tradingcore.matching`(가드: `platform_must_not_depend_on_other_modules`·`matching_must_not_depend_on_other_modules`)
@@ -46,7 +46,7 @@
 - 스키마 소유 5분리, 남의 스키마 참조(FK 포함) 금지 → `architecture.md`
 - 적용된 마이그레이션은 주석 포함 수정 금지(checksum 크래시). root expand/contract, enum은 `VARCHAR(20)` + `@Enumerated(STRING)` → `flyway.md`
 - AES 컬럼은 `@Convert(AesStringConverter)`·`length≥512`·조건은 `*_hash`, raw INSERT는 암호문 → `modules/shared/platform.md`
-- 소프트 삭제 테이블(`users`·`accounts`·`strategy`·`strategy_cycle`·`cycle_position`·`app_error_logs`)은 `@SQLRestriction("deleted_at IS NULL")`. `nativeQuery`엔 적용 안 돼 수동으로 쓴다. Cascade는 서비스가 사이클 → 계좌 → 사용자 순
+- 소프트 삭제 테이블(`users`·`accounts`·`strategy`·`strategy_cycle`·`cycle_position`·`app_error_logs`)은 `@SQLRestriction("deleted_at IS NULL")`. `nativeQuery`엔 적용 안 돼 수동으로 쓴다. Cascade는 서비스가 사이클 → 계좌 → 사용자 순(DB FK CASCADE 미작동)
 - `application-local.yml` datasource는 `${DB_URL:...}` 형식 유지
 
 ### 공유 enum (`shared.kernel`)

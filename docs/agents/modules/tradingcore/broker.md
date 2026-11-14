@@ -24,3 +24,4 @@ Spring Modulith 모듈(CLOSED) — Meritz/Toss/KIS/Mock 증권사 + Upbit/Binanc
 - `adapter/in/web/CandleInternalController`(`/api/internal/broker/candles/latest`, X-Internal-Token): root market이 `CandlePort`/`BrokerCandle`을 참조하지 않도록 `contract.broker.DailyCandleResponse`로 매핑해 노출한다.
 - 업비트 시세(김프용 KRW-USDT·코인 일봉)는 stats `UpbitMarketDataAdapter`(무인증 공개 시세)가 맡아 업비트 거래를 제거해도 남는다.
 - DCA 규칙: 일봉 페이징·Toss 캡가/0.01 → `vendors/toss.md`, MOO 매핑(KIS 매도 `31`/매수 `32`, 미국 매수는 MOO/MOC 불가) → `vendors/kis.md`, 업비트 → `vendors/upbit.md`·dca.md "코인 DCA 실행". `Broker.supportsOpenAuctionOrders()`가 개장 전 접수 대상 브로커를 가른다. KIS 계좌번호 저장 규칙 → `vendors/kis.md` "KIS 계좌번호 DB 저장 방식".
+- 브로커별 분기가 필요하면 `account.broker() == Broker.TOSS`처럼 직접 비교한다

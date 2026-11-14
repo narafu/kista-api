@@ -47,7 +47,7 @@ broker/
 - `adapter/out/upbit/` 전체, `domain/model/upbit`, `Broker.UPBIT`. `stats`의 `UpbitMarketDataPort`와 그 구현은 broker 어댑터와 독립인지 확인하고 남긴다.
 - `Broker.supportsOpenAuctionOrders()`(KIS만 true)와 그 분기(개장 경매 사전 접수 경로). 동작 경로 삭제라 단계 B에서 따로 다룬다.
 - 관리자 시세 체인: KIS가 빠지면 `AdminMarketPriceAdapter`·`AdminPriceSource`의 체인 단계가 1개다. 체인 추상을 지우고 시세 포트 구현 하나로 둔다.
-- 문서: `docs/agents/kis-api.md`, `upbit-api.md`, 어댑터 디렉토리 `CLAUDE.md`, 루트 `CLAUDE.md`·`README.md`·`flows.yml`의 KIS·업비트 서술. `CLAUDE.md` 첫 줄 "한국투자증권(KIS)·토스증권 API 기반"도 고친다.
+- 문서: `docs/agents/vendors/kis.md`, `vendors/upbit.md`, 어댑터 디렉토리 `CLAUDE.md`, 루트 `CLAUDE.md`·`README.md`·`flows.yml`의 KIS·업비트 서술. `CLAUDE.md` 첫 줄 "한국투자증권(KIS)·토스증권 API 기반"도 고친다.
 
 ### 2-2. 벤더 이름 제거와 시세 포트
 
@@ -121,7 +121,7 @@ record BrokerCapabilities(Broker broker, ExecutionPort execution, PortfolioPort 
 | B8 | 바이낸스 | 수수료가 여러 자산으로 부과될 때 그대로 합산한다 | 낮음 |
 | B9 | 메리츠 | `EGW00202`를 REST 권한 오류로 분류한다. 스펙에서는 WebSocket 접두어 누락 코드다 | 낮음 |
 
-**B3 철회 메모**: 403을 429처럼 `BrokerRateLimitException`으로 바꾸는 안(`findings/12` M4)도 하지 않는다. `CryptoDcaRoundExecutor`의 주문 접수 경로에서 TRANSIENT는 "결과 불명"으로 취급돼 주문이 SUBMITTING으로 남고 예수금이 성공처럼 차감된다. 접수되지 않은 것이 확정인 403에는 맞지 않고, 보안 차단이면 풀릴 때까지 그 상태로 머문다. 지금 동작(그 회차 미주문 기록, 사용자에게 보임)이 더 정직하다. 호출량이 한도의 1% 미만이라 재시도로 얻는 것도 없다. 실행 세션은 403(JSON이 아닌 본문 포함) → `rejected=true`를 고정하는 테스트가 `BinanceHttpClient` 테스트에 없으면 1건 추가하고, `binance-api.md` 오류 매핑 표 4번 행 비고에 "403(WAF)은 매칭 엔진 전 차단이라 확정 거절"을 한 줄 적는다.
+**B3 철회 메모**: 403을 429처럼 `BrokerRateLimitException`으로 바꾸는 안(`findings/12` M4)도 하지 않는다. `CryptoDcaRoundExecutor`의 주문 접수 경로에서 TRANSIENT는 "결과 불명"으로 취급돼 주문이 SUBMITTING으로 남고 예수금이 성공처럼 차감된다. 접수되지 않은 것이 확정인 403에는 맞지 않고, 보안 차단이면 풀릴 때까지 그 상태로 머문다. 지금 동작(그 회차 미주문 기록, 사용자에게 보임)이 더 정직하다. 호출량이 한도의 1% 미만이라 재시도로 얻는 것도 없다. 실행 세션은 403(JSON이 아닌 본문 포함) → `rejected=true`를 고정하는 테스트가 `BinanceHttpClient` 테스트에 없으면 1건 추가하고, `vendors/binance.md` 오류 매핑 표 4번 행 비고에 "403(WAF)은 매칭 엔진 전 차단이라 확정 거절"을 한 줄 적는다.
 
 빠진 처리(결함은 아님): 토스·바이낸스의 `Retry-After` 무시, 토스 401 본문 코드 미사용, 토스 취소 409·422 미분류, 바이낸스 `MARKET_LOT_SIZE`·`applyMinToMarket` 미확인, 메리츠 `expires_in` 폴백 없음.
 
@@ -129,7 +129,7 @@ record BrokerCapabilities(Broker broker, ExecutionPort execution, PortfolioPort 
 
 **지우면 안 되는 방어**(스펙이 함정으로 명시): 메리츠의 HTTP 500 + `rsp_cd` 본문 판정, `0000`이 오류에도 오는 경우, 연속조회 키 오류 시 첫 페이지 반환에 대한 `MAX_PAGES` 가드, 가격 0 검사.
 
-문서 드리프트: `binance-api.md`의 "성공 요청은 weight 0"은 틀렸다(주문 생성·취소류만 해당, `exchangeInfo`는 weight 20). 메리츠 `mod_stpr_cls_code` 주석, 토스 "US MARKET 주문 미지원" 주석(미지원은 MOC·MOO)도 스펙과 다르다. 지침서 09에서 고친다.
+문서 드리프트: `vendors/binance.md`의 "성공 요청은 weight 0"은 틀렸다(주문 생성·취소류만 해당, `exchangeInfo`는 weight 20). 메리츠 `mod_stpr_cls_code` 주석, 토스 "US MARKET 주문 미지원" 주석(미지원은 MOC·MOO)도 스펙과 다르다. 지침서 09에서 고친다.
 
 ## 4. 공용 시장 데이터를 메리츠로 옮기는 안
 

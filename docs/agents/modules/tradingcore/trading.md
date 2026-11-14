@@ -28,7 +28,7 @@
 
 ### 전략 보관 (ARCHIVED)
 - ACTIVE·PAUSED → ARCHIVED 한 방향이다(해제 없음). 보유 0·당일 접수 주문 마감 반영·미체결 취소 성공을 확인한 뒤 저장하고, 실패하면 PAUSED로 남는다
-- 보관 전략의 변경 경로는 모두 `Strategy.requireNotArchived()`로 거부한다. 삭제만 허용한다(소프트 삭제, 통계에서 빠짐)
+- 보관 전략 변경 거부: `Strategy.requireNotArchived()`를 pause·resume·update·VR 재설정·DCA 설정·투자금 추가·인출·수동 체결 보정에서 호출하고, 상태 API(`StrategyStatusInternalController`)는 ARCHIVED 요청과 보관 전략 ACTIVE 요청을 400으로 막는다. 삭제는 보관 전략도 허용한다(소프트 삭제, 통계에서 빠짐)
 - 목록·미리보기 제외는 호출부 필터(`!isArchived()`, `includeArchived`)로 한다. `StrategyPort.findByAccountId(s)`에 필터를 넣지 않는다. 계좌당 종목 중복 검사만 보관을 제외한다
 - 상태 쓰기는 `save(withStatus(...))`가 아니라 조건부 UPDATE(`updateStatusUnlessArchived`·`archiveIfPaused`)로 한다
 - 마감 리포트는 ARCHIVED도 PAUSED처럼 잡아 보관 직전 접수분 체결을 원장에 남긴다(사이클 종료만 기록, rotation·알림·VR 롤오버 없음)

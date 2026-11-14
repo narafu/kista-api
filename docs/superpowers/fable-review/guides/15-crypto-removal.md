@@ -95,10 +95,10 @@ C1의 사전 작업이 끝나기 전에는 단계 A 이후를 시작하지 않�
 | `shared/.../kernel/StrategyTicker.java` | 상수 2개. 모양은 `QLD(BigDecimal.ZERO, "…", Market.US_STOCK)`와 같다. 설명 문자열은 발행사의 현재 공식 명칭을 확인해 적는다 |
 | `shared/.../kernel/StrategyType.java:31` | DCA 허용 종목 `EnumSet`과 `:18` 주석. 다른 전략 종류에는 넣지 않는다 |
 | `shared/.../kernel/TradingPolicySettings.java:45` | DCA 허용 종목 기본값 |
-| `trading-core/.../meritz/MeritzExchangeRegistry.java` | 거래소 매핑. QLD(`"0066","AX"`)와 같을 가능성이 높지만 **메리츠 계좌로 두 종목의 현재가를 1회씩 조회해 확인한 뒤** 넣는다(`meritz-api.md:42`의 실측 목록도 갱신) |
+| `trading-core/.../meritz/MeritzExchangeRegistry.java` | 거래소 매핑. QLD(`"0066","AX"`)와 같을 가능성이 높지만 **메리츠 계좌로 두 종목의 현재가를 1회씩 조회해 확인한 뒤** 넣는다(`vendors/meritz.md:42`의 실측 목록도 갱신) |
 | `trading-core/.../kis/KisExchangeRegistry.java` | KIS가 아직 남아 있으면 AMEX 매핑(`"AMEX","AMS"`) 추가. 04 단계 A가 먼저 끝났으면 없다 |
 | 테스트 | `StrategyTypeCapabilityTest:69`, `TradingPolicySettingsTest:55,112`(둘 다 `containsExactly`), `MeritzExchangeRegistryTest:20` |
-| 문서 | `README.md:13`, `meritz-api.md:42` |
+| 문서 | `README.md:13`, `vendors/meritz.md:42` |
 
 자동으로 따라오는 것: `/api/meta`(`StrategyTicker.values()`), 토스(심볼이 enum 이름), Alpaca(심볼이 enum 이름. 두 종목 모두 `tradable`, 2026-11-14 실호출). 벤치마크의 ETF 목록(`EtfBenchmarkSymbol`)은 별개라 건드리지 않는다.
 
@@ -168,7 +168,7 @@ root 스키마는 바꿀 것이 없다. `kista_ref.fear_greed_snapshots`에는 C
 | T2 | 6절 1번: 주식 DCA 테스트 분리·보강 | Opus | 없음 |
 | T3 | 단계 P ③의 운영 확인 조회(읽기 전용)와 결과 기록. 덤프와 삭제 SQL 초안을 사용자에게 제시(4절) | Opus | 사용자의 단계 P ①② |
 | T4 | 단계 A: 통째 삭제 → 분기 제거 → Flyway(가드·완전 삭제·정책 JSON) → 테스트 기대값. 커밋은 "통째 삭제", "분기 제거", "마이그레이션"으로 나누되 배포는 하나 | Sonnet(통째 삭제·기계적 분기), Opus(DCA 커널·거래일·원장 서비스의 분기, 마이그레이션 검토) | T1~T3, 단계 U 배포 |
-| T5 | `flows.yml`(흐름 `crypto-market-indicators`·`crypto-dca` 삭제와 문구 약 20곳), `README.md`, `docs/architecture-map.md`, `CLAUDE.md`, `docs/agents/binance-api.md`·`upbit-api.md` 삭제, 모듈 문서(`dca.md`·`broker.md`·`stats.md`·`trading.md`·`account.md`·`notify.md`·`modules/api/market.md`·`admin.md`), `scheduler-time-table.md`, `code-quality-backlog.md`의 코인 항목, `scripts/dev-seed/dev-seed.sql`의 코인 시드, `.env.example`·`deploy/server/README.md` | Sonnet | T4와 같은 배포 |
+| T5 | `flows.yml`(흐름 `crypto-market-indicators`·`crypto-dca` 삭제와 문구 약 20곳), `README.md`, `docs/architecture-map.md`, `CLAUDE.md`, `docs/agents/vendors/binance.md`·`vendors/upbit.md` 삭제, 모듈 문서(`dca.md`·`broker.md`·`stats.md`·`trading.md`·`account.md`·`notify.md`·`modules/api/market.md`·`admin.md`), `scheduler-time-table.md`, `code-quality-backlog.md`의 코인 항목, `scripts/dev-seed/dev-seed.sql`의 코인 시드, `.env.example`·`deploy/server/README.md` | Sonnet | T4와 같은 배포 |
 | T6 | 단계 B: `Market` enum과 메타 필드 삭제, `execution_hour` 컬럼 삭제 마이그레이션 | Opus(범위 확인), Sonnet(적용) | T4 배포 후 1거래일, kista-ui의 메타 필드 제거 확인 |
 | T7 | 단계 D: `cross-repo.md`에 운영 secret 제거 요청 기록, memory `project_broker_strategy`·`project_binance_dca` 갱신 확인 | Sonnet | T4 |
 
