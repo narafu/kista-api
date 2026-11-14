@@ -287,3 +287,12 @@ findings 09가 "같은 trading 코드가 web·worker 두 프로세스에서 돌 
 - 검수: Opus 리뷰어 1회(두 묶음 합친 diff). 차단 결함 없음, 가드 구멍 4건과 문서 드리프트 1건을 커밋 전에 반영. 전체 테스트 1회 통과(리뷰 반영 뒤에는 architecture 테스트만 다시 돌렸다). push하지 않았다.
 - questions.md 추가 없음(중단 조건에 걸린 것 없음, 마지막 번호 Q-11 그대로).
 
+## 실행 기록 2026-11-15 — S15 T1·T2, S14
+
+- **S15 T1**: 공용 시세 `AlpacaMarketDataAdapter`(broker `adapter/out/marketdata`)와 계약 테스트 9건(변이 3종 확인). 지침서와 다르게 한 것: 포트 인터페이스를 만들지 않았다(Q-12), 토스 계좌 토큰 실호출을 하지 않았다(Q-13). `AlpacaProperties`는 `shared.platform.alpaca` 한 벌. Alpaca 규약(snapshots·bars의 인자, `limit`이 종목 합산이고 종목순으로 페이지가 나뉘는 것, `page_token`)은 공식 문서로 확인했다. 세부는 14의 11절 "T1 실행 결과".
+- **S15 T2**: `[시세 비교]` 로그(Sonnet 구현). 기존 시세 경로와 리포트 시각은 그대로다. 배포 뒤 3거래일 관찰, 방법과 기준은 14의 11절 "T2 실행 결과". 미배포.
+- **S14**: `findings/25-stats-divergence.md`, `findings/26-submitting-recovery.md`, 대조 테스트 `StatsCurveIndexDivergenceTest`(7건), 알림 문구 스냅샷 `NotificationMessageSnapshotTest` 2개(26건). main 코드 불변.
+- 검수: S15 코드에 Opus 리뷰어 1회. 차단 결함 없음. 권고 4건을 커밋 전에 반영했다 — 비교 호출이 주문 접수와 리포트 임계 구간 안에서 메리츠·Alpaca를 동기 호출하던 것을 접수 뒤·가상 스레드로 옮김, 수동 개장에서 미국 세션일이 하루 어긋나던 것(`DstInfo` 대신 거래일 − 1일), 테스트 보강, `page_token` 인코딩과 체결 시각 누락 방어. 반영 뒤 재리뷰는 하지 않았고 전체 테스트 1회 통과. S14는 테스트·문서뿐이라 리뷰하지 않았다. push하지 않았다.
+- 다음: T2 관찰 통과 → N19(14 T3·T5). N19에서 정할 것은 14의 11절 "T1 실행 결과"에 적었다(확정 봉의 완결 전 호출 거부, `interval` 인자 삭제, stats 어댑터 합치기, 토스 계좌 현재가). N15(13 U4)는 `findings/25` 5절의 권고 규칙과 사용자 확인 1건에서 시작한다. S15의 T4(환율)·T6(지수 `feed=sip`)은 하지 않았다.
+- questions.md: Q-12, Q-13 추가(둘 다 자체 결정).
+
