@@ -157,7 +157,7 @@ class OrderPersistenceAdapterTest {
         adapter.cancelPlanned(orderId);
 
         assertThat(entity.getStatus()).isEqualTo(OrderStatus.CANCELLED);
-        verify(repository).save(entity);
+        verify(repository).saveAndFlush(entity); // 같은 트랜잭션의 재저장 INSERT보다 먼저 내려야 한다
     }
 
     @Test

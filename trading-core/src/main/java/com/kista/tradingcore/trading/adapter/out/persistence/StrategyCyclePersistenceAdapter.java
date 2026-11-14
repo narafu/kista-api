@@ -57,6 +57,8 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
             e.setEndAmount(endAmount);
             e.setEndDate(endDate);
         });
+        // 종료 뒤 같은 트랜잭션에서 새 사이클을 여는 경로(VR 롤오버·재설정)가 있다 — 커밋 flush는 INSERT가 UPDATE보다 먼저라 uq_strategy_cycle_open 위반이 된다
+        jpaRepository.flush();
     }
 
     @Override

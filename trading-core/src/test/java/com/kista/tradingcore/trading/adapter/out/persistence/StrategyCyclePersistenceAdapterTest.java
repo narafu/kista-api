@@ -60,10 +60,19 @@ class StrategyCyclePersistenceAdapterTest extends DataJpaTestBase {
     }
 
     private void insertCycle(UUID cycleId, UUID strategyId, Instant createdAt, boolean deleted) {
+        insertCycle(cycleId, strategyId, createdAt, deleted, false);
+    }
+
+    // 전략당 열린 사이클은 하나(uq_strategy_cycle_open) — 같은 전략의 옛 사이클은 종료로 넣는다
+    private void insertEndedCycle(UUID cycleId, UUID strategyId, Instant createdAt) {
+        insertCycle(cycleId, strategyId, createdAt, false, true);
+    }
+
+    private void insertCycle(UUID cycleId, UUID strategyId, Instant createdAt, boolean deleted, boolean ended) {
         jdbcTemplate.update(
-                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, start_date, created_at, deleted_at) "
-                        + "VALUES (?, ?, (SELECT id FROM strategy_version WHERE strategy_id = ?), ?, 0, ?, ?, ?)",
-                cycleId, strategyId, strategyId, new BigDecimal("1000.00"), LocalDate.now(),
+                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, start_date, end_date, created_at, deleted_at) "
+                        + "VALUES (?, ?, (SELECT id FROM strategy_version WHERE strategy_id = ?), ?, 0, ?, ?, ?, ?)",
+                cycleId, strategyId, strategyId, new BigDecimal("1000.00"), LocalDate.now(), ended ? LocalDate.now() : null,
                 Timestamp.from(createdAt), deleted ? Timestamp.from(createdAt) : null);
     }
 
@@ -82,7 +91,7 @@ class StrategyCyclePersistenceAdapterTest extends DataJpaTestBase {
 
         // 등록 순서를 뒤섞어 createdAt ASC 정렬이 insert 순서가 아님을 검증
         insertCycle(cycleA2, strategyA, base.plus(2, ChronoUnit.HOURS), false);
-        insertCycle(cycleA1, strategyA, base, false);
+        insertEndedCycle(cycleA1, strategyA, base);
         insertCycle(cycleB1, strategyB, base.plus(1, ChronoUnit.HOURS), false);
         insertCycle(deletedCycle, strategyA, base.plus(3, ChronoUnit.HOURS), true); // 삭제 — 제외
         insertCycle(otherCycle, otherStrategy, base, false); // 조회 대상 전략 아님 — 제외
@@ -133,7 +142,7 @@ class StrategyCyclePersistenceAdapterTest extends DataJpaTestBase {
         UUID deletedLatestB = UUID.randomUUID(); // strategyB의 더 최신이지만 삭제됨 — 제외되어야 함
         UUID otherCycle = UUID.randomUUID();
 
-        insertCycle(cycleA1, strategyA, base, false);
+        insertEndedCycle(cycleA1, strategyA, base);
         insertCycle(cycleA2, strategyA, base.plus(2, ChronoUnit.HOURS), false);
         insertCycle(cycleB1, strategyB, base.plus(1, ChronoUnit.HOURS), false);
         insertCycle(deletedLatestB, strategyB, base.plus(3, ChronoUnit.HOURS), true);

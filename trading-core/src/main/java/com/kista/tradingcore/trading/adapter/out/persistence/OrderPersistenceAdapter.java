@@ -107,7 +107,8 @@ class OrderPersistenceAdapter implements OrderPort {
         OrderEntity e = lockOrConflict(orderId);
         requireStatus(e, OrderStatus.PLANNED);
         e.setStatus(OrderStatus.CANCELLED);
-        repository.save(e);
+        // 취소 뒤 같은 트랜잭션에서 같은 슬롯에 새 PLANNED를 넣는 경로(가격 보정)가 있다 — 커밋 flush는 INSERT가 UPDATE보다 먼저라 uq_orders_live_slot 위반이 된다
+        repository.saveAndFlush(e);
     }
 
     @Override

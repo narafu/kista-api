@@ -250,3 +250,21 @@ HAVING max(v.version_no) FILTER (WHERE v.deleted_at IS NULL) < max(v.version_no)
 - "삭제된 사이클·포지션을 일부러 읽는 코드"는 T2에서 `@SQLRestriction`을 떼기 전에 찾는다: native 쿼리 중 `deleted_at` 조건이 **없는** 것이 후보다. 발견하면 그 쿼리는 지금 결과를 유지하도록 조건을 명시하고 목록을 T2 커밋 메시지에 적는다.
 
 승인이 필요한 것(로드맵 9-4): T6의 "이미 삭제된 계좌 5개의 자격증명 정리", T8의 운영 정리 SQL 2건. SQL 본문과 `SELECT count(*)` 결과를 사용자에게 보인 뒤 돌린다. T1·T4는 스키마 변경이고 주문 경로라 매매 시간대 밖에 배포한다. "T3 배포 뒤 2거래일 관찰"은 실행 세션이 한다(삭제·재등록이 그 사이 없었으면 관찰할 것이 없으므로, 로컬에서 전략 삭제 → 조회 → 재등록을 한 번 돌린 것으로 갈음하고 T4로 간다).
+
+## 10. T1 실행 기록 (2026-11-15)
+
+마이그레이션 `V21__ledger_unique_constraints.sql`(trading). 저장 경로 전수표는 `findings/27-s11-save-paths.md`, 검증은 `LedgerUniqueConstraintIT`(실 DB 15건). 운영 위반 행은 두 제약 모두 0건(2026-11-15, 9절의 SQL 그대로).
+
+본문과 다르게 한 것:
+
+- **`uq_orders_live_slot`의 키는 `(strategy_cycle_id, trade_date, timing, direction, order_leg)`다.** 코드의 슬롯 판정(`TradingOrderSlots`)과 맞췄다. 이유와 반대쪽 결과는 `questions.md` Q-11.
+- `uq_strategy_cycle_open`은 `AND deleted_at IS NULL`을 붙였다(2-1 적용 전). T4에서 `strategy_cycle.deleted_at`을 drop할 때 이 인덱스를 조건 없는 것으로 다시 만든다.
+- **전수 확인에서 같은 트랜잭션의 SQL 순서 문제 2건이 나왔고 어댑터에서 고쳤다.** Hibernate는 커밋 flush에서 INSERT를 UPDATE보다 먼저 보낸다. ① VR 롤오버·재설정(`CycleSnapshotCreator.rolloverVrCycle`·`reconfigureVrCycle`)의 "옛 사이클 종료 → 새 사이클 저장" → `StrategyCyclePersistenceAdapter.markEnded`가 flush한다 ② PRIVACY 개별 가격 보정(`BuyOrderPriceCapper.applyIndividualCap`)의 "PLANNED 취소 → 같은 leg 재저장" → `OrderPersistenceAdapter.cancelPlanned`가 flush한다. 둘 다 제약을 건 뒤 flush를 빼면 IT가 실패하는 것을 확인했다. "살아 있는 주문 둘이 정상인 경로"(중단 조건)는 아니다. 순간적으로도 둘이 되지 않게 순서만 고정했다.
+- ⑤ 위반 시 처리는 새 코드 없이 충족된다. 배치의 PLANNED 저장은 `TradingBatchGuard.runSafely("원장 판정·계획 주문 저장")` 안이라 저장 실패가 그 사이클을 접수 대상에서 빼고 `TradingErrorEvent`로 관리자에게 간다(재시도 없음). 수동 실행은 500으로 끝난다. 사이클 회전(`CycleRotationService`)에서 위반이 나면 기존 실패 처리대로 전략이 PAUSED가 된다.
+- 리포트가 죽은 행(CANCELLED)을 FILLED로 되살리는 전이는 찾지 못했다(`TradingReporter.markFilledOrders`는 당일 취소 행을 CANCELLED로 유지한다). 그런 전이가 생기면 제약이 UPDATE도 막는다(IT로 고정).
+
+리뷰에서 나온 것(고치지 않고 적어 둔다): ① `StrategyService.reopenCycleIfEnded`에 같은 전략의 재개가 동시에 두 번 오면 둘째가 `uq_strategy_cycle_open`에 막혀 500이 된다(전에는 열린 사이클이 둘 생겼다). 409로 바꿀지는 13 U8(오류 상태)에서 정한다 ② 리포트 재개의 `mainOrders`는 전략의 당일 주문 전체인데 제외 목록은 현재 사이클의 CANCELLED만 본다. 같은 날 사이클이 바뀌고(VR 재설정) 옛 사이클의 취소 행에 체결이 있으면 `markFilled`가 그 행을 FILLED로 바꾼다. 기존 동작이고 옛 사이클의 같은 슬롯에 살아 있는 행이 또 있어야 제약에 걸리므로 그대로 둔다.
+
+제약을 걸면서 고친 기존 테스트: `OrderPersistenceAdapterDbTest`(한 전략에 열린 사이클 둘 → 하나는 종료, 같은 leg의 코인 주문 둘 → leg 분리), `StrategyCyclePersistenceAdapterTest`(옛 사이클을 종료로), `OrderPersistenceAdapterTest`(`saveAndFlush` 검증).
+
+배포: trading 스키마 마이그레이션 + 주문 저장 경로라 매매 시간대 밖(KST 07:00~16:00)에 한다. 배포 직전 9절의 SQL 두 개를 다시 돌려 0건인지 본다(0건이 아니면 `CREATE UNIQUE INDEX`가 실패해 kista-trading이 기동하지 못한다). 배포 뒤 2거래일 관찰: 관리자 알림과 `docker logs kista-trading`의 `uq_orders_live_slot`·`uq_strategy_cycle_open` 0건, PRIVACY 가격 보정(`BUY 가격 보정 완료(개별)`)과 VR 롤오버가 있던 날의 정상 완료.

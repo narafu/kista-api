@@ -63,8 +63,8 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
                 "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, start_date, created_at) VALUES (?, ?, ?, ?, 0, ?, now())",
                 cycleId, strategyId, strategyVersionId, new BigDecimal("1000.00"), LocalDate.now());
         jdbcTemplate.update(
-                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, start_date, created_at) VALUES (?, ?, ?, ?, 0, ?, now())",
-                otherCycleId, strategyId, strategyVersionId, new BigDecimal("2000.00"), LocalDate.now());
+                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, start_date, end_date, created_at) VALUES (?, ?, ?, ?, 0, ?, ?, now())",
+                otherCycleId, strategyId, strategyVersionId, new BigDecimal("2000.00"), LocalDate.now(), LocalDate.now()); // 종료된 사이클 — 전략당 열린 사이클은 하나(uq_strategy_cycle_open)
     }
 
     @Test
@@ -323,8 +323,12 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
     }
 
     Order saveCrypto() {
+        return saveCrypto("DCA_BUY");
+    }
+
+    Order saveCrypto(String leg) {
         return adapter.save(Order.cryptoMarket(accountId, cycleId, LocalDate.of(2026, 10, 18),
-                StrategyTicker.BTC, OrderDirection.BUY, "DCA_BUY", OrderTiming.AT_CLOSE,
+                StrategyTicker.BTC, OrderDirection.BUY, leg, OrderTiming.AT_CLOSE,
                 new BigDecimal("0.0001"), new BigDecimal("10000")));
     }
 
@@ -335,7 +339,7 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
         adapter.markPlaced(a, "upbit-uuid");
         assertThat(statusOf(a)).isEqualTo(OrderStatus.PLACED);
 
-        UUID b = saveCrypto().id();
+        UUID b = saveCrypto("DCA_BUY_2").id(); // 같은 슬롯에 살아 있는 주문은 하나(uq_orders_live_slot)
         adapter.markSubmitting(b);
         adapter.markFailed(b);
         assertThat(statusOf(b)).isEqualTo(OrderStatus.FAILED);
