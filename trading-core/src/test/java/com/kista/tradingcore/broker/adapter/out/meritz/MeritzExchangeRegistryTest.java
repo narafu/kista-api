@@ -17,7 +17,7 @@ class MeritzExchangeRegistryTest {
         assertThat(registry.vendorId(StrategyTicker.TQQQ)).isEqualTo("0537");
         assertThat(registry.marketCode(StrategyTicker.TQQQ)).isEqualTo("OQ");
         for (StrategyTicker t : new StrategyTicker[]{StrategyTicker.SOXL, StrategyTicker.USD, StrategyTicker.MAGX,
-                StrategyTicker.UPRO, StrategyTicker.QLD}) {
+                StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BITO, StrategyTicker.EETH}) {
             assertThat(registry.vendorId(t)).isEqualTo("0066");
             assertThat(registry.marketCode(t)).isEqualTo("AX");
         }

@@ -19,7 +19,9 @@ class KisExchangeRegistry {
             StrategyTicker.USD,  new Mapping("AMEX", "AMS"),
             StrategyTicker.MAGX, new Mapping("AMEX", "AMS"),
             StrategyTicker.UPRO, new Mapping("AMEX", "AMS"), // ProShares UltraPro S&P500 — NYSE Arca
-            StrategyTicker.QLD, new Mapping("AMEX", "AMS")   // ProShares Ultra QQQ — NYSE Arca
+            StrategyTicker.QLD, new Mapping("AMEX", "AMS"),  // ProShares Ultra QQQ — NYSE Arca
+            StrategyTicker.BITO, new Mapping("AMEX", "AMS"), // ProShares Bitcoin ETF — NYSE Arca
+            StrategyTicker.EETH, new Mapping("AMEX", "AMS")  // ProShares Ether ETF — NYSE Arca
     );
 
     public String ovrsExcgCd(StrategyTicker ticker) {

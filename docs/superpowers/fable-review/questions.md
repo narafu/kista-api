@@ -135,3 +135,22 @@
   2. 가드를 고친다: `TimeZones`를 `shared.platform.time`으로 옮기거나(전 코드 import 변경) platform 예외를 하나 추가하고 `ClockConfig`를 platform으로 옮긴다.
 - 멈춘 범위: P2의 Clock 항목만. 블랙리스트·`fearGreedRestClient` 개명은 진행했다. Alpaca 3벌 → 1벌은 하지 않았다 — 충돌이 아니고(findings/10 A1·A4, 빈 이름·properties FQCN이 모두 다름) 합치려면 R benchmark와 T marketcalendar·stats가 함께 쓸 새 platform 타입이 필요해 단계 X/R에서 alpaca 소유 모듈이 정해질 때 하는 편이 낫다.
 - 답: (Fable) 지침서 05의 3절 P2와 4-1절 M9 개정 — 선택지 ①. `ClockConfig`는 P2에서 빼고 M9에서 T 쪽 한 벌 삭제(가드 예외 목록의 T FQCN도 함께), Alpaca 3벌 → 1벌은 단계 X·R로 이동, `ee2027ca0`
+
+### Q-08 T0 BITO·EETH의 메리츠 거래소 코드를 실측하지 않고 넣었다
+- 상태: 자체 결정 (배포 뒤 사용자 확인 필요)
+- 묶음·태스크: S17 / 지침서 15 T0
+- 걸린 곳: 2-4절 "메리츠 계좌로 두 종목의 현재가를 1회씩 조회해 확인한 뒤 넣는다"와 로드맵 9-2 U3 "실계좌 실측은 하지 않는다". 10절 기본값이 "QLD와 같은 매핑을 넣고 배포 뒤 사용자가 확인"으로 정했다.
+- 근거: 둘 다 NYSE Arca 상장(`PROGRESS.md` 2차 결정, Alpaca `ARCA`). `MeritzExchangeRegistry`에 QLD와 같은 `"0066","AX"`를 넣었다. `meritz-api.md:42` 실측 목록에는 "실측 전"으로 따로 적었다.
+- 선택지: ① 지금 값 유지, 사용자가 확인. 매핑이 틀렸을 때 예상: 시세 조회·주문이 벤더 오류로 실패한다(미실측). 주문이 나가지 않는 방향이라 돈은 움직이지 않는다.
+- 멈춘 범위: 없음. 관리자 설정의 두 종목 허용만 확인 뒤로 미룬다.
+- 사용자 할 일(순서대로): 1) 배포 2) 관리자 설정에서 허용하기 **전에** 메리츠 계좌의 전략 등록 화면에서 BITO·EETH 현재가가 조회되는지 본다 3) 조회되면 관리자 설정 DCA 허용 종목에 두 종목을 넣는다(저장된 정책 JSON은 backfill되지 않는다 — `TradingPolicySettingsPersistenceAdapter:60-85`. 화면에서 안 되면 `db/migration-trading` jsonb 수정 1건) 4) 조회되지 않으면 그 종목은 허용하지 않고 매핑을 고친다(`meritz-api.md:42`의 실측 목록도 갱신)
+- 답: 자체 결정(2026-11-14), 지침서 15의 10절 기본값을 따름
+
+### Q-09 T0 EETH 발행사 명칭과 enum 위치
+- 상태: 자체 결정
+- 묶음·태스크: S17 / 지침서 15 T0
+- 걸린 곳: 10절 "상수 설명 문자열은 발행사 사이트에서 확인한다", "새 종목은 목록 끝에 더한다".
+- 근거: BITO는 ProShares SAI(2024-09-27 개명 "ProShares Bitcoin Strategy ETF" → "ProShares Bitcoin ETF")와 펀드 페이지로 확인했다. EETH는 같은 2024 SAI에 "Ether ETF"로 나오지만 2023 ProShares 글은 "Ether Strategy ETF"라 개명 공시를 직접 보지 못했다. 설명은 기존 대문자 표기로 `PROSHARES BITCOIN ETF`·`PROSHARES ETHER ETF`. 순서: `EnumSet`은 선언 순서로 돌기 때문에 상수를 QLD 뒤·BTC 앞에 두고, 허용 목록·테스트도 UPRO, QLD, BITO, EETH, BTC, ETH로 맞췄다("목록 끝"이 아니라 주식 종목 끝). BTC·ETH는 N18에서 지워지므로 그 뒤에는 목록 끝과 같다.
+- 선택지: EETH 명칭이 다르면 설명 문자열 한 줄만 고친다(UI 메타 표시용, DB·주문 영향 없음).
+- 멈춘 범위: 없음.
+- 답: 자체 결정(2026-11-14)

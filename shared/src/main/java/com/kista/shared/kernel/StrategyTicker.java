@@ -18,6 +18,8 @@ public enum StrategyTicker {
     SOXL(new BigDecimal("0.20"), "DIREXION SEMICONDUCTOR DAILY 3X", Market.US_STOCK), // 베타: 5.3~5.5
     UPRO(BigDecimal.ZERO, "PROSHARES ULTRAPRO S&P500 3X", Market.US_STOCK), // DCA 전용 — 익절률 미사용
     QLD(BigDecimal.ZERO, "PROSHARES ULTRA QQQ 2X", Market.US_STOCK),        // DCA 전용 — 익절률 미사용
+    BITO(BigDecimal.ZERO, "PROSHARES BITCOIN ETF", Market.US_STOCK),       // DCA 전용 — 비트코인 선물 ETF(NYSE Arca)
+    EETH(BigDecimal.ZERO, "PROSHARES ETHER ETF", Market.US_STOCK),         // DCA 전용 — 이더리움 선물 ETF(NYSE Arca)
     BTC(BigDecimal.ZERO, "BITCOIN", Market.CRYPTO_KRW, Market.CRYPTO_USDT), // 코인 DCA 전용 — 거래소 마켓 코드는 어댑터 레지스트리 소유
     ETH(BigDecimal.ZERO, "ETHEREUM", Market.CRYPTO_KRW, Market.CRYPTO_USDT); // 코인 DCA 전용
 

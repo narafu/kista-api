@@ -52,7 +52,7 @@ class TradingPolicySettingsTest {
     @Test
     void dcaDefaultsAllowCryptoTickers() {
         assertThat(TradingPolicySettings.defaults().strategy(StrategyType.DCA).ticker().allowedValues())
-                .containsExactly(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BTC, StrategyTicker.ETH);
+                .containsExactly(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BITO, StrategyTicker.EETH, StrategyTicker.BTC, StrategyTicker.ETH);
     }
 
     @Test
@@ -109,7 +109,7 @@ class TradingPolicySettingsTest {
     void defaults_keep_dca_disabled_with_dca_tickers() {
         StrategyCreationSettings dca = TradingPolicySettings.defaults().strategy(StrategyType.DCA);
         assertThat(dca.enabled()).isFalse();
-        assertThat(dca.ticker().allowedValues()).containsExactly(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BTC, StrategyTicker.ETH);
+        assertThat(dca.ticker().allowedValues()).containsExactly(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BITO, StrategyTicker.EETH, StrategyTicker.BTC, StrategyTicker.ETH);
         assertThat(dca.ticker().defaultValue()).isEqualTo(StrategyTicker.UPRO);
         assertThat(dca.divisionCount()).isNull();
     }

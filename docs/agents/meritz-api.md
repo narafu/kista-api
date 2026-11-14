@@ -39,7 +39,7 @@ adapter/out/meritz/ ← MeritzHttpClient(본문 `rsp_cd` 기반 응답 판정 �
 | 매수/매도 | `POST /trading/v1/overseas/orders/{buy\|sell}` | 응답 `rsp_cd 0001` + `data{oder_no, warn_cls_code, warn_msg}` |
 | 취소 | `POST /trading/v1/overseas/orders/cancel`(`oder_date`(US), `orgl_oder_no`, `oder_cls_code`(원주문 그대로), `odqt`) | |
 
-거래소 코드: 주문·잔고는 벤더코드 `ovrs_exch_vndr_idno`(NASDAQ `0537`, AMEX `0066`, NYSE `0321`), 시세는 `mrkt_cls_code`(`OQ`/`AX`/`NY`). 실측 TQQQ=OQ/0537, SOXL·USD·MAGX·UPRO·QLD=AX/0066. 매핑 SSOT는 `MeritzExchangeRegistry`.
+거래소 코드: 주문·잔고는 벤더코드 `ovrs_exch_vndr_idno`(NASDAQ `0537`, AMEX `0066`, NYSE `0321`), 시세는 `mrkt_cls_code`(`OQ`/`AX`/`NY`). 실측 TQQQ=OQ/0537, SOXL·USD·MAGX·UPRO·QLD=AX/0066. BITO·EETH=AX/0066은 같은 NYSE Arca 상장이라 넣은 값이다(실측 전). 매핑 SSOT는 `MeritzExchangeRegistry`.
 
 주문체결내역은 **주문당 1행·누적 체결**(실측 733건, `oder_no` 중복 0): `cntg_dqty`=누적 체결수량, `cntg_crnc_prc`=평균 체결가, `cntg_camt`=체결금액. `seln_byov_clcd` 1매도/2매수, `oder_rctf_cncl_cls_code` 0원주문/1정정/2취소, `ovrs_stck_oder_stat_cls_code` 0정상/1거부/2자동거부/3자동취소/4미접수. 부분 체결 후 장 마감 만료는 `3`·`ncnt_odqt=0`. `getExecutions`는 원주문 행·체결수량>0·종목 일치만 `Execution`으로 만든다(KIS와 같은 규칙).
 

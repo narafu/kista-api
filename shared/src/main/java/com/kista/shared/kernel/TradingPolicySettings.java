@@ -42,7 +42,7 @@ public record TradingPolicySettings(
                 field(true, List.of(BigDecimal.valueOf(10), BigDecimal.valueOf(15), BigDecimal.valueOf(20)), BigDecimal.valueOf(15)),
                 field(true, List.of(1, 2, 4), 2)));
         strategies.put(StrategyType.DCA, new StrategyCreationSettings(false, // 단계 배포 — 운영자가 관리자 설정에서 켠다
-                field(true, List.of(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BTC, StrategyTicker.ETH),
+                field(true, List.of(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BITO, StrategyTicker.EETH, StrategyTicker.BTC, StrategyTicker.ETH),
                         StrategyTicker.UPRO), null, null, null, null));
         return new TradingPolicySettings(brokers, strategies);
     }

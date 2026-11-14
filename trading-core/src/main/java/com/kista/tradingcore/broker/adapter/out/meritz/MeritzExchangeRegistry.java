@@ -17,7 +17,9 @@ class MeritzExchangeRegistry {
             StrategyTicker.USD, new Mapping("0066", "AX"),
             StrategyTicker.MAGX, new Mapping("0066", "AX"),
             StrategyTicker.UPRO, new Mapping("0066", "AX"),
-            StrategyTicker.QLD, new Mapping("0066", "AX")
+            StrategyTicker.QLD, new Mapping("0066", "AX"),
+            StrategyTicker.BITO, new Mapping("0066", "AX"), // NYSE Arca — QLD와 같은 매핑(실측 전, 배포 뒤 등록 화면 현재가로 확인)
+            StrategyTicker.EETH, new Mapping("0066", "AX")  // NYSE Arca — 위와 같음
     );
 
     String vendorId(StrategyTicker ticker) {

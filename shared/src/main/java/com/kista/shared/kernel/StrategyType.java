@@ -15,7 +15,7 @@ public enum StrategyType {
     INFINITE("무한매수법"), // MAGX/USD/TQQQ/SOXL 지원 (DCA 전용 티커 제외)
     PRIVACY("Fanding P전략"), // SOXL 전용
     VR("밸류리밸런싱"), // TQQQ 전용 — 밸류 기반 리밸런싱
-    DCA("적립식 분할매매"); // UPRO/QLD(주식)·BTC/ETH(코인) — 주기별 고정 금액 단방향 매매
+    DCA("적립식 분할매매"); // UPRO/QLD/BITO/EETH(주식)·BTC/ETH(코인) — 주기별 고정 금액 단방향 매매
 
     private final String description; // 전략 설명
 
@@ -28,7 +28,7 @@ public enum StrategyType {
             case PRIVACY -> StrategyCapability.basic(EnumSet.of(StrategyTicker.SOXL), true, true, false, true, List.of());
             case VR -> StrategyCapability.basic(EnumSet.of(StrategyTicker.TQQQ), true, false, false, false, List.of());
             case DCA -> new StrategyCapability(
-                    EnumSet.of(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BTC, StrategyTicker.ETH),
+                    EnumSet.of(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BITO, StrategyTicker.EETH, StrategyTicker.BTC, StrategyTicker.ETH),
                     false, false, false, false, List.of(),
                     List.of(OrderType.MOO, OrderType.MOC, OrderType.MARKET), List.of(OrderDirection.BUY, OrderDirection.SELL),
                     List.of(DcaFrequency.values()), List.of(DcaIndicator.values()));
