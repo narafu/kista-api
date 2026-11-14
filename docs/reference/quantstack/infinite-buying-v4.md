@@ -1,4 +1,6 @@
-# 무한매수법 V4.0 (일반모드 + 리버스모드) 정리본 — KISTA 검증용 핵심 문서
+# 무한매수법 V4.0 (일반모드 + 리버스모드) 정리본 — quantstack 제3자 해설
+
+> **2026-11-15: 규칙의 1차 근거는 원저작자 카페 글 `docs/reference/laor/infinite-v4.md`로 바뀌었다.** 아래 A절은 비교용으로만 남긴다. 원문과 다른 곳: B2·B3의 `T ≤ n/2 → 전반`·"T=20 전반" 표기(원문은 절반 이상이 후반), C·E-6의 아래 단계 `round2`(원문 예시는 내림), A6의 소진 MOC 누락, "확인 다음날부터" 종료(원문은 "그 날부터"). B3의 별%·별지점 수치는 원문 공식과 맞아 테스트 검증값으로 계속 쓴다.
 
 - 원본 URL: https://quantstack.app/infinite/v4-0-normal/ , https://quantstack.app/infinite/v4-0-reverse/ , https://quantstack.app/tools/calculator/ (계산기 로직), 계산기 JS 번들(`/_astro/calc.BpzleJls.js`, `/_astro/Calculator.BMqFwae7.js`), 로그인 전용 포트폴리오 계좌 상세 JS 번들(`/_astro/AccountDetailPage.tHCV9w52.js`, `/_astro/portfolio.BG40g5yr.js`)
 - 수집일: 2026-11-11 (두 V4 페이지 "마지막 업데이트" 2026-09-14)
