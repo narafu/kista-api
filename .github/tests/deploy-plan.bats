@@ -6,7 +6,7 @@ SCRIPTS="$BATS_TEST_DIRNAME/../scripts"
 scope() { printf '%s\n' "$@" | bash "$SCRIPTS/detect-deploy-scope.sh" | tr '\n' ' '; }
 
 @test "scope: 문서·런북·워크플로·배포 스크립트 테스트는 아무것도 배포하지 않음" {
-  [ "$(scope docs/x.md deploy/server/README.md deploy/server/schema-reorg/RUNBOOK.md deploy/grafana/d.json .github/workflows/server-deploy.yml .github/scripts/plan-deploy.sh .github/tests/x.bats)" = "verify=false config=false api=false scheduler=false trading=false " ]
+  [ "$(scope docs/x.md deploy/server/README.md deploy/grafana/d.json .github/workflows/server-deploy.yml .github/scripts/plan-deploy.sh .github/tests/x.bats)" = "verify=false config=false api=false scheduler=false trading=false " ]
 }
 
 @test "scope: trading-core 소스는 trading만, 스케쥴러 전용 빈은 scheduler만" {

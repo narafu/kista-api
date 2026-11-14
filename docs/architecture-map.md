@@ -9,7 +9,6 @@
 | L1 빌드·스키마 경계 | 어느 모듈이 어느 jar·DB 스키마 소속인가 | 아래 L1 |
 | L1.5 프로세스 간 통신 | root ↔ trading-core는 무엇으로 대화하나 | 아래 L1.5 |
 | L2 모듈 의존 그래프 | 모듈끼리 누가 누구를 참조하나 | **자동 생성** — 아래 L2 |
-| L3 핵심 흐름 | 매매 배치는 어떤 순서로 도나 | 아래 L3, 상세는 `docs/agents/workflow-batch.md` |
 | 업무 흐름 맵 | 무엇이 계기가 되어 어떤 순서로 어디까지 가나·하루에 언제 무엇이 도나 | **반자동 생성** — 아래 "아키텍처 맵" |
 
 ## L0 시스템 컨텍스트
@@ -246,38 +245,3 @@ flowchart LR
 - 상세 흐름 18개 — 랜드스케이프 카드 전부 연결. 사용자 여정(가입·승인·계좌 연결·전략 등록·매일 자동 매매·결과 확인·일시정지·재개·삭제·탈퇴), 사용자 기능(바로 주문·주문 취소·알림 설정·가계부·그룹 공유), 자동(개장·마감 배치·FIDA 기준표 수신), 관리자(런타임 매매 정책·체결 보정·스케쥴러 수동 실행·오류 로그·사용자 역할 변경). 새 카드는 flows.yml `flows:`에 키를 추가하고 landscape의 `flow:`로 연결한다
 - `code:` 클래스가 어느 모듈에도 속하지 않으면(예: `com.kista` 루트) 같은 테스트가 깨진다 — 오버레이에서 조용히 빠지지 않게
 - 생성기는 `ModuleGraphExporter`(모듈 그래프 데이터)·`ArchitectureMapExporter`(flows 검증·잡 수집·`data.js`·정적 파일 복사), 정적 원본은 `src/test/resources/architecture/map/`(셸·`style.css`·`core.js`·`views/*.js` — 디렉토리를 순회 복사하므로 뷰 파일을 추가해도 Java 수정 불필요)
-
-## L3 마감 매매 배치 (화~토 04:30 KST)
-
-개장 배치(`TradingOpenScheduler`, 월~금 22:30 KST)도 같은 골격이다. 단계·예외 처리 상세는 `docs/agents/workflow-batch.md`.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant S as TradingCloseScheduler
-    participant Svc as TradingService
-    participant Plan as TradingCandidatePlanner
-    participant Led as StrategyLedgerBudget
-    participant Exec as TradingOrderExecutor
-    participant B as Broker (KIS/Toss)
-    participant DB as trading.orders
-    participant R as TradingReporter
-    participant N as tradingcore.notify
-
-    S->>S: StrategyPort.findAllActive() → 사이클별 context 빌드
-    S->>Svc: executeBatch(contexts)
-    Svc->>B: ticker별 현재가 일괄 조회
-    Svc->>Plan: 전략 계산 · BUY cap 사전 계산
-    loop 계좌별 (TradingParallelRunner, AccountBudgetLock)
-        Plan->>Led: remaining · fit (전략 원장 상한)
-        Plan->>DB: 승인 주문 PLANNED 저장
-    end
-    Svc->>Svc: DstInfo.waitUntilOrderTime(now) (비DST 60분 대기)
-    Svc->>B: 접수 대상 현재가 재조회
-    Svc->>Exec: BuyOrderPriceCapper 재캡 후 접수
-    Exec->>B: AT_CLOSE 주문 접수
-    Exec->>DB: SUBMITTING 선점 → PLACED / FAILED (결과 불명은 SUBMITTING 유지)
-    Svc->>R: 체결 리포트
-    R-->>N: TradingReportReadyEvent (AFTER_COMMIT, EPR)
-    N->>N: 사용자 봇 Telegram · Redis 푸시
-```

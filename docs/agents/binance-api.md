@@ -13,7 +13,7 @@ adapter/out/binance/ ← BinanceConfig(binanceRestClient — baseUrl 없음)/Bin
 - 계좌번호가 없다: 키 쌍(`appKey`=API key, `secretKey`)만 쓰고 `accountNo`는 null이다. `Broker.isKeyOnlyCredentials()=true`라 중복 판정 키는 appKey(`Account.dedupeKey()`)이고, 키 만료일이 없어 `apiKeyExpiring=false`(`ApiKeyExpiryScheduler` 대상 아님)다. 시크릿은 서명에 필수다.
 - 서명: HMAC-SHA256 hex, 헤더 `X-MBX-APIKEY`. 모든 파라미터는 **query string**에 넣고(POST 포함) body는 비운다 — 서명 경로를 1개로 만든다. payload = 호출 파라미터 + `recvWindow=5000` + `timestamp`(`Clock.millis()` + 서버 시각 오프셋) 순서이고, **퍼센트 인코딩된 그 문자열이 곧 서명 대상**이다(2026-01 이후 -1022 규칙, 공식 문서 기준, 미실측). `signature`는 마지막에 붙인다. 공개 시세·exchangeInfo는 서명 없음.
 - 키/시크릿이 비어 있으면 호출 전에 `BrokerCredentialException`이다.
-- 레이트: IP 단위. 성공 요청은 weight 0(2026-04 변경, 공식 문서 기준, 미실측)이라 `X-MBX-USED-WEIGHT-1M` 로깅은 생략하고 429/418만 `BrokerRateLimitException`으로 매핑한다.
+- 레이트: IP 단위. 주문 생성·취소류 성공 요청만 weight 0(2026-04 변경, 공식 문서 기준, 미실측)이고 `exchangeInfo`는 weight 20이다. `X-MBX-USED-WEIGHT-1M` 로깅은 생략하고 429/418만 `BrokerRateLimitException`으로 매핑한다.
 
 ### 엔드포인트
 | 용도 | 호출 | 서명 | 필수 파라미터·메모 |
@@ -68,7 +68,7 @@ adapter/out/binance/ ← BinanceConfig(binanceRestClient — baseUrl 없음)/Bin
 ### 거래 규칙 (`getTradingRules`)
 - `LOT_SIZE.stepSize` → 수량 단위, `NOTIONAL.minNotional`(없으면 `MIN_NOTIONAL`) → 최소 주문 금액. 필터가 없으면 `IllegalStateException`.
 - 심볼 `status != TRADING`(`CANCEL_ONLY` 포함)이면 확정 거절이 아닌 `BinanceApiException(rejected=false)` — 틱마다 재시도한다.
-- 캐시 없음(설계 편차): 성공 요청 weight 0, 실행기가 계좌·틱 단위로 메모(`rulesMemo`), 호출이 실행 시각 규칙이 있는 틱에만 일어난다. 캐시가 없어 `CANCEL_ONLY` 같은 상태 변화도 즉시 반영된다. 계좌 수가 늘면 TTL 캐시(`// ponytail:` 주석).
+- 캐시 없음(설계 편차): 주문 경로는 weight 0이지만 `exchangeInfo`는 weight 20이다. 실행기가 계좌·틱 단위로 메모(`rulesMemo`), 호출이 실행 시각 규칙이 있는 틱에만 일어난다. 캐시가 없어 `CANCEL_ONLY` 같은 상태 변화도 즉시 반영된다. 계좌 수가 늘면 TTL 캐시(`// ponytail:` 주석).
 
 ### 연결 테스트 (`BinanceAuthApi`)
 `GET /sapi/v1/account/apiRestrictions` 한 번으로 판정한다. 키·시크릿 오류는 호출 자체가 -2015/-1022라 `BrokerCredentialException`이다. 응답 판정 순서:

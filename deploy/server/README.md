@@ -17,38 +17,9 @@
 
 Caddy 라우팅 스니펫(`deploy/server/caddy/kista-api.caddy`)은 이 디렉토리가 아니라 reconcile이 `/opt/kista-infra/routes/kista-api.caddy`에 설치한다(kista-infra caddy가 `routes/`를 ro 마운트).
 
-## 초기 서버 설정 (최초 1회)
+## 서버 초기 설정·백업·복구
 
-1. OCI 인스턴스(이미 생성됨): `VM.Standard.A1.Flex`(Ampere arm64), 2 OCPU, 12GB RAM, 부트 볼륨 50GB, Ubuntu 24.04 LTS — **arm64이므로 배포 워크플로가 `linux/arm64`로 이미지를 빌드한다**(다른 아키텍처로 재생성 시 `server-deploy.yml`의 `platforms` 값도 함께 변경 필요). 최초 12GB/부트 200GB로 생성했다가, free-tier 스토리지(리전당 200GB) 전량을 부트 볼륨 하나가 점유해 다른 인스턴스를 만들 여유가 없어져 부트 볼륨만 50GB로 재생성함(2026-08-03) — OCI는 볼륨 in-place 축소를 지원하지 않아 재생성이 유일한 방법. OCPU·메모리는 볼륨과 달리 Flexible shape라 `oci compute instance update --shape-config`로 실행 중에도 변경 가능(적용에 재부팅 필요) — 계획한 인스턴스 3대 합계가 OCI Always Free Ampere A1 총 한도(4 OCPU + 24GB RAM)를 정확히 채우도록 재생성 직후 8GB→12GB로 조정함
-2. 정적 공인 IP: 인스턴스 생성 시 Reserved Public IP 할당(또는 별도 예약 공인 IP 연결) → 도메인 A 레코드 연결 — **DNS 제공자가 프록시 기능을 지원하면(예: Cloudflare) 반드시 "DNS only"(프록시 끔, 회색 구름)로 설정**. 프록시를 켜면 DNS 제공자가 TLS를 가로채 Caddy의 Let's Encrypt 자동 인증서 발급(HTTP-01 challenge)이 실패한다
-   - **예약(Reserved) 공인 IP로 무중단 호스트 교체**: 반드시 Reserved(에페메럴 아님)로 할당해두면, 이후 인스턴스를 재생성해야 할 때(스펙 변경·볼륨 축소 등) 새 인스턴스를 임시 공인 IP로 완전히 기동·스모크 테스트한 뒤 예약 IP만 `oci network public-ip update --private-ip-id <새 인스턴스 private-ip-ocid>`로 재할당하면 된다 — 도메인·DNS·GitHub Secret(`SERVER_HOST`) 변경 없이 호스트를 교체할 수 있다(2026-08-03 부트 볼륨 축소 재생성 시 실사용)
-3. 인바운드 포트 개방 — 2단계:
-   - OCI 콘솔: 인스턴스가 속한 VCN의 Security List(또는 연결된 NSG)에 Ingress Rule 추가 — TCP `80`, `443`, source `0.0.0.0/0` (`22`는 이미 열려있을 것)
-   - **주의**: OCI Ubuntu 이미지는 콘솔 레벨 방화벽 외에 OS 레벨에서도 `iptables`(netfilter-persistent)로 SSH 외 인바운드를 기본 차단해두는 경우가 있다. 콘솔에서 포트를 열었는데 접속이 안 되면 인스턴스에서 `sudo iptables -L INPUT -n --line-numbers`로 OS 방화벽 규칙을 먼저 확인할 것 — 막혀 있으면 80/443 허용 규칙 추가 후 `sudo netfilter-persistent save`로 저장한다 (OCI 이미지 버전에 따라 달라질 수 있어 실제 접속 테스트로 최종 확인 필요)
-   - `8080`은 비공개 유지 — kista-infra의 Caddy가 `shared_net`을 통해 접근한다
-4. Docker 설치:
-   ```bash
-   curl -fsSL https://get.docker.com | sh
-   sudo usermod -aG docker $USER
-   ```
-5. 배포 경로 생성(`.env`는 손으로 만들지 않는다 — kista-infra 배포가 렌더링한다, 아래 "GitHub Secrets"):
-   ```bash
-   sudo mkdir -p /opt/kista-api
-   sudo chown $USER:$USER /opt/kista-api
-   ```
-6. 로그 로테이션 설정 (`/etc/docker/daemon.json`):
-   ```json
-   {
-     "live-restore": true,
-     "log-driver": "json-file",
-     "log-opts": { "max-size": "50m", "max-file": "5" }
-   }
-   ```
-7. 자동 재부팅 비활성화 (스케줄러 보호):
-   ```bash
-   sudo sed -i 's/^Unattended-Upgrade::Automatic-Reboot "true"/Unattended-Upgrade::Automatic-Reboot "false"/' \
-     /etc/apt/apt.conf.d/50unattended-upgrades
-   ```
+서버 초기 설정(OCI 인스턴스·예약 IP·방화벽·Docker·로그 로테이션)·백업·복구는 kista-infra 소관이다 — `kista-infra/README.md` "서버 재구축"·"백업/복구" 참고.
 
 ## GitHub Secrets
 
@@ -62,49 +33,7 @@ Caddy 라우팅 스니펫(`deploy/server/caddy/kista-api.caddy`)은 이 디렉�
 
 ## .env 내용
 
-Redis는 kista-infra 레포가 소유하는 컨테이너로 `data_net`에서 `redis` alias로 접근하며, `REDIS_URL`이
-`docker-compose.yml`에 `redis://redis:6379`로 하드코딩되어 있다 — `.env`에 별도 설정 불필요.
-
-```dotenv
-DB_URL=
-DB_USERNAME=
-DB_PASSWORD=
-
-JWT_SIGNING_KEY=
-AES_ENCRYPTION_KEY=
-ADMIN_KAKAO_IDS=
-
-KAKAO_CLIENT_ID=
-KAKAO_CLIENT_SECRET=
-CORS_ALLOWED_ORIGINS=
-
-TELEGRAM_BOT_TOKEN=
-TELEGRAM_CHAT_ID=
-INTERNAL_API_TOKEN=
-
-TOSS_ADMIN_CLIENT_ID=
-TOSS_ADMIN_CLIENT_SECRET=
-KIS_ADMIN_APP_KEY=                # 선택 — 관리자 KIS 시세(Toss 관리자 시세 실패분 폴백). 비우면 그 단계만 건너뜀. 등록 계좌와 다른 앱키 권장
-KIS_ADMIN_APP_SECRET=
-ALPACA_API_KEY=
-ALPACA_API_SECRET=
-CMC_API_KEY=                     # 선택 — CoinMarketCap Pro 무료 키, 비우면 코인 지표의 BTC 도미넌스·알트 시즌만 null
-FIREBASE_SERVICE_ACCOUNT_JSON=   # 반드시 단일 행 JSON
-
-GRAFANA_CLOUD_OTLP_ENABLED=true
-GRAFANA_CLOUD_OTLP_ENDPOINT=       # 예: https://otlp-gateway-prod-ap-northeast-0.grafana.net/otlp
-GRAFANA_CLOUD_OTLP_AUTH_HEADER=    # Grafana Cloud 발급 "Basic xxxx" 인증 헤더 값 전체
-
-HEARTBEAT_OPEN_URL=          # healthchecks.io 개장 스케쥴러 dead-man's switch (미설정 시 핑 생략)
-HEARTBEAT_CLOSE_URL=         # healthchecks.io 마감 스케쥴러 dead-man's switch (미설정 시 핑 생략)
-HEARTBEAT_CRYPTO_URL=        # healthchecks.io 코인 DCA 10분 틱 dead-man's switch (미설정 시 핑 생략, 체크 period 10분·grace 20~30분)
-```
-
-Optional JVM override (기본값은 `docker-compose.yml`에 이미 OCI 12GB 인스턴스 기준으로 반영돼 있다 — 다른 값이 필요할 때만 `.env`에 명시):
-
-```dotenv
-JAVA_OPTS=-Xmx1280m -Xms256m -XX:MaxMetaspaceSize=320m -XX:ReservedCodeCacheSize=96m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom
-```
+운영 키 목록 원본은 레포 루트 `.env.example`이다. `REDIS_URL`은 `docker-compose.yml`에 `redis://redis:6379`로 하드코딩돼 `.env` 설정이 필요 없다. JVM 기본값도 compose에 반영돼 있다.
 
 ## 배포 흐름
 
@@ -125,7 +54,7 @@ JAVA_OPTS=-Xmx1280m -Xms256m -XX:MaxMetaspaceSize=320m -XX:ReservedCodeCacheSize
 
 ## 배포 시간 제한
 
-없다 — kista-trading은 재기동 시 진행 중이던 매매 배치를 재개한다(`docs/superpowers/specs/archive/2026-10-02-trading-batch-resume-design.md`). 전제: kista-trading은 단일 인스턴스·stop-first 교체·`stop_grace_period` ≥ 200s(`.github/tests/compose-invariants.bats`가 잠금). infra compose(postgres·redis) 변경만 kista-infra가 KST 시각 창으로 막는다.
+없다 — kista-trading은 재기동 시 진행 중이던 매매 배치를 재개한다(`docs/agents/workflow-batch.md` "재기동 종료·재개"). 전제: kista-trading은 단일 인스턴스·stop-first 교체·`stop_grace_period` ≥ 200s(`.github/tests/compose-invariants.bats`가 잠금). infra compose(postgres·redis) 변경만 kista-infra가 KST 시각 창으로 막는다.
 
 ## 롤백 Runbook
 
@@ -133,7 +62,7 @@ JAVA_OPTS=-Xmx1280m -Xms256m -XX:MaxMetaspaceSize=320m -XX:ReservedCodeCacheSize
 
 **수동 롤백**: 서버에서 직전 release를 재적용한다(GHCR이 public이라 정리된 이미지도 다시 pull). 명령과 state 커밋 절차는 `kista-infra/README.md` "수동 복구 (reconcile exit 2)"가 원본이다(app=`kista-api`). 특정 옛 SHA로 되돌리려면 state를 그 SHA로 수정·커밋한 뒤 kista-infra `Reconcile App`을 workflow_dispatch(app=kista-api, config/roles에 그 SHA)로 실행 — 신선도 병합은 state보다 옛 요청을 무시하므로 state 수정이 먼저다.
 
-**Flyway 관련 롤백 주의**: 신규 마이그레이션이 포함된 배포는 `validate-on-migrate: true` 때문에 이전 이미지로 롤백 시 기동 실패할 수 있음. 이 경우 DB 마이그레이션 수동 롤백 후 이미지 롤백 필요. Breaking migration 배포는 별도 주의 필요. **스키마 재편 이행 릴리스는 자동 롤백 불가** — 옛 이미지의 `@Table(schema=...)`가 즉시 깨지고 헬스게이트 롤백도 옛 스키마명을 기대해 무력화된다. 수동 SSH 런북 `schema-reorg/RUNBOOK.md`(정방향·역방향 SQL)를 따른다. Flyway 이력 테이블은 서비스별로 `flyway_schema_history_api`(root)·`flyway_schema_history_trading`(trading)이다.
+**Flyway 관련 롤백 주의**: 신규 마이그레이션이 포함된 배포는 `validate-on-migrate: true` 때문에 이전 이미지로 롤백 시 기동 실패할 수 있음. 이 경우 DB 마이그레이션 수동 롤백 후 이미지 롤백 필요. Breaking migration 배포는 별도 주의 필요. 스키마 재편 이행은 2026-09 완료, 절차는 git 태그 `archive/docs-2026-11` 참고. Flyway 이력 테이블은 서비스별로 `flyway_schema_history_api`(root)·`flyway_schema_history_trading`(trading)이다.
 
 **이미지 디스크 정리 참고**: 적용 성공 시 이 레포 이미지(`ghcr.io/narafu/kista-api`) 중 컨테이너가 쓰지 않는 태그를 `docker rmi`로 지우고 dangling 레이어를 `prune -f`로 정리한다(`prune -a`는 다른 레포가 막 pull한 이미지까지 지울 수 있어 쓰지 않는다).
 

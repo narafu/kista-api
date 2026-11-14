@@ -43,3 +43,8 @@ com.kista.shared.platform/  ← 전역 인프라 leaf 모듈. `@ApplicationModul
 - 거래일 경계 시각 `DstInfo.SCHEDULER_RUN_TIME = 04:30 KST` — preview·수동실행·주문취소는 `DstInfo.nextTradeDate(ZonedDateTime)`를 쓴다
 - 현재 시각은 앱 루트 `ClockConfig`의 KST `Clock` 빈을 주입해 `X.now(clock)`으로 읽는다. 도메인·정적 유틸은 시각을 파라미터로 받는다. 테스트는 `Clock.fixed`(`FixedClockTestConfig`) — 가드 `HexagonalArchitectureTest.main_code_must_not_read_system_clock_directly`
 - 인라인 `.minusDays(1)`/`.plusDays(1)`로 날짜 기준 변환 금지 — `UsTradeDates`/`PrivacyDates` 경유
+
+### JPA Auditing
+- `BaseAuditEntity`(`createdAt`+`updatedAt`) 또는 `BaseCreatedAtEntity`(`createdAt`만)를 상속한다. `updated_at` 컬럼이 없는 엔티티에 `BaseAuditEntity` 금지(`ddl-auto: validate` 실패)
+- 서비스에서 domain record를 만들 때 `updatedAt=null`(`@LastModifiedDate`가 채움), `createdAt`은 update면 기존 값 보존·register면 `null`
+- `toEntity()`에서 `setCreatedAt()`/`setUpdatedAt()`을 호출하지 않는다(setter 없음, Spring Data Auditing이 필드에 직접 쓴다)
