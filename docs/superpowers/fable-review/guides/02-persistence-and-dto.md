@@ -1,5 +1,7 @@
 # 지침서 02. 영속·DTO 삼중 구조 축소 — 타입은 한 번만 선언한다
 
+> **실행 세션은 먼저 맨 끝의 9절 "실행 전 보정"과 `00-roadmap.md` 9절(공통 규칙)을 읽는다.** 본문과 다르면 그쪽이 우선한다. (2026-11-14)
+
 작성 2026-11-12 (Fable). 근거 측정: `findings/02-type-duplication.md` A·D절, `findings/01-vertical-slices.md` 패턴 1·2, JPA 기능 사용 집계(2026-11-12).
 
 ## 1. 현재 구조와 문제
@@ -157,3 +159,29 @@ Spring Data JDBC로 바꾸면 record를 그대로 저장해 Entity 44개와 변�
 - 05: View·결과 record의 위치(`api` 패키지), 관리자 View의 소유 모듈.
 - 10: T1·T2 선행, 목록 응답은 `Items<View>`·`CursorPage<View>`.
 - kista-ui: 스냅샷이 불변이면 영향 없음. 의도한 스키마 이름 변경(`XxxResponse` → `XxxView`)은 UI 생성 타입 이름을 바꾼다. **스키마 이름은 `@Schema(name=...)`으로 기존 이름을 유지한다**(UI 변경 0).
+
+## 9. 실행 전 보정 (2026-11-14 — 본문과 다르면 이 절이 우선)
+
+공통 규칙은 `00-roadmap.md` 9절. 측정 원본은 `findings/23`.
+
+전제 정정:
+
+- T2 시범 모듈 marketcalendar는 지금 main 681줄이다(본문 493줄은 조기 마감 작업 전 값). 전후 비교의 기준선은 착수할 때 다시 잰다.
+- T8의 "Alpaca 설정 3벌"은 14 T1에서 trading-core 2벌이 한 벌이 되고(14의 보정 절), root 것은 05 단계 X·R에서 합친다. 02에서는 하지 않는다.
+- `CycleHistoryPageResponse`는 trading·stats에 같은 이름으로 둘 있다. 합치거나 옮길 때 `OpenApiSchemaNameCollisionTest`가 걸리면 `@Schema(name = ...)`로 지금 스키마 이름을 유지한다(8절).
+
+기본값:
+
+- View record의 위치: 05 단계 R 전에는 모듈에 `api` NamedInterface가 없다. 모듈 안에서만 쓰는 View는 공개하지 않고 조회 서비스 옆에 둔다. 다른 모듈이 읽는 View만 그 모듈의 `domain/model`(이미 공개된 "domain")에 두고 R에서 `api`로 옮긴다. NamedInterface를 새로 만들지 않는다.
+- JPQL 생성자 프로젝션에 `@SQLRestriction`이 적용되는지는 문서를 찾지 않고 T2의 첫 View에서 확인한다: 삭제 표시한 행 하나를 넣고 조회해 빠지는지 본다. 빠지지 않으면 그 쿼리의 `where`에 `deleted_at IS NULL`을 적는 것이 기본값이다. native 쿼리는 지금처럼 언제나 손으로 적는다.
+- native 쿼리(55개)를 View로 바꿀 때 생성자 프로젝션이 안 되면 인터페이스 프로젝션을 쓰고, 그것도 맞지 않으면 그 쿼리는 지금 구조로 둔다.
+- Store로 합칠 때 `@Transactional`은 지금 붙어 있는 메서드에 그대로 둔다. 어댑터 다섯이 Store 하나가 되어도 트랜잭션을 여는 곳은 서비스다.
+- 04 단계 A(KIS 삭제)가 사용자 작업 대기라 끝나지 않았으면 `kis` 패키지 파일은 건드리지 않고 나머지를 진행한다.
+- "관리자 View는 데이터 소유 모듈로"(T4)가 05와 맞물려 정해지지 않으면 지금 위치에 두고 05 단계 X1에서 옮긴다.
+
+중단 조건(본문에 절이 없어 여기 둔다):
+
+- 02 T1의 스펙 스냅샷이 달라진다. 필드 이름·타입·required가 하나라도 바뀌면 그 변경을 되돌린다. 스키마 이름만 바뀌었으면 `@Schema(name)`로 맞춘다.
+- T5·T6 뒤 `CyclePositionPersistorDbTest` 등 원장 저장 테스트의 기대값을 바꿔야 통과한다. 되돌린다.
+
+배포: T5·T6은 원장 저장 경로를 건드리지만 동작은 같다. 승인 대상은 아니고 매매 시간대 밖에 배포한 뒤 다음 마감 리포트의 원장 행(보유 수량·평단·예수금)을 전날 방식과 대조한다.

@@ -1,5 +1,7 @@
 # 지침서 04. 브로커 축 — 비주력 삭제, API 문서 기준 정리, 시세 공급자 분리
 
+> **실행 세션은 먼저 맨 끝의 11절 "실행 전 보정"과 `00-roadmap.md` 9절(공통 규칙)을 읽는다.** 본문과 다르면 그쪽이 우선한다. (2026-11-14)
+
 작성 2026-11-11, **개정 2026-11-12** (Fable). 근거: `findings/03-parallel-structures.md` B절, `findings/11-broker-api-fit.md`(메리츠·토스 공식 스펙 대조), `findings/12-binance-api-fit.md`(바이낸스 공식 문서 대조), 운영 DB 조회(2026-11-11).
 
 > **2026-11-14 갱신**: 4절(4-1·4-2·4-3)과 단계 F는 `14-market-data-provider.md`가 대체한다(관리자 키 시세를 없앤다 — 사용자 결정 2026-11-13. 공급자는 Alpaca 권고, 사용자 선택은 14의 D1). 바이낸스·업비트·코인 매매는 전부 삭제한다(`15-crypto-removal.md`). 이 문서에서 유효한 것은 KIS 삭제(단계 A), 개장 경매 경로(단계 B), 메리츠·토스 스펙 결함(단계 C), 토큰 단순화와 공통 골격(단계 D, 대상은 메리츠·토스), facade 제거(단계 E의 2-5)다.
@@ -278,3 +280,42 @@ KISTA는 LOC·MOC 주문, 마감 리포트, VR 롤오버, Mock 체결 판정에 
 - 06: 주식·코인 실행 파이프라인 이원화.
 - 09: 벤더 문서 드리프트, KIS·업비트 문서 삭제.
 - `cross-repo.md`: `Broker` 메타 변경, 운영 secret 키, UI의 KIS·업비트 코드.
+
+## 11. 실행 전 보정 (2026-11-14 — 본문과 다르면 이 절이 우선)
+
+공통 규칙은 `00-roadmap.md` 9절. 측정 원본은 `findings/23`. 남은 것: 단계 A(KIS만), B, C의 B8·B9 중 바이낸스가 아닌 것, D의 2·3·4, E의 facade. 업비트·바이낸스·코인 포트는 15가, 시세 포트 분리는 14가 한다.
+
+**전제 정정 — 단계 A-3과 2-1의 "KIS 토큰 테이블 drop", "`KisToken*` 삭제"는 틀렸다.** `KisTokenEntity`는 `trading.broker_tokens`에 매핑되고 `KisTokenPersistenceAdapter`가 `BrokerTokenCachePort`를 구현하며, 메리츠가 `DbTokenCoordinator`를 통해 같은 테이블을 쓴다(`DbTokenCoordinator.java:13` 주석 "KIS·메리츠 공용"). 그래서:
+
+- 단계 A에서는 테이블을 지우지 않는다. `KisTokenEntity`·`KisTokenJpaRepository`·`KisTokenPersistenceAdapter`는 지우지 않고 `BrokerToken*`으로 이름만 바꾼다(테이블·컬럼 불변, 마이그레이션 없음).
+- 단계 A의 Flyway는 "KIS live 계좌가 있으면 실패" 가드와 KIS 계좌 행 정리만 한다.
+- `broker_tokens` drop은 단계 D-2에서 메리츠를 메모리 캐시로 바꾼 **다음 배포**에 한다.
+
+그 밖의 정정:
+
+- `getPriceSnapshot(s)`·`PriceSnapshot` 삭제(3절 "줄일 수 있는 것")는 04에서 하지 않는다. 14 T5가 옛 시세 포트 메서드를 함께 지운다.
+- facade 줄 수는 지금 `*BrokerAdapter` 4개 574줄, KIS·Mock을 빼면 241줄이다.
+- B7·D-2가 고치라고 한 토스 `verifyAccount`의 틀린 주석은 문구가 바뀌었다. `TossAuthApi.java:81-91` 부근의 지금 주석("토큰 캐시 저장 없음")이 실제 동작(연결 테스트가 운영 토큰을 무효화한다)을 말하는지 보고 고친다.
+- A-2가 확인하라고 한 KIS 언급(`TradingOrderExecutor:132,162`, `UsTradeDates`, `HttpClientTimeouts`, `MeritzAuthApi:43`)은 전부 주석이다. 코드 의존은 없다.
+
+같은 커밋에서 고칠 가드(단계 A):
+
+- `HexagonalArchitectureTest:122-123`의 `UsTradeDates` 허용 목록에서 `KisTradingApi`·`KisPriceApi`를 빼고 `DisplayName`의 "7개"를 고친다.
+- `kis_parser_must_not_depend_on_application_layer`(`:442`)는 규칙째 지운다(대상이 비면 `failOnEmptyShould`로 실패한다).
+- `vendor_models_must_not_leak_outside_broker`와 `TradingCoreTestVendorModelTest`의 패키지 목록에서 `kis`를 뺀다.
+- `Broker.KIS` 상수 삭제: `MarketVocabularyTest`의 상수별 단언, `/api/meta` 스펙, `Broker.java:22`·`AccountNumberMasker.java:3` 주석.
+
+기본값:
+
+- 삭제 표시된 KIS 계좌 행: 15의 C2와 같은 절차로 완전 삭제한다(enum 상수를 지우면 native 쿼리·관리자 조회가 그 행을 읽는 순간 예외가 난다). 덤프, 삭제 SQL, 예상 행 수를 사용자에게 보여 준 뒤 돌린다(로드맵 9-4).
+- D-2의 "메리츠 재발급은 같은 토큰을 돌려준다(실측)"를 실행 세션이 다시 확인할 수단이 없으면(실계좌 호출 금지) 메리츠는 `DbTokenCoordinator`를 유지하고 토스만 단순화한다. 이 경우 `broker_tokens`도 남는다. 사용자가 메리츠 계좌로 연속 발급 2회의 토큰이 같다고 확인해 주면 본문대로 진행한다.
+- `expires_date`가 없을 때의 `expires_in` 폴백은 본문대로 넣는다. 둘 다 없으면 만료 시각을 지어내지 않는다. 그 토큰은 캐시하지 않고 경고 로그를 남긴다.
+- 벤더 스펙에 없는 동작이 나오면 로드맵 9-2의 U3(돈이 덜 움직이는 쪽).
+- D-3의 공통 골격이 벤더 합보다 작아지지 않으면 원복한다(본문). 원복은 실패가 아니라 완료다.
+
+중단 조건(본문에 절이 없어 여기 둔다):
+
+- 단계 A 배포 직전 7절 4번 SQL에서 KIS live 계좌가 0이 아니다. 사용자 작업(W1)이 끝나지 않은 것이다. 코드 삭제 커밋은 로컬에 두고 배포를 요청하지 않는다.
+- 단계 B에서 `supportsOpenAuctionOrders` 분기를 지웠을 때 주식 DCA의 개장 주문 테스트 기대값이 달라진다. 되돌린다(KIS만 true라는 전제가 틀린 것이다).
+
+배포: 단계 A·B·D-2는 주문 경로다. 매매 시간대 밖. D-2 배포 뒤 첫 개장 배치에서 토큰 발급 로그가 계좌당 1회인지 본다.

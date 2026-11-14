@@ -1,5 +1,7 @@
 # 지침서 08. 매매 공식 — 기준 문헌 대조 판정
 
+> **실행 세션은 먼저 맨 끝의 8절 "실행 전 보정"과 `00-roadmap.md` 9절(공통 규칙)을 읽는다.** 본문과 다르면 그쪽이 우선한다. (2026-11-14)
+
 작성 2026-11-12 (Fable). 기준 문헌: `docs/reference/quantstack/`(quantstack.app 정리본, 2026-11-11 수집). 대조 전수표: `findings/08-formula-diff.md`(차이 약 40행). 이 문서는 그중 주문 가격·수량에 영향을 주는 항목을 Fable이 코드로 직접 확인하고 판정한 결과다.
 
 사용자 결정은 3절에 확정돼 있다(2026-11-12). F1·F3·F4·F6은 실제 주문이 바뀌므로 4절의 T7(변경 전후 주문 미리보기 확인)을 거쳐 배포한다.
@@ -201,3 +203,33 @@ F8은 유지로 확정됐다. `findings/13-vr-velog-diff.md`에서 소유자 글
 - 시점: 마감 리포트 뒤·22:00 개장 배치 전.
 - 배포 직전 확인(읽기 전용 SELECT): 그 거래일의 INFINITE BUY 주문(PLANNED·SUBMITTING·PLACED)과 열린 AT_OPEN `INFINITE_MOC_SELL`이 0건. 0건이 아니면 배포하지 않는다(옛 가격 행이 하루 유지되거나 옛 MOC와 이중 주문이 난다).
 - push는 사용자가 요청할 때 한다(승인은 내용에 대한 것이다).
+
+## 8. 실행 전 보정 (2026-11-14 — 본문과 다르면 이 절이 우선)
+
+공통 규칙은 `00-roadmap.md` 9절. 남은 것은 T7의 배포뿐이다. 2026-11-14 기준 `main`이 `origin/main`보다 12커밋 앞서 있어 S2는 아직 배포되지 않았다. 배포 승인은 받았다(Q-05). push는 사용자가 요청할 때 한다.
+
+배포 직전에 돌릴 확인(읽기 전용, `ssh kista-server`). 둘 다 0건이어야 한다. `<거래일>`은 그날 개장 배치가 쓸 KST 거래일이다.
+
+```sql
+-- ① 그 거래일의 INFINITE BUY 주문 중 아직 살아 있는 것
+SELECT o.id, o.order_leg, o.status, o.price, o.quantity
+FROM trading.orders o
+JOIN trading.strategy_cycle c ON c.id = o.strategy_cycle_id
+JOIN trading.strategy s ON s.id = c.strategy_id
+WHERE s.type = 'INFINITE' AND o.direction = 'BUY' AND o.trade_date = '<거래일>'
+  AND o.status IN ('PLANNED', 'SUBMITTING', 'PLACED');
+
+-- ② 열려 있는 개장 선접수 MOC 매도
+SELECT o.id, o.trade_date, o.status, o.quantity
+FROM trading.orders o
+WHERE o.order_leg = 'INFINITE_MOC_SELL' AND o.timing = 'AT_OPEN'
+  AND o.status IN ('PLANNED', 'SUBMITTING', 'PLACED');
+```
+
+컬럼 이름과 `order_leg` 값은 2026-11-14에 엔티티(`OrderEntity`, `StrategyCycleEntity`, `StrategyEntity`)와 `InfiniteStrategy.java:200`으로 확인했다. 그 뒤 스키마가 바뀌었으면 고쳐 쓴다.
+
+0건이 아니면 그날은 배포하지 않는다. 걸린 주문을 취소하거나 지우지 않는다. 다음 거래일 마감 리포트가 끝난 뒤(KST 07:00 이후) 다시 확인한다. 마감 리포트 시각은 `docs/agents/scheduler-time-table.md`.
+
+배포 뒤 첫 개장 배치에서 볼 것: Q-05의 비교표에 있는 두 전략의 LOC 가격이 "후" 열과 같은지(현재가에 따라 cap 값은 다를 수 있다), 수량이 "전"과 같은지. 다르면 로드맵 9-5의 1번.
+
+Q-04(리버스 첫날 MOC가 이틀 연속 나갈 수 있음)는 그대로 두기로 정해졌다. 운영에서 실제로 일어나면(같은 전략에 `INFINITE_MOC_SELL`이 연속 두 거래일) 관리자 알림 없이 지나가므로, 배포 뒤 첫 주에 위 ②를 `status = 'FILLED'`로 바꿔 한 번 본다.

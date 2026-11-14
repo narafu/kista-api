@@ -20,9 +20,9 @@
 | 11 D4 운영 정리 SQL 2건 | 승인. 실행 세션이 SQL을 보여준 뒤 돌린다 | 11 T8 |
 | 05 통합 방식 개정(엔진 HTTP는 worker) | 개정안으로 진행 | 05 단계 M |
 
-아직 답이 없는 것: 10 T8(가계부 집계)의 fable-ui 명세뿐이다. 사용자 결정은 전부 받았다.
+아직 답이 없는 것: 10 T8(가계부 집계)의 fable-ui 명세뿐이다. 사용자 결정은 전부 받았다. (2026-11-14: 명세가 오지 않을 때의 기본값을 10의 8절에 적었다.)
 
-## 추가 요청 3차 (2026-11-14, 사용자) — 미착수, 새 Fable 세션에서 한다
+## 추가 요청 3차 (2026-11-14, 사용자) — 완료(여섯 번째 fable-api 세션)
 
 배경: Fable 한도가 끝나면 `questions.md`에 답할 세션이 없다. 실행 세션이 묻지 않고도 진행할 수 있게 지침서를 미리 보완한다.
 
@@ -31,6 +31,21 @@
 3. **미구현 지침 보완.** 2의 결과(반복해서 틀린 전제의 종류, 실행 세션이 헤맨 지점)를 아직 실행하지 않은 태스크에 반영한다. `CHARTER.md`의 "실행 중 질문" 절도 Fable이 없는 상태에 맞게 고친다(답할 주체, 스스로 정해도 되는 범위).
 
 진행 방법: 측정(커밋 대조, 지침서별 전제 목록 추출)은 Sonnet 서브에이전트가 findings 파일로 쓰고, 판단과 지침서 수정은 Fable이 한다. 지침서 하나씩 끝내고 이 절에 표시한다.
+
+**결과**
+
+| 항목 | 산출물 |
+|---|---|
+| 1 질문 일반화 | 유형 7개(U1 외부 문서, U2 코드 전제, U3 스펙 공백, U4 2차 효과, U5 배포 승인, U6 중단 조건, U7 가드 충돌). 공통 규칙은 `guides/00-roadmap.md` 9절, 유형 표는 `questions.md` 머리. 지침서별 전수는 `findings/23`(01~07)·`findings/24`(08~15) |
+| 2 구현 평가 | `findings/22-implementation-review.md`(측정 + 끝의 "Fable 판정") |
+| 3 미구현 지침 보완 | 지침서 01~15 전부의 맨 끝에 "실행 전 보정" 절(전제 정정, 같은 커밋에서 고칠 가드, 기본값, 중단 조건의 대체 경로, 배포). `CHARTER.md` "실행 중 질문" 개정(답하는 주체는 지침서와 사용자, `questions.md`는 결정 기록) |
+
+- 구현 평가 요지: 끝난 것은 04 결함 5건, 05 P1·P7과 P2 일부, 08 T1~T7(미배포), 10 T1·T2. 감량 지침서(01·02·03·07·09)는 미착수라 main +1,005줄·test +1,255줄로 늘었다. 지침서와 다른 구현은 전부 지침서가 틀렸거나 비어 있던 곳이다. 틀린 전제 16건 중 9건은 착수 전 확인으로 걸러진다.
+- 지침서 본문을 뒤집은 정정(보정 절에 있음): ① 04 단계 A-3의 "KIS 토큰 테이블 drop" — `broker_tokens`는 메리츠와 공용이라 단계 A에서는 이름만 바꾸고 drop은 D-2 뒤 ② 09·13의 `.env.example`에 `CMC_API_KEY`·`KIS_ADMIN_APP_*` 추가 철회 ③ 09의 `UserSummaryAdapter` 삭제 철회(사용 중) ④ 10 T11은 계좌 단건만, T5의 trading-core 값 메타 통합은 05 단계 M 뒤 ⑤ 06의 `flows.yml` `code:` 수정은 T8이 아니라 각 태스크 커밋에서, T3은 `ArchitectureMapTest:31-36`도 ⑥ 06 T4의 장중 재기동 실험은 사용자 승인 때만 ⑦ 07의 `@Disabled` 금지가 01 A-1보다 우선 ⑧ 14의 `AlpacaProperties`는 `shared.platform` 한 벌로(trading-core 2벌 대체), 환율 중단 조건을 `trading`·`matching`으로 좁힘 ⑨ 15의 `flows.yml`에서 API 키 만료 알림 단계를 독립 흐름으로 남김, `ExceptionResponseTableTest:73`·`TradingSecurityPolicy:20` 추가, 단계 A는 되돌릴 수 없음을 명시 ⑩ 12 F2의 `daily-trades` 대상은 `StatisticsController`(계좌 범위).
+- 이번 세션에서 직접 확인한 것: `DbTokenCoordinator`가 KIS·메리츠 공용(`:13` 주석), `OrderType.MARKET` 참조 전수(주식 어댑터 3곳은 `case MARKET -> throw`), `trading`·`matching`에 환율 참조 0건, `daily-trades` 두 컨트롤러의 경로 prefix, `UsTradeDates` 허용 목록과 KIS 파서 규칙의 모양, 보정 절 SQL의 테이블·컬럼 이름(`orders`·`strategy_cycle`·`strategy`·`strategy_version`·`accounts`·`event_publication`), `main`이 `origin/main`보다 12커밋 앞(S2 미배포).
+- 확인하지 못한 것(보정 절에 기본값을 적었다): 토스 시세의 계좌 토큰 호출(토스 스펙 디렉토리가 비어 있다), 메리츠의 BITO·EETH 거래소 코드, 메리츠 토큰 재발급이 비파괴인지, kista-infra의 `lb_try_duration`.
+- 서브에이전트 3개(Sonnet)가 주간 한도로 한 번 죽었고 계정 전환 뒤 SendMessage로 재개해 끝냈다. 진행 중 서브에이전트: 없음.
+- **남은 Fable 작업: 없음.** 다음은 실행이다. 권장 순서: S17(BITO·EETH) → S8(문서, 자동 로드 비용부터) → S6·S9(감량) → S15·S16. S2는 사용자가 push를 요청하면 08의 8절 확인 SQL부터.
 
 사용자 작업 기록: **ETH DCA 전략 종료(2026-11-14, 사용자 통보).** 15 단계 P의 나머지(바이낸스·업비트 계좌 삭제, 관리자 설정에서 `BINANCE` 비활성과 DCA 허용 종목의 `BTC`·`ETH` 제거)는 통보받지 않았다. 실행 세션이 15 T3의 운영 조회로 확인한다. EETH로 옮길 계획이면 15 T0 배포가 먼저다.
 

@@ -1,5 +1,7 @@
 # 지침서 01. 헥사고날 다이어트 — 거울 인터페이스와 순수 위임층 제거
 
+> **실행 세션은 먼저 맨 끝의 9절 "실행 전 보정"과 `00-roadmap.md` 9절(공통 규칙)을 읽는다.** 본문과 다르면 그쪽이 우선한다. (2026-11-14)
+
 작성 2026-11-11 (Fable). 근거 측정: `findings/02-type-duplication.md` B·C절, `findings/01-vertical-slices.md` 패턴 3, `findings/04-test-bloat.md`.
 
 ## 1. 현재 구조와 문제
@@ -136,3 +138,27 @@ ArchUnit 규칙은 다음으로 바꾼다. 지키려는 성질을 패키지가 �
 - 05(프로세스 전제): 내부 HTTP 어댑터, contract mapper, 사용자 복제본.
 - 07(테스트): 이 지침서 뒤에 `@MockitoBean` 대상이 구체 클래스로 바뀐 상태에서 진행.
 - 09(문서): `constraints.md`·`architecture.md`·모듈 문서의 포트 서술.
+
+## 9. 실행 전 보정 (2026-11-14 — 본문과 다르면 이 절이 우선)
+
+공통 규칙은 `00-roadmap.md` 9절. 측정 원본은 `findings/23`.
+
+전제 정정:
+
+- 단계 A가 지우는 규칙 세 개의 줄 번호는 `HexagonalArchitectureTest`의 346·356·465다(본문의 466은 465).
+- A-2의 "trading-core 쪽에 같은 규칙이 복제돼 있으면"은 대상이 없다. trading-core의 architecture 테스트는 4개(Modulith·OpenApi·StreamSubscriber·VendorModel)뿐이고 루트 `HexagonalArchitectureTest`가 `com.kista` 전체를 본다.
+- UseCase 52개 전부 구현 1개, 모듈 밖 소비 3종 4곳은 지금도 맞다.
+
+같은 커밋에서 고칠 가드·선언:
+
+- 단계 B에서 usecase 패키지를 지울 때 `package-info.java` 9개의 `@NamedInterface("usecase")`(api의 benchmark·admin·user·finance·market, tradingcore의 account·trading·stats·privacy)와 모듈 `package-info` 주석 6개를 같이 고친다. 먼저 `git grep -n "::usecase"`로 다른 모듈의 `allowedDependencies` 참조가 있는지 본다.
+- `web_must_stay_pure_inbound_sink`(`:248-260`)는 `api.web`·`tradingcore.web`이 `application.service`에 의존하는 것을 막는다. 지금 web 셸의 다른 모듈 usecase import는 0건이라 걸리지 않는다. 걸리게 되면 규칙을 고치지 말고 그 컨트롤러를 소유 모듈의 `adapter/in/web`으로 옮긴다(05 R3과 같은 방향).
+
+기본값:
+
+- A-1의 `interfaces_must_earn_their_keep`은 `@Disabled`로 넣지 않는다. 단계 C 전에는 현재 위반 전체를 허용 목록에 넣고 켠다(07의 7절 우선).
+- 서비스에 `final`이 붙어 컨텍스트 로드가 실패하면 `final`을 뗀다.
+- 한 모듈의 단계 B에서 순환 빈 참조가 나오면 그 모듈의 변경만 되돌리고(그 모듈은 인터페이스 유지) 다음 모듈로 간다. 되돌린 모듈과 순환 경로를 이 절 아래에 적는다.
+- 프록시 방식(CGLIB)은 문서를 찾지 않고 `ApplicationContextLoadTest`·`TradingApplicationContextLoadTest`와 `@Transactional` 서비스의 기존 통합 테스트 통과로 확인한다.
+
+배포: 동작 변경이 없어 승인 대상이 아니다. 모듈 단위로 커밋한다.

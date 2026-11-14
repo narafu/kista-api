@@ -1,5 +1,7 @@
 # 지침서 09. 문서 구조 개편과 불필요 파일 삭제
 
+> **실행 세션은 먼저 맨 끝의 12절 "실행 전 보정"과 `00-roadmap.md` 9절(공통 규칙)을 읽는다.** 본문과 다르면 그쪽이 우선한다. (2026-11-14)
+
 작성 2026-11-12 (Fable). 근거 측정: `findings/06-docs-and-dead-files.md`, `cross-repo.md` A5·A6·사용자 결정 2·6, `guides/00-roadmap.md` 5절(다른 세션이 이미 처리한 것). 참조 현황은 2026-11-12에 `git grep`으로 다시 확인했다.
 
 **헌장 6항: 삭제와 대량 개편은 사용자 승인 뒤에 실행한다.** 8절이 승인 요청 목록이다.
@@ -242,3 +244,30 @@ T1 → T2 순서는 지킨다(유지 목록을 옮기기 전에 backlog를 지�
 - 01~08·10: 5절의 표.
 - kista-infra: A5(서버 초기 설정·백업 복구 문서의 원본은 infra), 결정 3(운영 키 목록 원본은 앱 레포 `.env.example`). 링크 대상 경로는 infra 세션에 확인한다.
 - kista-ui: `README.md` 영향만 확인.
+
+## 12. 실행 전 보정 (2026-11-14 — 본문과 다르면 이 절이 우선)
+
+공통 규칙은 `00-roadmap.md` 9절. 측정 원본은 `findings/24`. 승인 A~G는 전부 받았다(`PROGRESS.md`). G는 4-1 확인 뒤, F의 `.superpowers/`는 내용 확인 뒤다.
+
+전제 정정:
+
+- **4-4의 `UserSummaryAdapter`는 삭제 대상이 아니다.** `UserSummaryPort`를 main 두 곳(`AdminService`, `UserModuleFinanceMemberAdapter`)이 쓴다.
+- **4-4의 "`.env.example`에 `CMC_API_KEY=` 추가"는 하지 않는다.** 15가 코인 지표와 함께 이 키를 없앤다. 13 U9의 같은 항목과 `KIS_ADMIN_APP_*` 추가(04 단계 A가 지운다)도 하지 않는다.
+- 수치: backlog 970줄, `deploy/server/README.md`의 인용은 128줄, `CLAUDE.md` 파일은 29개다.
+- `own-type-ledger.md`·`code-quality-backlog.md`를 가리키는 곳에 루트 `CLAUDE.md:40,51`이 빠져 있다. `constraints.md:26,35,37`, `architecture.md:15`, `docs/agents/README.md:12`, `flyway.md:21,42`와 함께 고친다. 이 저장소의 사용자 memory(`MEMORY.md`와 그 파일들)가 가리키는 경로도 같이 본다.
+- T1의 `decisions.md`에는 01~08·10만이 아니라 11~15의 재심·사용자 결정도 넣는다(11 8절, 12 8절, 13 13절, 14 0절, 15 0절, `PROGRESS.md`의 결정 표 둘).
+
+같은 커밋에서 고칠 것:
+
+- `deploy/server/schema-reorg/` 삭제: `.github/tests/deploy-plan.bats:9`의 경로 문자열을 남아 있는 다른 문서 경로로 바꾼다. `V1__init.sql` 두 개의 주석은 고치지 않는다(체크섬. `check-migrations.sh`는 V1을 면제하므로 스크립트가 막아 주지 않는다. 실수하면 운영 기동이 깨진다).
+- 문서 예산 가드(T7)를 CI에 넣을 때 `detect-deploy-scope.sh`가 문서만 바뀐 변경을 `verify=false`로 판정하는지 본다. 그렇다면 예산 검사는 배포 판정과 무관한 별도 job으로 둔다.
+
+기본값:
+
+- 4-1의 `static/index.html`: kista-infra의 모니터 설정과 Caddy가 `/`를 보지 않으면 지운다(이 레포의 Caddy 헬스체크는 `/actuator/health/liveness`뿐이다). kista-infra를 확인할 수 없으면 지우지 않는다. 28줄짜리 파일이다.
+- F의 `.superpowers/`: 안에 git이 추적하지 않는 계획·명세·메모가 있으면 지우지 않고 파일 목록을 사용자에게 보인다. 캐시·잠금·빈 디렉토리뿐이면 지운다.
+- 모듈 문서에서 지우는 문장의 "이유"가 코드 주석에 없으면 주석으로 옮긴 뒤 지운다(본문). 옮길 자리가 분명하지 않으면 `decisions.md`에 한 줄로 남긴다.
+- 삭제 직전의 `git tag archive/docs-2026-11`은 로컬에 만든다. 태그 push는 사용자가 요청할 때 한다.
+- 다른 지침서(01·05·06·14·15)의 실행 세션이 같은 문서를 고치는 중이면 그 파일은 건드리지 않고 넘어간다. 문서 묶음(S8)은 다른 묶음과 동시에 돌리지 않는다(로드맵 4절).
+
+배포: 문서와 테스트 스크립트뿐이라 없다. `gson` 제거와 `mockwebserver3` 카탈로그 이동(4-4)은 빌드 변경이라 전체 테스트를 한 번 돌린다.

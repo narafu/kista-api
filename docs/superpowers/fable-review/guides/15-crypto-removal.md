@@ -1,5 +1,7 @@
 # 지침서 15. 크립토 삭제 — 바이낸스, 코인 매매, 대시보드 코인 지표
 
+> **실행 세션은 먼저 맨 끝의 10절 "실행 전 보정"과 `00-roadmap.md` 9절(공통 규칙)을 읽는다.** 본문과 다르면 그쪽이 우선한다. (2026-11-14)
+
 작성 2026-11-14 (Fable). 근거: `findings/20-crypto-removal-scope.md`(코드·DB·계약 전수, 운영 DB 읽기 조회). 직접 확인한 코드: `TradingPolicySettingsPersistenceAdapter`(정책 JSON 역직렬화), `OrderType.MARKET`·`DcaRoundSkippedEvent`·`pingCrypto`의 호출처.
 
 파일 단위 목록은 `findings/20`의 1~3절과 6절이 원본이다. 이 지침서는 판정과 순서만 적는다.
@@ -208,3 +210,60 @@ root 스키마는 바꿀 것이 없다. `kista_ref.fear_greed_snapshots`에는 C
 - **13**: stats 절의 코인 지표 View 직행, `CryptoMarketIndicatorsOpenApiCustomizer`, 설정 정리의 `binance.base-url`·`upbit`·`CMC_API_KEY` 항목은 대상이 없다. 알림 금액 표기의 "코인 체결" 갈래도 사라진다.
 - **14**: `FrankfurterConfig`를 남긴다(2-1절).
 - **cross-repo**: G절(kista-ui가 걷을 화면·필드, 운영 secret).
+
+## 10. 실행 전 보정 (2026-11-14 — 본문과 다르면 이 절이 우선)
+
+공통 규칙은 `00-roadmap.md` 9절. 측정 원본은 `findings/24`. 사용자 작업 상태: ETH DCA 전략은 종료됐다(2026-11-14 통보). 바이낸스·업비트 계좌 삭제와 관리자 설정 변경은 통보받지 않았다. T3의 확인 SQL로 본다.
+
+전제 정정:
+
+- **`OrderType.MARKET`의 주식 어댑터 거부 분기 3곳**은 `MeritzOrderApi.java:82`, `TossOrderApi.java:183`, `KisOrderApi.java:159`의 `case MARKET -> throw`다(`switch` 안이라 `OrderType.MARKET`으로 검색하면 나오지 않는다). 그 밖에 `MARKET`을 말하는 곳은 `DcaRule.java:40-73`, `DcaRuleRequest.java:41`, `Order.java:88`, `StrategyType.java:33`이고 전부 코인 분기다. T4에서 함께 걷는다.
+- 그래서 8절 중단 조건 "`OrderType.MARKET`이나 `executionHour`를 주식 경로가 쓰는 곳이 발견된다"의 뜻은 "**주식 계좌에서 `MARKET` 주문이나 `executionHour` 값이 실제로 만들어지는 경로**가 있다"다. 위 목록처럼 주식·코인이 같이 지나는 클래스 안의 코인 분기는 해당하지 않는다. 확인 방법: 주식 DCA 테스트(T2)에서 `MARKET` 주문이 한 번도 만들어지지 않는다.
+- 2-2절의 코인 지표 경로는 Caddy 말고도 `TradingSecurityPolicy.java:20`의 공개 경로 목록과 `tradingcore/web/package-info.java:5`의 주석에 있다. 같이 지운다.
+- 6절 테스트 목록에 `ExceptionResponseTableTest.java:73`(trading-core, `BrokerIpNotAllowedException` 행)이 빠져 있다. C5로 `ErrorCode.BROKER_IP_NOT_ALLOWED`를 지울 때 이 행과 `BrokerProblemDetails.java:35`를 같이 지운다.
+- 09 T3·13 U9가 `.env.example`에 `CMC_API_KEY`를 추가하라고 한 것은 철회했다. 이 지침서가 그 키를 쓰는 코드를 지운다.
+
+`flows.yml`(T4의 삭제 커밋에서 같이 고친다. `ArchitectureMapTest`가 `code:`의 클래스 존재를 검증한다):
+
+- `code:`에 삭제 대상 클래스가 있는 줄은 2026-11-14 기준 `:711,741,811,834,1629,1637,1646,1655,1662`다. 착수할 때 `git grep -n -iE "crypto|upbit|binance" -- src/test/resources/architecture/flows.yml`로 다시 찾는다.
+- `:711`·`:741`(계좌 연결 테스트)과 `:834`(잔고 조회)는 흐름이 남는다. `code:` 목록에서 `UpbitAuthApi`·`BinanceAuthApi`와 코인 포트폴리오 항목만 뺀다.
+- `:811`(코인 시장 지표)과 `crypto-dca` 흐름은 흐름째 지운다.
+- **API 키 만료 알림은 남는 기능이다**(토스·메리츠가 `ApiKeyExpirySource.ESTIMATED`). 그런데 그 단계(`:1669-1670`, `ApiKeyExpiryScheduler#publishDue`)가 `crypto-dca` 흐름 안에 있고 `landscape`의 `api-key-expiry`(`:58`)가 `flow: crypto-dca`를 가리킨다. 이 단계를 `api-key-expiry`라는 독립 흐름으로 떼어 남기고 `:58`의 `flow:`를 그것으로 바꾼다. `:57`의 `crypto-dca` 항목은 지운다. 단계의 `desc`에서 "업비트·KIS"를 뺀다.
+
+단계 P ③의 확인 SQL(읽기 전용, `ssh kista-server`). 전부 `live`·건수가 0이어야 단계 A를 배포한다.
+
+```sql
+-- 살아 있는 코인 계좌
+SELECT broker, count(*) FILTER (WHERE deleted_at IS NULL) AS live, count(*) AS total
+FROM trading.accounts WHERE broker IN ('BINANCE', 'UPBIT') GROUP BY 1;
+
+-- 살아 있는 코인 전략
+SELECT ticker, count(*) FILTER (WHERE deleted_at IS NULL) AS live, count(*) AS total
+FROM trading.strategy WHERE ticker IN ('BTC', 'ETH') GROUP BY 1;
+
+-- 코인 미체결 주문
+SELECT ticker, status, count(*) FROM trading.orders
+WHERE ticker IN ('BTC', 'ETH') AND status IN ('PLANNED', 'SUBMITTING', 'PLACED', 'PARTIALLY_FILLED')
+GROUP BY 1, 2;
+
+-- 미완료 코인 이벤트
+SELECT event_type, count(*) FROM trading.event_publication
+WHERE completion_date IS NULL AND event_type ILIKE '%crypto%' GROUP BY 1;
+```
+
+정책 JSON은 `trading.trading_runtime_settings`의 `trading-policy` 행을 읽어 `brokers`에 `BINANCE`가 비활성인지, DCA 허용 종목에 `BTC`·`ETH`가 없는지 눈으로 본다. `total`(삭제 표시 포함)의 행 수는 4절의 삭제 SQL이 지울 예상 행 수로 쓴다.
+
+기본값:
+
+- **T0의 메리츠 거래소 코드**: 실행 세션은 실계좌를 부르지 않는다. BITO·EETH는 QLD와 같은 NYSE Arca 상장이므로(`PROGRESS.md` 2차 결정 기록: Alpaca에서 둘 다 `ARCA`) `MeritzExchangeRegistry`에 QLD와 같은 매핑을 넣는다. 확인은 배포 뒤 사용자가 한다: 관리자 설정에서 두 종목을 허용하기 **전에** 메리츠 계좌의 전략 등록 화면에서 두 종목의 현재가가 조회되는지 본다. 조회되지 않으면 그 종목은 허용하지 않고 매핑을 고친다. 이 순서를 T0의 완료 보고에 적는다.
+- T0의 상수 설명 문자열(발행사 명칭)은 발행사 사이트에서 확인한다. 확인할 수 없으면 `ProShares Bitcoin ETF`(BITO), `ProShares Ether ETF`(EETH)로 넣고 "명칭 미확인"을 보고에 적는다.
+- T0에서 허용 종목 목록의 테스트(`StrategyTypeCapabilityTest:69`, `TradingPolicySettingsTest:55,112`)는 `containsExactly`라 순서를 본다. 새 종목은 목록 끝에 더한다. `KisExchangeRegistry`는 04 단계 A가 아직이면 같이 더하고, 끝났으면 대상이 없다.
+- 4절의 삭제 순서를 FK에서 정할 수 없는 테이블이 있으면(FK가 없는 참조) 자식으로 보고 먼저 지운다.
+
+중단 조건의 대체 경로(8절에 더한다):
+
+- 살아 있는 코인 계좌·전략이 있다(위 SQL의 `live`가 0이 아님): 사용자의 단계 P가 끝나지 않은 것이다. 삭제 커밋은 로컬에 두고 배포를 요청하지 않는다. 기다리는 동안 T1·T2(코드 삭제 없음)와 T0은 진행한다.
+- 주식 DCA 테스트의 기대값을 바꿔야 통과한다: 걷어 낸 분기 중 주식 쪽 갈래를 잘못 고른 것이다. 그 파일의 변경을 되돌리고 코인 분기만 다시 걷는다. 기대값은 고치지 않는다.
+- 삭제 표시된 코인 행을 읽어야 하는 기능이 나온다: 탈퇴 사용자 정리(`TradingUserCascadeListener`에서 시작)가 후보다. C2(완전 삭제)로 행이 없어지므로 읽을 것이 없다. 완전 삭제 뒤에도 그 기능이 0행으로 정상 종료하는지 테스트로 확인하고 진행한다.
+
+배포(단계 A): **되돌릴 수 없다.** 삭제 마이그레이션이 나가면 이전 이미지로 되돌려도 지운 행은 돌아오지 않는다. 복구 수단은 덤프뿐이다. 코드 쪽 문제는 롤백하지 않고 앞으로 고친다. 그래서 배포 전 확인표(로드맵 9-4)에 넣는다: 위 SQL 결과, 4절의 삭제 SQL과 예상 행 수, 덤프 파일 경로, kista-ui의 코인 화면 제거가 배포됐다는 확인(`cross-repo.md` G1). 매매 시간대 밖. 단계 B(T6)는 그 뒤 1거래일이 지나고 kista-ui의 메타 필드 참조가 빠졌다는 기록이 `cross-repo.md`에 있을 때 한다.

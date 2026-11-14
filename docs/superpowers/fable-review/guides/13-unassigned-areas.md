@@ -1,5 +1,7 @@
 # 13. 지정하지 않은 영역: 손댈 곳과 손대지 않을 곳
 
+> **실행 세션은 먼저 맨 끝의 14절 "실행 전 보정"과 `00-roadmap.md` 9절(공통 규칙)을 읽는다.** 본문과 다르면 그쪽이 우선한다. (2026-11-14)
+
 작성 2026-11-13 (Fable). 근거는 `findings/17-unassigned-modules.md`(finance·admin·stats·notify)와 `findings/18-crosscutting.md`(보안·설정·이벤트·오류 처리·미사용 코드), 그리고 코드 직접 확인(`JwtAuthFilter`, `TradingStatsService.buildPoints`, `InvestmentIndexCalculator`). 기준 커밋 `1db0d8db1`.
 
 > **2026-11-14 갱신**: 코인 지표·바이낸스·업비트는 삭제된다(`15-crypto-removal.md`). stats 절의 코인 지표 View 직행과 `CryptoMarketIndicatorsOpenApiCustomizer`, 설정 정리의 `binance.base-url`·`upbit`·`CMC_API_KEY`, 알림의 "코인 체결" 표기 갈래는 하지 않는다. `TossPriceApi`의 세션 판정 복제는 14의 T5에서 사라진다.
@@ -256,3 +258,32 @@ fable-ui 요청 반영(2026-11-13, `cross-repo.md` B절 U1·U2): ① 토큰에 `
 ## 13. 사용자 결정
 
 이 지침서 고유의 결정은 없다. 12의 D0(다중 사용자)·D2(코인 지표)가 U1의 PENDING 차단, U7, 3절의 지표 부분을 좌우한다. 실행 중 사용자 확인이 필요한 지점은 둘이다: U4에서 화면 숫자가 달라질 때, U8에서 응답 상태 코드가 바뀔 때(kista-ui와 같은 날 배포).
+
+## 14. 실행 전 보정 (2026-11-14 — 본문과 다르면 이 절이 우선)
+
+공통 규칙은 `00-roadmap.md` 9절. 측정 원본은 `findings/24`. D0이 (가)라 admin 리팩토링은 미루지 않는다. 코인 지표에 닿는 항목은 15가 지우므로 대상이 없다.
+
+전제 정정:
+
+- 9절(미사용 코드)의 `UserSettingsPort.findOrDefaultByUserIds`와 `FinanceCategory.SYSTEM_LOAN_ID`는 main에 없다. 건너뛴다. `FinanceAccount.withAccountNo`는 있고 호출처가 0이다.
+- 2절의 `AuditAction`이라는 타입은 없다. 감사 동작이 문자열 리터럴로 흩어져 있다는 2절의 문제 서술이 실제 상태다. U7에서 enum을 **새로** 만드는 것이다.
+- 3절의 `CryptoMarketIndicatorsOpenApiCustomizer`는 없다. 15의 대상이기도 하다.
+- 수치: `BrokerApiException.isRejected()`의 테스트 호출은 57곳, `new TradingErrorEvent`는 38곳, `fallbackExecution = true` 리스너는 23곳이다. U5의 분류표는 착수할 때 grep으로 다시 만든다.
+- 8절의 `StrategyService`에서 `IllegalStateException`을 던지는 줄은 지금 81·97·103·117이다(`:160`은 확인되지 않았다).
+- `TossPriceApi`의 세션 판정 복제는 14 T5가 파일째 지운다.
+- **6절의 "`.env.example`에 `CMC_API_KEY`·`KIS_ADMIN_APP_*` 추가"는 하지 않는다.** 15와 04 단계 A가 그 키를 쓰는 코드를 지운다.
+
+같은 커밋에서 고칠 것:
+
+- U1의 PENDING 차단을 `hasAnyRole` 식으로 넣으면, 역할 없이 `authentication(UUID)`만 넣는 `@WebMvcTest`가 한꺼번에 깨질 수 있다(슬라이스가 `SecurityConfig`를 `@Import`한 경우). 테스트마다 고치지 말고 `WebMvcTestSupport`의 인증 헬퍼에 기본 역할을 넣어 한 곳에서 푼다.
+- U5에서 이벤트 클래스 이름을 합치거나 바꾸면(`MarketClosedEvent`·`MarketCloseEvent`, `CycleCompletedEvent`·`CycleEndedEvent`) 배포 직전 `event_publication` 미완료 행이 0건인지 본다(`docker-infra.md` "배포 직전 EPR 정리 런북"). `flows.yml`의 `code:`도 같은 커밋에서 고친다.
+- U4의 `DailyCycleBook`은 stats의 `domain`에 둔다. matching에 두지 않는다.
+
+중단 조건의 대체 경로(11절에 더한다):
+
+- U4에서 유효 사이클 규칙을 하나로 맞추면 운영 계좌의 곡선·지수가 달라진다: 규칙을 합치지 않는다. 두 규칙의 차이를 계좌별 수치 표로 findings 파일에 남기고 사용자 결정을 기다린다. 장부를 하나로 모으는 구조 변경은 두 규칙을 인자로 받게 해서 값이 변하지 않는 범위로 먼저 한다.
+- U5에서 `TradingErrorEvent`를 종류별 이벤트로 나누다 대응하는 종류가 없는 것이 나온다: 새 이벤트를 만들지 않고 그 발행 지점은 `TradingErrorEvent`로 둔다. 남긴 목록을 커밋 메시지에 적는다.
+- U7에서 두 설정 저장소(root와 trading)의 값이 서로 다르다: 운영에서 실제로 읽히는 쪽(매매 정책은 trading 쪽)을 기준으로 삼고, 어긋난 키와 두 값을 표로 사용자에게 보인 뒤 승인을 받아 합친다. `trading_runtime_settings` drop은 합친 코드가 배포되고 그 값이 전환 전후 같다는 것을 SELECT로 확인한 **다음 배포**에 한다.
+- U1의 PENDING 차단은 kista-ui가 승인 대기 사용자의 허용 경로 목록을 줘야 한다(`cross-repo.md` E절). 목록이 없으면 PENDING 차단만 빼고 나머지(로그아웃 jti 차단, 내부 토큰 상수 시간 비교, 공개 경로 명시)를 한다.
+
+배포: U8(오류 상태 코드 409·502)은 kista-ui가 400에 기대는 곳이 없다는 확인이 `cross-repo.md`에 있을 때만 한다. 없으면 하지 않는다. U1은 인증 경로라 배포 뒤 로그인·토큰 갱신·로그아웃을 운영에서 한 번씩 해 본다(사용자에게 요청).

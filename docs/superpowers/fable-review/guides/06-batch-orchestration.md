@@ -1,5 +1,7 @@
 # 지침서 06. 배치 오케스트레이션 — 긴 메서드와 대기를 단계와 판정표로
 
+> **실행 세션은 먼저 맨 끝의 11절 "실행 전 보정"과 `00-roadmap.md` 9절(공통 규칙)을 읽는다.** 본문과 다르면 그쪽이 우선한다. (2026-11-14)
+
 작성 2026-11-12 (Fable). 근거 측정: `findings/03-parallel-structures.md` C·D절과 비일관 5번, `findings/05-frozen-decisions.md` S-25·C-02·C-30. 직접 읽은 코드(조기 마감 커밋 `9e542baf7`~`d3d78b0b3` 반영 상태): `TradingCloseScheduler`(239줄), `TradingOpenScheduler`(111), `TradingBatchResumer`(144), `TradingService`(485), `DstInfo`(161), `SessionTradeDates`, `KstTradeDates`, `MarketSessionTimes`, `CryptoDcaRunner`·`CryptoDcaScheduler`·`CryptoDcaRoundExecutor`.
 
 > **2026-11-14 갱신**: 코인 매매를 전부 삭제한다(`15-crypto-removal.md`). 2-6절, T6, D2의 "코인 틱 핑은 그대로"는 대상이 없다. `CLOSE_REPORT` 창 시작은 `closeAt + 20분`으로 바뀐다(`14-market-data-provider.md` D3 — 무료 통합 시세가 15분 지연). 접수 직전 현재가 재조회(`reloadPlacementPrices`)는 T2·T3 뒤에 지운다(14의 T7).
@@ -225,3 +227,34 @@ T2~T5는 각각 별도 커밋·별도 배포다. 한 배포에 두 태스크를 
 - 01(헥사고날): `TradingExecutionFacade`·`TradingExecutionUseCase` 제거가 먼저면 치환 범위가 준다.
 - 07(테스트): `TradingServiceTest` 압축은 이 지침서 뒤.
 - kista-infra: healthchecks 체크 일정(D2). 배포 파이프라인 변경은 없다.
+
+## 11. 실행 전 보정 (2026-11-14 — 본문과 다르면 이 절이 우선)
+
+공통 규칙은 `00-roadmap.md` 9절. 측정 원본은 `findings/23`. 사용자 결정 D1~D3은 전부 권고대로 확정됐다(`PROGRESS.md`). T6(코인)은 없다. `CLOSE_REPORT` 창의 시작은 14 T3이 `closeAt + 20분`으로 바꾼다. 06 T2는 `+10분`으로 만들고 14 T3이 상수 하나를 고치게 한다.
+
+전제 정정:
+
+- 22:00은 세 곳이다: `TradingOpenScheduler:32`(`CRON_TIME`), `:46`(cron 문자열), `DstInfo:121`(`OPEN_BATCH_FIRE_TIME`).
+- `TradingService.executeBatch(contexts)`는 죽은 경로가 맞다(main 호출은 `TradingExecutionFacade:32,47`뿐이고 그 facade를 부르는 곳이 없다). 오버로드가 둘이다(`TradingService:63,75`).
+- 락 TTL의 지금 값은 `TradingOpenScheduler:30`·`TradingCloseScheduler:55`의 `LOCK_TTL`에서 읽는다.
+- T8의 "각 30줄 이하"는 목표다. 지금 `scheduler-time-table.md`는 71줄, `workflow-batch.md`는 34줄이다. 표 두 개로 다시 썼는데 30줄을 넘으면 넘긴 채로 둔다.
+- `TossPriceApi`의 세션 판정 복제는 `:154-171`이고 14 T5가 파일째 지운다.
+
+같은 커밋에서 고칠 가드:
+
+- **T3**: `ArchitectureMapTest:31-36`이 `TradingOpenScheduler#run`의 실행 시각 `["22:00"]`을 단언한다. cron을 없애는 커밋에서 이 단언을 새 예약 방식에 맞게 고친다.
+- **T2~T5**: `flows.yml`의 `code:` 참조(`TradingOpenScheduler#run`, `TradingCloseScheduler#schedule`·`#pingHeartbeatSlot`·`#runNow`, `TradingBatchResumer#recoverClose`·`#resumeOpen`, `DstInfo#waitUntil*`·`#openBatchMissedAt`, `TradingService#waitFor`)를 **지우거나 이름을 바꾸는 그 커밋에서** 고친다. T8로 미루면 중간 커밋의 `ArchitectureMapTest`가 깨진다. T8에는 흐름의 서술(`desc`·`cond`)과 `lifecycles`만 남긴다.
+- **T4**: `GradleModuleBoundaryTest:74`와 `SchedulerDisabledContextTest`, `TradingSchedulerInternalController`가 부르는 `runNow` 두 개.
+- T1의 판정표를 marketcalendar에 두면 그 타입이 marketcalendar의 공개 패키지(`domain`)에 있어야 trading이 쓸 수 있다.
+
+T4의 재기동 실험과 8절의 배포 금지 시간이 겹친다. 이렇게 푼다:
+
+- "장중이 아닌 시각의 재기동 1회"는 평소 배포로 충족한다.
+- "접수 후~리포트 전 재기동 1회"는 미국장 정규 시간 안이라 8절의 예외다. **사용자가 날짜와 시각을 승인한 때에만** 한다. 승인이 없으면 하지 않고, 같은 상황을 만드는 IT(접수까지 끝난 체크포인트에서 `CLOSE_REPORT`만 다시 실행해 리포트가 한 번만 나가는지)로 대신한 뒤 T4의 완료 기록에 "운영 재기동 실험 미실시"를 적는다.
+
+중단 조건의 대체 경로(9절에 더한다):
+
+- 리포트 동등성 IT에서 원장이 다르다: T2의 분리를 커밋하지 않는다. 차이가 "정상 경로에만 있던 동작"(screen 적용, 로테이션 최소금액 알림)이면 본문대로 재조립 경로로 옮기고 다시 잰다. 설명되지 않는 차이면 T2를 멈추고 T1의 판정표만 남긴다. T3 이후는 T2에 기대므로 함께 멈춘다.
+- 배포 뒤 관찰에서 주문 건수·접수 시각·리포트 내용이 전날과 다르다, 경고 알림이 실험 밖에서 난다: 사용자에게 이전 커밋으로 되돌리는 배포를 요청한다. 체크포인트 값 `STARTED`·`PLANNED`를 T7 전까지 읽을 수 있게 두는 이유가 이것이다. T7(옛 값 제거)은 T2~T5의 관찰이 전부 끝난 뒤에만 한다.
+
+배포: T2~T5는 주문의 시각이 바뀌는 변경이다. 태스크마다 배포 전 확인표(로드맵 9-4)를 붙인다: 다음 거래일의 단계별 예정 시각(지금 대 변경 뒤), 진행 중 전략의 주문 비교. D2의 healthchecks.io 일정 변경은 사용자 작업이고, 바뀌기 전에는 핑 위치를 그대로 둔다.

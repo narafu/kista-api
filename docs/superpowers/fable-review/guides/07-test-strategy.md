@@ -1,5 +1,7 @@
 # 지침서 07. 테스트 전략 — 규칙이 사는 층에서 한 번만 검증한다
 
+> **실행 세션은 먼저 맨 끝의 9절 "실행 전 보정"과 `00-roadmap.md` 9절(공통 규칙)을 읽는다.** 본문과 다르면 그쪽이 우선한다. (2026-11-14)
+
 작성 2026-11-12 (Fable). 근거 측정: `findings/04-test-bloat.md`(정적 집계, 테스트 미실행), `findings/05-frozen-decisions.md` S-50·S-51·C-47. 이 지침서는 지침서 01·02·03·06의 구조 변경이 끝난 모듈부터 적용한다.
 
 ## 0. 먼저 알아둘 한계
@@ -153,3 +155,24 @@ grep -rc "@Test" --include='*.java' src/test trading-core/src/test | awk -F: '{s
 - 05: P1 뒤 T3. 단계 X가 내부 컨트롤러·contract mapper 테스트를 지운다.
 - 06: 판정표 테스트가 스케줄러 3종 테스트를 대체한다. T7은 그 뒤.
 - 09: `testing.md`와 `modules/tradingcore/trading-testing.md` 개정.
+
+## 9. 실행 전 보정 (2026-11-14 — 본문과 다르면 이 절이 우선)
+
+공통 규칙은 `00-roadmap.md` 9절. 측정 원본은 `findings/23`.
+
+전제 정정:
+
+- 기준선은 착수할 때 다시 잰다. 2026-11-14 값: 테스트 480파일 77,704줄, `@Test` 3,756개, `TradingServiceTest` 2,421줄(`when(` 408, `verify(` 219), `DataJpaTestBase` 상속 46파일. 15(크립토 삭제)가 끝나면 다시 달라진다.
+- T3의 "`MAPPINGS` 표 기반 테스트"는 이미 있다: `ExceptionResponseTableTest`(root `api/web/`, trading-core `tradingcore/web/`, 05 P1에서 만듦). 새로 만들지 않고 여기에 행을 더한다.
+- T3의 `asUser(uuid)` 헬퍼: `WebMvcTestSupport`에 `userToken(UUID)`·`userTokenWithRole(UUID)`가 이미 있다. 먼저 이것으로 되는지 보고, 안 되는 경우에만 더한다.
+- T2는 03 T5가 만드는 `StrategyKind`가 있어야 한다. 03 전에는 `VrRampValidator`처럼 지금 있는 도메인 클래스로 내릴 수 있는 규칙만 한다.
+
+기본값:
+
+- `@Disabled`는 쓰지 않는다. 01 단계 A-1의 "`@Disabled`와 사유" 문장보다 이 지침서의 7절이 우선한다(01의 보정 절에도 적었다). 지금 있는 `@Disabled` 14건은 T2·T7에서 만나는 대로 지우거나 고친다.
+- T1의 생성자 가드는 치환이 끝난 뒤에 켠다. 루트 테스트는 trading-core의 `TradingFixtures`를 쓸 수 없다(`testing.md`). 루트 쪽에 `new Strategy(`가 있으면 그 테스트가 루트에 있을 이유부터 본다.
+- 규칙을 도메인 테스트로 내린 뒤 변이 확인(규칙을 잠시 깨뜨려 새 테스트가 실패하는지)이 실패하지 않으면 서비스 테스트를 지우지 않는다. 그 규칙은 지금 자리에 둔다.
+- T3에서 어떤 컨트롤러의 인증·인가를 정책 테스트로 옮길 수 없으면(경로 규칙이 표로 뽑히지 않음) 그 컨트롤러의 401·403 슬라이스는 남긴다. `hasRole`을 검증하는 슬라이스(`@Import({SecurityConfig.class, JwtAuthFilter.class})`를 쓰는 것)는 정책 테스트가 같은 경로를 덮는 것을 확인한 뒤에만 지운다.
+- T5의 저장 테스트는 메서드 단위로 본다. 직접 쓴 쿼리(`@Query`, native)를 지나는 테스트는 왕복 테스트처럼 보여도 남긴다.
+
+배포: 테스트만 바꾸므로 없다. main을 먼저 고쳐야 하는 규칙 추출은 별도 커밋으로 하고 그 커밋은 03·05의 배포에 실린다.

@@ -1,5 +1,7 @@
 # 지침서 14. 공용 시장 데이터 공급자 전환 — 토스 관리자 키 제거
 
+> **실행 세션은 먼저 맨 끝의 11절 "실행 전 보정"과 `00-roadmap.md` 9절(공통 규칙)을 읽는다.** 본문과 다르면 그쪽이 우선한다. (2026-11-14)
+
 작성 2026-11-14 (Fable). 근거: `findings/19-market-data-consumers.md`(소비처·호출 빈도·배치 시세 흐름), `findings/21-market-data-providers.md`(Twelve Data·Alpaca 문서 대조와 실호출, 8절은 Fable 직접 교차 조회), `findings/14-alpaca-market-data.md`. 직접 읽은 코드: `TradingPriceFetcher`(199줄 전체), `TradingService`의 마감(105~165행)·접수(260~280행)·개장(335~430행) 구간.
 
 **이 지침서는 지침서 04의 4절(4-1·4-2·4-3)과 단계 F를 대체한다.** 04의 2-2절(시세 포트 분리)은 이 지침서의 T1·T3으로 흡수한다.
@@ -270,3 +272,36 @@ KIS 관리자 소스(`KisAdminPriceSource`·`KisAdminTokenCoordinator` 187줄)�
 - **12**: F1(Alpaca 일봉 페이지네이션 없음)은 T1의 어댑터에서 `next_page_token`을 따라가게 만들어 함께 닫는다.
 - **15**: 코인 지표가 쓰던 Frankfurter 과거 환율 조회(`HistoricalFxRatePort`)는 15가 지운다. T4는 같은 설정으로 최신 환율만 남긴다. 15가 먼저 실행되면 `FrankfurterConfig`를 지우지 말라고 15에 적어 두었다.
 - **cross-repo**: G절(환율 라벨·날짜, 차트 엔드포인트 인증, 운영 secret).
+
+## 11. 실행 전 보정 (2026-11-14 — 본문과 다르면 이 절이 우선)
+
+공통 규칙은 `00-roadmap.md` 9절. 측정 원본은 `findings/24`(단, 그 파일의 "`waitUntilPostClose` 메서드 0건"은 틀렸다. `DstInfo.waitUntilPostClose`가 있고 `TradingService.java:151,174,240`이 부른다. 4-3절의 "마감 리포트 +20분"은 이 메서드의 기준을 바꾸는 것이 맞다).
+
+전제 정정:
+
+- **`AlpacaProperties`는 세 벌이고 trading-core 안에만 둘이다**(marketcalendar는 `baseUrl` 포함, stats는 `dataBaseUrl` 포함. root benchmark에 하나 더). 새 어댑터가 놓일 broker 모듈은 다른 모듈의 `adapter/out`을 참조할 수 없다. T1에서 `shared.platform`에 한 벌(`apiKey`, `apiSecret`, `baseUrl`, `dataBaseUrl`)을 두고 trading-core의 두 벌을 그것으로 바꾼다. yml 키(`alpaca.*`)는 그대로다. root benchmark의 것은 05 단계 X·R에서 합친다(네 번째를 만들지 않는 것이 요점이다).
+- `BuyOrderPriceCapper:44-45`는 필드 선언이다. 현재가를 쓰는 줄은 파일에서 다시 찾는다. 3-5절의 결론은 그대로다.
+- `KisAdminPriceSource`·`KisAdminTokenCoordinator`·`KisPriceApi`는 04 단계 A가 지운다. 04가 아직이면 14 T5는 KIS 파일을 건드리지 않고 관리자 소스 체인에서 KIS 항목만 뺀다.
+
+중단 조건을 좁힌다(9절):
+
+- "주문·원장 계산이 환율을 쓰는 곳이 발견된다"의 확인 명령은 `git grep -lE "ExchangeRate|exchangeRate" -- trading-core/src/main/java/com/kista/tradingcore/trading trading-core/src/main/java/com/kista/tradingcore/matching`이다. 2026-11-14 결과는 0건이다. 본문의 명령(`trading-core/src/main` 전체)은 broker·stats의 표시용 환율(잔고 환산, 포트폴리오 요약)까지 잡아 언제나 걸린다. 그것들은 중단 사유가 아니다.
+- "확정 종가가 null일 때 원장 저장이 불명확하다": `CyclePositionPersistor.saveCyclePosition`을 읽어 종가가 없으면 저장하지 않고 예외·건너뜀으로 끝나는지 본다. 그렇지 않으면(null이나 현재가로 저장) T3 안에서 "확정 봉이 없으면 리포트를 완료로 기록하지 않는다"(7절 3번 테스트)를 먼저 넣고 진행한다. 멈추지 않는다.
+- "`feed=delayed_sip`이 403·400": `feed=iex` 하나로 답하게 두고(4-2절의 한쪽 실패 처리 그대로) "최근 체결이 N분보다 오래됨" 경고를 남긴다. 주문 경로의 현재가는 증권사에서 읽으므로 주문에는 영향이 없다. 멈추지 않고 사용자에게 알린다.
+- "T2의 통과 기준이 어긋난다": 아래 T2 항목.
+
+같은 커밋에서 고칠 가드:
+
+- T5에서 `TradingPriceFetcher`의 메서드(`reloadPlacementPrices`는 T7), `AdminMarketPriceAdapter`, `BrokerPricePort#getPrevClose`를 지우거나 이름을 바꿀 때 `flows.yml`의 `code:`(`:118,172,188,315,372,531,672`)를 같은 커밋에서 고친다. T5의 문서 목록에 있는 `flows.yml`은 서술 수정이고 이것은 별개다.
+- `usTradeDates_must_only_be_used_by_allowlisted_adapters`(`HexagonalArchitectureTest:112-130`): 새 Alpaca 어댑터는 `UsTradeDates`를 쓰지 않는다. 세션일은 호출하는 쪽이 인자로 준다(7절 1번 테스트의 "세션일 직전 봉"). 그래서 허용 목록에 더할 것이 없다. `TossPriceApi`를 지우는 T5에서 목록과 주석(`:116`)·`DisplayName`의 개수를 고친다.
+- Alpaca 응답 모델은 어댑터 패키지 안의 package-private record로 둔다. 포트는 기존 도메인 타입을 돌려준다(9절 기본값). `broker.domain.model.alpaca` 패키지를 만들지 않는다.
+
+태스크별 기본값:
+
+- **T1의 토스 실호출**: 운영에 토스 전략이 없고 실행 세션은 실계좌를 부르지 않는다. 로컬 `application-local.yml`에 토스 계좌 키가 있고 사용자가 허락하면 로컬에서 1회 부른다. 아니면 하지 않고, 토스 계좌는 6절의 대체 경로(Mock처럼 `MarketDataPort.latestPrices`)로 만든다. 나중에 토스 전략이 생기면 그때 확인한다는 한 줄을 `toss-api.md`에 남긴다.
+- **T2의 "메리츠 계좌 하나"**: 운영에서 활성 전략이 있는 메리츠 계좌 중 생성이 가장 이른 것. 비교 호출은 그 계좌의 토큰으로 그 계좌가 가진 종목만 부른다.
+- **T2의 판정**: 통과 기준이 숫자라 실행 세션이 판정한다. 3거래일의 비교 로그를 표로 만들어 `questions.md`에 "자체 결정"으로 적고 T3으로 간다. 어긋나면 어긋난 값의 종류로 가른다: 전일 종가·확정 종가가 어긋나면 T3을 하지 않고 표를 사용자에게 보인다(D3에서 받아들이기로 한 TQQQ 0.02달러를 넘는 차이다). 현재가만 0.5%를 넘으면 조회 시각 차이인지 로그의 시각으로 확인하고, 시각 차이로 설명되면 통과다. 마감+20분에 확정 봉이 없으면 +30분으로 한 번 더 재고 그 값으로 4-3절의 상수를 정한다.
+- **T3의 배포**: 주문 가격의 출처가 바뀐다. 배포 전 확인표(로드맵 9-4)에 T2의 표와 "분할 공시가 있는 주가 아님"을 넣는다.
+- **T4**: 기존 `FrankfurterFxRateAdapter`가 과거 날짜용이면 같은 설정·`RestClient`로 최신값 메서드를 더한다. 어댑터를 새로 만들지 않는다. 15가 `HistoricalFxRatePort`를 지워도 `FrankfurterConfig`는 남긴다.
+- **T6**: 저장된 지수 값과 `feed=sip` 값이 다르면 다시 받지 않는다. 차이의 크기(최대·평균)를 커밋 메시지에 적고 새로 받는 날부터 `sip`을 쓴다. 과거 값을 고치는 것은 사용자가 요청할 때 한다.
+- **T5 뒤의 사용자 작업**: 토스 관리자 키 폐기, 운영 secret에서 `TOSS_ADMIN_*` 제거(kista-infra, `cross-repo.md`에 적는다).

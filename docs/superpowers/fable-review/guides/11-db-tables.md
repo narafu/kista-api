@@ -1,5 +1,7 @@
 # 11. DB 테이블: 삭제의 뜻을 하나로, 유일 제약으로 원장 보호, 1:1 상세 테이블 접기
 
+> **실행 세션은 먼저 맨 끝의 9절 "실행 전 보정"과 `00-roadmap.md` 9절(공통 규칙)을 읽는다.** 본문과 다르면 그쪽이 우선한다. (2026-11-14)
+
 작성 2026-11-13 (Fable). 근거는 `findings/15-db-tables.md`(운영 DB 읽기 전용 조회 포함)와 코드 직접 확인. 기준 커밋 `1db0d8db1`.
 
 기존 지침서가 정한 것은 그대로다: 스키마 5개 유지(05 D2), 저장소는 애그리게이트당 Store(02 2-3), 전략 종류별 상세를 JSONB로 바꾸지 않는다(03 기각한 대안). 이 지침서는 그 아래 테이블·컬럼·제약 단위를 정한다. 03의 "테이블·컬럼을 바꾸지 않는다"는 03 태스크 안에서의 금지이고, 테이블 변경은 여기 태스크로만 한다.
@@ -202,3 +204,49 @@ trading 스키마도 expand/contract를 따른다(05 D3). 한 배포에서 컬�
 | D4 | 운영 정리 SQL 2건(죽은 락 7행 삭제, 옛 `public.flyway_schema_history` drop) | 승인 | 그대로 둔다(해는 없다) |
 
 T1(유일 제약)과 T5·T8·T9는 결정 없이 진행한다.
+
+## 9. 실행 전 보정 (2026-11-14 — 본문과 다르면 이 절이 우선)
+
+공통 규칙은 `00-roadmap.md` 9절. 측정 원본은 `findings/24`. 사용자 결정: D1 (가) 루트에만 삭제 표시, D2 권고대로(맨 뒤), D3 삭제, D4 승인(SQL을 보여 준 뒤).
+
+전제 정정:
+
+- `@SQLRestriction` 선언은 지금 32줄(25파일)이다. 본문의 14개는 테이블 기준이다. T3의 제거 범위는 착수할 때 `git grep -n "@SQLRestriction" -- '*.java'`로 다시 만든다.
+- 마이그레이션 번호는 착수할 때 센다(로드맵 9-3). 04·13·14·15와 같은 디렉토리를 쓴다.
+- trading 스키마의 expand/contract는 `check-migrations.sh`가 검사하지 않는다(`:10`). 05 D3에 따라 스스로 지킨다: 컬럼·테이블 drop은 그것을 읽는 코드가 사라진 **다음 배포**에 한다.
+- 15(크립토 삭제)의 C2는 이 지침서 D1의 예외다. 코인 계좌·전략 행은 완전 삭제한다.
+
+T1 배포 전 확인 SQL(읽기 전용, 2-2절의 인덱스 정의와 같은 조건). 인덱스를 걸기 전에 위반이 0건이어야 한다.
+
+```sql
+-- 같은 슬롯에 살아 있는 주문이 둘 이상
+SELECT strategy_cycle_id, trade_date, order_leg, count(*)
+FROM trading.orders
+WHERE status IN ('PLANNED', 'SUBMITTING', 'PLACED', 'PARTIALLY_FILLED', 'FILLED')
+  AND order_leg <> 'UNKNOWN'
+GROUP BY 1, 2, 3 HAVING count(*) > 1;
+
+-- 한 전략에 열린 사이클이 둘 이상
+SELECT strategy_id, count(*)
+FROM trading.strategy_cycle
+WHERE end_date IS NULL AND deleted_at IS NULL
+GROUP BY 1 HAVING count(*) > 1;
+```
+
+T3의 중단 조건 확인 SQL(삭제되지 않은 버전이 최대 `version_no`가 아닌 전략). `version_no`는 `trading.strategy_version`에 있다.
+
+```sql
+SELECT v.strategy_id
+FROM trading.strategy_version v
+GROUP BY v.strategy_id
+HAVING max(v.version_no) FILTER (WHERE v.deleted_at IS NULL) < max(v.version_no);
+```
+
+중단 조건의 대체 경로(5절 끝에 더한다):
+
+- T1에서 같은 슬롯에 살아 있는 주문 둘이 정상인 경로가 나온다(위 SQL이 0건이 아니거나 저장 경로 전수 확인에서 발견): 인덱스를 걸지 않는다. 그 경로의 `파일:줄`과 운영 건수를 `questions.md`에 적고 T1의 주문 쪽만 멈춘다. 열린 사이클 유일 제약은 독립이라 따로 진행한다.
+- T3에서 위 버전 SQL이 행을 돌려준다: 그 전략 id를 적고 T3을 멈춘다. 데이터를 손으로 맞추지 않는다. T2(읽기 쪽 준비)와 T5·T6·T8은 계속한다.
+- T7 ③에서 접기 전후 값이 1건이라도 다르다: 새 컬럼을 읽는 코드를 배포하지 않는다. 옛 테이블은 그대로 있으므로 backfill을 고쳐 다시 대조한다. 세 번 안에 맞지 않으면 그 테이블은 접지 않는다(네 테이블은 서로 독립이다).
+- "삭제된 사이클·포지션을 일부러 읽는 코드"는 T2에서 `@SQLRestriction`을 떼기 전에 찾는다: native 쿼리 중 `deleted_at` 조건이 **없는** 것이 후보다. 발견하면 그 쿼리는 지금 결과를 유지하도록 조건을 명시하고 목록을 T2 커밋 메시지에 적는다.
+
+승인이 필요한 것(로드맵 9-4): T6의 "이미 삭제된 계좌 5개의 자격증명 정리", T8의 운영 정리 SQL 2건. SQL 본문과 `SELECT count(*)` 결과를 사용자에게 보인 뒤 돌린다. T1·T4는 스키마 변경이고 주문 경로라 매매 시간대 밖에 배포한다. "T3 배포 뒤 2거래일 관찰"은 실행 세션이 한다(삭제·재등록이 그 사이 없었으면 관찰할 것이 없으므로, 로컬에서 전략 삭제 → 조회 → 재등록을 한 번 돌린 것으로 갈음하고 T4로 간다).

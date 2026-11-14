@@ -1,5 +1,7 @@
 # 지침서 03. 전략 축 재설계 — 전략 종류 하나가 한 곳에 모인다
 
+> **실행 세션은 먼저 맨 끝의 9절 "실행 전 보정"과 `00-roadmap.md` 9절(공통 규칙)을 읽는다.** 본문과 다르면 그쪽이 우선한다. (2026-11-14)
+
 작성 2026-11-12 (Fable). 근거 측정: `findings/03-parallel-structures.md` A·E절, `findings/04-test-bloat.md` B절, `findings/05-frozen-decisions.md` S-11·C-07·C-08·C-44. 직접 읽은 코드: `CycleOrderStrategy`, `CycleOrderComputer`, `StrategyCreationPersister`, `Strategy`.
 
 > **2026-11-14 갱신**: 코인 DCA 파이프라인은 삭제된다(`15-crypto-removal.md`). 이 문서의 `Crypto*` 언급(`CryptoDcaRunner:58`, "코인 DCA 파이프라인" 문장)은 대상이 없다.
@@ -167,3 +169,32 @@ trading/application/service/
 - 05(통합): 단계 R의 패키지 루트 rename과 T9의 패키지 이동이 겹친다. T9를 R보다 먼저 하거나 R의 ⑦과 한 번에 한다.
 - 06(배치): `afterPositionSaved`와 DCA 핸들러를 06이 쓴다. 03이 먼저다.
 - 07(테스트): `StrategyServiceTest` 분해는 03 뒤.
+
+## 9. 실행 전 보정 (2026-11-14 — 본문과 다르면 이 절이 우선)
+
+공통 규칙은 `00-roadmap.md` 9절. 측정 원본은 `findings/23`. 순서: 15(크립토 삭제)의 단계 A가 먼저다. 코인 분기가 남은 채로 종류별 핸들러를 만들지 않는다.
+
+전제 정정(줄 번호 이동, 내용은 같다):
+
+- `CycleOrderComputer.compute`의 INFINITE·PRIVACY 조립은 `:75-94`(본문 `:44-56`), `StrategyUpdateWriter:60,63`, `CapitalLedgerService:79,184`, `VrReconfigureService:69`, `ManualTradingService:57`, 백테스트 DCA 미지원은 `BacktestEngine:68-69`.
+- `TradingCycleResponse:127`의 분기는 등록 응답의 안내 플래그 계산이다. 상세 조립 분기는 `StrategyDetailAssembler`에 있다(분기 10곳, 본문의 12곳과 다르다). T6은 Assembler를 기준으로 한다.
+- 고정값 플래그 7개는 지금 `CycleOrderStrategy`의 default 메서드에 있고 `StrategyCapability`(`shared.kernel`)에는 없다. T2에서 옮길 때 `StrategyType` enum의 `capability()` 값도 같이 채운다. 플래그는 boolean이라 `shared`가 trading-core에 의존하게 되지 않는다.
+- "전략 타입 분기 약 63곳"은 상수 참조를 포함한 수다. `isX()`·`case` 분기만 세면 main 38곳이다. T9의 가드 허용 목록은 가드를 켠 뒤 실제 위반으로 만든다.
+
+같은 커밋에서 고칠 가드:
+
+- 서비스를 `kind/**`로 옮기거나 이름을 바꾸는 커밋(T4·T5·T9)에서 `HexagonalArchitectureTest:296-311`의 계좌 접근 허용 목록 FQCN을 고친다. `:316`이 목록의 클래스가 실제로 있는지 단언하므로 빠뜨리면 바로 실패한다. 지금 목록에 있는 이동 대상: `StrategyService`, `StrategyUpdateWriter`, `VrReconfigureService`, `DcaConfigService`, `support.SelectionChain`.
+- `flows.yml`의 `code:`는 단순 클래스명이라 패키지 이동은 걸리지 않는다. 이름을 바꾸거나 지우는 클래스(`PrivacyBaseGuard` 4곳, `StrategyCreationPersister` 1곳 등)만 그 커밋에서 고친다.
+- `PlanInput`의 DCA 입력이 trading 타입을 쓰면 `matching_must_not_depend_on_other_modules`에 걸린다. 그 타입을 matching으로 내리고, 내릴 수 없으면 DCA 입력만 지금 구조로 둔다.
+
+기본값:
+
+- `OrderPlan`의 nullable 필드가 호출부마다 뜻이 다르면 호출부의 지금 동작을 그대로 두고 타입으로 구분한다. 뜻을 하나로 합치지 않는다.
+- T7에서 `MockBrokerAdapter`가 matching의 `FillSimulator`를 쓰게 했을 때 trading-core `ModulithArchitectureTest`가 실패하면 두 벌을 유지하고 같은 표 기반 테스트를 양쪽에 건다(2-5절의 대체 경로).
+
+중단 조건(본문에 절이 없어 여기 둔다):
+
+- 주문 계획 스냅샷이나 백테스트 골든 파일이 달라진다. 기대값을 고치지 않고 되돌린 뒤 원인을 찾는다. 원인이 기존 결함이면 리팩토링과 분리해 사용자에게 보고한다.
+- `afterPositionSaved`류 훅의 호출 위치·트랜잭션 경계를 바꿔야만 핸들러로 묶인다. 그 훅은 핸들러에 넣지 않고 지금 자리에 둔다.
+
+배포: 주문 계산 경로지만 동작은 같아야 한다. T3·T4를 배포하기 전에 진행 중 전략 전부의 변경 전후 다음 거래일 주문을 비교해(로드맵 9-4) 한 건이라도 다르면 배포를 요청하지 않는다.

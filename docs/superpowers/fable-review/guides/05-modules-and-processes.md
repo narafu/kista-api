@@ -1,5 +1,7 @@
 # 지침서 05. 코드베이스 통합과 모듈 재구성 — 실행 지침
 
+> **실행 세션은 먼저 맨 끝의 13절 "실행 전 보정"과 `00-roadmap.md` 9절(공통 규칙)을 읽는다.** 본문과 다르면 그쪽이 우선한다. (2026-11-14)
+
 작성 2026-11-11, **전면 개정 2026-11-12** (Fable). 이 문서는 Fable 없이 Opus/Sonnet이 실행하는 것을 전제로 쓴다.
 
 > **2026-11-14 갱신**: X6의 호출처 목록에서 `CryptoDcaRunner`가 빠진다(`15-crypto-removal.md`). 단계 R에서 `MarketDataPort`와 Alpaca 어댑터를 `market` 모듈로 옮긴다(`14-market-data-provider.md` 4-1절). 단계 P의 선행인 04 단계 A는 KIS만 다룬다.
@@ -305,3 +307,41 @@ market  benchmark  finance  notification  ops  platform  app(모듈 아님: 앱 
 - kista-infra: role 2개, 전환 배포(4-3, infra 지침서 03 5-1절과 짝), Caddy 내부 리스너(7절), `KISTA_ROLE` env, EPR 훅, 고아 컨테이너 감지(infra 03 T8). 인스턴스 구성은 "운영 1대(3 OCPU·18GB로 확대, fida 포함) + 최소 대기 1대"로 사용자 결정(2026-11-12) — worker·web·DB가 한 호스트라는 전제는 그대로다.
 - kista-ui: 스펙 병합 스크립트(M13), 진입점(7절).
 - fida: `/api/internal/fida-orders` 계약(X5).
+
+## 13. 실행 전 보정 (2026-11-14 — 본문과 다르면 이 절이 우선)
+
+공통 규칙은 `00-roadmap.md` 9절. 측정 원본은 `findings/23`. 남은 것: P3·P4·P6, 단계 M·X·R·G.
+
+전제 정정:
+
+- P3의 nativeQuery 수는 지금 R 16곳, T 39곳이다(본문 11·약 45). 대상은 수가 아니라 "전부"이고 신설 가드가 빠진 것을 잡는다.
+- P4: `scheduler.enabled`를 말하는 문서가 본문보다 많다. `README.md`, `deploy/server/docker-compose.yml`, `docs/agents/`의 `local-dev.md`·`commands.md`·`docker-infra.md`·`scheduler-time-table.md`·`modules/tradingcore/{dca,account,trading}.md`, `docs/architecture-map.md`를 같이 고친다. `kista.role`은 아직 어디에도 없다.
+- M9의 "`PlainDecimalSerializer` 중복 1벌"은 대상이 없다(10 T1·T2가 다른 방식으로 처리했다). 건너뛴다.
+- M5가 고치라고 한 `deploy/server/schema-reorg/RUNBOOK.md`는 09 T2가 지운다. 09가 먼저 끝났으면 baseline 계약은 `docker-infra.md`에 적는다.
+- X6의 `TradingUserProfilePort` 호출처는 착수할 때 다시 grep한다. 본문 목록의 `CryptoTradeNotifier`·`CryptoDcaRunner`는 15가 지우고, `TradingUserProfiles`·`UserNotifyProfilePersistenceAdapter`·`UserNotifyProfileSyncListener`가 목록에 빠져 있다.
+- X5의 `FidaOrderRequest.orders` `@NotNull`은 끝났다(`820203d13`).
+- G의 `RefreshTokenCookieHelper`는 `api/user/adapter/in/web/security/`에 있다.
+- `lb_try_duration`(120초)과 `build-bundle.sh:17`은 kista-infra 레포의 값이다. 이 레포에서 확인되지 않으므로 전환 계획을 쓸 때 kista-infra에서 지금 값을 읽는다.
+
+같은 커밋에서 고칠 가드:
+
+| 태스크 | 가드 |
+|---|---|
+| P4 | `GradleModuleBoundaryTest:74`(`..adapter.in.schedule..` 참조 규칙), `SchedulerDisabledContextTest`. 둘 다 `scheduler.enabled`를 전제한다 |
+| M8(모듈 ID 개명) | `ArchitectureMapTest:40-44`(두 모델, `api.notify`·`tradingcore.notify`·`shared.kernel` 이름 단언), `ModuleGraphExporter`, `docs/agents/modules/` 파일명, `architecture.md`의 모듈 표 |
+| M9 | `HexagonalArchitectureTest:179-180`의 `ClockConfig` FQCN 둘 중 T 쪽. 합친 `UserEventResubmitScheduler`가 `api.web`에 남아 서비스를 직접 쓰면 `web_must_stay_pure_inbound_sink`에 걸리므로 소유 모듈의 `adapter/in/schedule`로 옮긴다 |
+| M12 | `TradingApplication`을 참조하는 테스트 6개, `RootDataJpaTestBase`를 상속한 테스트 20개 |
+| X1~X7 | `InternalApiContractTest`는 X8까지 둔다. 중간에 contract 타입이 전부 사라져 규칙 대상이 비면 그 커밋에서 X8을 앞당겨 테스트를 지운다 |
+| R②·⑦ | `HexagonalArchitectureTest:70,99,136`, `:296-311`, `GradleModuleBoundaryTest:55,120,130`, `TradingCoreTestVendorModelTest`. 패키지 문자열만 고치고 규칙의 뜻(의존 방향, 시간 기준, 계좌 접근 제한)은 그대로 둔다 |
+
+기본값(9절 표에 더한다):
+
+- 가드를 통과시키려면 규칙을 지우거나 예외를 늘려야 한다면 그 이동은 하지 않는다. 다음 순번(①~⑦)으로 넘어가고 건너뛴 이유를 이 절 아래에 적는다.
+- M3의 값이 다른 yml 키는 `findings/10` B-1 표를 따르되, 표에 없는 키가 나오면 worker(지금의 kista-trading) 값을 쓴다.
+- 단계 P·X·R의 배포는 동작이 같으면 승인 대상이 아니다. **단계 M의 전환 배포만은 일정과 롤백 계획을 사용자가 승인한 뒤에 한다**(4-3절). 실행 세션은 단계 M 브랜치를 만들고 4-3절 사전 확인 SQL의 결과와 전환 순서를 정리해 보고하는 데까지 한다.
+
+중단 조건의 대체 경로(10절에 더한다):
+
+- R ↔ T 순환 빈 참조: 순환을 만드는 호출 가운데 web 쪽에서 엔진으로 가는 호출을 읽기 전용 `api` 인터페이스 호출로, 엔진에서 web 쪽으로 가는 호출을 이벤트로 바꾼다. 그래도 안 풀리면 단계 M 브랜치를 합치지 않고 순환 경로(빈 이름 사슬)를 `questions.md`에 "사용자 결정 필요"로 적는다. `@Lazy`로 넘기지 않는다.
+- 탈퇴 cascade가 EPR 행 없이 실행된다: M9에서 T 리스너 둘(`TradingUserCascadeListener`·`UserNotifyProfileSyncListener`)이 `@TransactionalEventListener`로 남아 있고 발행 지점이 트랜잭션 안인지 본다. 고쳐도 EPR 행이 남지 않으면 스트림 경로를 그대로 둘 수는 없다(한 컨텍스트에서는 같은 이벤트를 서로 재발행해 순환한다 — 2절의 M4 위험). 대안은 Q-06의 선택지 1이다: 컨슈머가 trading 내부 전용 이벤트로 재발행하고 T 리스너가 그 타입을 듣는다. 리스너 파라미터 타입이 바뀌므로 배포 직전 EPR 미완료 행 0건을 확인한다.
+- 전환 뒤 주문 수·금액이 미리보기와 다르다, worker가 둘 떴다, EPR 미완료 행이 줄지 않는다: 4-3절의 롤백을 사용자에게 요청한다. 원인을 찾기 전에 다시 전환하지 않는다.

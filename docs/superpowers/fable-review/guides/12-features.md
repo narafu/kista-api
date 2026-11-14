@@ -1,5 +1,7 @@
 # 12. 기능 검토: 유지가 애매한 것, 보완할 것, 추가할 것
 
+> **실행 세션은 먼저 맨 끝의 10절 "실행 전 보정"과 `00-roadmap.md` 9절(공통 규칙)을 읽는다.** 본문과 다르면 그쪽이 우선한다. (2026-11-14)
+
 작성 2026-11-13 (Fable). 근거는 `findings/16-feature-inventory.md`(엔드포인트 176개·스케줄 진입점 23개·알림 28종 전수, 운영 DB 읽기 전용 조회, kista-ui 호출처 grep)와 `findings/15`·`18`. 기준 커밋 `1db0d8db1`.
 
 > **2026-11-14 갱신**: 사용자가 바이낸스·코인 매매·코인 지표 전부 삭제를 결정했다(`15-crypto-removal.md`). D2는 "삭제"로 바뀌었고 F7은 15의 T4다. B3의 코인 미리보기·D4·F8·F4의 바이낸스 부분은 대상이 없다. 공용 시세는 토스 관리자 키에서 외부 공급자로 옮긴다(`14-market-data-provider.md`, Alpaca 권고·D1 대기). F1(일봉 페이지네이션)은 14의 T1에서 닫는다.
@@ -213,3 +215,24 @@ F5·F7의 삭제 범위 전수표는 04 단계 A(브로커 삭제)의 절차를 
 - "흔적 없음"을 "미사용"으로 읽지 않는다. A1의 측정이 쌓이기 전에는 조회 전용 기능의 사용 여부를 알 수 없다.
 - 삭제할 때 테이블을 같은 배포에서 drop하지 않는다(expand/contract).
 - 운영자가 등록·삭제를 반복한 흔적(삭제 전략 63개, 삭제 MOCK 계좌 5개)을 정리 대상으로 보지 않는다. 11의 D1이 다룬다.
+
+## 10. 실행 전 보정 (2026-11-14 — 본문과 다르면 이 절이 우선)
+
+공통 규칙은 `00-roadmap.md` 9절. 측정 원본은 `findings/24`. 사용자 결정으로 남은 태스크는 F2(작은 삭제)와 F4(조사)뿐이다. F1(Alpaca 일봉 페이지네이션)은 14 T1의 새 어댑터가 맡고, F5·F6·F8은 없고, F7은 15 T4다.
+
+전제 정정(F2):
+
+- **`daily-trades`**: 같은 매핑이 둘이다. 지울 것은 계좌 범위인 `StatisticsController.java:53`(`/api/accounts/{accountId}/daily-trades`)이고, 유저 범위인 `DashboardController.java:53`(`/api/daily-trades`)은 남긴다. 지우기 전에 kista-ui가 계좌 범위 경로를 부르지 않는지 `cross-repo.md`에서 확인한다. 기록이 없으면 지우지 않는다.
+- **`GET /api/admin/_ping`**: `testing.md`가 `AdminPingControllerTest`를 `hasRole` 인가 검증의 본보기로 가리킨다. 다른 관리자 컨트롤러 테스트 중 `@Import({SecurityConfig.class, JwtAuthFilter.class})`로 역할을 검증하는 것이 있으면 `testing.md`의 참조를 그것으로 바꾸고 지운다. 없으면 `_ping`과 그 테스트를 남긴다.
+- `trade-dates` 삭제는 root 컨트롤러(`AdminTradeController.java:56`), `TradingQueryHttpAdapter.java:65`, 내부 API(`TradingInternalQueryController.java:71`)와 테스트 3곳이 한 묶음이다. kista-ui가 쓰지 않는다는 확인은 `cross-repo.md`에 있다.
+- `is-open` 삭제는 05 단계 X와 묶는다(본문). 그 전에 따로 하지 않는다.
+- 낡은 주석 4곳과 `KbLandHousingBenchmarkScheduler`의 주석("일요일 07:00") 대 cron(토요일 08:00) 불일치는 그대로 남아 있다. 주석을 cron에 맞춘다.
+
+기본값(F4, 메리츠의 접수 불명 주문 복구 조사):
+
+- 스펙(`/Users/phs/Downloads/meritz_openapi_spec_20261112.json`)과 `docs/agents/meritz-api.md`만으로 조사한다. 실계좌 호출은 하지 않는다.
+- 주문 조회 API가 "우리가 보낸 그 요청"을 식별할 값(클라이언트 주문 키, 접수 시각과 수량·가격의 조합)을 주면 복구 설계를 04의 3절 표에 항목으로 더한다.
+- 주지 않으면 조사 결과만 findings 파일로 남기고 끝낸다. 지금 동작(접수 불명은 재전송하지 않고 관리자 알림)이 안전한 쪽이라 바꾸지 않는다.
+- 바이낸스는 보지 않는다(15).
+
+배포: F2는 엔드포인트 삭제다. kista-ui가 부르지 않는 것이 확인된 것만 지우므로 api만 먼저 나가도 된다.
