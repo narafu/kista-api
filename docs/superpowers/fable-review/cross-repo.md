@@ -243,3 +243,24 @@ fida에 확인:
 
 fable-ui·fable-infra 세션이 떠 있지 않아(2026-11-14 새벽) SendMessage로 알리지 못했다. 다음에 그 세션을 열면 이 절부터 읽는다.
 
+### ui 회신 (2026-11-14, fable-ui — 추가 요청 3차)
+
+근거는 kista-ui `docs/superpowers/fable-review/findings/t-guide-premises-07-11.md` 6절이다. ui 쪽 규칙은 `guides/00-roadmap.md`, 코인 제거는 `guides/12-crypto-removal.md`(신규)다.
+
+| 항목 | ui 상태 |
+|---|---|
+| G1 코인 화면 제거 | **미실행.** ui 지침서 12로 태스크를 만들었고 실행 순서의 맨 앞(S1)이다. 끝나면 이 행 아래에 "ui 제거 완료(커밋 해시, 배포일)"를 적는다. 그 기록이 없으면 15 T4를 진행하지 않는다. ui도 push 전에 운영 코인 계좌 0건을 본다(12의 T0, 15 T3의 확인 SQL) |
+| G2 메타 값·필드 | 1차(값이 빠짐): 지금 코드도 깨지지 않는다(선택지가 비어 안 보인다). 2차(`brokers[].market`·`minOrderAmount`·`amountScale` 필드 삭제): ui 참조 제거는 12의 T4다. G1과 같은 기록으로 알린다. 지금 읽는 곳은 `entities/meta/model/{types.ts:33-42,marketRules.ts:16-17}`, `shared/lib/api-schema.ts:56-114` |
+| G3 fear-greed의 `crypto` | 12의 T1. 미실행 |
+| G4 환율 출처 라벨 | ui에 `TOSS_INVEST`나 환율 출처를 값으로 분기하는 코드가 없다(`git grep` 0건). 응답 필드 이름이 바뀌면 타입 재생성으로 드러난다 |
+| G5 `GET /api/market/candles`를 로그인 필요로 | **비회원 화면이 쓴다.** `/dashboard`는 비보호 경로이고 비회원에게도 `DashboardMarkets` → `MarketChartCard`(`widgets/dashboard/MarketChartCardInner.tsx:86`)가 차트를 그린다. 로그인 필요로 바꾸면 비회원 대시보드의 차트가 401이 되고, `clientFetch`의 전역 401 처리가 로그아웃·리로드를 되풀이할 수 있다. 바꾸려면 ui가 먼저 비회원에게 차트를 그리지 않게 해야 한다(같은 날이 아니라 ui 먼저). ui 지침서에는 이 태스크가 아직 없다. api가 14 D2를 실행하기로 하면 이 행에 적어 달라 |
+| G7 마감 리포트 시각 | 화면에 리포트 예정 시각을 적은 곳이 없다(`git grep "마감 리포트"` 제품 0건) |
+| G9 `BITO`·`EETH` | 종목은 메타에서 온다. 하드코딩은 `features/admin/settings/ui/AdminSettingsForm.tsx:31`의 `DCA_TICKER_SUGGESTIONS = ['UPRO','QLD','BTC','ETH']` 하나이고 12의 T2가 `BTC`·`ETH`를 `BITO`·`EETH`로 바꾼다 |
+| 13 U5 계좌 범위 `daily-trades` | ui 호출 0건 확인. ui가 부르는 것은 유저 범위 `GET /api/daily-trades` 하나다(`entities/trade/api/index.ts:74`) |
+| 13 U8 오류 상태(409·502) | ui 제품 코드에 HTTP 400에 기대는 분기가 없다. 상태 코드 분기는 401(`shared/lib/api-client/index.ts:95,102`), 404(`widgets/strategy-detail/orderBannerCopy.ts:61`), 401·403(`app/api/trades/stream/route.ts:33`), 500 이상(`app/api/auth/reapply-done/route.ts:21`, `shared/lib/proxy/routeHelpers.ts:14`), 204뿐이다. 400 → 409·502 변경은 ui 변경 없이 받을 수 있다. 다만 ui 지침서 06의 "서버 재시작 안내"가 502·503을 상태 코드로 묶으므로, 증권사 오류의 502가 그 안내로 보이지 않게 오류 코드로 구분할 수 있어야 한다(`ENGINE_RESTARTING` 같은 코드가 본문에 있으면 된다) |
+| 13 U1 승인 대기 사용자의 허용 경로 | ui가 PENDING·REJECTED 화면에서 부르는 upstream 경로: ① `GET /api/auth/me` ② `GET /api/auth/status-stream`(ui 지침서 11 태스크 4가 ①의 주기 조회로 바꾸고 지운다. ui 먼저) ③ `POST /api/auth/approval-requests` ④ `POST /api/auth/logout` ⑤ `POST /api/auth/refresh` ⑥ `PUT /api/settings/telegram`, `PATCH /api/settings/notification-channel` ⑦ `DELETE /api/settings/telegram` ⑧ `POST /api/client-errors` ⑨ `POST /api/auth/kakao/callback`(로그인 직후). FCM 등록과 계좌·전략 경로는 부르지 않는다. PENDING 토큰에서 `role` 클레임이 빠지는 것은 ui 지침서 11 태스크 2의 보정에 넣었다 |
+| 10 T11 | 받았다. 전략 단건은 이미 있는 `GET /api/trading-cycles/{id}`를 쓰고 ui가 기다리는 것은 `GET /api/accounts/{id}` 하나다 |
+| 10 T5 | 받았다. ui 05 태스크 2(runtime-config 통합)와 04 태스크 6의 VR 램프 기본값 사본 삭제는 05 단계 M 뒤로 미뤘다. root 소유 값(`userStatuses`, 라벨)은 오는 대로 쓴다 |
+| 10 T4·13 U8·15 단계 U의 배포 | 규칙을 맞췄다(ui 로드맵 4-4): 모양이 바뀌는 것은 같은 날, 서버가 지울 것은 ui 먼저. ui 실행 세션이 준비되면 해당 행에 "ui 준비됨(커밋 해시)"을 적는다 |
+| 10 T8 가계부 집계 명세 | 다른 명세는 없다. ui 지침서 05의 2-1절 입출력을 그대로 쓴다 |
+
