@@ -164,7 +164,7 @@ public interface CycleOrderStrategy {
     }
 
     // 전략 계산 결과 — position은 INFINITE만 non-null(리버스모드는 가격 캡 전용), vrPosition은 VR만 non-null
-    // (preview의 INSUFFICIENT_BALANCE 케이스에서도 보존 — BuyOrderPriceCapper 접수 전 보정에 재사용)
+    // (preview의 INSUFFICIENT_BALANCE 케이스에서도 보존 — BuyOrderPriceCapper 접수 전 보정에 재사용, 프론트 단위금액·현재가·부족 금액 표시)
     // skips: DCA 규칙 skip 판정(이력 기록용), referencePrices: DCA 주문 leg → 주문 기준가 — DCA 외 전략은 빈 값
     // reverseMode: INFINITE 리버스모드 — position은 가격 캡 재산정 전용이라 화면 표시(displayPosition)에서 뺀다
     record OrderPlan(InfinitePosition position, VrPosition vrPosition, List<PlannedOrder> orders,

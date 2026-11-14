@@ -15,7 +15,7 @@ import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 
 public interface StrategyPort {
-    List<Strategy> findByAccountId(UUID accountId);
+    List<Strategy> findByAccountId(UUID accountId); // 보관(ARCHIVED) 포함 — 통계가 공유하므로 보관 제외는 호출부 필터로 한다
     Optional<Strategy> findById(UUID id);
 
     // 없으면 NoSuchElementException
@@ -43,7 +43,7 @@ public interface StrategyPort {
     void deleteByAccountId(UUID accountId); // 계좌 삭제 시 전략 일괄 소프트 삭제
     void deleteByUserId(UUID userId);       // 사용자 탈퇴 시 전략 일괄 소프트 삭제
 
-    // 여러 계좌 ID → 전략 목록 배치 조회 (관리자 계좌 목록용)
+    // 여러 계좌 ID → 전략 목록 배치 조회 (관리자 계좌 목록용) — 보관 포함, 필터를 넣으면 통계에서 보관 전략 성과가 사라진다
     Map<UUID, List<Strategy>> findByAccountIds(Collection<UUID> accountIds);
 
     // strategy_cycle.id → strategyId + strategy.type 배치 조회 (관리자 거래내역용 — admin이 자체 조립)

@@ -175,6 +175,7 @@ class TradingCandidatePlanner {
                 : priceCapper.prepareForAllocation(
                         plan.orders(), price, plan.position(), plan.vrPosition(), strategy.ticker(),
                         strategy.type(), tradeDate);
+        // 저장 지점(TradingOrderPlanner)도 막지만 여기서 먼저 거절한다 — 없으면 결함이 원장 부족 알림·슬롯 중복 제외로 가려진다
         validateConcreteOrderLegs(strategy, preparedOrders);
         List<PlannedOrder> creatableOrders = filterCreatableOrders(
                 preparedOrders, existingOrders, creatableTimings);
