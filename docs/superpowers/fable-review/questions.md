@@ -145,21 +145,24 @@
 - 멈춘 범위: 없음. 관리자 설정의 두 종목 허용만 확인 뒤로 미룬다.
 - 사용자 할 일(순서대로): 1) 배포 2) 관리자 설정에서 허용하기 **전에** 메리츠 계좌의 전략 등록 화면에서 BITO·EETH 현재가가 조회되는지 본다 3) 조회되면 관리자 설정 DCA 허용 종목에 두 종목을 넣는다(저장된 정책 JSON은 backfill되지 않는다 — `TradingPolicySettingsPersistenceAdapter:60-85`. 화면에서 안 되면 `db/migration-trading` jsonb 수정 1건) 4) 조회되지 않으면 그 종목은 허용하지 않고 매핑을 고친다(`meritz-api.md:42`의 실측 목록도 갱신)
 - 답: 자체 결정(2026-11-14), 지침서 15의 10절 기본값을 따름
+- 검토: (Fable, 2026-11-14, 사용자 요청) 선택지 ① 유지에 동의한다. 두 종목 모두 NYSE Arca 상장이고(EETH는 ProShares 팩트시트로 확인), `MeritzExchangeRegistry`에서 같은 Arca 상장인 SOXL·USD·MAGX·UPRO·QLD가 전부 `0066`/`AX`로 실측돼 있어 다른 값일 근거가 없다. KIS 쪽 `AMEX`/`AMS`와도 맞는다. 틀렸을 때는 조회·주문이 실패하는 방향이라 U3 기본값(돈이 덜 움직이는 쪽)에 맞다. 상태는 그대로 둔다 — 남은 것은 위 "사용자 할 일" 2)의 현재가 조회뿐이고, 조회되면 `meritz.md:42`의 "실측 전"을 지우고 이 항목을 답변됨으로 바꾼다.
 
 ### Q-09 T0 EETH 발행사 명칭과 enum 위치
-- 상태: 자체 결정
+- 상태: 답변됨
 - 묶음·태스크: S17 / 지침서 15 T0
 - 걸린 곳: 10절 "상수 설명 문자열은 발행사 사이트에서 확인한다", "새 종목은 목록 끝에 더한다".
 - 근거: BITO는 ProShares SAI(2024-09-27 개명 "ProShares Bitcoin Strategy ETF" → "ProShares Bitcoin ETF")와 펀드 페이지로 확인했다. EETH는 같은 2024 SAI에 "Ether ETF"로 나오지만 2023 ProShares 글은 "Ether Strategy ETF"라 개명 공시를 직접 보지 못했다. 설명은 기존 대문자 표기로 `PROSHARES BITCOIN ETF`·`PROSHARES ETHER ETF`. 순서: `EnumSet`은 선언 순서로 돌기 때문에 상수를 QLD 뒤·BTC 앞에 두고, 허용 목록·테스트도 UPRO, QLD, BITO, EETH, BTC, ETH로 맞췄다("목록 끝"이 아니라 주식 종목 끝). BTC·ETH는 N18에서 지워지므로 그 뒤에는 목록 끝과 같다.
 - 선택지: EETH 명칭이 다르면 설명 문자열 한 줄만 고친다(UI 메타 표시용, DB·주문 영향 없음).
 - 멈춘 범위: 없음.
 - 답: 자체 결정(2026-11-14)
+- 검토: (Fable, 2026-11-14, 사용자 요청) 명칭 확정, 코드 수정 없음. EETH도 BITO와 같은 날(2024-09-27) "ProShares Ether Strategy ETF" → "ProShares Ether ETF"로 바뀌었다(ETF Database insight report "Before September 27, 2024, the fund was named ProShares Ether Strategy ETF", TrackInsight 현행 표기도 같다. 개명 공시 원문은 찾지 못해 2차 출처 기준). `PROSHARES ETHER ETF`가 맞다. 순서(QLD 뒤·BTC 앞)도 유지 — 지침서의 "목록 끝"은 기존 상수 순서를 건드리지 말라는 뜻이고, `@Enumerated(STRING)`이라 선언 위치는 DB에 영향이 없다.
 
 ### Q-10 메리츠 확정 종가 조회의 `mod_stpr_cls_code=1` 주석이 스펙과 반대였다
-- 상태: 자체 결정
+- 상태: 답변됨
 - 묶음·태스크: S8 / 지침서 09 T3(4-4 "메리츠 `mod_stpr_cls_code` 주석을 스펙대로")
 - 걸린 곳: `MeritzPriceApi.fetchConfirmedClose`가 `"1"`을 보내며 "수정주가 반영"이라고 주석을 달았다. 스펙은 반대다.
 - 근거: `meritz_openapi_spec_20261112.json` 일봉 API `mod_stpr_cls_code`(required Y) — `"0": 분할을 반영해 보정한 주가`, `"1": 보정 전 원래 주가`.
 - 선택지: ① 주석만 고치고 `"1"` 유지 — 그 거래일 하루(`from`=`to`)의 종가를 찾는 용도라 거래 당일의 원래 가격이 맞고, 조회일 뒤에 분할이 없으면 두 값은 같다 ② `"0"`으로 변경 — 이후 분할이 생기면 과거 거래일 종가가 보정가로 바뀌어 원장 평가가 소급해서 달라진다.
 - 멈춘 범위: 없음. 확정 종가 출처는 지침서 14 T3에서 Alpaca로 옮겨 가며 이 호출은 주문 경로 밖이 된다.
 - 답: 자체 결정(2026-11-14) ①. 주석만 스펙대로 고쳤다(동작 불변).
+- 검토: (Fable, 2026-11-14, 사용자 요청) ① 확정. 스펙 원문을 다시 확인했다(해외 일봉 `mod_stpr_cls_code` required Y, `"0": 분할을 반영해 보정한 주가`, `"1": 보정 전 원래 주가`). 확정 종가는 그 거래일 체결·원장과 같은 가격 기준이어야 하므로 원주가가 맞고, KIS `KisPriceApi`의 `MODP=0`(수정주가 미반영)과도 같은 기준이다. 주의: 같은 스펙의 국내 일봉은 `0:수정종가(기본값)`, `1:원종가`에 required N으로 정의가 따로 있다 — 해외 값과 뜻은 같지만 필수 여부가 다르니 섞어 읽지 않는다.
