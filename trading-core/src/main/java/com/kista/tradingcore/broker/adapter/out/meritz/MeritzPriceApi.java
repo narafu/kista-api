@@ -103,7 +103,7 @@ class MeritzPriceApi {
             p.add("mrkt_cls_code", exchangeRegistry.marketCode(ticker));
             p.add("iscd", ticker.name());
             p.add("dely_rltm_cls_code", "0"); // 실시간
-            p.add("mod_stpr_cls_code", "1"); // 수정주가 반영
+            p.add("mod_stpr_cls_code", "1"); // 1: 보정 전 원래 주가(0은 분할 반영 보정가) — 스펙상 필수 파라미터
             p.add("from", expected);
             p.add("to", expected);
             List<CandleRow> bars = http.rowList(http.get(CANDLE_PATH, account, p), CandleRow.class);

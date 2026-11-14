@@ -6,7 +6,7 @@ springdoc                = "3.1.1"
 swagger                  = "2.2.55" # springdoc 3.1.1이 끌어오는 swagger-core 버전과 동일
 lombok                   = "1.18.48"
 firebase-admin           = "9.11.0"
-gson                     = "2.14.0"
+okhttp                   = "5.5.0"
 # Spring Modulith — 2.x가 Boot 4/Spring Framework 7 baseline (Boot 자체 BOM은 버전 미관리, 별도 BOM platform import 필요). 2.1.1이 최신 GA(2.2.0-M1은 마일스톤)
 spring-modulith           = "2.1.1"
 
@@ -42,9 +42,9 @@ spring-boot-starter-security   = { module = "org.springframework.boot:spring-boo
 spring-security-test           = { module = "org.springframework.security:spring-security-test" }
 # Boot 4부터 @WebMvcTest의 SecurityFilterChain 자동 감지가 이 스타터 존재 여부에 좌우됨 (없으면 보안 미적용으로 401 기대 테스트가 200 반환)
 spring-boot-starter-security-test = { module = "org.springframework.boot:spring-boot-starter-security-test" }
-gson                           = { module = "com.google.code.gson:gson", version.ref = "gson" }
 
 # Testing
+okhttp-mockwebserver3          = { module = "com.squareup.okhttp3:mockwebserver3", version.ref = "okhttp" }
 archunit-junit5                = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
 # Boot 4부터 기술별 테스트 슬라이스가 spring-boot-starter-test에서 분리된 개별 스타터로 이동
 spring-boot-starter-webmvc-test    = { module = "org.springframework.boot:spring-boot-starter-webmvc-test" }

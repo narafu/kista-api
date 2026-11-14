@@ -40,7 +40,7 @@ class TossOrderApi {
     private final TossHttpClient tossHttpClient;
 
     public OrderResult place(OrderInstruction instruction, BrokerAccountRef account) {
-        // Toss는 MARKET 주문 미지원 — MOC도 LIMIT+CLS로 대체
+        // Toss는 MOC·MOO 미지원 — MOC는 LIMIT+CLS, MOO는 LIMIT+DAY로 대체(주식 orderType은 LIMIT만)
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("symbol", instruction.ticker().name());              // 종목 코드 (예: SOXL)
         body.put("side", instruction.direction().name());             // BUY / SELL

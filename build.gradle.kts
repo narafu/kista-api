@@ -51,7 +51,6 @@ dependencies {
     // Security & JWT
     implementation(libs.spring.boot.starter.security)
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server") // NimbusJwtDecoder+NimbusJwtEncoder (ECC P-256 JWKS 검증/발급)
-    runtimeOnly(libs.gson)
 
     // API Documentation
     implementation(libs.springdoc.openapi.webmvc.ui)
@@ -93,8 +92,8 @@ dependencies {
     // Spring Modulith 테스트 지원 (ApplicationModuleTest) + 모듈 구조 다이어그램 생성
     testImplementation(libs.spring.modulith.starter.test)
     testImplementation(libs.spring.modulith.docs)
-    // InvestmentPointsHttpAdapter 등 내부 API HTTP 어댑터 테스트용 (버전 카탈로그 미등록 — 단일 사용처라 직접 좌표 지정)
-    testImplementation("com.squareup.okhttp3:mockwebserver3:5.5.0")
+    // InvestmentPointsHttpAdapter 등 내부 API HTTP 어댑터 테스트용
+    testImplementation(libs.okhttp.mockwebserver3)
 
     // testFixtures 소스셋 — DomainFixtures(User fixture)만 남음
     testFixturesImplementation(project(":shared")) // shared.kernel(UserRole/UserStatus) 접근
