@@ -24,8 +24,8 @@
 - 원장 금액이 응답으로 나갈 때는 조립 서비스에서 `Currency.round()`. 비율은 반올림 전 값으로 계산. 가격·수량·지표값은 대상 아님
 
 ### 신규 파일 배치
-애그리게이트 모듈(`com.kista.<api|tradingcore|shared>.<module>`) 안에 `domain/model` + `application/{usecase,port/output,service}` + `adapter/{in,out}`. 공개 범위는 모듈 문서.
-- 인바운드 포트 `application/usecase/`, 아웃바운드 포트 `application/port/output/`의 `*Port`(`*Repository` 금지), 파라미터·반환 타입과 `*Command`(`*Request` 금지)는 `domain/model/`(컨트롤러 DTO와 겹치는 타입도 옮기고 DTO에서 re-import)(가드: `outbound_port_interfaces_must_have_Port_suffix` 등)
+모듈(`com.kista.<api|tradingcore|shared>.<module>`) 안에 `domain/model` + `application/{port/output,service}` + `adapter/{in,out}`. 공개 범위는 모듈 문서.
+- 인터페이스는 구현 2개 이상·모듈 간 역전·프로세스 계약만(새 UseCase·단일 구현 포트 금지, 가드: `interfaces_must_earn_their_keep`). 포트는 `application/port/output/`의 `*Port`, 파라미터·반환 타입과 `*Command`(`*Request` 금지)는 `domain/model/`(컨트롤러 DTO와 겹치는 타입도 옮기고 DTO에서 re-import)
 - broker 밖이 쓰는 기능은 `tradingcore.broker.application.port.output`의 `*Port`로(가드: `vendor_models_must_not_leak_outside_broker`)
 - 크로스모듈 컨트롤러는 `api.web`, trading-core 전역 web은 `tradingcore.web`, 그 외 컨트롤러는 모듈 `adapter/in/web`
 - 공용 인프라는 `shared.platform`, 주문생성 커널은 `tradingcore.matching`(가드: `platform_must_not_depend_on_other_modules`·`matching_must_not_depend_on_other_modules`)

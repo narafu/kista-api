@@ -162,3 +162,12 @@ ArchUnit 규칙은 다음으로 바꾼다. 지키려는 성질을 패키지가 �
 - 프록시 방식(CGLIB)은 문서를 찾지 않고 `ApplicationContextLoadTest`·`TradingApplicationContextLoadTest`와 `@Transactional` 서비스의 기존 통합 테스트 통과로 확인한다.
 
 배포: 동작 변경이 없어 승인 대상이 아니다. 모듈 단위로 커밋한다.
+
+단계 A 실행 결과(2026-11-15, S6):
+
+- 규칙 세 개 중 `application_must_not_depend_on_adapter`는 지우지 않고 `application_must_not_depend_on_inbound_adapters`로 좁혔다. 2절의 원칙이 "의존 방향은 지킨다"이고 단계 C가 필요로 하는 것은 application → `adapter.out`(Store·클라이언트)뿐이라, application → `adapter.in`은 계속 막는다. 나머지 둘과 `inbound_port_interfaces_must_have_UseCase_or_Query_suffix`는 지웠다.
+- `stores_expose_domain_types_only`의 대상은 `adapter.out.persistence`의 `*Store`와 `*Adapter`다(단계 C가 개명해도 규칙은 그대로 맞는다). Entity 판정은 `*Entity` 이름 또는 `@Entity`·`@Embeddable`·`@MappedSuperclass`이고 제네릭 인자까지 본다.
+- `application_and_domain_must_not_see_infrastructure_types`는 현재 위반 0건으로 켰다. 본문 목록에 `org.springframework.data.redis..`를 더했다(application → `adapter.out`을 열면서 Redis 타입이 새는 것을 막는다). 벤더 모델 패키지 자신(`broker.domain.model.{kis,meritz,binance}`)은 대상에서 뺐다. 브로커가 아닌 외부 응답 DTO(`adapter.out`의 카카오·CNN 등)는 타입으로 막지 않는다 — 단계 C에서 클라이언트를 직접 쓰게 할 때 그 클래스의 public 시그니처가 도메인 타입만 쓰는지 본다.
+- `interfaces_must_earn_their_keep`은 켜져 있고 본문과 달리 `application.usecase`도 본다(UseCase 접미사 규칙을 지운 뒤 새 UseCase를 막는 가드가 없어서). 구현이 1개 이하인 인터페이스 134개(UseCase·Query 52 + 포트 82)를 `src/test/resources/architecture/single-impl-interfaces.txt`에 넣었고 의존 역전 4개는 테스트 안 상수다. 이 목록은 줄어들기만 한다: **단계 B·C에서 인터페이스를 지우면 같은 커밋에서 그 줄을 지우고 `PENDING_REMOVAL_CEILING`(지금 134)을 남은 줄 수로 내려야 한다.** 없는 인터페이스·구현이 2개가 된 인터페이스가 목록에 남으면 실패하고, 목록이 상한보다 길어도 실패한다. `:shared`의 포트는 대상이 아니다.
+- 단계 B에서 걸릴 수 있는 남은 규칙: `web_must_stay_pure_inbound_sink`(위 보정 그대로), `notify_must_stay_pure_outbound_gateway`(notify → `application.usecase` 의존 금지 문자열 — usecase 패키지가 사라져도 통과한다), `service_classes_must_be_annotated_with_service`.
+

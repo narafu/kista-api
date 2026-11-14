@@ -6,6 +6,7 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaCodeUnitAccess;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaConstructor;
+import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchCondition;
@@ -19,6 +20,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -32,11 +35,16 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.simpleNameEndingWith;
+import static com.tngtech.archunit.core.domain.properties.CanBeAnnotated.Predicates.annotatedWith;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideOutsideOfPackage;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
@@ -47,6 +55,29 @@ class HexagonalArchitectureTest {
 
     private static JavaClasses classes;
     private static JavaClasses mainClasses;
+
+    // 벤더 전용 도메인 모델 패키지 — broker 어댑터만 안다
+    private static final String[] VENDOR_MODEL_PACKAGES = {
+            "com.kista.tradingcore.broker.domain.model.kis..", "com.kista.tradingcore.broker.domain.model.toss..",
+            "com.kista.tradingcore.broker.domain.model.upbit..", "com.kista.tradingcore.broker.domain.model.meritz..",
+            "com.kista.tradingcore.broker.domain.model.binance.."};
+    // Entity 판정: JPA 애너테이션 또는 *Entity 이름
+    private static final DescribedPredicate<JavaClass> IS_ENTITY =
+            simpleNameEndingWith("Entity").or(annotatedWith(jakarta.persistence.Entity.class))
+                    .or(annotatedWith(jakarta.persistence.Embeddable.class)).or(annotatedWith(jakarta.persistence.MappedSuperclass.class)).as("Entity");
+    // application·domain이 몰라야 하는 인프라 타입
+    private static final DescribedPredicate<JavaClass> INFRASTRUCTURE_TYPES =
+            resideInAnyPackage("jakarta.persistence..", "org.springframework.data.jpa..", "org.springframework.data.redis..", "org.springframework.web.client..")
+                    .or(resideInAnyPackage(VENDOR_MODEL_PACKAGES))
+                    .or(IS_ENTITY).or(simpleNameEndingWith("JpaRepository")).as("인프라 타입");
+    // 제거 대기 목록(single-impl-interfaces.txt)의 상한 — 목록에 새 항목을 더해 통과시키는 것을 막는다
+    private static final int PENDING_REMOVAL_CEILING = 134;
+    // 구현이 다른 모듈에 있어 순환을 끊는 포트(decisions.md "포트 역전(DIP)")
+    private static final Set<String> DEPENDENCY_INVERSION_PORTS = Set.of(
+            "com.kista.api.user.application.port.output.ApprovalPolicyPort",
+            "com.kista.tradingcore.account.application.port.output.BrokerEnabledPort",
+            "com.kista.tradingcore.account.application.port.output.AccountOpenOrderCancelPort",
+            "com.kista.tradingcore.broker.application.port.output.MockSimulationDataPort");
 
     @BeforeAll
     static void setUp() {
@@ -240,7 +271,7 @@ class HexagonalArchitectureTest {
         ArchRule rule = noClasses()
                 .that().resideOutsideOfPackage("com.kista.tradingcore.broker..")
                 .should().dependOnClassesThat()
-                .resideInAnyPackage("com.kista.tradingcore.broker.domain.model.kis..", "com.kista.tradingcore.broker.domain.model.toss..", "com.kista.tradingcore.broker.domain.model.upbit..", "com.kista.tradingcore.broker.domain.model.meritz..", "com.kista.tradingcore.broker.domain.model.binance..");
+                .resideInAnyPackage(VENDOR_MODEL_PACKAGES);
         rule.check(classes);
     }
 
@@ -342,23 +373,74 @@ class HexagonalArchitectureTest {
     }
 
     @Test
-    @DisplayName("인바운드 어댑터는 application.service(구현체)에 직접 의존하지 않는다")
-    void inbound_adapters_must_not_depend_on_application_layer() {
+    @DisplayName("application 레이어는 인바운드 어댑터를 의존하지 않는다 — 아웃바운드 구현(Store·클라이언트)은 직접 써도 된다")
+    void application_must_not_depend_on_inbound_adapters() {
         ArchRule rule = noClasses()
-                .that().resideInAPackage("com.kista..adapter.in..")
+                .that().resideInAPackage("com.kista..application..")
                 .should().dependOnClassesThat()
-                .resideInAPackage("com.kista..application.service..");
+                .resideInAPackage("com.kista..adapter.in..");
         rule.check(classes);
     }
 
     @Test
-    @DisplayName("application 레이어는 adapter 레이어를 의존하지 않는다")
-    void application_must_not_depend_on_adapter() {
+    @DisplayName("application·domain은 인프라 타입(JPA·Entity·JpaRepository·RestClient·벤더 모델)을 모른다")
+    void application_and_domain_must_not_see_infrastructure_types() {
+        // 헥사고날에서 지키려는 성질은 패키지가 아니라 타입이다 — 구현 클래스를 직접 써도 이 타입들만 새지 않으면 된다
         ArchRule rule = noClasses()
-                .that().resideInAPackage("com.kista..application..")
-                .should().dependOnClassesThat()
-                .resideInAPackage("com.kista..adapter..");
+                .that().resideInAnyPackage("com.kista..application..", "com.kista..domain..")
+                // 벤더 모델 패키지 자신은 domain 아래라 대상에서 뺀다
+                .and().resideOutsideOfPackages(VENDOR_MODEL_PACKAGES)
+                .should().dependOnClassesThat(INFRASTRUCTURE_TYPES);
         rule.check(classes);
+    }
+
+    @Test
+    @DisplayName("영속 구현(*Store·*Adapter)의 public 메서드 시그니처에 Entity가 나오지 않는다")
+    void stores_expose_domain_types_only() {
+        // 서비스가 영속 구현을 직접 주입받아도 Entity가 application으로 새지 않게 시그니처를 잠근다(제네릭 인자 포함)
+        ArchRule rule = methods()
+                .that().arePublic()
+                .and().areDeclaredInClassesThat().resideInAPackage("com.kista..adapter.out.persistence..")
+                .and().areDeclaredInClassesThat(simpleNameEndingWith("Store").or(simpleNameEndingWith("Adapter")))
+                .should(new ArchCondition<JavaMethod>("not expose Entity types in signature") {
+                    @Override
+                    public void check(JavaMethod method, ConditionEvents events) {
+                        Stream.concat(Stream.of(method.getReturnType()), method.getParameterTypes().stream())
+                                .flatMap(type -> type.getAllInvolvedRawTypes().stream())
+                                .filter(IS_ENTITY)
+                                .forEach(entity -> events.add(SimpleConditionEvent.violated(method,
+                                        method.getFullName() + " 시그니처에 " + entity.getSimpleName())));
+                    }
+                });
+        rule.check(mainClasses);
+    }
+
+    @Test
+    @DisplayName("포트·UseCase 인터페이스는 구현 2개 이상이거나 허용 목록(모듈 간 역전·제거 대기)에 있어야 한다 — 거울 인터페이스 재발 방지")
+    void interfaces_must_earn_their_keep() throws IOException {
+        // 제거 대기 목록은 줄어들기만 한다 — 포트를 지우거나 구현이 늘면 목록에서도 빼야 통과한다(지침서 01 단계 C)
+        Set<String> pendingRemoval;
+        try (var in = getClass().getResourceAsStream("/architecture/single-impl-interfaces.txt")) {
+            pendingRemoval = new String(in.readAllBytes(), StandardCharsets.UTF_8).lines()
+                    .map(String::strip).filter(line -> !line.isEmpty() && !line.startsWith("#"))
+                    .collect(Collectors.toSet());
+        }
+        // :shared 포트는 프로세스 계약이라 대상이 아니다
+        Set<String> singleImpl = mainClasses.stream()
+                .filter(c -> c.isInterface() && c.isTopLevelClass() && !c.getSimpleName().equals("package-info"))
+                .filter(c -> (c.getPackageName().contains(".application.port.output") || c.getPackageName().contains(".application.usecase"))
+                        && !c.getPackageName().startsWith("com.kista.shared."))
+                .filter(c -> c.getAllSubclasses().stream().filter(sub -> !sub.isInterface()).count() < 2)
+                .map(JavaClass::getName)
+                .collect(Collectors.toSet());
+
+        assertThat(DEPENDENCY_INVERSION_PORTS).as("의존 역전 허용 목록의 포트가 존재한다").allMatch(mainClasses::contain);
+        assertThat(singleImpl).as("구현이 하나뿐인 새 포트 — 구체 클래스를 직접 쓴다")
+                .allMatch(name -> DEPENDENCY_INVERSION_PORTS.contains(name) || pendingRemoval.contains(name));
+        assertThat(pendingRemoval).as("제거 대기 목록은 줄어들기만 한다 — 줄이면 PENDING_REMOVAL_CEILING도 내린다")
+                .hasSizeLessThanOrEqualTo(PENDING_REMOVAL_CEILING);
+        assertThat(pendingRemoval).as("제거 대기 목록에 남은 낡은 항목 — single-impl-interfaces.txt에서 지운다")
+                .allMatch(name -> singleImpl.contains(name) && !DEPENDENCY_INVERSION_PORTS.contains(name));
     }
 
     @Test
@@ -380,19 +462,6 @@ class HexagonalArchitectureTest {
                 // package-info.class는 ACC_INTERFACE 플래그로 컴파일되어 areInterfaces()에 오탐 매칭됨 — 제외
                 .and().doNotHaveSimpleName("package-info")
                 .should().haveSimpleNameEndingWith("Port");
-        rule.check(classes);
-    }
-
-    @Test
-    @DisplayName("인바운드 포트 인터페이스는 *UseCase 또는 *Query 접미사를 가져야 한다")
-    void inbound_port_interfaces_must_have_UseCase_or_Query_suffix() {
-        ArchRule rule = classes()
-                .that().resideInAPackage("com.kista..application.usecase..")
-                .and().areInterfaces()
-                // package-info.class는 ACC_INTERFACE 플래그로 컴파일되어 areInterfaces()에 오탐 매칭됨 — 제외
-                .and().doNotHaveSimpleName("package-info")
-                .should().haveSimpleNameEndingWith("UseCase")
-                .orShould().haveSimpleNameEndingWith("Query");
         rule.check(classes);
     }
 
@@ -457,17 +526,6 @@ class HexagonalArchitectureTest {
                 .that().resideInAPackage("com.kista..application..")
                 .should().dependOnClassesThat()
                 .resideInAPackage("com.kista..adapter.out.sse..");
-        rule.check(classes);
-    }
-
-    @Test
-    @DisplayName("RestController는 application.usecase/application.port.output 인터페이스에만 의존하고 application 구현체에 직접 의존하지 않는다")
-    void rest_controllers_must_not_depend_on_application_implementations() {
-        ArchRule rule = noClasses()
-                .that().resideInAPackage("com.kista..adapter.in.web..")
-                .and().areAnnotatedWith(org.springframework.web.bind.annotation.RestController.class)
-                .should().dependOnClassesThat()
-                .resideInAPackage("com.kista..application.service..");
         rule.check(classes);
     }
 
