@@ -54,7 +54,8 @@ public class SchedulerLockService {
         }
     }
 
-    // 획득 시 finished_at을 비워 "실행 중"으로 표시 — 배포 가드가 lock_until > now() AND finished_at IS NULL로 실행 중 배치를 판정한다
+    // 획득 시 finished_at을 비워 "실행 중"으로 표시(운영 진단용 — 이를 읽던 배포 가드는 폐지됐다)
+    // 시각은 Clock 빈이 아니라 DB 서버 now() — 인스턴스 간 시계 편차와 무관하게 만료를 판정한다
     private boolean tryAcquire(String lockName, Duration lockAtMostFor) {
         List<String> rows = jdbcTemplate.queryForList("""
                 INSERT INTO scheduler_locks (name, lock_until, locked_at, locked_by, finished_at)
@@ -88,7 +89,7 @@ public class SchedulerLockService {
     }
 
     // 성공 완료 시각 기록 — 락 자체는 TTL까지 유지(중복 실행 방지)하고 완료 사실만 남긴다.
-    // 기록 실패가 이미 끝난 배치를 실패로 보이게 하면 안 되므로 경고만 남긴다(배포 가드가 TTL까지 보수적으로 막을 뿐)
+    // 기록 실패가 이미 끝난 배치를 실패로 보이게 하면 안 되므로 경고만 남긴다(finished_at은 운영 진단용일 뿐)
     private void markFinished(String lockName) {
         try {
             jdbcTemplate.update("""
