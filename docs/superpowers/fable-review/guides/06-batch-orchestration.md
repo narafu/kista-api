@@ -258,3 +258,28 @@ T4의 재기동 실험과 8절의 배포 금지 시간이 겹친다. 이렇게 �
 - 배포 뒤 관찰에서 주문 건수·접수 시각·리포트 내용이 전날과 다르다, 경고 알림이 실험 밖에서 난다: 사용자에게 이전 커밋으로 되돌리는 배포를 요청한다. 체크포인트 값 `STARTED`·`PLANNED`를 T7 전까지 읽을 수 있게 두는 이유가 이것이다. T7(옛 값 제거)은 T2~T5의 관찰이 전부 끝난 뒤에만 한다.
 
 배포: T2~T5는 주문의 시각이 바뀌는 변경이다. 태스크마다 배포 전 확인표(로드맵 9-4)를 붙인다: 다음 거래일의 단계별 예정 시각(지금 대 변경 뒤), 진행 중 전략의 주문 비교. D2의 healthchecks.io 일정 변경은 사용자 작업이고, 바뀌기 전에는 핑 위치를 그대로 둔다.
+
+## 12. T1 실행 기록 (2026-11-15)
+
+판정표는 `trading-core`의 `trading.domain.model.TradingBatchStep`(`Kind`·`Trigger`·`Decision`·`decide`), 표 테스트는 `TradingBatchStepTest`(68행)다. 기존 main 코드는 바꾸지 않았고 아직 어느 스케줄러도 이 표를 쓰지 않는다. 상수(30·10·90·1분)는 T2~T4가 스케줄러를 표로 옮길 때까지 `TradingCloseScheduler`와 두 곳에 있다.
+
+본문 2-2와 다르게 만든 것(전부 "지금 코드에 없는 규칙을 넣지 않는다"를 따른 결과다):
+
+| 항목 | 본문 | 실제 | 근거 |
+|---|---|---|---|
+| 위치 | calendar 모듈 | `trading.domain.model` | 표가 `TradingBatchPhase`·`TradingBatchJob`(trading)을 읽는다. marketcalendar에 두면 의존이 거꾸로 선다. 05 단계 R에서 옮길지 다시 본다 |
+| `Missed` | `alert`만 | `alert` + `warnInterrupted` | PLACING에서 끊기고 창도 지난 경우 지금은 경고와 불가 알림이 둘 다 나간다(`TradingBatchResumer.recoverClose`) |
+| 수동 실행과 phase | 완료 값 이상이면 Skip | 수동은 phase를 보지 않는다 | `TradingCloseScheduler.runNow`는 DONE 뒤에도 다시 돈다(슬롯 멱등, `STARTED`가 DONE을 덮어쓴다) |
+| 수동 개장 | 표에 없음 | 휴장·시각과 무관하게 Run | `TradingOpenScheduler.runNow`에 판정이 없다. 차단 구간은 T5(D3)가 넣는다 |
+| `OPEN_PLACE` 창 끝 | `closeAt − 30분` | `min(closeAt − 30분, 거래일 04:30 KST)` | `TradingOpenScheduler.canRun`의 04:30 거래일 경계. 비DST에서 04:30~05:30이 달라진다. T5가 상수 `OPEN_TRADE_DATE_CUTOFF`를 지운다 |
+
+T3·T4가 표를 붙일 때 확인할 차이(표가 지금 동작과 다른 답을 주는 곳):
+
+- cron 22:00 발화(`TradingOpenScheduler.run`)는 phase를 보지 않아 수동 실행이 DONE을 남긴 뒤에도 다시 돈다. 표는 자동 + DONE을 Skip한다(재개기와 마감 쪽은 이미 그렇다).
+- 개장 전 자동 판정은 Reserve(`openAt`)다. 지금은 22:00에 시작해 개장까지 잔다. 접수 시각은 같다.
+- 기동 시 개장 창이 지났고 OPEN이 DONE이 아니면 재개기는 조용히 넘어가고 `canRun`은 알린다. 표는 Missed를 돌려주고 알릴지는 호출자(`alertIfMissed`)가 정한다.
+- 자동 마감의 `[closeAt − 31분, closeAt − 30분)` 1분은 표가 호출 경로를 가리지 않고 Run이다. 지금 조기 발화 허용은 예약 콜백(`canPlace`의 `AUTOMATIC_WINDOW`)에만 있고, 재개기(`recoverClose`)와 예약 등록(`register`)은 `now < closeAt − 30분`이면 예약한다. 기동 재개가 이 1분에 걸리면 접수가 최대 60초 빨라진다.
+- 리포트의 거래일 경과 문구는 스케줄러 것(`[마감 리포트 누락] 거래일 경과 — …`)을 썼다. 재개기의 지금 문구는 `[재개 불가] trading-close 리포트 거래일 불일치 — …`다.
+- 자동 마감의 창 경과 문구는 재개기 것(`[재개 불가] trading-close 접수 마감 경과 …`)을 썼다. 예약 콜백이 늦게 발화한 경우의 지금 문구는 `[마감 접수 불가] …`다. `[재개 경고]` 문구는 표에 없고(`warnInterrupted`만) 호출자가 고른다.
+
+기존 테스트 대응: `TradingBatchStepTest`의 각 행 이름이 옮겨 온 테스트 메서드 이름이다(`TradingBatchResumerTest` 17개, `TradingCloseSchedulerTest` 11개, `TradingOpenSchedulerTest` 2개와 테스트가 없던 수동 개장 `runNow`, 나머지 25행은 창 경계). 판정이 아니라 실행 골격이라 옮기지 않은 것: 락 획득 실패, 인터럽트 플래그 복원, 실행 예외 보고, 세션 조회 예외(`missingSession_…`, `schedule_missingData…`), 예약 중복·취소(`reservations` 맵), 대상 전략 조립(`run_adds…`, `run_includes…`, `run_noActive…`), 하트비트 4건(`heartbeatSlot_*`, 휴장일 핑). 이들은 T4에서 새 스케줄러 테스트로 간다. 변이 확인: `PLACEMENT_MARGIN`을 11분으로 바꾸면 2행이 실패한다.
