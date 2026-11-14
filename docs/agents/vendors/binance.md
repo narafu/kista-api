@@ -6,7 +6,7 @@
 
 `com.kista.tradingcore.broker.adapter.out.binance` 구성:
 
-adapter/out/binance/ ← BinanceConfig(binanceRestClient — baseUrl 없음)/BinanceHttpClient(모든 파라미터 query, HMAC-SHA256 퍼센트 인코딩 payload 서명, 오류 code 매핑: 429·418→BrokerRateLimitException, -2014·-2015·-1022→BrokerCredentialException, 5xx·-1006·-1007·I/O→BinanceApiException(rejected=false), 그 외 rejected=true)/BinanceSymbolRegistry(BTC→BTCUSDT)/BinanceClientOrderIds(주문 UUID↔32자 hex 변환 단일 지점)/BinanceExchangeAdapter(CryptoExchangePort — 시장가 매수 quoteOrderQty·매도 quantity, 조회는 -2013·-2026만 empty, 체결 시 myTrades로 받은 자산 수수료를 뺀 순수량)/BinanceAuthApi(BrokerConnectionTestPort — apiRestrictions 출금→IP→권한 판정). 거래 규칙 캐시 없음. 상세 → `docs/agents/binance-api.md`
+adapter/out/binance/ ← BinanceConfig(binanceRestClient — baseUrl 없음)/BinanceHttpClient(모든 파라미터 query, HMAC-SHA256 퍼센트 인코딩 payload 서명, 오류 code 매핑: 429·418→BrokerRateLimitException, -2014·-2015·-1022→BrokerCredentialException, 5xx·-1006·-1007·I/O→BinanceApiException(rejected=false), 그 외 rejected=true)/BinanceSymbolRegistry(BTC→BTCUSDT)/BinanceClientOrderIds(주문 UUID↔32자 hex 변환 단일 지점)/BinanceExchangeAdapter(CryptoExchangePort — 시장가 매수 quoteOrderQty·매도 quantity, 조회는 -2013·-2026만 empty, 체결 시 myTrades로 받은 자산 수수료를 뺀 순수량)/BinanceAuthApi(BrokerConnectionTestPort — apiRestrictions 출금→IP→권한 판정). 거래 규칙 캐시 없음. 상세 → `docs/agents/vendors/binance.md`
 
 ### 기본 사실
 - Base `https://api.binance.com`(프로퍼티 `binance.base-url`, 기본값은 `BinanceHttpClient`의 `@Value` — yml에는 없다). 테스트넷은 `https://testnet.binance.vision`. `BinanceConfig`의 `binanceRestClient`는 baseUrl이 없다 — 서명된 절대 URI를 그대로 보내 템플릿 재인코딩(서명 불일치)을 피한다. 타임아웃 connect 3s·read 10s.

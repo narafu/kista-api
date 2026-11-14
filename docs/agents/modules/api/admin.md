@@ -1,33 +1,29 @@
 ## com.kista.api.admin (`:api`)
 
-com.kista.api.admin/    ← Spring Modulith 모듈(CLOSED) — 관리자 조회·정정·재정렬·감사로그·앱오류로그 + 런타임 설정. "domain"·"usecase"·"port" 3개 NamedInterface, service·adapter internal. event/schedule NamedInterface 없음. 오류 로그(`app_error_logs`) 저장은 두 입구가 같은 `AppErrorLogPort.save`로 수렴한다 — root 프로세스 내부 발행분은 `adapter/in/event/AppErrorRaisedListener`, trading-core 발행분은 `adapter/in/redis/AppErrorStreamConsumer`
-  domain/model/       ← 관리자 도메인(AdminAnomalies/AdminStats/AppErrorLog/AuditLog) + 표지 예외 own-type(AdminBrokerCredentialException/AdminBrokerRateLimitException/AdminPrivacyTradeConflictException/TradingPolicyUnavailableException — HTTP 상태코드 복원용, contract 대상 아님) + 런타임 설정(RuntimeSettings/BenchmarkSettings/BenchmarkFieldSettings/RuntimeSettingsBundle) — "domain". trading-core 내부 API의 요청·응답 타입은 own-type 복제 없이 `com.kista.shared.contract`(`AccountSummaryResponse`/`OrderResponse`/`StrategyResponse`/`StrategySummaryResponse`/`TradeCorrectionRequest·Response`/`PrivacyTradeBaseResponse`/`FidaOrderRequest`/`PrivacyBaseUpdateRequest`/`PrivacyOrderUpdateRequest`/`PrivacyOrderAddRequest`)를 포트·서비스·어댑터가 그대로 쓴다. `AccountSummaryResponse`는 id/userId/accountNo(마스킹 전)/broker/createdAt 5필드로 의도적으로 좁힌 계약(appKey/secretKey 등 평문 비밀값 제외). wire 계약 잠금 → `InternalApiContractTest`, 게이트·잔존 own-type → `docs/agents/decisions.md`
-  application/usecase/ ← AdminPrivacyTradeUseCase/AdminQueryUseCase/AdminStrategyUseCase/AdminTradeCorrectionUseCase/AdminUserUseCase/AdminSettingsUseCase/RuntimeSettingsUseCase — "usecase"
-  application/port/output/ ← AccountQueryPort/AppErrorLogPort/AuditLogPort/PortfolioQueryPort(텔레그램 `/status`·`/history`용 trading-core 포트폴리오 조회)/PrivacyQueryPort/RuntimeSettingsPort(root 소유 설정: approvalRequired+benchmarks)/TradingPolicyPort(trading-core 소유 정책 위임)/TradingCommandPort/TradingQueryPort/TradingSchedulerCommandPort(trigger only 2메서드) — "port"
-  application/service/ ← internal — AdminService(사용자 승인/거절/삭제/역할 변경 오케스트레이션 — `changeRole`은 자기 강등·마지막 ADMIN 검증(`UserPort.countByRole`) + `UserUseCase.changeRole` 위임 + 감사 로그만 남기고 저장·AT 무효화(`BlacklistPort`)는 user가 캡슐화)/AdminQueryService/AdminStrategyService/AdminTradeCorrectionService/AdminPrivacyTradeService/RuntimeSettingsService(root 소유 설정 트랜잭션 경계 + `ApprovalPolicyPort` 구현)/AdminSettingsService(`AdminSettingsUseCase` — root 설정과 trading-core 정책을 `RuntimeSettingsBundle`로 묶어 조회·갱신, 갱신 순서 trading 정책 PUT → root 저장 → 감사 로그, 트랜잭션 없음, 조회는 엄격)/RuntimeConfigService(`RuntimeSettingsUseCase` — 공개 `/api/runtime-config` 전용, trading-core 정책 조회 실패 시 `TradingPolicySettings.defaults()`로 강등). AdminQueryService는 계좌 목록/단건/건수를 전부 accountQueryPort(내부 API)로 위임한다 — trading-core `AccountPort` 직접 의존은 0
-  adapter/in/web/     ← internal(AdminTradingSchedulerController 예외) — 컨트롤러 10개(AdminAccount/AdminDashboard/AdminObservability/AdminPing/AdminPrivacyTrade/AdminSettings/AdminTrade/AdminUser/RuntimeConfig/ClientErrorLog) + UserSummaries(`user.domain.model.UserSummary` id→요약 Map 헬퍼) + dto/ 21종. `AdminTradingSchedulerController`(`/api/admin/scheduler/{open,close}`, 202)는 `scheduler.enabled` 게이팅 없이 kista-api role에서도 상시 노출 — `com.kista.api.web.AdminSchedulerController`(`/kbland-*`)와 prefix 공유하되 하위 경로가 겹치지 않는다. KbLand 트리거는 role-게이팅이라 admin에 두면 "admin 컨트롤러는 항상 존재" 전제가 깨져 web에 잔류
-  adapter/out/internal/ ← AccountQueryHttpAdapter/PortfolioQueryHttpAdapter(`GET /api/internal/trading/stats/portfolio/{current,history}` → `contract.stats.PortfolioCurrentResponse`(전략별 리스트, 없으면 빈 200)/`PortfolioOrderResponse`(전 종목, `currency` 포함))/PrivacyQueryHttpAdapter/TradingCommandHttpAdapter/TradingQueryHttpAdapter/TradingSchedulerCommandHttpAdapter/TradingPolicyHttpAdapter(`GET|PUT /api/internal/trading/policy-settings`) — 위 7개 포트를 내부 API(RestClient)로 구현. Scheduler 어댑터는 짧은 호출이라 공용 `internalApiRestClient`를 쓰고 trade-corrections류는 `internalApiWriteRestClient` 사용. `PrivacyQueryHttpAdapter.createBase`는 409를 `onStatus`로 되돌려 `AdminPrivacyTradeConflictException`으로 변환(없으면 catch-all 500)
-  adapter/in/telegram/ ← internal — 텔레그램 **봇 명령 채널**: TelegramWebhookController(`POST /telegram/webhook` — `platform.security.SecurityConfig`에서 permitAll, 경로 불변) + TelegramBotService(package-private, `/status`·`/history`·`/help` 명령과 신규가입 알림 인라인 버튼(`approve:{userId}`/`reject:{userId}` callback_data) 처리 — 승인·거절은 `AdminUserUseCase.approveUserByTelegram/rejectUserByTelegram`(감사 로그 기록, chatId에 연결된 ADMIN이 없으면 `admin_id=null` + payload `actor=TELEGRAM_BOT`, 이미 ACTIVE면 `User.AlreadyActiveException`을 잡아 안내 답장 — 중복 클릭에도 webhook 200, 그 외 예외는 기존대로 전파), 조회는 `UserUseCase.findUserIdByTelegramChatId`·`PortfolioQueryPort`, `platform.telegram.TelegramHttpClient` 사용) + TelegramUpdate(웹훅 payload). 관리자 채팅방(`telegram.chat-id`) 외 chatId는 무시. 이 채널은 인바운드 관리자 명령이지 알림 발송이 아니므로 notify에 두지 않는다
-  adapter/in/event/   ← internal — AppErrorRaisedListener(package-private `@Component`, `@EventListener` 동기 — 발행 지점(공용 advice 500 — `web.ApiExceptionReporter`·`TelegramAdapter.notifyError`)이 트랜잭션 밖인 경우가 많아 `@TransactionalEventListener`는 이벤트를 버린다. `AppErrorRaisedEvent` → `AppErrorLogPort.save(errorType, message, stackTrace, context)` 4-인자 저장 — `AppErrorLogPersistenceAdapter.save`는 `REQUIRES_NEW`라 `@TransactionalEventListener(AFTER_COMMIT)` 리스너 안에서 호출돼도 유실되지 않는다)
-  adapter/in/redis/   ← internal — AppErrorStreamConsumer(`stream:app.error` 컨슈머 그룹 `root` — platform `RedisStreamSubscriber` 상속, trading-core `AppErrorRaisedEvent`를 `AppErrorLogPort.save`로 저장하는 `onRecord`와 `@Scheduled` 5분 주기 `recoverPending()` 배선만 가진다. `cancelOnError=false` 구독·ack·구독 재기동·XCLAIM pending 복구 골격은 베이스.)
-  adapter/out/persistence/audit/    ← AuditLogEntity/AppErrorLogEntity + JpaRepository + PersistenceAdapter 6파일
-  adapter/out/persistence/settings/ ← RuntimeSettingsEntity + JpaRepository + PersistenceAdapter 3파일
-  ── `@Table(schema="public")`: AuditLogEntity/AppErrorLogEntity/RuntimeSettingsEntity는 플랫폼 공통 테이블이라 public 명시 유지
+Spring Modulith 모듈(CLOSED) — 관리자 조회·정정·재정렬·감사로그·앱오류로그 + 런타임 설정. "domain"·"usecase"·"port" NamedInterface, service·adapter internal.
+
+- 오류 로그(`app_error_logs`) 저장은 두 입구가 같은 `AppErrorLogPort.save`로 수렴한다 — root 발행분 `AppErrorRaisedListener`(동기 `@EventListener`: 발행 지점이 트랜잭션 밖이라 AFTER_COMMIT은 이벤트를 버린다), trading-core 발행분 `AppErrorStreamConsumer`(`stream:app.error`, 그룹 `root`).
+- trading-core 내부 API 요청·응답은 own-type 복제 없이 `com.kista.shared.contract`를 그대로 쓴다. `AccountSummaryResponse`는 id/userId/accountNo/broker/createdAt 5필드로 의도적으로 좁힌 계약이다(appKey/secretKey 등 평문 비밀 제외). 잠금: `InternalApiContractTest`, 게이트·잔존 own-type → `decisions.md`. 표지 예외(`AdminBrokerCredentialException` 등)는 HTTP 상태코드 복원용 own-type이다.
+- admin은 trading-core `AccountPort`에 직접 의존하지 않는다 — 계좌 조회는 전부 `AccountQueryPort`(내부 API)로 위임한다.
+- `AdminService.changeRole`은 자기 강등과 마지막 ADMIN 강등을 막고(`UserPort.countByRole`) `UserUseCase.changeRole`에 위임하며 감사 로그만 남긴다. 저장·AT 무효화(`BlacklistPort`)는 user가 캡슐화한다.
+- 내부 API 호출: 짧은 스케줄러 트리거는 `internalApiRestClient`, 정정류는 `internalApiWriteRestClient`. `PrivacyQueryHttpAdapter.createBase`는 409를 `AdminPrivacyTradeConflictException`으로 되돌린다(없으면 catch-all 500).
+- `AdminTradingSchedulerController`(`/api/admin/scheduler/{open,close}`, 202)는 `scheduler.enabled` 게이팅 없이 kista-api role에서도 항상 노출한다. `web.AdminSchedulerController`(`/kbland-*`)는 role-게이팅이라 "admin 컨트롤러는 항상 존재" 전제가 깨져 web에 남아 있고 두 컨트롤러는 prefix만 공유한다.
+- 감사·앱오류·런타임 설정 엔티티는 플랫폼 공통 테이블이라 `@Table(schema="public")`를 유지한다.
 
 ### 런타임 설정 API 규칙
-- `GET /api/runtime-config` → 로그인 전 UI가 가입·계좌·전략 생성 정책을 조회하는 공개 엔드포인트. 동적 설정이므로 `Cache-Control: no-store` 유지
-- `GET|PUT /api/admin/settings` → ADMIN 전용. PUT은 auth/brokers/strategies 전체 설정을 검증한 뒤 한 번에 교체하며 부분 갱신 API로 취급하지 않음. 조회·갱신 응답 모두 `Cache-Control: no-store` 유지
-- 증권사 활성화·전략 생성 정책의 **적용 규칙**은 정책 소유자인 trading-core가 집행한다 → `modules/tradingcore/trading.md` "런타임 매매 정책 적용". admin은 `TradingPolicyHttpAdapter`로 조회·교체만 중계
-- 관리자 설정 PUT의 brokers는 부분 맵을 허용한다 — 생략한 증권사 키는 현재 값을 유지(AdminSettingsController가 getSettings()로 현재 정책을 읽어 AdminSettingsRequest.toDomain(currentBrokers)에 넘김), allowedIp는 PUT으로 바꾸지 않는다(기본값 TradingPolicySettings.SERVER_EGRESS_IP). UPBIT·MERITZ·BINANCE·DCA는 기본 비활성.
-- 기존 운영 행의 DCA 티커 허용값에는 BTC/ETH가 없다(키 단위 백필이라 값 내부는 보충되지 않음) — 코인 DCA를 열 때 관리자 화면에서 DCA 티커에 BTC/ETH를 추가해야 한다.
-- 런타임 설정 응답은 `NON_NULL` 직렬화 사용. 전략 유형에 적용되지 않는 field(예: PRIVACY의 `divisionCount`)는 `null`로 내리지 않고 JSON에서 생략
-- `approvalRequired` 값이 `true → false`로 바뀌면 그 시점의 모든 PENDING 사용자를 기존 `UserUseCase.approve()` 흐름으로 활성화. 설정 갱신은 `RUNTIME_SETTINGS_UPDATE` 감사 로그 기록
+- `GET /api/runtime-config`는 로그인 전 UI가 가입·계좌·전략 생성 정책을 읽는 공개 엔드포인트다. 동적 설정이므로 `Cache-Control: no-store`. trading-core 정책 조회 실패 시 `TradingPolicySettings.defaults()`로 강등한다(`RuntimeConfigService`).
+- `GET|PUT /api/admin/settings`는 ADMIN 전용, 응답 모두 `no-store`. 조회는 엄격하다(trading-core 장애가 그대로 오류로 드러나야 기본값을 실제 설정으로 오인하지 않는다). PUT은 전체 설정을 검증한 뒤 한 번에 교체하며 부분 갱신 API가 아니다.
+- 갱신 순서는 trading 정책 PUT → root 저장 → 감사 로그이고 트랜잭션은 없다(HTTP를 DB 트랜잭션에 두지 않기 위함). 후자가 실패하면 정책만 바뀌지만 PUT이 멱등이라 재시도하면 수렴한다.
+- PUT의 brokers는 부분 맵을 허용한다(생략한 증권사 키는 현재 값 유지 — 신규 증권사를 모르는 구 관리자 화면 호환). `allowedIp`는 PUT으로 바꾸지 않는다(`TradingPolicySettings.SERVER_EGRESS_IP`). UPBIT·MERITZ·BINANCE·DCA는 기본 비활성.
+- 증권사 활성화·전략 생성 정책의 **적용 규칙**은 정책 소유자인 trading-core가 집행한다 → `modules/tradingcore/trading.md` "런타임 매매 정책 적용". admin은 `TradingPolicyHttpAdapter`로 조회·교체만 중계한다.
+- 운영 DB의 기존 DCA 티커 허용값에는 BTC/ETH가 없다 — 코인 DCA를 열 때 관리자 화면에서 추가해야 한다.
+- 응답은 `NON_NULL` 직렬화 — 전략 유형에 적용되지 않는 field(예: PRIVACY의 `divisionCount`)는 null이 아니라 생략한다.
+- `approvalRequired`가 `true → false`로 바뀌면 그 시점의 모든 PENDING 사용자를 `UserUseCase.approve()`로 활성화한다. 갱신은 `RUNTIME_SETTINGS_UPDATE` 감사 로그를 남긴다.
 
-### ADMIN 권한 관리
-- ADMIN seed는 `ADMIN_KAKAO_IDS` 환경변수(쉼표 구분)이며, 로그인 시 idempotent하게 promote한다
-- `/api/admin/**` → `hasRole("ADMIN")`, 관리자 액션은 `audit_logs`에 영구 기록한다
-- 로컬: `POST /api/auth/dev-admin-token` → 고정 UUID `...002` ADMIN 발급
+### ADMIN 권한
+- ADMIN seed는 `ADMIN_KAKAO_IDS`이고 로그인 시 idempotent하게 promote한다. `/api/admin/**`는 `hasRole("ADMIN")`이며 관리자 액션은 `audit_logs`에 영구 기록한다.
 
-### 텔레그램 봇 명령 채널 (adapter.in.telegram)
-- 봇 명령 채널(`TelegramWebhookController` + `TelegramBotService` + `TelegramUpdate`)은 알림 발송이 아니라 **인바운드 관리자 명령**이라 `com.kista.api.admin.adapter.in.telegram`이 소유한다
-- 전송 쪽 규칙(`TelegramHttpClient`)은 `docs/agents/modules/api/notify.md`
+### 텔레그램 봇 명령 채널 (`adapter.in.telegram`)
+- 알림 발송이 아니라 인바운드 관리자 명령(`/status`·`/history`·`/help`, 신규가입 인라인 버튼 `approve:{userId}`/`reject:{userId}`)이라 notify가 아니라 admin이 소유한다. 전송 쪽 규칙(`TelegramHttpClient`)은 `notify.md`.
+- `POST /telegram/webhook`은 permitAll, 경로 불변. 관리자 채팅방(`telegram.chat-id`) 외 chatId는 무시한다.
+- 승인·거절은 `approveUserByTelegram/rejectUserByTelegram`이 감사 로그를 쓴다(chatId에 연결된 ADMIN이 없으면 `admin_id=null` + payload `actor=TELEGRAM_BOT`). 이미 ACTIVE면 `User.AlreadyActiveException`을 잡아 안내 답장한다(중복 클릭에도 webhook 200).

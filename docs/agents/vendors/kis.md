@@ -95,7 +95,7 @@ adapter/out/kis/    ← KisHttpClient(공통 헤더 + executeWithRetry: 401 시 
 - 관리자 시세 2단계(`KisAdminPriceSource`, Toss 관리자 실패분만)는 `KisPriceApi.fetchQuotes`의 원시 `last`/`base`를 대체 없이 쓴다 — `last`는 현재가로만, `base`는 전일종가로만(빈값이면 누락 → 계좌 단계). 위 `last→base`·`base→current` 폴백은 계좌 단계(③)에만 남는다
 - 마감 리포트 확정 종가는 별도 `getClosingPrice(s)`(dailyprice `HHDFS76240000`, `fetchConfirmedClose`)로 조회한다 — 호출량 증가를 마감 리포트 1일 1회로 한정하려고 `getPrevClose(s)`(미리보기·통계 핫패스 공용)와 분리했다. 응답 봉 날짜가 기대 거래일과 다르면 라이브 현재가로 fallback
 - **전략 생성 화면과 실제 매매의 기준가 통일** (전일종가는 `BrokerRouter`가 관리자 시세 우선으로 조회하므로 계좌 브로커와 무관하게 대부분 Toss 캔들 기준): `AccountStatisticsService.getPrices()`(tradingcore.stats, `GET /prices` 티커 목록)와 `StrategyHistoryQueryService.strategySeedPreview()`(trading, 최소 시드 미리보기 — `StrategyService`가 위임) 모두 `BrokerPricePort.getPrevClose(s)`를 사용 — `TradingPreviewService`·실제 매매 실행(`InfinitePosition.averagePrice()`, holdings==0→prevClose)과 동일한 소스로 맞춰, "전략 생성 시 본 기준가"와 "실제 첫 주문가"가 항상 일치하도록 함. 순수 현재가(`getPrice`/`getPrices`)는 이 두 화면 어디에도 쓰지 않음
-- **`BrokerPricePort`에 `getPrevClose`/`getPrevCloses` 전용 메서드 존재**: `getPriceSnapshot(s)`(현재가+전일종가 조합)와 별개로, 전일종가만 필요하면 이걸 사용 — KIS는 응답이 한 API에 묶여 있어 내부적으로 `getPriceSnapshot(s)`를 재사용(호출 절감 없음)하지만, Toss는 현재가 API(`/api/v1/prices`) 호출을 완전히 생략하고 캔들 API만 호출하므로 실질적 절감이 있음 (`toss-api.md` "가격 조회 API 3분리" 참고)
+- **`BrokerPricePort`에 `getPrevClose`/`getPrevCloses` 전용 메서드 존재**: `getPriceSnapshot(s)`(현재가+전일종가 조합)와 별개로, 전일종가만 필요하면 이걸 사용 — KIS는 응답이 한 API에 묶여 있어 내부적으로 `getPriceSnapshot(s)`를 재사용(호출 절감 없음)하지만, Toss는 현재가 API(`/api/v1/prices`) 호출을 완전히 생략하고 캔들 API만 호출하므로 실질적 절감이 있음 (`toss.md` "가격 조회 API 3분리" 참고)
 
 ### KIS 응답 Ticker 필터링 패턴
 - 응답 stream에서 enum 외 종목 제거: `.flatMap(o -> StrategyTicker.tryParse(o.pdno()).map(t -> new Foo(t, ...)).stream())`

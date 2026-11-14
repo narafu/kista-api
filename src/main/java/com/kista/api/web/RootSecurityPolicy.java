@@ -13,6 +13,7 @@ import java.util.List;
 // root 프로세스(kista-api·kista-scheduler) 고유 공개/인증 라우트 규칙 — platform.security.SecurityConfig가
 // 공통 규칙(/api/internal/**, /api/admin/**) 뒤에 이 정책을 적용한다. 규칙 순서는 첫 매치 우선이라
 // 구체 경로(status-stream·me·approval-requests)를 /api/auth/** permitAll보다 먼저 둔다.
+// principal을 읽는 /api/auth 핸들러(me·approval-requests 등)는 permitAll이면 토큰 없을 때 principal이 null로 들어와 500이 되므로 authenticated로 둔다.
 @Component
 public class RootSecurityPolicy implements SecurityRoutePolicy {
 

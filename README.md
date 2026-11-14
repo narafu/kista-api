@@ -64,4 +64,4 @@ docker compose up -d postgres redis                          # DB·Redis
 | [`docs/agents/scheduler-time-table.md`](docs/agents/scheduler-time-table.md) | 배치 실행 시각 |
 | [`docs/agents/constraints.md`](docs/agents/constraints.md) | 설계 제약·Flyway·Git 규칙 |
 | [`docs/agents/docker-infra.md`](docs/agents/docker-infra.md) | 배포·운영 런북 |
-| [`docs/agents/kis-api.md`](docs/agents/kis-api.md) · [`toss-api.md`](docs/agents/toss-api.md) | 증권사 API 연동 |
+| [`docs/agents/vendors/kis.md`](docs/agents/vendors/kis.md) · [`vendors/toss.md`](docs/agents/vendors/toss.md) | 증권사 API 연동 |

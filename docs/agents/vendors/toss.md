@@ -55,7 +55,7 @@
 
 ### 가격 조회 API 3분리 — TossPriceApi
 
-Toss는 현재가(`/api/v1/prices`)와 전일종가(캔들 API)가 **완전히 분리된 HTTP 호출**이므로, 필요한 값만 조회하도록 메서드를 3그룹으로 분리했다 (KIS는 한 응답에 둘 다 묶여 있어 이 구분이 무의미 — `kis-api.md` 참고):
+Toss는 현재가(`/api/v1/prices`)와 전일종가(캔들 API)가 **완전히 분리된 HTTP 호출**이므로, 필요한 값만 조회하도록 메서드를 3그룹으로 분리했다 (KIS는 한 응답에 둘 다 묶여 있어 이 구분이 무의미 — `kis.md` 참고):
 
 - `getPrice`/`getPrices` — 현재가만, `/api/v1/prices` 1회 호출
 - `getPrevClose`/`getPrevCloses` — 전일종가만, 캔들 API만 호출(**현재가 API 미호출**). 캔들 조회 실패 종목만 현재가로 fallback(별도 배치 호출)

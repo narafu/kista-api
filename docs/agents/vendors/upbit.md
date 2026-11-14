@@ -54,7 +54,7 @@
 - 체결 수량은 `executed_volume`을 기준으로 삼는다(→ dca.md "코인 DCA 실행"). 평균가는 응답에 필드가 없어 `trades`가 있으면 Σfunds/Σvolume(8자리 HALF_UP)로 계산하고, 체결이 없으면 null이다. 순 체결 수량 = 체결 수량이고, 수수료는 `paid_fee`·수수료 자산은 `KRW`다(KRW 마켓 수수료는 원화).
 
 ### identifier 규칙
-- `identifier` = 주문 UUID다. 같은 `identifier` 재전송으로 멱등을 얻는다 — 바이낸스 `clientOrderId`는 열린 주문 중에서만 고유해 재전송이 이중 매수가 되는 것과 다르다(→ binance-api.md "clientOrderId 규칙").
+- `identifier` = 주문 UUID다. 같은 `identifier` 재전송으로 멱등을 얻는다 — 바이낸스 `clientOrderId`는 열린 주문 중에서만 고유해 재전송이 이중 매수가 되는 것과 다르다(→ binance.md "clientOrderId 규칙").
 - 조회도 `identifier`로 할 수 있어 전송·조회 형태가 같다(변환 계층 없음).
 
 ### 연결 테스트 (`UpbitAuthApi`)

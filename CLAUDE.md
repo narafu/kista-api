@@ -49,6 +49,6 @@ Java 25 + Spring Boot 4, Hexagonal Architecture + Spring Modulith, Gradle 서브
 - `decisions.md` 하지 않기로 한 것(유지·기각·트리거 보류, own-type 허용 원장)
 - `modules/tradingcore/trading-formulas.md` 매매·VR 공식 SSOT, `modules/tradingcore/dca.md` DCA
 - `workflow.md` 매매·스케쥴러·주문 로직 인덱스(`workflow-batch`·`-ledger-price`·`-capper`·`-orders`)
-- 증권사 API `meritz-api.md`·`toss-api.md`·`kis-api.md`·`binance-api.md`·`upbit-api.md`, `flyway.md`(이상 해당 디렉토리 작업 시 자동 로드)
+- 증권사 API `vendors/meritz.md`·`vendors/toss.md`·`vendors/kis.md`·`vendors/binance.md`·`vendors/upbit.md`, `flyway.md`(이상 해당 디렉토리 작업 시 자동 로드)
 - `local-dev.md` 로컬 개발, `docker-infra.md` 배포·운영 로그·DB 접속, `scheduler-time-table.md` 스케줄러 시각
 - 전체 그림: `docs/architecture-map.md`, `build/architecture-map/index.html`(`ArchitectureMapTest` 생성, 원본 `flows.yml`)
