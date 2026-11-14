@@ -295,7 +295,7 @@ KIS 관리자 소스(`KisAdminPriceSource`·`KisAdminTokenCoordinator` 187줄)�
 - T5에서 `TradingPriceFetcher`의 메서드(`reloadPlacementPrices`는 T7), `AdminMarketPriceAdapter`, `BrokerPricePort#getPrevClose`를 지우거나 이름을 바꿀 때 `flows.yml`의 `code:`(`:118,172,188,315,372,531,672`)를 같은 커밋에서 고친다. T5의 문서 목록에 있는 `flows.yml`은 서술 수정이고 이것은 별개다.
 - `usTradeDates_must_only_be_used_by_allowlisted_adapters`(`HexagonalArchitectureTest:112-130`): 새 Alpaca 어댑터는 `UsTradeDates`를 쓰지 않는다. 세션일은 호출하는 쪽이 인자로 준다(7절 1번 테스트의 "세션일 직전 봉"). 그래서 허용 목록에 더할 것이 없다. `TossPriceApi`를 지우는 T5에서 목록과 주석(`:116`)·`DisplayName`의 개수를 고친다.
 - Alpaca 응답 모델은 어댑터 패키지 안의 package-private record로 둔다. 포트는 기존 도메인 타입을 돌려준다(9절 기본값). `broker.domain.model.alpaca` 패키지를 만들지 않는다.
-- D2의 `GET /api/market/candles` 인증: **공개로 둔다(기본값).** fable-ui 회신(2026-11-14, `cross-repo.md` G절 끝 G5 행)으로 비회원 대시보드가 이 엔드포인트를 쓰는 것이 확인됐다. 로그인 필요로 바꾸면 비회원 차트가 401이고 ui의 전역 401 처리가 로그아웃·리로드를 되풀이할 수 있다. 바꾸는 것은 이 지침서의 태스크가 아니다. 사용자가 비회원 차트를 없애기로 하면 ui가 먼저 배포하고, 그 뒤에 `cross-repo.md` G5 행에 적고 바꾼다.
+- D2의 `GET /api/market/candles` 인증: **공개로 둔다(사용자 확정 2026-11-14: "비회원 차트 나와야 해"). 로그인 필요로 바꾸지 않는다.** 아래는 경위다. fable-ui 회신(2026-11-14, `cross-repo.md` G절 끝 G5 행)으로 비회원 대시보드가 이 엔드포인트를 쓰는 것이 확인됐다. 로그인 필요로 바꾸면 비회원 차트가 401이고 ui의 전역 401 처리가 로그아웃·리로드를 되풀이할 수 있다. 바꾸는 것은 이 지침서의 태스크가 아니다. 사용자가 비회원 차트를 없애기로 하면 ui가 먼저 배포하고, 그 뒤에 `cross-repo.md` G5 행에 적고 바꾼다.
 
 태스크별 기본값:
 
