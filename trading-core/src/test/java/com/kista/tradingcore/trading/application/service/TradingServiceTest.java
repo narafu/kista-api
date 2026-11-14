@@ -43,6 +43,7 @@ import com.kista.tradingcore.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -101,6 +102,7 @@ class TradingServiceTest {
     @Mock TradingBatchRunPort batchRunPort; // 재개 체크포인트 — 단계 기록·리포트 마커
     TradingBatchRunState runState; // 협조적 종료 상태 — 실인스턴스
     TradingService service;
+    PriceSourceComparison priceComparison = mock(PriceSourceComparison.class); // 병행 비교 로그 — 넘겨받은 세션일만 검증
     AccountBudgetLock budgetLock = spy(new AccountBudgetLock()); // 배치 allocator 경로용 실제 락 + 구간 추적
 
     static final DstInfo PAST_DST = new DstInfo(true,
@@ -233,7 +235,7 @@ class TradingServiceTest {
                 marketEventNotifier,
                 new TradingParallelRunner(0), // 순차 모드 — 기존 테스트 결정성 보존
                 batchGuard, candidatePlanner, batchRunPort, runState, balanceLoader, dcaDetailPort,
-                new PrivacyBaseGuard(privacyValidation, eventPublisher), cycleStrategies, cycleHistoryPort, FIXED);
+                new PrivacyBaseGuard(privacyValidation, eventPublisher), cycleStrategies, cycleHistoryPort, priceComparison, FIXED);
         // 기준표 장전 점검 기본값: 이슈 없음 — 가드 발동 시나리오만 개별 stub
         lenient().when(privacyValidation.inspect(any(PrivacyTradeBase.class)))
                 .thenReturn(new com.kista.tradingcore.privacy.domain.model.PrivacyTradeValidationReport(List.of()));
@@ -2417,5 +2419,21 @@ class TradingServiceTest {
             }
         }).when(lock).call(any(), any());
         return held;
+    }
+
+    @Test
+    void passesUsSessionDateToPriceComparison() throws Exception {
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        List<BatchContext> contexts = List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER));
+        ArgumentCaptor<LocalDate> sessionDate = ArgumentCaptor.forClass(LocalDate.class);
+
+        service.placeOpenOrders(contexts, PAST_DST);
+        service.executeBatch(contexts, PAST_DST);
+
+        verify(priceComparison, times(2)).afterLoad(any(), any(), sessionDate.capture());
+        assertThat(sessionDate.getAllValues()).containsExactly(
+                DstInfo.nextTradeDate(ZonedDateTime.now(FIXED)).minusDays(1), // 개장: 내일 KST 거래일의 미국 세션
+                LocalDate.now(FIXED).minusDays(1));                           // 마감: 오늘 KST 거래일의 미국 세션
     }
 }

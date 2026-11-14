@@ -10,7 +10,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 // 기본값(자기 루트)으로 trading-core 전체를 덮는다. :shared 빈은 PlatformAutoConfiguration이 등록하고, Modulith 검증 모델에만 shared를 포함한다
 @SpringBootApplication
 @Modulithic(additionalPackages = "com.kista.shared")
-@ConfigurationPropertiesScan // AlpacaProperties 등 trading-core 소유 @ConfigurationProperties
+@ConfigurationPropertiesScan // trading-core 소유 @ConfigurationProperties
 @EnableScheduling
 public class TradingApplication {
     public static void main(String[] args) {

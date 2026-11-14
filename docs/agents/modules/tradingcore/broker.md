@@ -13,6 +13,7 @@ Spring Modulith 모듈(CLOSED) — Meritz/Toss/KIS/Mock 증권사 + Upbit/Binanc
 - 공통 6개 Port(Portfolio/Margin/SellableQuantity/BrokerOrderCorrection/Execution/BrokerPrice)를 `account.broker()`로 위임한다. `BrokerCapabilitiesPort`/`BrokerAdapterPort`는 구현하지 않는다(구현하면 자기 자신이 `List<BrokerCapabilitiesPort>`에 수집된다).
 - 소비처는 Port 인터페이스를 그대로 주입한다 — `@Primary`가 Router를 고른다. 신규 브로커는 `BrokerCapabilitiesPort` 구현체 1개만 추가하면 되고 Router·switch는 고치지 않는다. 미등록 브로커는 400.
 - 현재가·전일종가·확정종가는 `AdminMarketPricePort`(계좌 없는 관리자 시세: Toss → KIS 순, 단계별 누락분만 다음 단계) 우선, 누락분만 계좌 어댑터가 조회한다. 스냅샷은 계좌 어댑터 전용. 다건 조회에서 계좌 보충이 실패하면 관리자 결과가 있을 때 warn 후 부분 결과를 반환하고 없으면 예외를 전파한다. `BrokerCredentialException`은 항상 전파, `BrokerRateLimitException`은 관리자 결과가 있으면 부분 결과 우선, 단건은 항상 전파한다.
+- 공용 시세 `AlpacaMarketDataAdapter`(`adapter/out/marketdata`, 타입 단위 NamedInterface `marketdata`, 인터페이스 없음): 현재가(iex·지연 통합 중 더 늦은 체결)·전일 종가·확정 일봉·일봉 이력. 날짜 인자는 미국 세션일. 아직 운영 경로는 쓰지 않고 `PriceSourceComparison`(trading)이 `[시세 비교]` 로그로 기존 값과 대조한다(fable 14 T2, T3 전환 때 삭제). `BrokerPricePort.currentPrices`는 관리자 시세를 거치지 않는 계좌 증권사 현재가다.
 - 통계 capability(Candle/ExchangeRate)는 `BrokerStatisticsPort`로 묶여 Toss만 구현한다. 미지원 증권사는 `BrokerStatisticsPorts.find`가 빈 Optional을 주고 400 사유는 소비자가 정한다.
 - 코인은 `CryptoExchangePort`로 분리(`BrokerCapabilitiesPort`와 별개). 마지막 일봉 일자 계약은 `CryptoCandle.latestCompletedKstDate`.
 

@@ -1,5 +1,6 @@
 package com.kista.tradingcore.stats.adapter.out.alpaca;
 
+import com.kista.shared.platform.alpaca.AlpacaProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.stats.domain.model.DailyCandle;
@@ -15,7 +16,6 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 
-// 별도 AlpacaConfig/AlpacaProperties를 쓰는 이유 — marketcalendar의 동명 AlpacaProperties는 internal이라 재사용 불가(Modulith 경계)
 @Slf4j
 @Component
 class AlpacaCandleAdapter implements HistoricalCandlePort {

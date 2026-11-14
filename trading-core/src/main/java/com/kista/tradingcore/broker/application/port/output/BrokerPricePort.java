@@ -6,6 +6,7 @@ import com.kista.shared.kernel.StrategyTicker;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -23,4 +24,8 @@ public interface BrokerPricePort {
     // 정규장 확정 종가 — 마감 리포트 전용(getPrevClose와 별도). KIS는 dailyprice, Toss/MOCK은 일봉 캔들(TossCandleApi) 기반 확정 종가 (봉 없으면 라이브가 폴백)
     BigDecimal getClosingPrice(StrategyTicker ticker, LocalDate tradeDate, BrokerAccountRef account);
     Map<StrategyTicker, BigDecimal> getClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, BrokerAccountRef account);
+    // 그 계좌의 증권사에서 직접 읽은 현재가 — 관리자 시세를 거치지 않는다(개별 어댑터의 getPrices는 이미 계좌 직접 조회)
+    default Map<StrategyTicker, BigDecimal> currentPrices(BrokerAccountRef account, Collection<StrategyTicker> tickers) {
+        return getPrices(List.copyOf(tickers), account);
+    }
 }

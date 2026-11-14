@@ -1,5 +1,6 @@
 package com.kista.tradingcore.stats.adapter.out.alpaca;
 
+import com.kista.shared.platform.alpaca.AlpacaProperties;
 import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.stats.domain.model.DailyCandle;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ class AlpacaCandleAdapterTest {
 
     private final RestClient.Builder builder = RestClient.builder();
     private final AlpacaProperties properties = new AlpacaProperties(
-            "test-key", "test-secret", "https://data.test");
+            null, "test-key", "test-secret", "https://data.test");
 
     private AlpacaCandleAdapter buildAdapter() {
         return new AlpacaCandleAdapter(builder.build(), properties, FixedClockTestConfig.FIXED);

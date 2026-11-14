@@ -1,5 +1,6 @@
 package com.kista.tradingcore.marketcalendar.adapter.out.alpaca;
 
+import com.kista.shared.platform.alpaca.AlpacaProperties;
 import com.kista.shared.platform.http.RestClients;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;

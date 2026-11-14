@@ -135,6 +135,17 @@ class BrokerRouterTest {
     }
 
     @Test
+    @DisplayName("currentPrices: 계좌 어댑터로 직접 보내고 관리자 시세를 부르지 않는다")
+    void currentPricesSkipsAdmin() {
+        BrokerAccountRef kisRef = ref(Broker.KIS);
+        List<StrategyTicker> tickers = List.of(StrategyTicker.SOXL);
+        when(kis.currentPrices(kisRef, tickers)).thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("9")));
+
+        assertThat(router.currentPrices(kisRef, tickers)).containsEntry(StrategyTicker.SOXL, new BigDecimal("9"));
+        verify(admin, never()).getPrices(any());
+    }
+
+    @Test
     @DisplayName("getPrice 단건: 관리자 값이 있으면 그대로, 없으면 계좌 단건 조회로 폴백")
     void priceSingleAdminThenAccount() {
         BrokerAccountRef kisRef = ref(Broker.KIS);

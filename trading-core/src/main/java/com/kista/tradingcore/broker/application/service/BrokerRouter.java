@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -87,6 +88,11 @@ class BrokerRouter implements PortfolioPort, MarginPort, SellableQuantityPort,
     @Override
     public Map<StrategyTicker, BigDecimal> getPrices(List<StrategyTicker> tickers, BrokerAccountRef account) {
         return adminFirst(tickers, adminPrices::getPrices, missing -> of(account).getPrices(missing, account));
+    }
+
+    @Override
+    public Map<StrategyTicker, BigDecimal> currentPrices(BrokerAccountRef account, Collection<StrategyTicker> tickers) {
+        return of(account).currentPrices(account, tickers); // adminFirst를 타지 않는다
     }
 
     @Override

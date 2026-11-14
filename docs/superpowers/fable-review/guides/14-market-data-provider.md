@@ -145,7 +145,7 @@ public interface MarketDataPort {
 - `AdminMarketPricePort`, `AdminPriceSource`, `CandlePort`, stats의 `HistoricalCandlePort`가 이 포트 하나로 합쳐진다.
 - `BrokerPricePort`는 메서드 8개에서 **1개**로 줄어 남는다(3-5절): `Map<StrategyTicker, BigDecimal> currentPrices(BrokerAccountRef account, Collection<StrategyTicker> tickers)`. `BrokerRouter`는 관리자 우선 로직 없이 계좌의 브로커로만 보낸다. 메리츠는 `MeritzPriceApi`의 현재가 조회(종목별 반복), 토스는 `GET /api/v1/prices`를 **계좌 토큰**으로, Mock은 `MarketDataPort.latestPrices`에 위임한다. 주문 경로만 이 포트를 쓰고 화면 경로는 `MarketDataPort`를 쓴다. 시그니처의 세부(반환 타입 이름, `CandleQuery`의 모양)는 구현자가 기존 `Candle`·`PriceSnapshot` 타입을 재사용해 정한다.
 - 구현은 `broker/adapter/out/marketdata/`의 Alpaca 어댑터 하나다(`AdminMarketPriceAdapter`가 있는 자리). stats의 `AlpacaCandleAdapter`(78줄)를 이쪽으로 합친다.
-- 인터페이스를 두는 이유: 실제 외부 구현이 있고(지침서 01의 유지 조건), 테스트 대역과 Mock 브로커가 주입받는다.
+- 인터페이스를 두는 이유: 실제 외부 구현이 있고(지침서 01의 유지 조건), 테스트 대역과 Mock 브로커가 주입받는다. **철회(2026-11-15, S15 T1)**: 01 단계 A의 가드 `interfaces_must_earn_their_keep`이 구현 하나뿐인 새 포트를 막는다. 인터페이스 없이 구체 클래스 `AlpacaMarketDataAdapter`를 직접 주입한다(11절 "T1 실행 결과").
 - 환율은 별도다. `ExchangeRatePort.getExchangeRate()`의 구현을 Frankfurter로 바꾼다(4-3절).
 
 ### 4-2. 값별 호출과 캐시
@@ -306,3 +306,24 @@ KIS 관리자 소스(`KisAdminPriceSource`·`KisAdminTokenCoordinator` 187줄)�
 - **T4**: 기존 `FrankfurterFxRateAdapter`가 과거 날짜용이면 같은 설정·`RestClient`로 최신값 메서드를 더한다. 어댑터를 새로 만들지 않는다. 15가 `HistoricalFxRatePort`를 지워도 `FrankfurterConfig`는 남긴다.
 - **T6**: 저장된 지수 값과 `feed=sip` 값이 다르면 다시 받지 않는다. 차이의 크기(최대·평균)를 커밋 메시지에 적고 새로 받는 날부터 `sip`을 쓴다. 과거 값을 고치는 것은 사용자가 요청할 때 한다.
 - **T5 뒤의 사용자 작업**: 토스 관리자 키 폐기, 운영 secret에서 `TOSS_ADMIN_*` 제거(kista-infra, `cross-repo.md`에 적는다).
+
+T1 실행 결과(2026-11-15, S15):
+
+- **`MarketDataPort` 인터페이스는 만들지 않았다.** `broker/adapter/out/marketdata/AlpacaMarketDataAdapter`(public, 타입 단위 `@NamedInterface("marketdata")`)가 4-1절의 메서드 넷을 그대로 가진다: `latestPrices`, `confirmedBars`, `closesBefore`, `dailyCandles`. T3·T7과 04 단계 D는 이 클래스를 주입한다. 05 단계 R에서 `market` 모듈로 옮길 때도 클래스째 옮긴다.
+- 반환 타입은 기존 `BrokerCandle`이다(새 `DailyBar`·`Candle` 타입 없음). 새 값 타입은 조회 조건 `DailyCandleQuery`(기간 / 최근 N개 / 세션일 이전 N개, 조정 방식 RAW·SPLIT·ALL) 하나다. `dailyCandles`의 종목은 `String`이다(차트가 `QQQ` 같은 전략 밖 종목을 묻는다).
+- 날짜 인자는 전부 미국 세션일이다. KST 거래일을 세션일로 바꾸는 것은 호출하는 쪽이다(어댑터는 `UsTradeDates`를 쓰지 않는다). T2는 `UsTradeDates.toUsTradeDate`와 같은 규칙(KST 거래일 − 1일)을 `TradingService`의 임시 헬퍼로 썼다(`DstInfo.marketOpen()`의 뉴욕 날짜는 수동 개장에서 틀린다).
+- `confirmedBars`는 뉴욕 16:16(정규 마감 + 지연 15분) 전에 읽은 봉을 캐시하지 않는다. **완결 전 호출을 거부하지는 않는다** — 장중에 부르면 진행 중인 봉이 온다. T3에서 리포트 단계가 세션의 `closeAt + 20분` 뒤에만 부르게 하거나 `closeAt`을 인자로 받아 거부하게 한다(조기 마감일 포함).
+- 현재가의 "최근 체결이 N분보다 오래됨" 경고는 넣지 않았다. 장외 시간에는 언제나 오래된 값이라 개장 여부를 알아야 한다. 한쪽 피드가 실패하면 warn 로그만 남긴다. 필요하면 T3에서 세션 정보와 함께 넣는다.
+- 일봉 조회는 `next_page_token`을 끝까지 따라간다(12 F1). stats의 `AlpacaCandleAdapter`·`HistoricalCandlePort`를 이 어댑터로 합치는 것은 T3이다(백테스트의 `to` 클램프를 `DailyCandleQuery.range`로 옮긴다).
+- 차트 일봉(`CandlePort.getCandles`·`getLatestCandles`)은 `interval` 인자를 받지만 root 엔드포인트는 일봉만 연다(`MarketHolidayController`). T3에서 `interval`을 지운다.
+- `AlpacaProperties`는 `shared.platform.alpaca`에 한 벌이다(필드 순서 `baseUrl, apiKey, apiSecret, dataBaseUrl`). trading-core의 두 벌을 지웠다. root benchmark의 것은 그대로다.
+- 토스 `GET /api/v1/prices` 계좌 토큰 실호출은 하지 않았다(실계좌 호출 금지, 운영 토스 전략 0). T3에서 토스 계좌는 Mock처럼 `latestPrices`를 쓴다(6절 대체 경로).
+
+T2 실행 결과(2026-11-15, S15, 미배포 — **관찰 대기(배포일부터 3거래일)**):
+
+- `PriceSourceComparison`(trading, 임시)이 `TradingService`의 5곳에서 불린다: 개장·마감 `loadPriceContext` 뒤(`prevClose`, `current`), 주문 접수가 끝난 뒤 2곳(`current`, old는 접수에 쓴 재조회 값. 메리츠 호출이 주문을 늦추지 않게 접수 뒤에 부른다), 마감 리포트의 확정 종가 조회 뒤(가상 스레드 하나에서 `close+10`, 10분 뒤 `close+20`). 수동 재실행 경로(`reportRebuilt`)에는 넣지 않았다.
+- `BrokerPricePort.currentPrices(account, tickers)`를 더했다(3-5절의 최종 모양. `BrokerRouter`가 관리자 시세를 거치지 않고 계좌 증권사로 보낸다). 기존 메서드와 호출처는 그대로다.
+- "메리츠 계좌 하나"는 그 배치의 메리츠 계좌 중 id(UUID v7)가 가장 작은 것이다(배치 컨텍스트에 생성 시각이 없다).
+- 읽을 때 주의: `prevClose`의 old는 전일 종가 조회가 실패하면 현재가로 대체된 값이다(지금 동작). 그날 diffPct가 크면 같은 시각의 "전일 종가" 경고 로그를 먼저 본다.
+- 관찰 명령(운영, 읽기 전용): `ssh kista-server "docker logs kista-trading --since 24h 2>&1 | grep -F '[시세 비교]'"`. kind별로 보려면 뒤에 `| grep 'kind=close+20'`. 비교 호출 자체의 실패는 `grep -F '시세 비교' | grep '건너뜁니다'`.
+- 통과 기준은 8절 T2 행과 이 절의 "T2의 판정" 그대로다: `prevClose` 전부 diffPct 0, `current` |diffPct| ≤ 0.5, `close+20`은 SOXL·USD·QLD diffPct 0·TQQQ 차이 0.02달러 이내이고 `new=null`이 없어야 한다. `close+10`은 참고값이다(무료 등급은 최근 15분을 주지 않아 +10분에는 봉이 덜 찼을 수 있다).

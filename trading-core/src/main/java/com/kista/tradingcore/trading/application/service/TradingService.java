@@ -55,6 +55,7 @@ class TradingService {
     private final PrivacyBaseGuard privacyBaseGuard;           // PRIVACY 기준표 장전 점검 — 이슈 시 신규 PRIVACY 주문 생성 차단
     private final CycleOrderStrategies cycleOrderStrategies;   // 리포트 재개 대상 판정 — 주문 0건이어도 롤오버 판정이 필요한 전략(VR)
     private final CyclePositionPort cyclePositionPort;       // 리포트 직전 최신 포지션 재조회 — 계획~리포트 사이 append된 스냅샷 보존
+    private final PriceSourceComparison priceComparison;       // 14 T2 시세 출처 병행 비교 로그(임시, T3에서 삭제)
     private final Clock clock;                                 // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 증권사 접수 결과: 사이클 상태 + 접수된 주문 목록
@@ -116,6 +117,7 @@ class TradingService {
 
         // 시작 시점 현재가 + 전일종가 + 기준 매매표(PRIVACY) 일괄 조회 (0회차 진입 방향 판단에 모두 필요)
         TradingPriceFetcher.PriceContext priceCtx = screenPrivacyBase(priceFetcher.loadPriceContext(started, today), today, "마감 배치");
+        priceComparison.afterLoad(started, priceCtx, usSessionDate(today)); // 병행 비교 로그 — 배치 결과에 쓰지 않는다
 
         // 슬롯별 후보 수집·예산 배정 — 누락된 AT_CLOSE 슬롯만 PLANNED로 저장
         List<TradingCandidatePlanner.CycleState> states = candidatePlanner.planAll(started, priceCtx.startPriceSnapshots(), priceCtx.privacyBase(), today);
@@ -155,12 +157,18 @@ class TradingService {
         runState.critical(() -> {
             // 장 마감 후 확정 종가 일괄 조회 (라이브 현재가 아님 — KIS는 dailyprice, Toss/MOCK은 일봉 캔들 기반 확정 종가)
             Map<StrategyTicker, BigDecimal> closingPrices = priceFetcher.fetchClosingPrices(priceCtx.cycleTickers(), today, priceCtx.priceAccount());
+            priceComparison.closes(priceCtx.cycleTickers(), closingPrices, usSessionDate(today));
             // recordAndNotifyExecutions — 전략별: 체결 조회 + 이력 저장 + 알림
             reportAll(placedStates, closingPrices, today);
             reportPausedStrategies(paused, today);
             checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
             return null;
         });
+    }
+
+    // UsTradeDates.toUsTradeDate와 같은 규칙 — T3에서 이 클래스와 함께 삭제
+    private static LocalDate usSessionDate(LocalDate kstTradeDate) {
+        return kstTradeDate.minusDays(1);
     }
 
     // 활성 전략이 리포트할 게 없는 날의 마무리 — 정지 리포트 대상이 있으면 마감 후 리포트하고 DONE
@@ -286,7 +294,10 @@ class TradingService {
                             return new CyclePlacedState(state, mainOrders);
                         })))
                 .toList();
-        return parallelRunner.runAll(tasks);
+        List<CyclePlacedState> placed = parallelRunner.runAll(tasks);
+        // 접수가 모두 끝난 뒤 병행 비교 — 비교 호출이 주문을 늦추지 않게 한다
+        priceComparison.current(states.stream().map(TradingCandidatePlanner.CycleState::ctx).toList(), placementPrices);
+        return placed;
     }
 
     // 전략별: 체결 조회 + 이력 저장 + 알림 (실패 사이클은 격리, 계좌별 동시 상한 내 병렬 실행)
@@ -344,6 +355,7 @@ class TradingService {
 
         // 가격 스냅샷 + PRIVACY 기준 매매표 일괄 조회 (개장 전 현시점, 내일 기준 — FIDA가 미리 송신했을 경우)
         TradingPriceFetcher.PriceContext priceCtx = screenPrivacyBase(priceFetcher.loadPriceContext(started, tradeDate), tradeDate, "개장 배치");
+        priceComparison.afterLoad(started, priceCtx, usSessionDate(tradeDate)); // 병행 비교 로그 — 배치 결과에 쓰지 않는다
 
         // KIS DCA MOO/LOO는 개장 경매 참여를 위해 개장 전에 접수한다 — 나머지 AT_OPEN은 개장 후 기존 흐름
         try {
@@ -426,6 +438,8 @@ class TradingService {
                 return null;
             });
         }
+        // 접수가 모두 끝난 뒤 병행 비교 — 비교 호출이 주문을 늦추지 않게 한다
+        priceComparison.current(placeableStates.stream().map(TradingCandidatePlanner.CycleState::ctx).toList(), placementPrices);
     }
 
     // 지정 시각까지 대기 — DST 정보 로깅 후 sleep(종료 요청 시 즉시 중단), 도달 로그

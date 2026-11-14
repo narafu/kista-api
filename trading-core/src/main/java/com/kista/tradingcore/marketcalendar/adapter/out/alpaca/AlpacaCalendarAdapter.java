@@ -1,5 +1,6 @@
 package com.kista.tradingcore.marketcalendar.adapter.out.alpaca;
 
+import com.kista.shared.platform.alpaca.AlpacaProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarRefreshPort;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketHolidayStorePort;
