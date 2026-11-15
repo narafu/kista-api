@@ -21,7 +21,8 @@ fail() { echo "::error file=$1::$2"; failed=1; }
 if [ -n "$base" ] && git cat-file -e "${base}^{commit}" 2>/dev/null; then
   while IFS=$'\t' read -r status path _; do
     fail "$path" "이미 존재하던 마이그레이션이 변경됨(${status}) — 적용된 파일은 수정·삭제 금지, 새 버전 파일을 추가할 것"
-  done < <(git diff --name-status --diff-filter=MDR "$base" HEAD -- "${ALL_DIRS[@]}")
+  # SQL만 본다 — 같은 디렉토리의 문서(CLAUDE.md 등) 삭제를 마이그레이션 변경으로 오판한 적이 있다
+  done < <(git diff --name-status --diff-filter=MDR "$base" HEAD -- "${ALL_DIRS[@]/%//*.sql}")
 else
   # 수동 실행·신규 브랜치(0000…)·force push로 base가 없으면 불변 검사를 못 한다 — 조용히 넘기지 않고 알린다
   echo "::warning::base(${base:-없음})를 히스토리에서 찾을 수 없어 마이그레이션 적용 이력 불변 검사를 생략합니다"

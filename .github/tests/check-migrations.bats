@@ -57,3 +57,11 @@ ALTER TABLE a DROP COLUMN y;"
   [ "$status" -eq 1 ]
   [[ "$output" == *"trading/V1__init.sql"* ]]
 }
+
+@test "적용 이력 불변: 마이그레이션 디렉토리의 SQL 아닌 파일 삭제는 통과" {
+  echo "# 문서" > root/CLAUDE.md && git add -A && git commit -qm doc
+  base=$(git rev-parse HEAD)
+  git rm -q root/CLAUDE.md && git commit -qm rmdoc
+  run bash "$SCRIPT" "$base"
+  [ "$status" -eq 0 ]
+}
