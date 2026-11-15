@@ -1,8 +1,8 @@
 # 배치 스케줄러 시간표
 
 이 문서는 각 모듈 `adapter/in/schedule` 패키지의 배치 실행 시점을 정리한다.
-스케쥴러 빈은 `scheduler.enabled=true`(`SCHEDULER_ENABLED`)일 때만 등록되며 프로세스별로 갈린다 — 매매(TradingOpen/Close)·캘린더 스케쥴러는 `:trading-core`라 `kista-trading`에서, 나머지(KB Land·시세·finance·토큰 정리)는 root `app.jar`의 `kista-scheduler`에서 실행된다.
-`kista-api`는 `scheduler.enabled=false`라 어느 스케쥴러도 등록하지 않는다(`deploy/server/docker-compose.yml`).
+스케쥴러 빈은 `kista.role`이 `worker`·`all`(`@ConditionalOnWorkerRole`, env `KISTA_ROLE`)일 때만 등록되며 프로세스별로 갈린다 — 매매(TradingOpen/Close)·캘린더 스케쥴러는 `:trading-core`라 `kista-trading`에서, 나머지(KB Land·시세·finance·토큰 정리)는 root `app.jar`의 `kista-scheduler`에서 실행된다.
+`kista-api`는 `KISTA_ROLE=web`이라 어느 스케쥴러도 등록하지 않는다(`deploy/server/docker-compose.yml`).
 모든 시각은 `KST` 기준이다.
 
 ## 거래 관련
@@ -54,11 +54,11 @@
 
 ## Redis Stream 복구 (cron 아님)
 
-`RedisStreamSubscriber` 서브클래스(root `AppErrorStreamConsumer`·`PushNotificationStreamConsumer`, trading-core `UserDeletedStreamConsumer`·`UserNotifyProfileStreamConsumer`)의 `@Scheduled(fixedDelay = 5분)`이 끊긴 구독 재기동 + pending XCLAIM 복구를 한다. `scheduler.enabled` 게이팅이 없어 각 프로세스(role)마다 동작한다.
+`RedisStreamSubscriber` 서브클래스(root `AppErrorStreamConsumer`·`PushNotificationStreamConsumer`, trading-core `UserDeletedStreamConsumer`·`UserNotifyProfileStreamConsumer`)의 `@Scheduled(fixedDelay = 5분)`이 끊긴 구독 재기동 + pending XCLAIM 복구를 한다. `@ConditionalOnWorkerRole` 게이팅이 없어 각 프로세스(role)마다 동작한다.
 
 ## 참고
 
-- 모든 스케줄러는 `scheduler.enabled=true`일 때만 동작한다 — 운영에서는 `kista-scheduler`·`kista-trading` 컨테이너만 이 값이 true다(Stream 복구 제외).
+- 모든 스케줄러는 `kista.role`이 worker·all일 때만 동작한다 — 운영에서는 `kista-scheduler`·`kista-trading` 컨테이너만 worker다(Stream 복구 제외).
 - 거래 스케줄러는 cron 시간 외에 내부 대기 로직을 추가로 가질 수 있다.
 - 실제 운영 흐름은 [docs/agents/workflow.md](workflow.md)도 함께 보면 된다.
 

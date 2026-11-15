@@ -306,4 +306,5 @@ ui 코드 변경은 필요 없다. ui가 부르는 `/api/auth` 경로 6개(`kaka
 
 - api `deploy/server/README.md`의 롤백 절("state를 그 SHA로 수정·커밋한 뒤 dispatch")은 `resolve-request.sh`의 로직으로는 "변경 없음"이 된다. 실행해 보지는 않았다. 맞다면 README를 "서버에서 `reconcile.sh <app> <release id>`"로 고친다(infra README의 수동 복구 절과 같게).
 - 자동 배포를 잠시 끄는 스위치가 두 레포 어디에도 없다. 전환은 I-2 첫 줄로 버티지만, 다음에 role 구성이 또 바뀔 일이 있으면 워크플로 변수 하나(`DEPLOY_PAUSED`)를 두는 편이 낫다 — 지금은 만들지 않는다.
-- api `deploy/server/docker-compose.yml:80` 주석("`TradingSchedulerInternalController`가 게이팅 없이 항상 노출")은 코드와 다르다(`:21`에 게이트가 있다). `compose-invariants.bats`는 재발행 플래그를 `kista-trading`만 단언해 `constraints.md`의 서술보다 좁다. 둘 다 M의 배포 파일 수정에서 없어진다.
+- api `deploy/server/docker-compose.yml:80` 주석("`TradingSchedulerInternalController`가 게이팅 없이 항상 노출")은 코드와 다르다(`:21`에 게이트가 있다). `compose-invariants.bats`는 재발행 플래그를 `kista-trading`만 단언해 `constraints.md`의 서술보다 좁다. 둘 다 M의 배포 파일 수정에서 없어진다. (2026-11-15 P4: 주석은 고쳤다.)
+- P4(2026-11-15): compose `environment:`의 `SCHEDULER_ENABLED`가 `KISTA_ROLE`(kista-api=web, kista-scheduler·kista-trading=worker)로 바뀌었다. kista-infra 쪽 secrets·reconcile에는 두 키 모두 없어 할 일이 없다. M에서 role 이름이 `kista-web`·`kista-worker`로 바뀔 때 값은 그대로 따라간다.

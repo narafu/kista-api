@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 // trading 개장/마감 스케쥴러 수동 트리거 — 구 web.AdminSchedulerController open/close 케이스 이관
-// (내부 API 호출이라 scheduler.enabled 게이팅 없이 kista-api role에서도 상시 노출)
+// (내부 API 호출이라 role 게이팅 없이 kista-api role에서도 상시 노출)
 @WebMvcTest(AdminTradingSchedulerController.class)
 @Import({SecurityConfig.class, RootSecurityPolicy.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
 @Execution(ExecutionMode.SAME_THREAD)

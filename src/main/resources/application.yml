@@ -70,11 +70,6 @@ management:
     tags:
       application: ${spring.application.name}
 
-# 역할 게이트 — kista-api(HTTP) / kista-scheduler(배치) 같은 이미지 2-role 분리
-# env 미설정 시 true (local·test 기존 동작 유지). prod는 application-prod.yml에서 false로 덮음
-scheduler:
-  enabled: ${SCHEDULER_ENABLED:true}
-
 springdoc:
   api-docs:
     path: /api-docs
@@ -133,5 +128,6 @@ logging:
     com.kista: DEBUG
 
 kista:
+  role: ${KISTA_ROLE:all} # web|worker|all — 로컬·테스트 기본 all, 운영은 compose가 지정
   scheduler-lock:
     table: public.scheduler_locks # SchedulerLockService 락 테이블 — 스키마 한정 필수

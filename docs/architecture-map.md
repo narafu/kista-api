@@ -67,7 +67,7 @@ L0을 컨테이너·네트워크·볼륨·배포 경로 수준으로 펼친 그�
 컨테이너·네트워크·Caddy 라우팅 그림은 kista-infra [`README.md` 배포 구성도](https://github.com/narafu/kista-infra/blob/main/README.md#배포-구성도)(private, 손으로 관리)가 원본이다. 여기서 다시 그리지 말고 그쪽을 본다.
 
 그림에 없는 의미 정보:
-- **role 구분**: 같은 `app.jar`라도 `SCHEDULER_ENABLED`로 갈린다 — kista-api는 `false`(HTTP 전용), kista-scheduler는 `true`(비매매 스케쥴러). kista-trading은 `trading-core.jar`(`APP_JAR`)로 매매 배치 + HTTP
+- **role 구분**: 같은 `app.jar`라도 `KISTA_ROLE`로 갈린다 — kista-api는 `web`(HTTP 전용), kista-scheduler는 `worker`(비매매 스케쥴러). kista-trading은 `trading-core.jar`(`APP_JAR`)로 매매 배치 + HTTP
 - **EPR 재발행 소유**: kista-scheduler = `public.event_publication`, kista-trading = `trading.event_publication`, kista-api는 재발행 안 함(둘 다 true면 이중 claim)
 - **교체 방식**: blue/green은 bundle `bluegreen` 파일의 kista-api·kista-ui만. kista-trading은 단일 인스턴스·stop-first 고정 — 재기동 시 매매 배치 재개가 잔여 락을 인수하므로 겹침 기동 금지(`.github/tests/compose-invariants.bats`)
 - **외부 호출자**: 별도 OCI 인스턴스의 fida-server가 공인 API 도메인으로 `/api/internal/fida-orders`를 호출 → Caddy `@trading` → kista-trading
@@ -238,7 +238,7 @@ flowchart LR
 # 출력: build/architecture-map/index.html (file://로 연다 — cytoscape만 CDN이라 인터넷 필요)
 ```
 
-- 탭 5개: 구조(모듈 의존 그래프 — 처음엔 `:api`·`:trading-core`·`:shared` 박스로 접혀 있고 박스 클릭·"모두 펼치기"로 모듈을 편다. 노드 클릭 → 나가는·들어오는 의존을 대상 모듈 → 의존 종류 → `소스클래스 → 타깃클래스`로, 엣지 클릭 → 두 모듈 사이 클래스 단위 의존. 의존 종류 필터·platform/sharedkernel 숨김. "흐름 오버레이"를 고르면 단계별 모듈을 강조하고 연속 단계 사이를 의존 엣지 또는 점선 가상 엣지로 이어 재생한다) / 랜드스케이프(사용자 여정은 노선도, 나머지는 카드 — 카드마다 터치 레인 스파크라인·모듈 수) / 흐름(스윔레인 — 레인 = 사용자·kista-ui·kista-api·kista-scheduler·Redis·kista-trading·DB·증권사·Telegram·외부(fida), 단계 클릭 → 업무 설명·상태 변화·실패 경로·담당 코드, ▶ 재생) / 타임라인(KST 24h 선형, 실행 프로세스별 — cron 시각은 `CronExpression`으로 계산, 프로세스는 trading-core 소속 → `kista-trading`, root는 `scheduler.enabled` 게이트 여부로 `kista-scheduler` 또는 공용) / 생명주기(user·strategy·order·매매 배치 체크포인트 — 상태를 한 줄에 놓고 전이를 호로)
+- 탭 5개: 구조(모듈 의존 그래프 — 처음엔 `:api`·`:trading-core`·`:shared` 박스로 접혀 있고 박스 클릭·"모두 펼치기"로 모듈을 편다. 노드 클릭 → 나가는·들어오는 의존을 대상 모듈 → 의존 종류 → `소스클래스 → 타깃클래스`로, 엣지 클릭 → 두 모듈 사이 클래스 단위 의존. 의존 종류 필터·platform/sharedkernel 숨김. "흐름 오버레이"를 고르면 단계별 모듈을 강조하고 연속 단계 사이를 의존 엣지 또는 점선 가상 엣지로 이어 재생한다) / 랜드스케이프(사용자 여정은 노선도, 나머지는 카드 — 카드마다 터치 레인 스파크라인·모듈 수) / 흐름(스윔레인 — 레인 = 사용자·kista-ui·kista-api·kista-scheduler·Redis·kista-trading·DB·증권사·Telegram·외부(fida), 단계 클릭 → 업무 설명·상태 변화·실패 경로·담당 코드, ▶ 재생) / 타임라인(KST 24h 선형, 실행 프로세스별 — cron 시각은 `CronExpression`으로 계산, 프로세스는 trading-core 소속 → `kista-trading`, root는 `@ConditionalOnWorkerRole` 여부로 `kista-scheduler` 또는 공용) / 생명주기(user·strategy·order·매매 배치 체크포인트 — 상태를 한 줄에 놓고 전이를 호로)
 - URL 해시가 전체 상태다 — `#structure/trading?flow=close-batch&step=lock`, `#flow/close-batch/lock`, `#timeline/TradingCloseScheduler%23run`, `#lifecycle/order/3`. 리뷰 메모에 링크로 남길 수 있다. 헤더 통합 검색(`/`)은 모듈·흐름·단계(제목·code)·잡·상태 enum을 한 목록에서 찾는다
 - 상세 패널 하단 "연결"이 뷰를 잇는다 — 모듈 ↔ 거치는 흐름 단계·소속 잡, 단계 ↔ 모듈·생명주기 전이·시작 잡. 단계 → 모듈은 `code:` 클래스 패키지(`com.kista.<module>`)에서 자동 도출(`ArchitectureMapExporter.stepModules`)하므로 flows.yml에 쓰지 않는다. 잡 ↔ 단계는 잡 이름(`Class#method`)이 단계 `code:` 항목과 같으면 연결된다
 - `ArchitectureMapTest`가 flows.yml의 `클래스#메서드` 참조·레인·흐름 연결을 검증하고, `lifecycles:`는 상태 enum 상수 집합이 `states`와 정확히 같은지·전이의 상태·`flow: <flowId>/<stepId>` 링크까지 검증한다 — 메서드 이름이 바뀌거나 enum 상수가 늘면 이 테스트가 깨지니 flows.yml을 같이 고친다. 스키마는 flows.yml 머리 주석이 SSOT

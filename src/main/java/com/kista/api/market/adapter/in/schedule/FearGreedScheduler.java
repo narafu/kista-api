@@ -4,7 +4,7 @@ import com.kista.shared.platform.scheduling.SchedulerJobRunner;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.api.market.application.service.FearGreedService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import com.kista.shared.platform.role.ConditionalOnWorkerRole;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -16,7 +16,7 @@ import java.time.Instant;
 // 07:00은 미국 정규장 마감(KST 05:00 DST / 06:00 비DST) 확정값, 12:00은 07:00 실패 대비 재수집(조회는 KST 일자별 최신 1건)
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true) // local에서 끄면 운영 DB·텔레그램과 중복 알림 발생 방지
+@ConditionalOnWorkerRole // web role(kista-api)에서는 미등록 — 운영 DB·텔레그램 중복 실행 방지
 public class FearGreedScheduler {
 
     private final FearGreedService fearGreedService;

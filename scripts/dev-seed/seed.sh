@@ -66,13 +66,13 @@ docker exec -i "$PG_CONTAINER" psql -q -U kista -d kistadb < "$DIR/dev-seed.sql"
 echo "SQL 시드 적용"
 
 # 벤치마크 수집기 트리거 — 202 후 백그라운드 실행(root 로그 확인)
-# 트리거 엔드포인트는 scheduler.enabled=true일 때만 등록되는데 root local은 false(텔레그램 중복 방지) —
-# 404면 root를 SCHEDULER_ENABLED=true로 잠시 띄워 이 스크립트를 다시 실행한 뒤 원복한다(kista_ref 행이 있으면 생략 가능)
+# 트리거 엔드포인트는 kista.role이 worker·all일 때만 등록되는데 root local은 web(텔레그램 중복 방지) —
+# 404면 root를 KISTA_ROLE=all로 잠시 띄워 이 스크립트를 다시 실행한 뒤 원복한다(kista_ref 행이 있으면 생략 가능)
 for path in kbland-housing-benchmark kbland-price-index market-index-prices; do
   code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $ADMIN_TOKEN" "$API/api/admin/scheduler/$path")
   case $code in
     202) echo "수집기 트리거: $path" ;;
-    404) echo "수집기 트리거 생략: $path — root를 SCHEDULER_ENABLED=true로 기동해야 함" >&2 ;;
+    404) echo "수집기 트리거 생략: $path — root를 KISTA_ROLE=all로 기동해야 함" >&2 ;;
     *)   echo "수집기 트리거 실패: $path $code" >&2 ;;
   esac
 done

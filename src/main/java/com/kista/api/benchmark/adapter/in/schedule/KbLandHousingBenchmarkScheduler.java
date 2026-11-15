@@ -5,7 +5,7 @@ import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.api.benchmark.application.service.HousingBenchmarkService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import com.kista.shared.platform.role.ConditionalOnWorkerRole;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -14,7 +14,7 @@ import java.time.Duration;
 // 매주 일요일 KST 07:00 KB Land 주택 벤치마크 수집 및 저장
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true)
+@ConditionalOnWorkerRole
 public class KbLandHousingBenchmarkScheduler {
 
     private final HousingBenchmarkService housingBenchmarkService;

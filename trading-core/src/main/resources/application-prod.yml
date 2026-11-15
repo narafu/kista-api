@@ -35,3 +35,7 @@ logging:
   level:
     root: WARN
     com.kista: INFO
+
+# 운영 role은 compose가 KISTA_ROLE로 지정 — 기본값을 두지 않아 누락 시 기동 실패
+kista:
+  role: ${KISTA_ROLE}

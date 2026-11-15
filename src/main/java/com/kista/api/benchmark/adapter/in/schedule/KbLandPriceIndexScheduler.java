@@ -5,7 +5,7 @@ import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.api.benchmark.application.service.HousingBenchmarkService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import com.kista.shared.platform.role.ConditionalOnWorkerRole;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -16,7 +16,7 @@ import java.time.Duration;
 // 월 1회(매월 1일 08:20 KST) 20년 전체를 다시 받아 오래된 구간의 보정도 반영한다.
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true)
+@ConditionalOnWorkerRole
 public class KbLandPriceIndexScheduler {
 
     private static final int RECENT_YEARS = 2;

@@ -5,7 +5,7 @@ import com.kista.shared.platform.scheduling.SchedulerJobRunner;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import com.kista.shared.platform.role.ConditionalOnWorkerRole;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -14,7 +14,7 @@ import java.time.Duration;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true) // local에서 끄면 운영 DB·텔레그램과 중복 알림 발생 방지
+@ConditionalOnWorkerRole // web role(kista-api)에서는 미등록 — 운영 DB·텔레그램 중복 실행 방지
 public class RefreshTokenCleanupScheduler {
 
     private final TokenService tokenService;

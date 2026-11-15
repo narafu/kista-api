@@ -48,7 +48,7 @@ docker compose up -d postgres redis                          # DB·Redis
 
 ## 배포
 
-- 세 앱 프로세스는 **같은 GHCR 이미지**(arm64)를 쓴다 — api/scheduler는 `app.jar`를 `SCHEDULER_ENABLED`로 갈라 쓰고, trading은 `APP_JAR=trading-core.jar`.
+- 세 앱 프로세스는 **같은 GHCR 이미지**(arm64)를 쓴다 — api/scheduler는 `app.jar`를 `KISTA_ROLE`(web/worker)로 갈라 쓰고, trading은 `APP_JAR=trading-core.jar`.
 - `kista-infra`(private)가 Caddy·PostgreSQL·Redis·백업 cron을 소유하고, 앱별 선언(`state/<app>.yml`)대로 서버에 reconcile한다. API 도메인 라우팅 규칙만은 이 레포 `deploy/server/caddy/kista-api.caddy`가 소유하며 `CaddyRoutingTest`가 컨트롤러 경로와 대조한다.
 - 매매 시간대 배포 가드는 없다 — `kista-trading`은 재기동 시 진행 중 매매 배치를 재개한다. API 장애는 매매 배치에 영향을 주지 않는다.
 - 배포 구성도는 [`docs/architecture-map.md`](docs/architecture-map.md) "L0-1 배포 구성".

@@ -543,6 +543,22 @@ class HexagonalArchitectureTest {
         rule.check(classes);
     }
 
+    @Test
+    @DisplayName("@Scheduled 메서드를 가진 클래스는 @ConditionalOnWorkerRole이 있어야 한다 — web role(kista-api)의 배치 중복 실행 방지")
+    void scheduled_classes_must_be_gated_by_worker_role() {
+        // adapter.in.redis는 스트림 복구용이라 web role에서도 돌아야 한다(단계 M9에서 삭제 대상), shared는 공용 인프라
+        ArchRule rule = classes()
+                .that(new DescribedPredicate<JavaClass>("@Scheduled 메서드를 가진 클래스") {
+                    @Override
+                    public boolean test(JavaClass c) {
+                        return c.getMethods().stream().anyMatch(m -> m.isAnnotatedWith(org.springframework.scheduling.annotation.Scheduled.class));
+                    }
+                })
+                .and().resideOutsideOfPackages("..adapter.in.redis..", "com.kista.shared..")
+                .should().beAnnotatedWith(com.kista.shared.platform.role.ConditionalOnWorkerRole.class);
+        rule.check(mainClasses);
+    }
+
     private static ArchCondition<JavaClass> haveExactlyOneAutowiredConstructorWhenMultiple() {
         return new ArchCondition<>("생성자가 2개 이상이면 정확히 하나에 @Autowired가 있어야 함") {
             @Override

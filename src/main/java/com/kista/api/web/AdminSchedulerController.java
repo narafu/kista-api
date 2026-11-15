@@ -7,14 +7,14 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import com.kista.shared.platform.role.ConditionalOnWorkerRole;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-// 2-role 배포에서 kista-scheduler에만 유효 — kista-api role(scheduler.enabled=false)에서는
+// 2-role 배포에서 kista-scheduler에만 유효 — kista-api role(kista.role=web)에서는
 // 참조하는 3개 벤치마크 스케쥴러 빈과 동일 게이트로 이 컨트롤러 빈 자체가 등록되지 않는다(오라우팅 시 404).
 // trading 개장/마감 트리거는 admin.adapter.in.web.AdminTradingSchedulerController(내부 API 호출)로 분리됨 —
 // 같은 "/api/admin/scheduler" prefix를 공유하지만 하위 경로가 겹치지 않아 라우팅 충돌 없이 공존한다
@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/scheduler")
 @RequiredArgsConstructor
-@ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true)
+@ConditionalOnWorkerRole
 @Tag(name = "Admin", description = "관리자 API")
 public class AdminSchedulerController {
 

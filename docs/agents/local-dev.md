@@ -26,8 +26,8 @@ scripts/dev-seed/seed.sh   # root(8080)·trading-core(8081) local 기동 상태�
 - MOCK 시세는 Toss 공용 피드라 trading-core `application-local.yml`에 `toss.admin-client-id`/`admin-client-secret` 필요 — 없으면 MOCK 전략 등록·preview가 422/503
 - trading-core local은 스케쥴러가 켜져 있어 ACTIVE MOCK 전략이 실제로 돈다(DB 주문만 생성, 실패 시 관리자 텔레그램 알림)
 - 로컬 `application-local.yml`(root·trading-core)의 `telegram.bot-token`은 운영과 다른 테스트 봇 토큰을 쓸 것 — 운영 봇이면 로컬 알림이 운영 관리자 chat에 섞인다
-- 벤치마크(`kista_ref`)는 가짜 행 없이 수집기 트리거(kbland 2종 + ETF 지수 종가 `/api/admin/scheduler/market-index-prices`) — root를 `SCHEDULER_ENABLED=true`로 잠시 띄워야 엔드포인트가 열린다
-  - 트리거 후 반드시 `SCHEDULER_ENABLED` 없이 재기동하고 `/api/admin/scheduler/*` 404로 꺼졌는지 확인할 것 — 켜둔 채 두면 로컬 cron이 운영과 같이 돈다(락은 DB별이라 못 막고, 로컬이 운영 봇을 쓰면 시작 알림이 운영 관리자 chat에 중복 발송).
+- 벤치마크(`kista_ref`)는 가짜 행 없이 수집기 트리거(kbland 2종 + ETF 지수 종가 `/api/admin/scheduler/market-index-prices`) — root를 `KISTA_ROLE=all`로 잠시 띄워야 엔드포인트가 열린다
+  - 트리거 후 반드시 `KISTA_ROLE` override 없이 재기동하고 `/api/admin/scheduler/*` 404로 꺼졌는지 확인할 것 — 켜둔 채 두면 로컬 cron이 운영과 같이 돈다(락은 DB별이라 못 막고, 로컬이 운영 봇을 쓰면 시작 알림이 운영 관리자 chat에 중복 발송).
 
 
 ### 로컬 2-프로세스 부팅 (root + trading-core)

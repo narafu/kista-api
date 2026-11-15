@@ -22,9 +22,9 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// API role(scheduler.enabled=false) 시 9개 @Scheduled 빈 + AdminSchedulerController(동일 게이트)가
-// 컨텍스트에 전혀 없어야 한다. @ConditionalOnProperty가 실제 컨텍스트 로드에서 작동하는지 end-to-end 검증.
-@SpringBootTest(properties = "scheduler.enabled=false")
+// API role(kista.role=web) 시 9개 @Scheduled 빈 + AdminSchedulerController(동일 게이트)가
+// 컨텍스트에 전혀 없어야 한다. @ConditionalOnWorkerRole이 실제 컨텍스트 로드에서 작동하는지 end-to-end 검증.
+@SpringBootTest(properties = "kista.role=web")
 @ActiveProfiles("test")
 @Execution(ExecutionMode.SAME_THREAD)
 class SchedulerDisabledContextTest {
@@ -47,7 +47,7 @@ class SchedulerDisabledContextTest {
         };
         for (Class<?> type : schedulers) {
             assertThat(context.getBeanNamesForType(type))
-                    .as("%s 는 scheduler.enabled=false 에서 미등록이어야 한다", type.getSimpleName())
+                    .as("%s 는 kista.role=web 에서 미등록이어야 한다", type.getSimpleName())
                     .isEmpty();
         }
     }
@@ -62,6 +62,6 @@ class SchedulerDisabledContextTest {
                     return type != null && type.getName().contains(".adapter.in.schedule.");
                 })
                 .toList();
-        assertThat(leaked).as("scheduler.enabled=false 인데 등록된 schedule 패키지 빈").isEmpty();
+        assertThat(leaked).as("kista.role=web 인데 등록된 schedule 패키지 빈").isEmpty();
     }
 }

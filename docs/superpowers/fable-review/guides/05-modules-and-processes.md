@@ -314,6 +314,8 @@ market  benchmark  finance  notification  ops  platform  app(모듈 아님: 앱 
 
 **P3 실행 결과(2026-11-15)**: 대상 전부 한정, 스키마 판단이 애매한 테이블 0. 별칭을 새로 쓴 곳은 `SchedulerLockService`(`INSERT INTO %s AS l`)뿐. 루트 테스트 classpath에는 두 `application.yml`이 있지만 루트 resources가 앞이라 `public.scheduler_locks`를 받는다(기존 search_path가 갈리던 방식과 같다). M6은 이 프로퍼티를 role별로 두지 않고 `trading.scheduler_locks` 하나로 정하면 된다.
 
+**P4 실행 결과(2026-11-15)**: `shared.platform.role.@ConditionalOnWorkerRole`(`kista.role` = web|worker|all, 누락·오타는 기동 실패), 게이트 16개 교체, base yml `${KISTA_ROLE:all}`·prod `${KISTA_ROLE}`(기본값 없음), 가드 `scheduled_classes_must_be_gated_by_worker_role`(`adapter.in.redis`·shared 제외). 본문과 다르게 한 것: ① 스트림 컨슈머(root·trading-core 모두 `adapter/in/redis`)에는 게이트를 붙이지 않았다 — 복구 `@Scheduled`만이 아니라 구독 전체가 꺼지고, root 컨슈머는 kista-api도 돌리고 있어 동작이 바뀐다. M9에서 지운다 ② "env 먼저 배포"는 따로 하지 않는다 — `KISTA_ROLE`은 `.env`가 아니라 레포의 compose `environment:`에 있고 kista-infra reconcile이 compose·images.env를 한 release로 묶어 role별로 올리고 롤백도 묶음째라, 구 코드+새 compose나 새 코드+구 compose 조합이 생기지 않는다(리뷰가 `reconcile.sh`로 확인) ③ `.env.example`은 바꿀 것이 없다. 로컬 root는 gitignored `application-local.yml`의 `kista.role: web`이 이전 `scheduler.enabled: false`를 대신한다(다른 개발 환경에서는 그 파일을 같이 고쳐야 스케줄러가 꺼진다).
+
 전제 정정:
 
 - P3의 nativeQuery 수는 지금 R 16곳, T 39곳이다(본문 11·약 45). 대상은 수가 아니라 "전부"이고 신설 가드가 빠진 것을 잡는다.

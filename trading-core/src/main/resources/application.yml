@@ -118,5 +118,6 @@ cmc:
   api-key: ${CMC_API_KEY:} # CoinMarketCap Pro API(무료 Basic) — 비면 도미넌스·알트 시즌 섹션만 null
 
 kista:
+  role: ${KISTA_ROLE:all} # web|worker|all — 로컬·테스트 기본 all, 운영은 compose가 지정
   scheduler-lock:
     table: trading.scheduler_locks # SchedulerLockService 락 테이블 — 스키마 한정 필수

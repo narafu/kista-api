@@ -5,7 +5,7 @@ import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.tradingcore.account.application.event.ApiKeyExpiringEvent;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import com.kista.shared.platform.role.ConditionalOnWorkerRole;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -19,7 +19,7 @@ import java.util.Set;
 // 거래소 API 키 만료 일일 점검 — 30·7·0일 전에만 알림 이벤트 발행
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true) // local에서 끄면 운영 DB·텔레그램과 중복 방지
+@ConditionalOnWorkerRole // web role(kista-api)에서는 미등록 — 운영 DB·텔레그램 중복 실행 방지
 public class ApiKeyExpiryScheduler {
 
     private static final Set<Long> NOTIFY_DAYS_LEFT = Set.of(30L, 7L, 0L); // 알림 시점(만료까지 남은 일수)

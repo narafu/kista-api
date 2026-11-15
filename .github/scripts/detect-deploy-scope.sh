@@ -4,9 +4,9 @@
 #   config    : compose·Caddy·reconcile 계약·hook이 바뀜 → 이미지 재빌드 없이 kista-infra가 config SHA로 재적용
 #               (compose가 영향받는 role만 재생성, Caddy만이면 reload만)
 #   api       : app.jar 산출물이 바뀜 → kista-api 이미지 교체
-#   scheduler : app.jar 산출물이 바뀜 → kista-scheduler 이미지 교체 (kista-api와 같은 jar, SCHEDULER_ENABLED=true만 다름)
+#   scheduler : app.jar 산출물이 바뀜 → kista-scheduler 이미지 교체 (kista-api와 같은 jar, KISTA_ROLE만 다름(web/worker))
 #   trading   : trading-core.jar 산출물이 바뀜 → kista-trading 이미지 교체
-# 스케쥴러 전용 빈(@ConditionalOnProperty scheduler.enabled — adapter/in/schedule/* 와 AdminSchedulerController)은
+# 스케쥴러 전용 빈(@ConditionalOnWorkerRole — adapter/in/schedule/* 와 AdminSchedulerController)은
 # kista-api role에 아예 등록되지 않으므로 그 파일만 바뀐 커밋은 scheduler만 교체한다.
 # 테스트 전용 경로는 jar에 들어가지 않으므로 verify만 켠다. 워크플로·배포 판정 스크립트·bats는 deploy-checks 잡이 매번 검증하므로 아무것도 켜지 않는다.
 set -euo pipefail

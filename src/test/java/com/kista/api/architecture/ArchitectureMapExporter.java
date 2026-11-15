@@ -2,10 +2,10 @@ package com.kista.api.architecture;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.kista.shared.platform.role.ConditionalOnWorkerRole;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaEnumConstant;
 import com.tngtech.archunit.core.domain.JavaMethod;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.scheduling.support.CronExpression;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -337,14 +337,13 @@ final class ArchitectureMapExporter {
         return label.replace("-", "~");
     }
 
-    // 실행 프로세스 판별 — trading-core는 kista-trading, root는 scheduler.enabled 게이트 여부로 갈린다
+    // 실행 프로세스 판별 — trading-core는 kista-trading, root는 @ConditionalOnWorkerRole 여부로 갈린다
     private static String process(JavaClass owner) {
         var uri = owner.getSource().map(s -> s.getUri().toString().replace('\\', '/')).orElse("");
         if (uri.contains("/trading-core/")) {
             return "kista-trading";
         }
-        boolean gated = owner.isAnnotatedWith(ConditionalOnProperty.class)
-                && owner.getAnnotationOfType(ConditionalOnProperty.class).prefix().equals("scheduler");
+        boolean gated = owner.isAnnotatedWith(ConditionalOnWorkerRole.class);
         return gated ? "kista-scheduler" : "kista-api · kista-scheduler";
     }
 

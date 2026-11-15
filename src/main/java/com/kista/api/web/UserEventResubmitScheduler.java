@@ -5,7 +5,7 @@ import com.kista.shared.kernel.UserDeletedEvent;
 import com.kista.shared.kernel.UserNotifyProfileChangedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import com.kista.shared.platform.role.ConditionalOnWorkerRole;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.events.ResubmissionOptions;
@@ -20,11 +20,11 @@ import java.util.concurrent.TimeUnit;
 // trading-core에서 계속 매매되는 것을 막는다. 처음 실패를 발견한 회차에만 관리자에게 알린다(상태 없이 1회 — completionAttempts는
 // 재발행할 때마다 1씩 늘고 첫 실패 시 1 — 재기동 재발행이 먼저 집어 횟수를 올린 건은 알림이 빠질 수 있다).
 // 같은 이벤트의 다른 root 리스너(finance cascade·FCM 정리·탈퇴 알림) 실패분도 함께 재발행된다(각자 멱등). user 모듈에 두지 않는 이유: 알림(notify)이 이미 user에 의존해 순환이 생긴다.
-// kista-scheduler(public EPR 재발행 소유)에서만 돈다 — kista-api role은 scheduler.enabled=false
+// kista-scheduler(public EPR 재발행 소유)에서만 돈다 — kista-api role은 kista.role=web
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true)
+@ConditionalOnWorkerRole
 public class UserEventResubmitScheduler {
 
     private static final Duration MIN_AGE = Duration.ofMinutes(5); // 상태 NULL 레거시 행만 거른다 — Modulith 2.1.1 SQL은 OR 우선순위상 FAILED 행엔 적용되지 않는다

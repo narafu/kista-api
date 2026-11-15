@@ -40,3 +40,10 @@ block() { awk -v s="  $1:" '$0 == s {on=1; next} on && /^  [a-z]/ {exit} on' "$D
   [ "$(grep -vE '^[[:space:]]*(#|$)' "$D/bluegreen")" = kista-api ]
   [ "$(block kista-api | grep -vE '^[[:space:]]*#' | grep -c container_name)" -eq 0 ]
 }
+
+@test "KISTA_ROLE: kista-api=web, kista-scheduler·kista-trading=worker, SCHEDULER_ENABLED 없음" {
+  block kista-api | grep -q 'KISTA_ROLE: web'
+  block kista-scheduler | grep -q 'KISTA_ROLE: worker'
+  block kista-trading | grep -q 'KISTA_ROLE: worker'
+  [ "$(grep -vE '^[[:space:]]*#' "$D/docker-compose.yml" | grep -c SCHEDULER_ENABLED)" -eq 0 ]
+}

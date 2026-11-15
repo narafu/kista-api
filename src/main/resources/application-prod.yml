@@ -17,9 +17,9 @@ spring:
       # kista-scheduler 서비스가 SPRING_MODULITH_EVENTS_REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART=true로 되켬
       republish-outstanding-events-on-restart: false
 
-# prod 기본은 API role — 스케쥴러 미등록. kista-scheduler 서비스가 SCHEDULER_ENABLED=true로 override
-scheduler:
-  enabled: false
+# 운영 role은 compose가 KISTA_ROLE(web|worker)로 지정 — 기본값을 두지 않아 누락 시 기동 실패(web이 worker로 뜨는 중복 배치 방지)
+kista:
+  role: ${KISTA_ROLE}
 
 management:
   health:

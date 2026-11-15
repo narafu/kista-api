@@ -1458,7 +1458,7 @@ flows:
         to: [trading]
         title: 개장·마감 수동 트리거를 kista-trading에 위임
         desc: >-
-          /open·/close 컨트롤러는 scheduler.enabled 게이팅 없이 모든 root 프로세스에 존재한다. 받은 프로세스는 직접 배치를 돌리지 않고
+          /open·/close 컨트롤러는 role 게이팅 없이 모든 root 프로세스에 존재한다. 받은 프로세스는 직접 배치를 돌리지 않고
           내부 HTTP(POST /api/internal/trading/scheduler/open|close)로 kista-trading에 넘긴 뒤 202를 돌려준다.
         code: [AdminTradingSchedulerController#triggerOpen, AdminTradingSchedulerController#triggerClose, TradingSchedulerCommandHttpAdapter#triggerOpen, TradingSchedulerCommandHttpAdapter#triggerClose]
         fail: >-
@@ -1495,7 +1495,7 @@ flows:
           KB부동산 주택 벤치마크·주간 매매가격지수(월간 전체 갱신 포함)·ETF 지수 종가 수집은 Caddy가 kista-scheduler로 보낸 요청을 그 프로세스가 직접 받아 가상 스레드로 실행하고 202를 돌려준다.
           cron과 같은 락 이름을 공유해 동시 실행되지 않는다.
         code: [AdminSchedulerController#triggerKbLandHousingBenchmark, AdminSchedulerController#triggerKbLandPriceIndex, AdminSchedulerController#triggerKbLandPriceIndexFullRefresh, AdminSchedulerController#triggerMarketIndexPriceSync, KbLandHousingBenchmarkScheduler#runNow, KbLandPriceIndexScheduler#runNow, MarketIndexPriceSyncScheduler#runNow]
-        fail: 이 컨트롤러는 scheduler.enabled인 프로세스에만 있다. kista-api로 잘못 라우팅되면 404가 된다.
+        fail: 이 컨트롤러는 worker role(kista.role=worker·all) 프로세스에만 있다. kista-api로 잘못 라우팅되면 404가 된다.
 
       - id: notify
         lane: scheduler

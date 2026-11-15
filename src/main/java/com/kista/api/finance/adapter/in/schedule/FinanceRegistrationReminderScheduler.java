@@ -4,7 +4,7 @@ import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.api.finance.application.service.FinanceRegistrationReminderNotifier;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import com.kista.shared.platform.role.ConditionalOnWorkerRole;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -15,7 +15,7 @@ import java.time.YearMonth;
 // 매월 마지막 날 21시(KST)에 이번 달 가계부 등록이 없는 사용자에게 알림
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true)
+@ConditionalOnWorkerRole
 class FinanceRegistrationReminderScheduler {
 
     private final FinanceRegistrationReminderNotifier notifier;

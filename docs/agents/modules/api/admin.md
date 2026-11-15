@@ -7,7 +7,7 @@ Spring Modulith 모듈(CLOSED) — 관리자 조회·정정·재정렬·감사�
 - admin은 trading-core `AccountPort`에 직접 의존하지 않는다 — 계좌 조회는 전부 `AccountQueryPort`(내부 API)로 위임한다.
 - `AdminService.changeRole`은 자기 강등과 마지막 ADMIN 강등을 막고(`UserPort.countByRole`) `UserService.changeRole`에 위임하며 감사 로그만 남긴다. 저장·AT 무효화(`BlacklistPort`)는 user가 캡슐화한다.
 - 내부 API 호출: 짧은 스케줄러 트리거는 `internalApiRestClient`, 정정류는 `internalApiWriteRestClient`. `PrivacyQueryHttpAdapter.createBase`는 409를 `AdminPrivacyTradeConflictException`으로 되돌린다(없으면 catch-all 500).
-- `AdminTradingSchedulerController`(`/api/admin/scheduler/{open,close}`, 202)는 `scheduler.enabled` 게이팅 없이 kista-api role에서도 항상 노출한다. `web.AdminSchedulerController`(`/kbland-*`)는 role-게이팅이라 "admin 컨트롤러는 항상 존재" 전제가 깨져 web에 남아 있고 두 컨트롤러는 prefix만 공유한다.
+- `AdminTradingSchedulerController`(`/api/admin/scheduler/{open,close}`, 202)는 `@ConditionalOnWorkerRole` 게이팅 없이 kista-api role에서도 항상 노출한다. `web.AdminSchedulerController`(`/kbland-*`)는 role-게이팅이라 "admin 컨트롤러는 항상 존재" 전제가 깨져 web에 남아 있고 두 컨트롤러는 prefix만 공유한다.
 - 감사·앱오류·런타임 설정 엔티티는 플랫폼 공통 테이블이라 `@Table(schema="public")`를 유지한다.
 
 ### 런타임 설정 API 규칙

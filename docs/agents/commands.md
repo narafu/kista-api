@@ -16,4 +16,4 @@ grep -l 'failures="[1-9]' build/test-results/test/TEST-*.xml   # 실패 진단�
 - Docker: `docker compose up -d`(PostgreSQL·Redis·Prometheus·Grafana, 앱은 별도 실행), `docker compose down -v`(로컬 DB 초기화)
 - 로컬 로그: `logs/kista-api.log`, `logs/kista-trading.log`
 
-**SCHEDULER_ENABLED 같은 일회성 override로 띄웠다가 원복했다면 재기동 후 실제 동작으로 확인한다**(예: `/api/admin/scheduler/*`가 404). 검증 전에는 "원복 완료"라고 보고하지 않는다. IntelliJ MCP `execute_run_configuration` envs 등은 persist되지 않는다고 안내돼도 믿지 않는다. 로컬과 운영이 관리자 봇을 공유하고 스케줄러 락은 DB별이라, 켜 둔 채면 운영과 같은 cron이 돌아 알림이 중복 발송된다.
+**`KISTA_ROLE=all` 같은 일회성 override로 띄웠다가 원복했다면 재기동 후 실제 동작으로 확인한다**(예: `/api/admin/scheduler/*`가 404 — 로컬 root 기본은 `application-local.yml`의 `kista.role: web`). 검증 전에는 "원복 완료"라고 보고하지 않는다. IntelliJ MCP `execute_run_configuration` envs 등은 persist되지 않는다고 안내돼도 믿지 않는다. 로컬과 운영이 관리자 봇을 공유하고 스케줄러 락은 DB별이라, 켜 둔 채면 운영과 같은 cron이 돌아 알림이 중복 발송된다.

@@ -6,7 +6,7 @@ import com.kista.tradingcore.account.application.event.AccountDeletedEvent;
 import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import com.kista.shared.platform.role.ConditionalOnWorkerRole;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.events.ResubmissionOptions;
@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true) // local에서 끄면 비활성 — 운영 kista-trading 단일 인스턴스만
+@ConditionalOnWorkerRole // web role이면 비활성 — 운영 kista-trading 단일 인스턴스만
 class UserEventResubmitScheduler {
 
     private static final Duration MIN_AGE = Duration.ofMinutes(5); // 상태 NULL 레거시 행만 거른다 — Modulith 2.1.1 SQL은 OR 우선순위상 FAILED 행엔 적용되지 않는다
