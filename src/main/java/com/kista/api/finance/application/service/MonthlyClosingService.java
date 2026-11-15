@@ -1,7 +1,6 @@
 package com.kista.api.finance.application.service;
 
 import com.kista.api.finance.domain.model.MonthlyClosing;
-import com.kista.api.finance.application.usecase.MonthlyClosingUseCase;
 import com.kista.api.finance.application.port.output.FinanceGroupPort;
 import com.kista.api.finance.application.port.output.MonthlyClosingPort;
 import lombok.RequiredArgsConstructor;
@@ -17,21 +16,19 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-class MonthlyClosingService implements MonthlyClosingUseCase {
+public class MonthlyClosingService {
 
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
 
     private final MonthlyClosingPort monthlyClosingPort;
     private final FinanceGroupPort financeGroupPort;
 
-    @Override
     @Transactional(readOnly = true)
     public List<MonthlyClosing> list(UUID userId) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         return monthlyClosingPort.findMyScope(userId, currentGroupId);
     }
 
-    @Override
     public MonthlyClosing setCompleted(UUID userId, String month, boolean completed) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         // 형식·범위(월 01~12) 동시 검증 — 실패 시 DateTimeParseException → ProblemDetailExceptionHandler가 400으로 매핑

@@ -7,7 +7,7 @@ import com.kista.api.finance.adapter.in.web.dto.FinanceGroupMemberResponse;
 import com.kista.api.finance.adapter.in.web.dto.FinanceGroupResponse;
 import com.kista.api.finance.domain.model.FinanceGroupInvitation;
 import com.kista.api.finance.application.port.output.FinanceMemberPort;
-import com.kista.api.finance.application.usecase.FinanceGroupUseCase;
+import com.kista.api.finance.application.service.FinanceGroupService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -30,7 +30,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FinanceGroupController {
 
-    private final FinanceGroupUseCase groupUseCase;
+    private final FinanceGroupService groupUseCase;
     private final FinanceMemberPort financeMemberPort; // 멤버 닉네임 조회(user 모듈 의존은 포트 어댑터가 격리)
 
     @Operation(summary = "내 그룹 목록 조회", description = "내가 속한 그룹 목록(한 사용자는 최대 1개 그룹).")

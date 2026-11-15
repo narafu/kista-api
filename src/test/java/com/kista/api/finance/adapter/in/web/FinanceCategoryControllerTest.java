@@ -2,7 +2,7 @@ package com.kista.api.finance.adapter.in.web;
 
 import com.kista.api.finance.domain.model.FinanceCategory;
 import com.kista.api.finance.domain.model.FinanceCategoryCommand;
-import com.kista.api.finance.application.usecase.FinanceCategoryUseCase;
+import com.kista.api.finance.application.service.FinanceCategoryService;
 import com.kista.api.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -35,7 +35,7 @@ class FinanceCategoryControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean FinanceCategoryUseCase categoryUseCase;
+    @MockitoBean FinanceCategoryService categoryUseCase;
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 

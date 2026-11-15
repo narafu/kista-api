@@ -15,7 +15,7 @@ Hexagonal Architecture(Port & Adapter) + Spring Modulith 애그리게이트 모�
 
 ```
 # api 프로세스 (kista-api·kista-scheduler) — api 7 + shared 3     NamedInterface
-api.finance     가계부                                  domain/usecase/port
+api.finance     가계부                                  domain/port/event
 api.notify      Telegram/FCM 아웃바운드 게이트웨이       port/domain
 api.market      공포탐욕지수                             domain/port/event
 api.benchmark   주택/ETF 벤치마크 비교                   domain/port/event/schedule

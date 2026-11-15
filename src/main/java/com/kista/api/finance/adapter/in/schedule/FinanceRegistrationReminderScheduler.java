@@ -2,7 +2,7 @@ package com.kista.api.finance.adapter.in.schedule;
 
 import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.shared.kernel.TimeZones;
-import com.kista.api.finance.application.usecase.FinanceRegistrationReminderUseCase;
+import com.kista.api.finance.application.service.FinanceRegistrationReminderNotifier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -18,7 +18,7 @@ import java.time.YearMonth;
 @ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true)
 class FinanceRegistrationReminderScheduler {
 
-    private final FinanceRegistrationReminderUseCase notifier;
+    private final FinanceRegistrationReminderNotifier notifier;
     private final SchedulerLockService schedulerLockService;
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 

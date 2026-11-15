@@ -2,7 +2,7 @@ package com.kista.api.finance.adapter.in.web;
 
 import com.kista.api.finance.adapter.in.web.dto.FinanceBudgetRequest;
 import com.kista.api.finance.adapter.in.web.dto.FinanceBudgetResponse;
-import com.kista.api.finance.application.usecase.FinanceBudgetUseCase;
+import com.kista.api.finance.application.service.FinanceBudgetService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -27,7 +27,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FinanceBudgetController {
 
-    private final FinanceBudgetUseCase budgetUseCase;
+    private final FinanceBudgetService budgetUseCase;
 
     @Operation(summary = "예산 목록 조회", description = "date를 지정하면 그 날짜에 유효한 예산만 반환합니다.")
     @ApiResponse(responseCode = "200", description = "조회 성공")

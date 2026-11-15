@@ -4,9 +4,6 @@ import com.kista.api.finance.domain.model.AssetSnapshotCommand;
 import com.kista.api.finance.domain.model.BulkFinanceRegisterResult;
 import com.kista.api.finance.domain.model.FinanceTransactionCommand;
 import com.kista.api.finance.application.port.output.FinanceGroupPort;
-import com.kista.api.finance.application.usecase.AssetSnapshotUseCase;
-import com.kista.api.finance.application.usecase.BulkFinanceRegisterUseCase;
-import com.kista.api.finance.application.usecase.FinanceTransactionUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -21,13 +18,14 @@ import java.util.function.Function;
 // shareToGroup=true면 각 create가 원자적으로 그룹 소유로 생성한다(별도 share 전환 단계 없음).
 @Service
 @RequiredArgsConstructor
-class BulkFinanceRegisterService implements BulkFinanceRegisterUseCase {
+public class BulkFinanceRegisterService {
 
-    private final AssetSnapshotUseCase assetSnapshotUseCase;
-    private final FinanceTransactionUseCase financeTransactionUseCase;
+    private final AssetSnapshotService assetSnapshotUseCase;
+    private final FinanceTransactionService financeTransactionUseCase;
     private final FinanceGroupPort financeGroupPort;
 
-    @Override
+    // shareToGroup=true면 각 항목을 등록자의 현재 그룹 소유로 원자적 생성한다.
+    // 무그룹 유저가 true를 넘기면 IllegalStateException(400).
     public BulkFinanceRegisterResult register(UUID userId, boolean shareToGroup,
                                                List<AssetSnapshotCommand> assets,
                                                List<FinanceTransactionCommand> transactions) {

@@ -26,16 +26,6 @@ com.kista.api.finance.application.port.output.FinanceGroupPort
 com.kista.api.finance.application.port.output.FinanceMemberPort
 com.kista.api.finance.application.port.output.FinanceTransactionPort
 com.kista.api.finance.application.port.output.MonthlyClosingPort
-com.kista.api.finance.application.usecase.AssetSnapshotUseCase
-com.kista.api.finance.application.usecase.BulkFinanceRegisterUseCase
-com.kista.api.finance.application.usecase.FinanceAccountUseCase
-com.kista.api.finance.application.usecase.FinanceBudgetUseCase
-com.kista.api.finance.application.usecase.FinanceCategoryUseCase
-com.kista.api.finance.application.usecase.FinanceGroupUseCase
-com.kista.api.finance.application.usecase.FinanceRegistrationReminderUseCase
-com.kista.api.finance.application.usecase.FinanceTransactionUseCase
-com.kista.api.finance.application.usecase.FinanceUserDataEraseUseCase
-com.kista.api.finance.application.usecase.MonthlyClosingUseCase
 com.kista.api.market.application.port.output.CandleQueryPort
 com.kista.api.market.application.port.output.CnnFearGreedPort
 com.kista.api.market.application.port.output.CryptoFearGreedPort

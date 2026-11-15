@@ -3,7 +3,7 @@ package com.kista.api.finance.adapter.in.web;
 import com.kista.api.finance.domain.model.FinanceGroup;
 import com.kista.api.finance.domain.model.FinanceGroupInvitation;
 import com.kista.api.finance.domain.model.FinanceGroupMember;
-import com.kista.api.finance.application.usecase.FinanceGroupUseCase;
+import com.kista.api.finance.application.service.FinanceGroupService;
 import com.kista.api.finance.application.port.output.FinanceMemberPort;
 import com.kista.api.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
@@ -38,7 +38,7 @@ class FinanceGroupControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean FinanceGroupUseCase groupUseCase;
+    @MockitoBean FinanceGroupService groupUseCase;
     @MockitoBean FinanceMemberPort financeMemberPort;
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");

@@ -2,7 +2,6 @@ package com.kista.api.finance.application.service;
 
 import com.kista.api.finance.domain.model.FinanceCategory;
 import com.kista.api.finance.domain.model.FinanceCategoryCommand;
-import com.kista.api.finance.application.usecase.FinanceCategoryUseCase;
 import com.kista.api.finance.application.port.output.FinanceCategoryPort;
 import com.kista.api.finance.application.port.output.FinanceGroupPort;
 import lombok.RequiredArgsConstructor;
@@ -18,12 +17,12 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-class FinanceCategoryService implements FinanceCategoryUseCase {
+public class FinanceCategoryService {
 
     private final FinanceCategoryPort categoryPort;
     private final FinanceGroupPort financeGroupPort;
 
-    @Override
+    // 조회 스코프는 항상 호출자의 현재 소속 그룹(서버 판단) — type null이면 전체 타입. flat 목록 반환 — 트리 조립은 web 계층 책임.
     @Transactional(readOnly = true)
     public List<FinanceCategory> list(UUID userId, FinanceCategory.Type type) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
@@ -34,7 +33,7 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
     }
 
     // shareToGroup=true면 현재 소속 그룹 소유로, false면 개인 소유로 생성한다.
-    @Override
+    // 무그룹인데 shareToGroup=true면 거부.
     public FinanceCategory create(UUID userId, boolean shareToGroup, FinanceCategoryCommand command) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         FinanceCategory parent = resolveParent(command.parentId(), userId, currentGroupId, command.type());
@@ -53,7 +52,6 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
         return saved;
     }
 
-    @Override
     public FinanceCategory update(UUID categoryId, UUID userId, FinanceCategoryCommand command) {
         // findByIdOrThrow(삭제된 카테고리도 조회됨)를 쓰면 안 됨 — FinanceCategory에 deletedAt이 없어
         // save() merge 시 삭제 상태가 조용히 풀려버린다(코드리뷰에서 발견, 2026-08-19, FinanceAccountService와 동일 결함).
@@ -71,7 +69,6 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
     // 개인 소유 카테고리를 소유자가 자신의 현재 그룹으로 전환한다. 하위 카테고리(임의 depth)도 함께 전환된다.
     // 개인 카테고리의 자식은 resolveParent()가 부모 접근권한을 요구해 구조적으로 항상 같은 소유자 트리이므로
     // 벌크 UPDATE에 개별 userId 재검증이 필요 없다.
-    @Override
     public FinanceCategory shareToGroup(UUID categoryId, UUID userId) {
         FinanceCategory existing = categoryPort.findActiveByIdOrThrow(categoryId);
         if (existing.isSystem()) {
@@ -88,7 +85,7 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
     }
 
     // 그룹 공유 카테고리를 개인 소유로 되돌린다. 하위 카테고리(임의 depth)도 함께 되돌아간다.
-    @Override
+    // 같은 그룹 멤버면 누구든 가능
     public FinanceCategory unshare(UUID categoryId, UUID userId) {
         FinanceCategory existing = categoryPort.findActiveByIdOrThrow(categoryId);
         if (existing.isSystem()) {
@@ -104,7 +101,6 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
                 .orElse(existing);
     }
 
-    @Override
     public void delete(UUID categoryId, UUID userId) {
         FinanceCategory existing = categoryPort.findByIdOrThrow(categoryId);
         if (existing.isSystem()) {
@@ -115,7 +111,8 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
         log.info("[userId={}] 카테고리 삭제: categoryId={}", userId, categoryId);
     }
 
-    @Override
+    // 시스템(그룹 공용) 카테고리 admin 관리(listSystem·createSystem·updateSystem·deleteSystem) — /api/admin/finance/categories 전용, 그룹 개념이 없다.
+    // type null이면 전체 타입. flat 목록 반환 — 트리 조립은 web 계층 책임.
     @Transactional(readOnly = true)
     public List<FinanceCategory> listSystem(FinanceCategory.Type type) {
         // findSelectable(null, null, type)은 (userId IS NULL AND groupId IS NULL) 조건으로 시스템만 정확히 걸러진다.
@@ -124,7 +121,6 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
                 .toList();
     }
 
-    @Override
     public FinanceCategory createSystem(FinanceCategoryCommand command) {
         resolveParent(command.parentId(), null, null, command.type());
         FinanceCategory category = new FinanceCategory(null, null, command.parentId(), null,
@@ -134,7 +130,6 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
         return saved;
     }
 
-    @Override
     public FinanceCategory updateSystem(UUID categoryId, FinanceCategoryCommand command) {
         // requireSystem()이 아닌 삭제된 카테고리를 제외하는 조회 사용 — update()와 동일한 부활 방지 이유
         FinanceCategory existing = requireSystem(categoryPort.findActiveByIdOrThrow(categoryId));
@@ -144,7 +139,6 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
         return categoryPort.save(updated);
     }
 
-    @Override
     public void deleteSystem(UUID categoryId) {
         requireSystem(categoryId);
         categoryPort.softDeleteWithChildren(categoryId);

@@ -3,7 +3,6 @@ package com.kista.api.finance.application.service;
 import com.kista.api.finance.domain.model.FinanceGroup;
 import com.kista.api.finance.domain.model.FinanceGroupInvitation;
 import com.kista.api.finance.domain.model.FinanceGroupMember;
-import com.kista.api.finance.application.usecase.FinanceGroupUseCase;
 import com.kista.api.finance.application.port.output.FinanceGroupPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,18 +19,16 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-class FinanceGroupService implements FinanceGroupUseCase {
+public class FinanceGroupService {
 
     private final FinanceGroupPort financeGroupPort;
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
-    @Override
     @Transactional(readOnly = true)
     public List<FinanceGroup> listMyGroups(UUID userId) {
         return financeGroupPort.findByMemberUserId(userId);
     }
 
-    @Override
     @Transactional(readOnly = true)
     public List<FinanceGroupMember> listMembers(UUID groupId, UUID userId) {
         if (financeGroupPort.findRole(groupId, userId).isEmpty()) {
@@ -42,7 +39,6 @@ class FinanceGroupService implements FinanceGroupUseCase {
 
     // 무그룹 유저가 초대하면 그 자리에서 새 그룹을 만들고 본인을 OWNER로 등록한다. 이미 그룹이 있으면
     // 그 그룹의 OWNER만 초대할 수 있다(기존 정책 유지).
-    @Override
     public FinanceGroupInvitation invite(UUID groupId, UUID userId, long expiresInHours) {
         UUID targetGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         if (targetGroupId == null) {
@@ -67,7 +63,6 @@ class FinanceGroupService implements FinanceGroupUseCase {
         return invitation;
     }
 
-    @Override
     public FinanceGroupInvitation respondToInvitation(String code, UUID userId, FinanceGroupInvitation.Status status) {
         if (status != FinanceGroupInvitation.Status.ACCEPTED && status != FinanceGroupInvitation.Status.DECLINED) {
             throw new IllegalArgumentException("초대 응답은 수락 또는 거절만 가능합니다.");
@@ -94,7 +89,6 @@ class FinanceGroupService implements FinanceGroupUseCase {
     // 그룹 이탈 — 리소스(finance_transactions 등)의 group_id는 그대로 유지되고 이관하지 않는다.
     // 나간 사람은 더 이상 멤버가 아니므로 findMyScope에서 그룹 데이터가 자연히 제외되고, 남은 사람은
     // 계속 조회된다. 회원 탈퇴(UserCascadeDeleter)와 달리 그룹 자체는 남길 수 있다.
-    @Override
     @Transactional
     public void leaveGroup(UUID groupId, UUID userId, UUID targetUserId) {
         boolean isSelf = userId.equals(targetUserId);

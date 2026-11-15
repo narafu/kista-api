@@ -5,7 +5,6 @@ import com.kista.api.finance.application.port.output.AssetSnapshotPort;
 import com.kista.api.finance.application.port.output.FinanceGroupPort;
 import com.kista.api.finance.application.port.output.FinanceMemberPort;
 import com.kista.api.finance.application.port.output.FinanceTransactionPort;
-import com.kista.api.finance.application.usecase.FinanceRegistrationReminderUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -28,7 +27,7 @@ import java.util.concurrent.Semaphore;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-class FinanceRegistrationReminderNotifier implements FinanceRegistrationReminderUseCase {
+public class FinanceRegistrationReminderNotifier {
 
     private static final int MAX_CONCURRENT_CHECKS = 10;
     private static final String REMINDER_TITLE = "가계부 등록을 아직 안 하셨어요";
@@ -40,7 +39,7 @@ class FinanceRegistrationReminderNotifier implements FinanceRegistrationReminder
     private final FinanceTransactionPort financeTransactionPort;
     private final ApplicationEventPublisher eventPublisher;     // 리마인더 요청 이벤트 발행
 
-    @Override
+    // 대상 월(month) 가계부 등록이 없는 ACTIVE 사용자에게 알림 발송
     public void notifyUsersWithoutThisMonthRegistration(YearMonth month) {
         LocalDate from = month.atDay(1);
         LocalDate to = month.atEndOfMonth();

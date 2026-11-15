@@ -2,7 +2,7 @@ package com.kista.api.finance.adapter.in.web;
 
 import com.kista.api.finance.domain.model.FinanceBudget;
 import com.kista.api.finance.domain.model.FinanceBudgetCommand;
-import com.kista.api.finance.application.usecase.FinanceBudgetUseCase;
+import com.kista.api.finance.application.service.FinanceBudgetService;
 import com.kista.api.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -38,7 +38,7 @@ class FinanceBudgetControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean FinanceBudgetUseCase budgetUseCase;
+    @MockitoBean FinanceBudgetService budgetUseCase;
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 

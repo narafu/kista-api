@@ -3,7 +3,6 @@ package com.kista.api.finance.application.service;
 import com.kista.api.finance.domain.model.FinanceBudget;
 import com.kista.api.finance.domain.model.FinanceBudgetCommand;
 import com.kista.api.finance.domain.model.FinanceCategory;
-import com.kista.api.finance.application.usecase.FinanceBudgetUseCase;
 import com.kista.api.finance.application.port.output.FinanceBudgetPort;
 import com.kista.api.finance.application.port.output.FinanceCategoryPort;
 import com.kista.api.finance.application.port.output.FinanceGroupPort;
@@ -21,13 +20,12 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-class FinanceBudgetService implements FinanceBudgetUseCase {
+public class FinanceBudgetService {
 
     private final FinanceBudgetPort budgetPort;
     private final FinanceGroupPort financeGroupPort;
     private final FinanceCategoryPort financeCategoryPort;
 
-    @Override
     @Transactional(readOnly = true)
     public List<FinanceBudget> list(UUID userId, UUID categoryId, LocalDate date) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
@@ -41,7 +39,6 @@ class FinanceBudgetService implements FinanceBudgetUseCase {
     // 거부 시 어떤 후보도 변경하지 않는다(전량 판정 후 실행) — resolveOverlapActions() 참고.
     // 그룹 소유 save 시 그룹 스코프 겹침은 finance_budgets_no_overlap EXCLUDE가 잡아 어댑터가
     // OverlappingPeriodException(409)으로 변환·롤백한다(shareToGroup() PATCH와 동일).
-    @Override
     public FinanceBudget create(UUID userId, boolean shareToGroup, FinanceBudgetCommand command) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         verifyBudgetCommand(userId, currentGroupId, command);
@@ -108,7 +105,6 @@ class FinanceBudgetService implements FinanceBudgetUseCase {
         }
     }
 
-    @Override
     public FinanceBudget update(UUID budgetId, UUID userId, FinanceBudgetCommand command) {
         FinanceBudget existing = budgetPort.findByIdOrThrow(budgetId);
         UUID currentGroupId = FinanceAccessSupport.verifyAccessible(existing, userId, financeGroupPort);
@@ -134,7 +130,6 @@ class FinanceBudgetService implements FinanceBudgetUseCase {
         }
     }
 
-    @Override
     public void delete(UUID budgetId, UUID userId) {
         FinanceBudget existing = FinanceAccessSupport.loadAccessible(
                 budgetPort::findByIdOrThrow, budgetId, userId, financeGroupPort);
@@ -145,7 +140,6 @@ class FinanceBudgetService implements FinanceBudgetUseCase {
 
     // 개인 소유 예산을 소유자가 자신의 현재 그룹으로 전환한다. 본인 것만 전환 가능(그룹 멤버 전체 아님).
     // 그룹 전환/복귀 시 겹침(EXCLUDE 제약)이 있으면 어댑터가 OverlappingPeriodException으로 변환하므로 그대로 전파.
-    @Override
     public FinanceBudget shareToGroup(UUID budgetId, UUID userId) {
         FinanceBudget existing = budgetPort.findByIdOrThrow(budgetId);
         return GroupShareSupport.shareToGroup(existing, userId, financeGroupPort.findCurrentGroupId(userId),
@@ -159,7 +153,6 @@ class FinanceBudgetService implements FinanceBudgetUseCase {
     }
 
     // 그룹 공유 예산을 개인 소유로 되돌린다. 소유자는 그대로 유지, groupId만 null로.
-    @Override
     public FinanceBudget unshare(UUID budgetId, UUID userId) {
         FinanceBudget existing = budgetPort.findByIdOrThrow(budgetId);
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);

@@ -2,7 +2,7 @@ package com.kista.api.finance.adapter.in.web;
 
 import com.kista.api.finance.adapter.in.web.dto.FinanceTransactionRequest;
 import com.kista.api.finance.adapter.in.web.dto.FinanceTransactionResponse;
-import com.kista.api.finance.application.usecase.FinanceTransactionUseCase;
+import com.kista.api.finance.application.service.FinanceTransactionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -27,7 +27,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FinanceTransactionController {
 
-    private final FinanceTransactionUseCase transactionUseCase;
+    private final FinanceTransactionService transactionUseCase;
 
     @Operation(summary = "거래내역 목록 조회", description = "userId=본인UUID로 필터링하면 개인 탭(내가 입력한 내역만)입니다.")
     @ApiResponse(responseCode = "200", description = "조회 성공")

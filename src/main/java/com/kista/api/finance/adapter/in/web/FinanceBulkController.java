@@ -5,7 +5,7 @@ import com.kista.api.finance.adapter.in.web.dto.BulkFinanceRegisterResponse;
 import com.kista.api.finance.domain.model.AssetSnapshotCommand;
 import com.kista.api.finance.domain.model.BulkFinanceRegisterResult;
 import com.kista.api.finance.domain.model.FinanceTransactionCommand;
-import com.kista.api.finance.application.usecase.BulkFinanceRegisterUseCase;
+import com.kista.api.finance.application.service.BulkFinanceRegisterService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -28,7 +28,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FinanceBulkController {
 
-    private final BulkFinanceRegisterUseCase bulkFinanceRegisterUseCase;
+    private final BulkFinanceRegisterService bulkFinanceRegisterUseCase;
 
     @Operation(summary = "가계부 일괄 등록", description = "자산/수입/소비/저축 기록 여러 건을 한 번에 등록합니다 (항목별 날짜는 요청 값 그대로 사용).")
     @ApiResponse(responseCode = "200", description = "등록 처리 완료 (항목별 성공/실패는 응답 본문 참고)")

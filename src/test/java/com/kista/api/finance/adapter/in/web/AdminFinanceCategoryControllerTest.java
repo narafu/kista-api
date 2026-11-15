@@ -6,7 +6,7 @@ import com.kista.shared.platform.security.SecurityConfig;
 import com.kista.api.finance.domain.model.FinanceCategory;
 import com.kista.api.finance.domain.model.FinanceCategoryCommand;
 import com.kista.shared.platform.security.TokenBlacklistPort;
-import com.kista.api.finance.application.usecase.FinanceCategoryUseCase;
+import com.kista.api.finance.application.service.FinanceCategoryService;
 import com.kista.api.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -45,7 +45,7 @@ class AdminFinanceCategoryControllerTest {
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort;
-    @MockitoBean FinanceCategoryUseCase categoryUseCase;
+    @MockitoBean FinanceCategoryService categoryUseCase;
 
     @Test
     void list_anonymous_returns401() throws Exception {

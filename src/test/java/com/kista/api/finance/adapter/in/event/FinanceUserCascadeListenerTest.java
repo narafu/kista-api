@@ -1,6 +1,6 @@
 package com.kista.api.finance.adapter.in.event;
 
-import com.kista.api.finance.application.usecase.FinanceUserDataEraseUseCase;
+import com.kista.api.finance.application.service.FinanceUserDataEraseService;
 import com.kista.shared.kernel.UserDeletedEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,7 +20,7 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class FinanceUserCascadeListenerTest {
 
-    @Mock FinanceUserDataEraseUseCase eraser;
+    @Mock FinanceUserDataEraseService eraser;
     @InjectMocks FinanceUserCascadeListener listener;
 
     @Test

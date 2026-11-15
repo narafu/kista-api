@@ -5,7 +5,7 @@ import com.kista.api.finance.adapter.in.web.dto.AssetSnapshotResponse;
 import com.kista.api.finance.domain.model.AssetSnapshot;
 import com.kista.api.finance.domain.model.FinanceAccount;
 import com.kista.api.finance.domain.model.FinanceCategory;
-import com.kista.api.finance.application.usecase.AssetSnapshotUseCase;
+import com.kista.api.finance.application.service.AssetSnapshotService;
 import com.kista.api.finance.application.port.output.FinanceAccountPort;
 import com.kista.api.finance.application.port.output.FinanceCategoryPort;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,7 +32,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AssetSnapshotController {
 
-    private final AssetSnapshotUseCase assetSnapshotUseCase;
+    private final AssetSnapshotService assetSnapshotUseCase;
     // 응답 보강(카테고리명·계좌명·최상위 카테고리 ID) 전용 읽기 조회 — UseCase 외 out-port 직접 의존은
     // 이 컨트롤러에 한해 의도적 예외다 (plan §5.5 참고)
     private final FinanceCategoryPort financeCategoryPort;

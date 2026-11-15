@@ -3,7 +3,6 @@ package com.kista.api.finance.application.service;
 import com.kista.api.finance.domain.model.AssetSnapshot;
 import com.kista.api.finance.domain.model.AssetSnapshotCommand;
 import com.kista.api.finance.domain.model.FinanceCategory;
-import com.kista.api.finance.application.usecase.AssetSnapshotUseCase;
 import com.kista.api.finance.application.port.output.AssetSnapshotPort;
 import com.kista.api.finance.application.port.output.FinanceCategoryPort;
 import com.kista.api.finance.application.port.output.FinanceGroupPort;
@@ -22,14 +21,13 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-class AssetSnapshotService implements AssetSnapshotUseCase {
+public class AssetSnapshotService {
 
     private final AssetSnapshotPort assetSnapshotPort;
     private final FinanceGroupPort financeGroupPort;
     private final FinanceCategoryPort financeCategoryPort;
     private final MonthlyClosingGuard monthlyClosingGuard;
 
-    @Override
     @Transactional(readOnly = true)
     public List<AssetSnapshot> list(UUID userId, LocalDate from, LocalDate to, UUID filterUserId) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
@@ -37,7 +35,6 @@ class AssetSnapshotService implements AssetSnapshotUseCase {
     }
 
     // shareToGroup=true면 소유자의 현재 그룹 소유로, false면 개인 소유로 원자적 생성한다.
-    @Override
     public AssetSnapshot create(UUID userId, boolean shareToGroup, AssetSnapshotCommand command) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         verifyAssetCategory(userId, currentGroupId, command.categoryId());
@@ -53,7 +50,6 @@ class AssetSnapshotService implements AssetSnapshotUseCase {
         return saved;
     }
 
-    @Override
     public AssetSnapshot update(UUID snapshotId, UUID userId, AssetSnapshotCommand command) {
         AssetSnapshot existing = assetSnapshotPort.findByIdOrThrow(snapshotId);
         UUID currentGroupId = FinanceAccessSupport.verifyAccessible(existing, userId, financeGroupPort);
@@ -76,7 +72,6 @@ class AssetSnapshotService implements AssetSnapshotUseCase {
         }
     }
 
-    @Override
     public void delete(UUID snapshotId, UUID userId) {
         AssetSnapshot existing = assetSnapshotPort.findByIdOrThrow(snapshotId);
         UUID currentGroupId = FinanceAccessSupport.verifyAccessible(existing, userId, financeGroupPort);
@@ -87,7 +82,6 @@ class AssetSnapshotService implements AssetSnapshotUseCase {
     }
 
     // 개인 소유 자산 기록을 소유자가 자신의 현재 그룹으로 전환한다. 본인 것만 전환 가능(그룹 멤버 전체 아님).
-    @Override
     public AssetSnapshot shareToGroup(UUID snapshotId, UUID userId) {
         AssetSnapshot existing = assetSnapshotPort.findByIdOrThrow(snapshotId);
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
@@ -104,7 +98,7 @@ class AssetSnapshotService implements AssetSnapshotUseCase {
     }
 
     // 그룹 공유 자산 기록을 개인 소유로 되돌린다. 소유자는 그대로 유지, groupId만 null로.
-    @Override
+    // 같은 그룹 멤버면 누구든 가능(소유자 한정 아님).
     public AssetSnapshot unshare(UUID snapshotId, UUID userId) {
         AssetSnapshot existing = assetSnapshotPort.findByIdOrThrow(snapshotId);
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);

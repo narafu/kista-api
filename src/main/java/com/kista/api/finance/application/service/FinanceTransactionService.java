@@ -3,7 +3,6 @@ package com.kista.api.finance.application.service;
 import com.kista.api.finance.domain.model.FinanceCategory;
 import com.kista.api.finance.domain.model.FinanceTransaction;
 import com.kista.api.finance.domain.model.FinanceTransactionCommand;
-import com.kista.api.finance.application.usecase.FinanceTransactionUseCase;
 import com.kista.api.finance.application.port.output.FinanceCategoryPort;
 import com.kista.api.finance.application.port.output.FinanceGroupPort;
 import com.kista.api.finance.application.port.output.FinanceTransactionPort;
@@ -21,14 +20,13 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-class FinanceTransactionService implements FinanceTransactionUseCase {
+public class FinanceTransactionService {
 
     private final FinanceTransactionPort transactionPort;
     private final FinanceGroupPort financeGroupPort;
     private final FinanceCategoryPort financeCategoryPort;
     private final MonthlyClosingGuard monthlyClosingGuard;
 
-    @Override
     @Transactional(readOnly = true)
     public List<FinanceTransaction> list(UUID userId, LocalDate from, LocalDate to,
                                           UUID categoryId, UUID filterUserId) {
@@ -37,7 +35,6 @@ class FinanceTransactionService implements FinanceTransactionUseCase {
     }
 
     // shareToGroup=true면 소유자의 현재 그룹 소유로, false면 개인 소유로 원자적 생성한다.
-    @Override
     public FinanceTransaction create(UUID userId, boolean shareToGroup, FinanceTransactionCommand command) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         verifyCategory(userId, currentGroupId, command.categoryId());
@@ -53,7 +50,6 @@ class FinanceTransactionService implements FinanceTransactionUseCase {
         return saved;
     }
 
-    @Override
     public FinanceTransaction update(UUID transactionId, UUID userId, FinanceTransactionCommand command) {
         FinanceTransaction existing = transactionPort.findByIdOrThrow(transactionId);
         UUID currentGroupId = FinanceAccessSupport.verifyAccessible(existing, userId, financeGroupPort);
@@ -75,7 +71,6 @@ class FinanceTransactionService implements FinanceTransactionUseCase {
         }
     }
 
-    @Override
     public void delete(UUID transactionId, UUID userId) {
         FinanceTransaction existing = transactionPort.findByIdOrThrow(transactionId);
         UUID currentGroupId = FinanceAccessSupport.verifyAccessible(existing, userId, financeGroupPort);
@@ -86,7 +81,6 @@ class FinanceTransactionService implements FinanceTransactionUseCase {
     }
 
     // 개인 소유 거래를 소유자가 자신의 현재 그룹으로 전환한다. 본인 것만 전환 가능(그룹 멤버 전체 아님).
-    @Override
     public FinanceTransaction shareToGroup(UUID transactionId, UUID userId) {
         FinanceTransaction existing = transactionPort.findByIdOrThrow(transactionId);
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
@@ -103,7 +97,6 @@ class FinanceTransactionService implements FinanceTransactionUseCase {
     }
 
     // 그룹 공유 거래내역을 개인 소유로 되돌린다. 소유자는 그대로 유지, groupId만 null로.
-    @Override
     public FinanceTransaction unshare(UUID transactionId, UUID userId) {
         FinanceTransaction existing = transactionPort.findByIdOrThrow(transactionId);
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);

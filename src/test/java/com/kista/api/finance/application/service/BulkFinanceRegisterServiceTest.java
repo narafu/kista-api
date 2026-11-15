@@ -7,8 +7,6 @@ import com.kista.api.finance.domain.model.FinanceTransactionCommand;
 import com.kista.api.finance.domain.model.Market;
 import com.kista.api.finance.domain.model.MonthlyClosing;
 import com.kista.api.finance.application.port.output.FinanceGroupPort;
-import com.kista.api.finance.application.usecase.AssetSnapshotUseCase;
-import com.kista.api.finance.application.usecase.FinanceTransactionUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -32,8 +30,8 @@ import static org.mockito.Mockito.when;
 
 class BulkFinanceRegisterServiceTest {
 
-    private AssetSnapshotUseCase assetSnapshotUseCase;
-    private FinanceTransactionUseCase transactionUseCase;
+    private AssetSnapshotService assetSnapshotUseCase;
+    private FinanceTransactionService transactionUseCase;
     private FinanceGroupPort financeGroupPort;
     private BulkFinanceRegisterService service;
 
@@ -42,8 +40,8 @@ class BulkFinanceRegisterServiceTest {
 
     @BeforeEach
     void setUp() {
-        assetSnapshotUseCase = mock(AssetSnapshotUseCase.class);
-        transactionUseCase = mock(FinanceTransactionUseCase.class);
+        assetSnapshotUseCase = mock(AssetSnapshotService.class);
+        transactionUseCase = mock(FinanceTransactionService.class);
         financeGroupPort = mock(FinanceGroupPort.class);
         service = new BulkFinanceRegisterService(assetSnapshotUseCase, transactionUseCase, financeGroupPort);
     }

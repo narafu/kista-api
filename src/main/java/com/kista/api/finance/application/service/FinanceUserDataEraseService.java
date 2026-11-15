@@ -6,7 +6,6 @@ import com.kista.api.finance.application.port.output.FinanceBudgetPort;
 import com.kista.api.finance.application.port.output.FinanceCategoryPort;
 import com.kista.api.finance.application.port.output.FinanceGroupPort;
 import com.kista.api.finance.application.port.output.FinanceTransactionPort;
-import com.kista.api.finance.application.usecase.FinanceUserDataEraseUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,7 +17,7 @@ import java.util.UUID;
 // 경계는 FinanceUserCascadeListener(REQUIRES_NEW)가 열고 여기선 합류한다.
 @Service
 @RequiredArgsConstructor
-class FinanceUserDataEraseService implements FinanceUserDataEraseUseCase {
+public class FinanceUserDataEraseService {
 
     private final FinanceTransactionPort financeTransactionPort;
     private final AssetSnapshotPort assetSnapshotPort;
@@ -27,7 +26,7 @@ class FinanceUserDataEraseService implements FinanceUserDataEraseUseCase {
     private final FinanceBudgetPort financeBudgetPort;
     private final FinanceGroupPort financeGroupPort;
 
-    @Override
+    // 호출자 트랜잭션 합류 — 리스너가 REQUIRES_NEW로 경계를 연다
     @Transactional
     public void eraseUserData(UUID userId) {
         // 재무 기록 — userId(입력자) 단위로만 정리한다. 그룹을 통째로 지우면 배우자 등 다른

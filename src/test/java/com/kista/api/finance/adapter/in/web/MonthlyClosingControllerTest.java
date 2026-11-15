@@ -1,7 +1,7 @@
 package com.kista.api.finance.adapter.in.web;
 
 import com.kista.api.finance.domain.model.MonthlyClosing;
-import com.kista.api.finance.application.usecase.MonthlyClosingUseCase;
+import com.kista.api.finance.application.service.MonthlyClosingService;
 import com.kista.api.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -33,7 +33,7 @@ class MonthlyClosingControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean MonthlyClosingUseCase monthlyClosingUseCase;
+    @MockitoBean MonthlyClosingService monthlyClosingUseCase;
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 

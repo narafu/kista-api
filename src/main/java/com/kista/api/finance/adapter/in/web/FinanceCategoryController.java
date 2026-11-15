@@ -3,7 +3,7 @@ package com.kista.api.finance.adapter.in.web;
 import com.kista.api.finance.adapter.in.web.dto.FinanceCategoryRequest;
 import com.kista.api.finance.adapter.in.web.dto.FinanceCategoryResponse;
 import com.kista.api.finance.domain.model.FinanceCategory;
-import com.kista.api.finance.application.usecase.FinanceCategoryUseCase;
+import com.kista.api.finance.application.service.FinanceCategoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FinanceCategoryController {
 
-    private final FinanceCategoryUseCase categoryUseCase;
+    private final FinanceCategoryService categoryUseCase;
 
     @Operation(summary = "카테고리 목록 조회", description = "카테고리를 중첩된 트리로 반환합니다.")
     @ApiResponse(responseCode = "200", description = "조회 성공")

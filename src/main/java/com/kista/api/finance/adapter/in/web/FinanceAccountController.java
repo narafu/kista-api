@@ -2,7 +2,7 @@ package com.kista.api.finance.adapter.in.web;
 
 import com.kista.api.finance.adapter.in.web.dto.FinanceAccountRequest;
 import com.kista.api.finance.adapter.in.web.dto.FinanceAccountResponse;
-import com.kista.api.finance.application.usecase.FinanceAccountUseCase;
+import com.kista.api.finance.application.service.FinanceAccountService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -25,7 +25,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FinanceAccountController {
 
-    private final FinanceAccountUseCase accountUseCase;
+    private final FinanceAccountService accountUseCase;
 
     @Operation(summary = "계좌 목록 조회")
     @ApiResponse(responseCode = "200", description = "조회 성공")

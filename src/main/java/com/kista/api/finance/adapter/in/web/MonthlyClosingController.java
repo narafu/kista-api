@@ -2,7 +2,7 @@ package com.kista.api.finance.adapter.in.web;
 
 import com.kista.api.finance.adapter.in.web.dto.MonthlyClosingRequest;
 import com.kista.api.finance.adapter.in.web.dto.MonthlyClosingResponse;
-import com.kista.api.finance.application.usecase.MonthlyClosingUseCase;
+import com.kista.api.finance.application.service.MonthlyClosingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -21,7 +21,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class MonthlyClosingController {
 
-    private final MonthlyClosingUseCase monthlyClosingUseCase;
+    private final MonthlyClosingService monthlyClosingUseCase;
 
     @Operation(summary = "월별 마감 상태 목록 조회")
     @ApiResponse(responseCode = "200", description = "조회 성공")

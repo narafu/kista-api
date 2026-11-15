@@ -6,7 +6,7 @@ import com.kista.api.finance.domain.model.AssetSnapshotCommand;
 import com.kista.api.finance.domain.model.FinanceAccount;
 import com.kista.api.finance.domain.model.FinanceCategory;
 import com.kista.api.finance.domain.model.Market;
-import com.kista.api.finance.application.usecase.AssetSnapshotUseCase;
+import com.kista.api.finance.application.service.AssetSnapshotService;
 import com.kista.api.admin.application.port.output.AppErrorLogPort;
 import com.kista.api.finance.application.port.output.FinanceAccountPort;
 import com.kista.api.finance.application.port.output.FinanceCategoryPort;
@@ -42,7 +42,7 @@ class AssetSnapshotControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean AssetSnapshotUseCase assetSnapshotUseCase;
+    @MockitoBean AssetSnapshotService assetSnapshotUseCase;
     @MockitoBean FinanceCategoryPort financeCategoryPort;
     @MockitoBean FinanceAccountPort financeAccountPort;
 
