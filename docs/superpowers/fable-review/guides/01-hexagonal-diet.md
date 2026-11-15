@@ -171,3 +171,12 @@ ArchUnit 규칙은 다음으로 바꾼다. 지키려는 성질을 패키지가 �
 - `interfaces_must_earn_their_keep`은 켜져 있고 본문과 달리 `application.usecase`도 본다(UseCase 접미사 규칙을 지운 뒤 새 UseCase를 막는 가드가 없어서). 구현이 1개 이하인 인터페이스 134개(UseCase·Query 52 + 포트 82)를 `src/test/resources/architecture/single-impl-interfaces.txt`에 넣었고 의존 역전 4개는 테스트 안 상수다. 이 목록은 줄어들기만 한다: **단계 B·C에서 인터페이스를 지우면 같은 커밋에서 그 줄을 지우고 `PENDING_REMOVAL_CEILING`(지금 134)을 남은 줄 수로 내려야 한다.** 없는 인터페이스·구현이 2개가 된 인터페이스가 목록에 남으면 실패하고, 목록이 상한보다 길어도 실패한다. `:shared`의 포트는 대상이 아니다.
 - 단계 B에서 걸릴 수 있는 남은 규칙: `web_must_stay_pure_inbound_sink`(위 보정 그대로), `notify_must_stay_pure_outbound_gateway`(notify → `application.usecase` 의존 금지 문자열 — usecase 패키지가 사라져도 통과한다), `service_classes_must_be_annotated_with_service`.
 
+
+단계 B 실행 결과(2026-11-15, S6):
+
+- UseCase·Query 52개를 모두 지웠다(privacy 2, account 1, market 3, benchmark 4, user 5, admin 7, finance 10, stats 8, trading 12). 되돌린 모듈은 없다. marketcalendar·api.notify는 usecase 패키지가 없어 대상 없음. `PENDING_REMOVAL_CEILING`은 134에서 82(포트만 남음)가 됐다.
+- 모듈 밖 소비는 `UserService`·`AccountService`·`PrivacyTradeValidationService`에 타입 단위 `@NamedInterface("api")`를 붙였다. 서비스의 public 메서드 전부가 모듈 밖에 보인다.
+- 중첩 타입 이동: `AdminPrivacyTradeUseCase.CreateResult`는 같은 필드의 `PrivacyQueryPort.CreateBaseResult`와 합쳐 `admin.domain.model.PrivacyBaseCreateResult`로, `InvestmentPointsQuery.Scope`는 `stats.domain.model.InvestmentPointsScope`로.
+- 가드 보정: `notify_must_stay_pure_outbound_gateway`의 금지 대상을 지운 usecase 패키지에서 `application.service`로 바꿨다(그대로 두면 공회전). `web_must_stay_pure_inbound_sink`는 `mainClasses`만 본다(실 컨텍스트 IT가 서비스로 픽스처를 만든다).
+- 주입 필드·파라미터 이름(`xxxUseCase`)은 치환 커밋과 분리한 이름 정리 커밋에서 타입 이름(`xxxService`)으로 맞췄다. 타입이 서비스가 아닌 `useCase` 필드(`CryptoDcaRunner`, `TradingExecutionFacade` 소비처)와 테스트 메서드·`DisplayName`·`TokenUseCaseTestConfig` 이름은 남겼다.
+- **단계 C로 넘김**: `interfaces_must_earn_their_keep`은 `application.port.output`·`application.usecase`만 본다. usecase 패키지가 사라졌으니 단일 구현 인터페이스를 다른 패키지(`application.service`, `adapter`)에 새로 만들면 잡히지 않는다. 단계 C 5번에서 가드를 켤 때 대상을 `com.kista`의 모든 인터페이스(:shared 포트·함수형 인터페이스 등은 허용 목록)로 넓힌다.
