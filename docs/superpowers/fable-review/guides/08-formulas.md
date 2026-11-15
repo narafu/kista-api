@@ -242,8 +242,15 @@ T8·T9는 공식 변경이라 6절대로 사용자 결정 없이 하지 않는�
 
 | # | 태스크 | 모델 | 완료 판정 |
 |---|---|---|---|
-| T8 | 리버스 별지점을 "현재 사이클 원장 5행"이 아니라 "직전 5거래일 종가"로 계산한다(findings/28 I-1). 지금은 사이클 초반에 5행 미만 평균이 되고 등록 개장 행이 한 행을 차지한다. 종가 출처는 공용 시세 일봉(14 T3 전환 뒤에는 Alpaca)이고 조회 실패 시 지금 방식으로 떨어지는지, 그날 리버스 주문을 내지 않는지를 먼저 정한다. `BacktestEngine.STAR_POINT_WINDOW` 경로는 이미 종가 5개라 운영만 바뀐다. **사용자 결정 필요**: ① 바꾼다 ② 지금 방식 유지(이유를 `trading-formulas.md` 1-7에 적는다). 결정 전 권고는 ①이다 — 보유를 가진 채 재등록한 전략이 바로 리버스에 들어가는 운영 사례(`01a1dcd7`)가 있다 | Opus | `./gradlew :trading-core:test --tests 'com.kista.tradingcore.trading.application.service.CycleOrderComputer*' 2>&1 \| grep -E "FAILED\|BUILD"` + 리버스 진행 전략의 전후 비교표 |
-| T9 | 리버스 종료 조건을 원문대로 `종가 > round2(평단 × (1 − 목표수익률))`로 바꾼다(`ReverseModePosition.shouldExit`, findings/28 I-5). 종가가 임계와 정확히 같은 날만 달라진다. **사용자 결정 필요**: ① 바꾼다 ② `≥` 유지. 권고는 ①(원문 문장이 분명하고 바꾸면 돈이 덜 움직인다)이지만 급하지 않다. T8과 같은 배포에 싣는다 | Sonnet | `./gradlew :trading-core:test --tests 'com.kista.tradingcore.matching.*' 2>&1 \| grep -E "FAILED\|BUILD"` |
+| T8 | 리버스 별지점을 "현재 사이클 원장 5행"이 아니라 "직전 5거래일 종가"로 계산한다(findings/28 I-1). 지금은 사이클 초반에 5행 미만 평균이 되고 등록 개장 행이 한 행을 차지한다. 종가 출처는 공용 시세 일봉(14 T3 전환 뒤에는 Alpaca)이고 조회 실패 시 지금 방식으로 떨어지는지, 그날 리버스 주문을 내지 않는지를 먼저 정한다. `BacktestEngine.STAR_POINT_WINDOW` 경로는 이미 종가 5개라 운영만 바뀐다. 사용자 결정(2026-11-15): ① 바꾼다. 결정 전 권고는 ①이다 — 보유를 가진 채 재등록한 전략이 바로 리버스에 들어가는 운영 사례(`01a1dcd7`)가 있다 | Opus | `./gradlew :trading-core:test --tests 'com.kista.tradingcore.trading.application.service.CycleOrderComputer*' 2>&1 \| grep -E "FAILED\|BUILD"` + 리버스 진행 전략의 전후 비교표 |
+| T9 | 리버스 종료 조건을 원문대로 `종가 > round2(평단 × (1 − 목표수익률))`로 바꾼다(`ReverseModePosition.shouldExit`, findings/28 I-5). 종가가 임계와 정확히 같은 날만 달라진다. 사용자 결정(2026-11-15): ① 바꾼다. 권고는 ①(원문 문장이 분명하고 바꾸면 돈이 덜 움직인다)이지만 급하지 않다. T8과 같은 배포에 싣는다 | Sonnet | `./gradlew :trading-core:test --tests 'com.kista.tradingcore.matching.*' 2>&1 \| grep -E "FAILED\|BUILD"` |
 | T10 | 문서만. `trading-formulas.md`에 ① 1-1의 종목 문장에 "원문은 TQQQ·SOXL만 다룬다. USD·MAGX와 30분할은 같은 일반식을 적용한 KISTA 확장" ② 2-2에 "V′의 pool은 적립·인출 반영 전 예수금(`VrCycleRolloverService`)" ③ 1-3 "일반모드 최종회차" 행에 "원문은 재진입 시 첫날 MOC 1회, KISTA는 2회가 될 수 있다(Q-04에서 유지)"를 넣는다. `bash .github/scripts/check-doc-budget.sh`를 돌린다 | Sonnet | 문서 검토 |
+
+**T8·T9·T10 실행 결과(2026-11-15, S18)**: 사용자 결정 ①①(2026-11-15).
+- T9: `ReverseModePosition.shouldExit`를 `>`로 변경(`InfinitePosition.nextReverseMode` 주석 동기화). 테스트 `shouldExit_strictlyGreaterThanThreshold`. 기존 단언·백테스트 골든 변경 없음.
+- T8: `CycleOrderComputer`가 `AlpacaMarketDataAdapter.dailyCandles(심볼, lastBefore(거래일−1, 5, RAW))` 종가 평균을 별지점으로 쓴다. 조회 예외·5개 미만이면 기존 원장 행 평균 + warn(`BrokerCallGuard.tryGet`). 미리보기 경로(readOnly 트랜잭션)도 같은 조회를 쓴다 — 전일종가 조회와 같은 기존 구조.
+- 테스트(`CycleOrderComputerTest`): `starPoint_usesAlpacaDailyCloses`·`starPoint_fallsBackToLedgerOnFailure`·`starPoint_fallsBackToLedgerWhenFewerThanFive`·`starPoint_notQueriedOnFirstReverseDay`. 변이 확인(일봉 경로 비활성화) 시 첫 테스트 실패 확인.
+- T10: `trading-formulas.md` 1-1·1-3·1-4·1-7·2-2 반영. 백테스트 골든 변경 없음.
+- 리뷰 후속: 미확정 당일 봉 제외, 저장된 매도 leg 가격 재사용.
 
 하지 않기로 한 것(다시 제안하지 않는다): 아래 단계 3건과 지정가 22:00 접수는 2026-11-15 소유자 결정으로 유지, 가격 cap 1.05는 백로그 P-04의 재평가 대상, 최소 1주 보장은 주문 0건 정지를 막는 장치라 유지, VR 기본값은 2026-11-12 사용자 확인으로 유지.

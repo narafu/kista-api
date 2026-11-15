@@ -14,13 +14,13 @@
 
 ### 1-1. 문헌 규칙 (`docs/reference/laor/infinite-v4.md` — 카페 원문)
 - 1회 매수금 = 잔금 ÷ (분할수 − T). T는 매수 체결 시 누적 가산, 쿼터매도 시 ×0.75. 분할 20·30·40 권장.
-- 별% = 목표수익률 × (1 − 2T/분할수). TQQQ 40분할이면 T마다 0.75%p씩 15% → −15%. 별지점 = 평단 × (1 + 별%), 소수 2자리. 원문은 20·40분할 식만 주고 30분할 식은 없다(KISTA는 같은 일반식으로 확장).
+- 별% = 목표수익률 × (1 − 2T/분할수). TQQQ 40분할이면 T마다 0.75%p씩 15% → −15%. 별지점 = 평단 × (1 + 별%), 소수 2자리. 원문은 TQQQ·SOXL만 다루고 20·40분할 식만 준다. USD·MAGX와 30분할은 같은 일반식을 적용한 KISTA 확장이다.
 - 전반전(T < 분할수/2): 1회분 절반은 별지점 LOC, 나머지는 평단 LOC(원문 예시와 맞는 배분: 별지점 쪽 절반 내림 수량을 먼저 잡고 남은 금액을 평단 쪽에 — 절차 자체는 원문에 없고 사이트 코드 §C와 같은 해석. KISTA도 이 순서다). 후반전(T ≥ 분할수/2, 원문 명시): 1회분 전액 별지점 LOC. 둘 다 그 아래로 LOC 1주씩을 계속 건다(가격 = 1회분 ÷ (누적 수량 + k), 내림, 단계 수 제한 없음).
 - LOC 매수점 = 별지점 − 0.01, LOC 매도점 = 별지점(같은 종가에서 매수·매도가 함께 체결되지 않게 하는 장치). 평단 LOC 매수는 −0.01 없음.
 - 매도: 보유 1/4(내림) 별지점 LOC + 나머지 지정가(평단 × (1+목표수익률)), 지정가는 프리장 시작에 접수.
 - 처음 매수(보유 0): 1회분을 종가보다 10~15% 높은 가격(큰수) LOC로 걸고 그 아래로 LOC 1주씩을 계속 건다.
 - T > 분할수 − 1이면 리버스모드(잔금이 남아 있어도 진입). 4.0이 쿼터손절(1/4 MOC)을 리버스모드로 대체했다는 서술은 quantstack에만 있다.
-- 리버스: 첫날 보유 ÷ (분할수/2) MOC 매도, 매수 없음. 이후 별지점(직전 5거래일 종가 평균) LOC 매도(보유 ÷ (분할수/2)) + 잔금/4 쿼터매수 LOC(별지점 − 0.01). 쿼터매수로 1주도 못 사면 첫날과 같은 MOC 매도. T는 매도 ×0.95(20분할 ×0.9), 매수 T + (n − T) × 0.25. 종가가 평단 × (1 − 목표수익률)보다 커지면 "그 날부터" 일반모드 복귀(당일·다음 날 여부는 원문 불명확), T를 승계한다.
+- 리버스: 첫날 보유 ÷ (분할수/2) MOC 매도, 매수 없음. 이후 별지점(직전 5거래일 종가 평균) LOC 매도(보유 ÷ (분할수/2)) + 잔금/4 쿼터매수 LOC(별지점 − 0.01). 쿼터매수로 1주도 못 사면 첫날과 같은 MOC 매도. T는 매도 ×0.95(20분할 ×0.9), 매수 T + (n − T) × 0.25. 종가가 round2(평단 × (1 − 목표수익률))보다 커지면(`>`, 2026-11-15 `≥`에서 원문대로 변경) "그 날부터" 일반모드 복귀(당일·다음 날 여부는 원문 불명확), T를 승계한다.
 - 계산기 검증값(`docs/reference/quantstack/infinite-buying-v4.md` B3, TQQQ 40분할 평단 50 — 별%·별지점은 원문 공식과 일치, T=20을 "전반"으로 붙인 계산기 라벨만 원문과 다르다): T=1 14.25%·57.13(매수 57.12), T=10 7.50%·53.75, T=20 0%·50.00, T=21 −0.75%·49.63, T=40 −15%·42.50. `InfinitePositionTest.starPoint_matchesReferenceCalculator`·`InfiniteStrategyTypeTest.locPrices_*`가 이 값으로 고정돼 있다.
 
 ### 1-2. 공식 (코드)
@@ -50,7 +50,7 @@ isFinalRound = unitAmount > deposit  또는  referencePrice > deposit
 | T | 체결마다 누적 가산 | 원장에서 매일 재계산(`purchaseAmount ÷ unitAmount`) | 상태를 저장하지 않아 어긋날 일이 없고 추가·인출·부분 체결이 자동 반영된다. 1회 매수금은 수식상 같다: `잔금 ÷ (n − R) = D ÷ (n − n·C/(D+C)) = (D+C)/n = unitAmount`(D=예수금, C=매입액). 매수에 의한 T 변화도 같고(리버스 쿼터매수 `R' = R + (n−R)/4`), 매도는 실현 손익만큼 분모가 달라져 문헌의 ×0.75와 근사로만 같다 |
 | 전·후반 경계 T = n/2 | 원문은 후반("절반 이상"). quantstack 계산기 표만 전반 | 후반 | 원문과 일치(차이 아님 — quantstack 계산기 라벨 오류) |
 | 첫 매수 큰수 | 종가 +10~15%(원문 예시 +12%, 사이트 코드 +13%) | 전일종가 × (1+목표수익률) − 0.01을 접수 전 cap(현재가 × 1.05)이 낮춘다. 가격은 원장 예수금을 넘지 않는다 | 큰수는 증권사 가격 제한을 피하는 실무 장치라 비율은 규칙이 아니다. 원장 상한은 최소 1주 보장 수량이 원장을 넘어 매수 전체가 거절되는 교착을 막는다(1주 가드는 전일종가 기준) |
-| 일반모드 최종회차 | (리버스로 넘어감) | 리버스 첫날 규칙 MOC를 일반모드가 낸다, 최소 1주 | 리버스 플래그가 체결 뒤 리포트에서만 켜지는 구조 때문. 다음 날 첫날 MOC가 한 번 더 나갈 수 있다(`fable-review/questions.md` Q-04) |
+| 일반모드 최종회차 | (리버스로 넘어감) | 리버스 첫날 규칙 MOC를 일반모드가 낸다, 최소 1주 | 리버스 플래그가 체결 뒤 리포트에서만 켜지는 구조 때문. 다음 날 첫날 MOC가 한 번 더 나갈 수 있다(`fable-review/questions.md` Q-04). 원문은 재진입 시 첫날 MOC 1회, KISTA는 2회가 될 수 있다(Q-04에서 유지) |
 | 전반 절반 배분의 자투리 | **별지점 쪽 먼저로 읽힌다**(원문 예시 1회 539.23·별지점 78.12·평단 69.75 → 별지점 3주·평단 4주) | 별지점 쪽 먼저, 최소 1주(같은 입력이면 별지점 3주·평단 4주) | 원문 예시와 일치. 2026-11-15 평단 쪽 먼저에서 바꿨다(지침서 08 F5의 유지 결정을 대체, 상한가 재계산 경로도 같은 순서). 검증: `InfinitePositionTest.earlyAllocation_matchesOriginalExample` |
 | 아래 단계 LOC | 첫 매수·전반·후반 모두 1주씩 단계 제한 없이(예시 7~8단계) | 보정 3건(1-5) | 유지(2026-11-15 소유자 결정). 3단계가 평단 대비 약 −3%~−23%를 덮어 TQQQ 일간 변동 대부분이 들어오고 주문 건수가 적다. 대가: 종가가 사다리 아래로 깊이 빠진 날 1회분을 다 쓰지 못한다(원문 예시에서 종가 40이면 원문 14주·KISTA 10주) |
 | 1/4 수량 | 내림(원문 예시 141주 → 35주) | floor | 원문과 일치 |
@@ -60,7 +60,7 @@ isFinalRound = unitAmount > deposit  또는  referencePrice > deposit
 - **최소 1주 보장**: 전반 매수②(별지점)·매수①(잔여 > 0일 때)·후반 매수·첫 매수·최종회차 MOC.
 - **리버스 진입 추가 조건** `referencePrice > deposit`: 기준가로 1주도 못 사면 진입. 진입 `unitAmount > deposit`은 문헌 `T > n − 1`과 같다(`(D+C)/n > D ⟺ n·C/(D+C) > n − 1`).
 - **리버스 예산 소진**: 쿼터매수로 1주도 못 사면 같은 수량을 MOC 매도(`REVERSE_INFINITE_QUOTA_MOC_SELL`). 고유 요소가 아니라 원문 규칙이다(`laor/infinite-v4.md` 5절, quantstack에는 누락).
-- **리버스 종료 `≥`**: 종가 ≥ round2(평단 × (1 − targetProfitRate)), holdings > 0, 체결 후 평단 기준(`ReverseModePosition.shouldExit`). 문헌은 "보다 커지면".
+- **리버스 종료**: 종가 > round2(평단 × (1 − targetProfitRate)), holdings > 0, 체결 후 평단 기준(`ReverseModePosition.shouldExit`). 원문과 일치(2026-11-15 `≥`에서 변경).
 - **보정 주문·가격 cap**: 아래 1-5·1-6.
 
 ### 1-5. 보정 주문 (INFINITE 가격 캡 경로)
@@ -78,10 +78,11 @@ BUY 가격이 cap(currentPrice × 1.05, PriceCapPolicy)을 넘으면 cap 기준�
 
 ### 1-7. 리버스모드 별지점
 ```
-starPointPrice = 현재 사이클에서 INFINITE 상세(cycle_position_infinite)가 있는 최신 cycle_position 5건(STAR_POINT_WINDOW — 마감 리포트·등록 개장 행. 수동 체결 보정 행은 체결가가 종가 자리에 들어가므로 제외. 로테이션 개장 행은 detail이 없어 제외되나 새 사이클은 보유 0에서 시작해 리버스 진입 전에 창이 리포트 행으로 채워져 영향 없음)의 closingPrice 평균  (scale=2, HALF_UP — null·0 이하 종가 제외, 남는 값이 없으면 null)
+starPointPrice = 직전 5거래일 종가 평균 — 공용 시세 일봉(`AlpacaMarketDataAdapter.dailyCandles`, `lastBefore(거래일−1, 5, RAW)`)  (scale=2, HALF_UP)
+대체 경로: 조회 실패·5개 미만이면 현재 사이클에서 INFINITE 상세(cycle_position_infinite)가 있는 최신 cycle_position 5건(STAR_POINT_WINDOW — 마감 리포트·등록 개장 행. 수동 체결 보정 행은 체결가가 종가 자리에 들어가므로 제외)의 closingPrice 평균(null·0 이하 제외, 남는 값이 없으면 null) + warn
 LOC 매도 가격 = starPointPrice, 쿼터매수 LOC 가격 = starPointPrice − 0.01(TICK_SIZE)
 ```
-- 문헌은 "5거래일", KISTA는 "저장 행 5건". 보통 같고, 사이클 초반에는 5건 미만 평균이 된다.
+- 원문과 일치(2026-11-15 원장 행 5건에서 변경), 대체 경로만 원장 행이다. 미리보기 경로도 같은 조회를 쓴다. 같은 거래일에 저장된 리버스 LOC 매도가 있으면 그 가격을 별지점으로 재사용한다(누락 매수 leg와 값이 어긋나지 않게). 일봉 조회는 확정 봉만 쓴다(마감+16분 전이면 진행 중인 오늘 봉 제외).
 - 쿼터매수는 접수 전 가격 캡 대상이다: 주문가 = min(starPointPrice − 0.01, 현재가 × 1.05), 수량 = floor(round2(deposit/4) ÷ 주문가) — 상세 `workflow-capper.md`.
 - 리버스모드 첫날은 별지점 없이 MOC 매도만 낸다 — 별지점은 2일차부터 계산(`CycleOrderComputer.computeStarPointPrice`).
 - 백테스트(`BacktestEngine.STAR_POINT_WINDOW`)도 같은 5개 윈도우 — 두 값은 함께 바꾼다.
@@ -101,6 +102,7 @@ sellPrice(s) = upperBand ÷ (holdings − s + 1)  (scale=2, HALF_UP, s=1..20)
 
 V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_UP, 중간 scale=10 — VrPosition.nextValue)
      평가금 = holdings × 종가
+     pool = 적립·인출 반영 전 예수금(`VrCycleRolloverService`)
 ```
 - **gradient(G)·poolLimitRate 램프**: 전략 최초 사이클 startDate부터 경과한 주수(weeks)에 따라 바뀐다. 값·기본값은 4절.
   - `gradientAt(weeks)`: `weeks < gGraceWeeks` → `initialGradient`; 이후 `gStepWeeks`마다 `+1`(고정, `StrategyVrDetail.G_STEP`), `gMax` 상한

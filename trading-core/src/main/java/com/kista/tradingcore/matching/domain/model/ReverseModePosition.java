@@ -68,12 +68,12 @@ public record ReverseModePosition(
                 && calcLocBuyQuantity() == 0;
     }
 
-    // 리버스모드 종료 조건: 종가 ≥ 평단 × (1 - targetProfitRate) — 종가가 평단 근처 이상으로 회복되면 일반모드로 복귀
+    // 리버스모드 종료 조건: 종가 > 평단 × (1 - targetProfitRate) — 원문은 '보다 커지면', 종가가 임계를 넘어 회복되면 일반모드로 복귀
     // 포지션 객체 없이 판단하는 static 헬퍼 — InfinitePosition.nextReverseMode가 사용
     public static boolean shouldExit(BigDecimal avgPrice, BigDecimal closingPrice, BigDecimal targetProfitRate) {
         if (closingPrice == null || avgPrice == null) return false;
         BigDecimal threshold = avgPrice.multiply(BigDecimal.ONE.subtract(targetProfitRate))
                 .setScale(Currency.USD.amountScale(), HALF_UP);
-        return closingPrice.compareTo(threshold) >= 0;
+        return closingPrice.compareTo(threshold) > 0;
     }
 }

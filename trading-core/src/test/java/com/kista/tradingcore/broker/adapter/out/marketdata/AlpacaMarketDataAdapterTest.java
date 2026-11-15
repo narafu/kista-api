@@ -252,4 +252,46 @@ class AlpacaMarketDataAdapterTest {
         assertThat(adapter.dailyCandles("SOXL", DailyCandleQuery.latest(1, DailyCandleQuery.Adjustment.SPLIT))).hasSize(1);
         server.verify();
     }
+
+    @Test
+    @DisplayName("일봉 이력: 확정 봉 조회에서 마감+16분 전이면 진행 중인 오늘 봉을 빼고 그 앞 count개를 돌려준다")
+    void dailyCandles_lastBefore_dropsUnsettledTodayBar() {
+        RestClient.Builder b = RestClient.builder().baseUrl("https://data.test");
+        MockRestServiceServer srv = MockRestServiceServer.bindTo(b).build();
+        AlpacaMarketDataAdapter a = new AlpacaMarketDataAdapter(b.build(),
+                new AlpacaProperties(null, "test-key", "test-secret", "https://data.test"),
+                Clock.fixed(Instant.parse("2026-01-05T20:40:00Z"), TimeZones.KST));
+        srv.expect(ExpectedCount.once(), requestTo(startsWith(BARS)))
+                .andExpect(noQueryParam("end"))
+                .andExpect(queryParam("limit", "3"))
+                .andRespond(withSuccess("""
+                        {"bars":{"SOXL":[{"t":"2026-01-05T05:00:00Z","o":1,"h":1,"l":1,"c":50,"v":1,"n":1,"vw":1},{"t":"2026-01-02T05:00:00Z","o":1,"h":1,"l":1,"c":49,"v":1,"n":1,"vw":1},{"t":"2025-12-31T05:00:00Z","o":1,"h":1,"l":1,"c":48,"v":1,"n":1,"vw":1}]},"next_page_token":null}
+                        """, MediaType.APPLICATION_JSON));
+
+        List<BrokerCandle> candles = a.dailyCandles("SOXL", DailyCandleQuery.lastBefore(LocalDate.of(2026, 1, 6), 2, DailyCandleQuery.Adjustment.RAW));
+
+        assertThat(candles).extracting(BrokerCandle::date).containsExactly(LocalDate.of(2025, 12, 31), LocalDate.of(2026, 1, 2));
+        srv.verify();
+    }
+
+    @Test
+    @DisplayName("일봉 이력: 확정 봉 조회에서 마감+16분 뒤면 오늘 봉을 포함한다")
+    void dailyCandles_lastBefore_keepsSettledTodayBar() {
+        RestClient.Builder b = RestClient.builder().baseUrl("https://data.test");
+        MockRestServiceServer srv = MockRestServiceServer.bindTo(b).build();
+        AlpacaMarketDataAdapter a = new AlpacaMarketDataAdapter(b.build(),
+                new AlpacaProperties(null, "test-key", "test-secret", "https://data.test"),
+                Clock.fixed(Instant.parse("2026-01-06T01:20:00Z"), TimeZones.KST));
+        srv.expect(ExpectedCount.once(), requestTo(startsWith(BARS)))
+                .andExpect(noQueryParam("end"))
+                .andExpect(queryParam("limit", "2"))
+                .andRespond(withSuccess("""
+                        {"bars":{"SOXL":[{"t":"2026-01-05T05:00:00Z","o":1,"h":1,"l":1,"c":50,"v":1,"n":1,"vw":1},{"t":"2026-01-02T05:00:00Z","o":1,"h":1,"l":1,"c":49,"v":1,"n":1,"vw":1},{"t":"2025-12-31T05:00:00Z","o":1,"h":1,"l":1,"c":48,"v":1,"n":1,"vw":1}]},"next_page_token":null}
+                        """, MediaType.APPLICATION_JSON));
+
+        List<BrokerCandle> candles = a.dailyCandles("SOXL", DailyCandleQuery.lastBefore(LocalDate.of(2026, 1, 6), 2, DailyCandleQuery.Adjustment.RAW));
+
+        assertThat(candles).extracting(BrokerCandle::date).containsExactly(LocalDate.of(2026, 1, 2), LocalDate.of(2026, 1, 5));
+        srv.verify();
+    }
 }

@@ -141,8 +141,12 @@ public class AlpacaMarketDataAdapter {
         }
         // 최근 N개: 내림차순으로 N개만 받아 뒤집는다. 시작일은 거래일이 달력일의 절반을 넘는다는 여유로 잡는다
         LocalDate start = (end != null ? end : today).minusDays(query.count() * 2L + 30);
-        return fetchBars(symbol, start, end, query.adjustment(), true, query.count()).getOrDefault(symbol, List.of()).stream()
+        // to 지정(확정 봉 계약)인데 end를 뺀 경우 응답에 진행 중인 오늘 봉이 섞일 수 있다 — 마감+16분 전이면 버리고, 한 개 빠져도 count개가 차도록 limit을 하나 더 받는다
+        boolean dropOpenBar = query.to() != null && end == null
+                && clock.instant().isBefore(today.atTime(BAR_SETTLED_AT).atZone(TimeZones.NY).toInstant());
+        return fetchBars(symbol, start, end, query.adjustment(), true, query.count() + (dropOpenBar ? 1 : 0)).getOrDefault(symbol, List.of()).stream()
                 .filter(bar -> query.to() == null || !bar.date().isAfter(query.to()))
+                .filter(bar -> !dropOpenBar || !bar.date().equals(today))
                 .limit(query.count())
                 .sorted(Comparator.comparing(Bar::date))
                 .map(Bar::toCandle).toList();

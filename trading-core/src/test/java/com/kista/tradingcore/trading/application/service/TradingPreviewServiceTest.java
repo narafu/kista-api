@@ -541,7 +541,7 @@ class TradingPreviewServiceTest {
         when(balanceLoader.tryLoadBalance(STOCK_DCA)).thenReturn(new TradingBalanceLoader.BalanceLoad(
                 new AccountBalance(0, null, BigDecimal.ZERO), null));
         StrategyOrderPlanBuilder realBuilder = new StrategyOrderPlanBuilder(balanceLoader, null, null,
-                new CycleOrderComputer(strategies, null, null, null, null, null, orderPort), strategies, null, orderPort, collector);
+                new CycleOrderComputer(strategies, null, null, null, null, null, orderPort, mock(com.kista.tradingcore.broker.adapter.out.marketdata.AlpacaMarketDataAdapter.class)), strategies, null, orderPort, collector);
         TradingPreviewService wired = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, cyclePositionPort, realBuilder,
                 ledgerBudget, priceFetcher, marginPort, sellableQuantityPort, marketCalendarPort, FIXED);
 

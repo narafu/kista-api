@@ -97,4 +97,14 @@ class ReverseModePositionTest {
         assertThat(ReverseModePosition.shouldExit(
                 new BigDecimal("100.003"), new BigDecimal("100.001"), BigDecimal.ZERO)).isTrue();
     }
+
+    @Test
+    @DisplayName("리버스 종료는 종가가 임계와 같으면 하지 않고 0.01 크면 한다(원문 '보다 커지면')")
+    void shouldExit_strictlyGreaterThanThreshold() {
+        // 목표수익률 0 → 임계 100.00
+        assertThat(ReverseModePosition.shouldExit(
+                new BigDecimal("100.00"), new BigDecimal("100.00"), BigDecimal.ZERO)).isFalse();
+        assertThat(ReverseModePosition.shouldExit(
+                new BigDecimal("100.00"), new BigDecimal("100.01"), BigDecimal.ZERO)).isTrue();
+    }
 }

@@ -39,6 +39,7 @@ class CycleOrderComputerTest {
     @Mock StrategyCycleVrPort strategyCycleVrPort;
     @Mock StrategyVrDetailPort strategyVrDetailPort;
     @Mock OrderPort orderPort;
+    @Mock com.kista.tradingcore.broker.adapter.out.marketdata.AlpacaMarketDataAdapter alpaca;
     @Mock InfiniteStrategy infiniteStrategy;
     @Mock VrStrategy vrStrategy;
     @Mock PrivacyStrategy privacyStrategy;
@@ -91,7 +92,7 @@ class CycleOrderComputerTest {
 
         computer = new CycleOrderComputer(
                 cycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort,
-                strategyInfiniteDetailPort, strategyCycleVrPort, strategyVrDetailPort, orderPort);
+                strategyInfiniteDetailPort, strategyCycleVrPort, strategyVrDetailPort, orderPort, alpaca);
     }
 
     @Test
@@ -261,7 +262,7 @@ class CycleOrderComputerTest {
         CycleOrderStrategies realCycleStrategies = new CycleOrderStrategies(List.of(realVrCycleStrategy));
         CycleOrderComputer realComputer = new CycleOrderComputer(
                 realCycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort,
-                strategyInfiniteDetailPort, strategyCycleVrPort, strategyVrDetailPort, orderPort);
+                strategyInfiniteDetailPort, strategyCycleVrPort, strategyVrDetailPort, orderPort, alpaca);
 
         // 가격 캡 트리거 픽스처:
         // holdings=1, value=10000, bandWidth=15% → lowerBand=8500, buyPrice(m=1) = 8500/1 = 8500
@@ -352,7 +353,7 @@ class CycleOrderComputerTest {
         CycleOrderComputer reverseComputer = new CycleOrderComputer(
                 new CycleOrderStrategies(List.of(new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy))),
                 cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCycleVrPort, strategyVrDetailPort, orderPort);
+                strategyCycleVrPort, strategyVrDetailPort, orderPort, alpaca);
 
         reverseComputer.compute(BALANCE, INFINITE_STRATEGY, new BigDecimal("20.00"),
                 LocalDate.now(), INFINITE_CYCLE, null, null, CURRENT_PRICE);
@@ -360,6 +361,94 @@ class CycleOrderComputerTest {
         var captor = org.mockito.ArgumentCaptor.forClass(ReverseModePosition.class);
         verify(reverseStrategy).buildOrders(captor.capture(), any(LocalDate.class));
         assertThat(captor.getValue().starPointPrice()).isEqualTo(new BigDecimal("10.00"));
+    }
+
+    static final LocalDate STAR_TRADE_DATE = LocalDate.of(2026, 7, 10);
+
+    // 리버스 2일차 상태로 stub하고 computer.compute를 실행해 전략에 넘어간 별지점을 돌려준다
+    private BigDecimal starPointOfReverseDay2(boolean ledgerHasRows) {
+        UUID cycleId = INFINITE_CYCLE.id();
+        if (ledgerHasRows) {
+            // 원장 행 평균 = 10.00 (일봉 평균과 다르게 잡는다)
+            lenient().when(cyclePositionPort.findLatestWithInfiniteDetailByCycleId(cycleId, 5)).thenReturn(List.of(
+                    new CyclePosition(UUID.randomUUID(), cycleId, BigDecimal.ONE, new BigDecimal("10.00"), null, BigDecimal.ZERO, null, null)));
+        }
+        return starPointOfReverseDay2(List.of());
+    }
+
+    private BigDecimal starPointOfReverseDay2(List<Order> stored) {
+        UUID cycleId = INFINITE_CYCLE.id();
+        when(cyclePositionInfiniteDetailPort.findLatestByCycleId(cycleId, 2)).thenReturn(List.of(
+                new CyclePositionInfiniteDetail(UUID.randomUUID(), true),
+                new CyclePositionInfiniteDetail(UUID.randomUUID(), true)));
+        lenient().when(orderPort.findPlannedOrPlacedByCycleAndDate(cycleId, STAR_TRADE_DATE)).thenReturn(stored);
+        ReverseInfiniteStrategy reverseStrategy = mock(ReverseInfiniteStrategy.class);
+        CycleOrderComputer reverseComputer = new CycleOrderComputer(
+                new CycleOrderStrategies(List.of(new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy))),
+                cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
+                strategyCycleVrPort, strategyVrDetailPort, orderPort, alpaca);
+        reverseComputer.compute(BALANCE, INFINITE_STRATEGY, new BigDecimal("20.00"),
+                STAR_TRADE_DATE, INFINITE_CYCLE, null, null, CURRENT_PRICE);
+        var captor = org.mockito.ArgumentCaptor.forClass(ReverseModePosition.class);
+        verify(reverseStrategy).buildOrders(captor.capture(), any(LocalDate.class));
+        return captor.getValue().starPointPrice();
+    }
+
+    private static List<com.kista.tradingcore.broker.domain.model.BrokerCandle> candles(String... closes) {
+        return java.util.Arrays.stream(closes).map(c -> new com.kista.tradingcore.broker.domain.model.BrokerCandle(
+                STAR_TRADE_DATE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, new BigDecimal(c), 0L)).toList();
+    }
+
+    @Test
+    @DisplayName("리버스 2일차 — 별지점은 직전 5거래일 일봉 종가 평균이고 원장 행 평균이 아니다")
+    void starPoint_usesAlpacaDailyCloses() {
+        var query = com.kista.tradingcore.broker.domain.model.DailyCandleQuery.lastBefore(
+                STAR_TRADE_DATE.minusDays(1), 5, com.kista.tradingcore.broker.domain.model.DailyCandleQuery.Adjustment.RAW);
+        when(alpaca.dailyCandles("SOXL", query)).thenReturn(candles("20.00", "21.00", "22.00", "23.00", "24.00"));
+
+        assertThat(starPointOfReverseDay2(true)).isEqualTo(new BigDecimal("22.00"));
+        verify(alpaca).dailyCandles("SOXL", query);
+    }
+
+    @Test
+    @DisplayName("리버스 2일차 — 일봉 조회가 예외면 원장 행 평균으로 대체한다")
+    void starPoint_fallsBackToLedgerOnFailure() {
+        when(alpaca.dailyCandles(any(), any())).thenThrow(new IllegalStateException("alpaca down"));
+
+        assertThat(starPointOfReverseDay2(true)).isEqualTo(new BigDecimal("10.00"));
+    }
+
+    @Test
+    @DisplayName("리버스 2일차 — 일봉이 5개 미만이면 원장 행 평균으로 대체한다")
+    void starPoint_fallsBackToLedgerWhenFewerThanFive() {
+        when(alpaca.dailyCandles(any(), any())).thenReturn(candles("20.00", "21.00", "22.00", "23.00"));
+
+        assertThat(starPointOfReverseDay2(true)).isEqualTo(new BigDecimal("10.00"));
+    }
+
+    @Test
+    @DisplayName("리버스 2일차 — 같은 날 저장된 LOC 매도가 있으면 그 가격이 별지점이고 일봉을 조회하지 않는다")
+    void starPoint_reusesStoredSellLegPrice() {
+        Order sell = new Order(UUID.randomUUID(), ACCOUNT_ID, INFINITE_CYCLE.id(), STAR_TRADE_DATE, StrategyTicker.SOXL,
+                com.kista.shared.kernel.OrderType.LOC, com.kista.shared.kernel.OrderTiming.AT_CLOSE, OrderDirection.SELL,
+                ReverseInfiniteStrategy.LOC_SELL_LEG, BigDecimal.ONE, new BigDecimal("25.00"),
+                com.kista.shared.kernel.OrderStatus.PLANNED, null, null, null);
+
+        assertThat(starPointOfReverseDay2(List.of(sell))).isEqualTo(new BigDecimal("25.00"));
+        verifyNoInteractions(alpaca);
+    }
+
+    @Test
+    @DisplayName("리버스 첫날 — 일봉을 조회하지 않는다")
+    void starPoint_notQueriedOnFirstReverseDay() {
+        when(cyclePositionInfiniteDetailPort.findLatestByCycleId(INFINITE_CYCLE.id(), 2)).thenReturn(List.of(
+                new CyclePositionInfiniteDetail(UUID.randomUUID(), true),
+                new CyclePositionInfiniteDetail(UUID.randomUUID(), false)));
+
+        computer.compute(BALANCE, INFINITE_STRATEGY, new BigDecimal("20.00"),
+                STAR_TRADE_DATE, INFINITE_CYCLE, null, null, CURRENT_PRICE);
+
+        verifyNoInteractions(alpaca);
     }
 
     private BigDecimal privacyValuationPrice(BigDecimal closingPrice, BigDecimal prevClose) {
@@ -371,7 +460,7 @@ class CycleOrderComputerTest {
                 new CyclePosition(UUID.randomUUID(), cycle.id(), BigDecimal.ONE, closingPrice, null, BigDecimal.ZERO, null, null)));
         when(mockStrategies.of(StrategyType.PRIVACY)).thenReturn(mockPrivacyOrderStrategy);
         CycleOrderComputer c = new CycleOrderComputer(mockStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort,
-                strategyInfiniteDetailPort, strategyCycleVrPort, strategyVrDetailPort, orderPort);
+                strategyInfiniteDetailPort, strategyCycleVrPort, strategyVrDetailPort, orderPort, alpaca);
 
         c.compute(BALANCE, privacy, prevClose, LocalDate.now(), cycle, null, ACCOUNT_ID, null);
 
