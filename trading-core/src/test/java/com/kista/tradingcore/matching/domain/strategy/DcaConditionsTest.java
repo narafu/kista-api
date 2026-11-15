@@ -151,6 +151,14 @@ class DcaConditionsTest {
         var holding = new AccountBalance(BigDecimal.ONE, new BigDecimal("1000.51"), BigDecimal.ZERO);
         var prev = new BigDecimal("986");
         assertThat(DcaConditions.check(c, Market.CRYPTO_KRW, List.of(prev), holding, null, prev)).isEmpty();
+    }
+
+    @Test
+    void avgPriceTargetRoundsToCentsOnUsStock() {
+        DcaRule c = config(new DcaCondition(DcaIndicator.AVG_PRICE, DcaOperator.LTE, null, new BigDecimal("-1.5")));
+        // 목표가 1000.51 × 0.985 = 985.50235 — USD(2자리)는 985.50이라 전일 종가 986은 미충족
+        var holding = new AccountBalance(BigDecimal.ONE, new BigDecimal("1000.51"), BigDecimal.ZERO);
+        var prev = new BigDecimal("986");
         assertThat(DcaConditions.check(c, Market.US_STOCK, List.of(prev), holding, null, prev)).hasValueSatisfying(s ->
                 assertThat(s.reason()).isEqualTo(DcaSkipReason.CONDITION_NOT_MET));
     }
