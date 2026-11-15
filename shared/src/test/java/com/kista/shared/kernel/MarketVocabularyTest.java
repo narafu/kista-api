@@ -18,7 +18,6 @@ class MarketVocabularyTest {
             assertThat(stock.getMarket()).isEqualTo(Market.US_STOCK);
             assertThat(stock.getCurrency()).isEqualTo(Currency.USD);
         }
-        assertThat(Broker.UPBIT.supportsOpenAuctionOrders()).isFalse();
     }
 
     @Test

@@ -322,3 +322,5 @@ KISTA는 LOC·MOC 주문, 마감 리포트, VR 롤오버, Mock 체결 판정에 
 배포: 단계 A·B·D-2는 주문 경로다. 매매 시간대 밖. D-2 배포 뒤 첫 개장 배치에서 토큰 발급 로그가 계좌당 1회인지 본다.
 
 단계 A 결과(2026-11-15): KIS 어댑터·`Broker.KIS`·관리자 시세 체인(`TossAdminPriceSource`가 `AdminMarketPricePort`를 직접 구현)을 삭제했고 trading V22가 KIS 계좌를 지운다. 미배포. 개장 경매 경로(`placePreOpenDcaOrders`)는 지원 브로커 없이 남아 단계 B가 지운다(`questions.md` Q-14).
+
+단계 B 결과(2026-11-15): `Broker.supportsOpenAuctionOrders()`, `TradingService.placePreOpenDcaOrders`와 호출 try/catch, `dcaDetailPort` 필드를 지웠다. 삭제 전에 TOSS·MERITZ·MOCK 파라미터 테스트(`stock_dca_moo_is_placed_after_market_open_notification`)로 개장 알림 뒤 DCA MOO 접수를 고정했고 삭제 뒤 그대로 통과해 중단 조건에 걸리지 않았다. `flows.yml`·README·가드는 대상 없음(단계 A가 `dca-preopen`을 이미 지움). 미배포, 단계 A와 함께 매매 시간대 밖에 배포.

@@ -34,9 +34,4 @@ public enum Broker {
     public boolean isCryptoExchange() {
         return market.isCrypto();
     }
-
-    // 개장 경매 사전 접수 지원 증권사 없음 — 경로 삭제는 04 단계 B
-    public boolean supportsOpenAuctionOrders() {
-        return false;
-    }
 }

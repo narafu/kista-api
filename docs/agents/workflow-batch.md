@@ -22,7 +22,7 @@
   - 리포트 마커: 전략별 리포트 완료는 `trading.trading_batch_report`에 남는다. `CyclePositionPersistor`가 포지션 저장 직후 기록하며, 키가 전략인 이유는 rotation 후에도 유효해야 하기 때문이다. 마커 커밋 뒤 rotation(`CycleRotationService.rotate` — 사이클 완료 알림 발행부터 새 사이클 생성까지)이 실패하면 전략을 PAUSED로 두고 사용자에게 `CycleRotationFailedEvent`로 알린 뒤 예외를 전파한다. 마커·종료가 커밋돼 재개는 건너뛰지만, PAUSED + 종료 사이클은 사용자 재개 시 `reopenCycleIfEnded`가 새 사이클을 열어 풀린다. PAUSE마저 실패한 ACTIVE 좀비는 `BatchContextFactory`가 매 배치 관리자에게 보고한다.
   - 기동 시 재개: `TradingBatchResumer`(ApplicationReadyEvent)가 처리한다. `local` 프로파일에선 비활성이다 — 로컬은 상시 기동이 아니라 기동마다 "[재개 불가]"가 운영과 같은 관리자 봇(`TELEGRAM_CHAT_ID`)으로 나갔다.
     - 마감 배치: 오늘(화~토)·다음 거래일(월~금 22:00 이후) 각각 실제 세션을 조회해, 주문 시각(마감 30분 전) 전이면 예약만 등록하고, 지났으면 행 없음·`PLANNED`·`PLACING`이고 마감 10분 전 이전일 때 전체 재실행한다(`PLACING`은 이중 접수 경고). `PLACED`면 리포트만 재개한다(`resumeCloseReport` — 대상은 당일 주문이 있거나 롤오버 판정이 필요한(VR) 전략 중 마커가 없는 것이며, 정지 전략은 롤오버 판정 절 없이 당일 접수 주문이 있을 때만 포함, 사전 잔고는 최신 `cycle_position`, 대상 주문은 DB PLACED). 접수 마감을 지났으면 관리자 알림만 보낸다.
-    - 개장 배치(월~금 22:00~ / 화~토 ~04:30): 행 없음·`PLACING`이고 그 거래일 실제 마감 30분 전 이전이면 재실행한다(`DstInfo.forOpenBatch` — 자정 이후 재개도 지난 개장을 기다리지 않음). 개장 배치(22:00 KST)는 `supportsOpenAuctionOrders()` 브로커의 DCA AT_OPEN 주문을 `waitUntilMarketOpen(now)` 전에 계획·접수하도록 돼 있으나 지원 브로커가 없어 현재 그 경로는 실행되지 않는다(삭제는 04 단계 B). 나머지 AT_OPEN은 개장 후 접수한다.
+    - 개장 배치(월~금 22:00~ / 화~토 ~04:30): 행 없음·`PLACING`이고 그 거래일 실제 마감 30분 전 이전이면 재실행한다(`DstInfo.forOpenBatch` — 자정 이후 재개도 지난 개장을 기다리지 않음). AT_OPEN 주문은 모두 개장 후 접수한다.
     - 락: 재개는 `SchedulerLockService.takeOver`로 이전 프로세스 락을 인수한다. 자기 프로세스 락(기동 직후 cron 선발화)은 인수하지 않는다.
   - 전제: **`kista-trading` 단일 인스턴스 + 이전 컨테이너 종료 후 기동(겹침 없음)**.
   - 남은 위험: SIGKILL·OOM·임계구역 150s 초과 시에는 접수 도중 torn-order(브로커 접수 / DB PLANNED·FAILED)가 남을 수 있다. 이 경우 `PLACING` 경고를 보고 수동 확인한다.

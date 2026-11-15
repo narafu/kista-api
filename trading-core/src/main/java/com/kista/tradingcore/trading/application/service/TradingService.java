@@ -5,7 +5,6 @@ import com.kista.tradingcore.trading.application.service.support.TradingBalanceL
 import com.kista.tradingcore.trading.application.service.support.TradingBatchRunState;
 
 import com.kista.tradingcore.trading.domain.model.*;
-import com.kista.shared.kernel.OrderTiming;
 import com.kista.tradingcore.matching.domain.model.*;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
@@ -51,7 +50,6 @@ class TradingService {
     private final TradingBatchRunPort batchRunPort;            // 재개 체크포인트 (단계 기록·리포트 마커 조회)
     private final TradingBatchRunState runState;               // 협조적 종료 — 배치 스레드·임계구역 등록
     private final TradingBalanceLoader balanceLoader;          // 리포트 재개 시 사전 잔고(최신 cycle_position) 재구성
-    private final StrategyDcaDetailPort dcaDetailPort;         // 개장 전 접수 대상(DCA MOO) 판별용 DCA 설정 조회
     private final PrivacyBaseGuard privacyBaseGuard;           // PRIVACY 기준표 장전 점검 — 이슈 시 신규 PRIVACY 주문 생성 차단
     private final CycleOrderStrategies cycleOrderStrategies;   // 리포트 재개 대상 판정 — 주문 0건이어도 롤오버 판정이 필요한 전략(VR)
     private final CyclePositionPort cyclePositionPort;       // 리포트 직전 최신 포지션 재조회 — 계획~리포트 사이 append된 스냅샷 보존
@@ -357,15 +355,6 @@ class TradingService {
         TradingPriceFetcher.PriceContext priceCtx = screenPrivacyBase(priceFetcher.loadPriceContext(started, tradeDate), tradeDate, "개장 배치");
         priceComparison.afterLoad(started, priceCtx, usSessionDate(tradeDate)); // 병행 비교 로그 — 배치 결과에 쓰지 않는다
 
-        // 개장 경매 사전 접수 지원 증권사의 DCA MOO/LOO는 개장 전에 접수한다 — 나머지 AT_OPEN은 개장 후 기존 흐름
-        try {
-            placePreOpenDcaOrders(started, tradeDate, priceCtx);
-        } catch (RuntimeException e) {
-            // 실패해도 INFINITE/VR 개장 접수를 막지 않는다 — DCA 컨텍스트는 개장 후 기존 흐름이 접수
-            log.error("DCA 개장 전 접수 실패 — 개장 후 접수로 대체", e);
-            eventPublisher.publishEvent(new TradingErrorEvent(null, "[DCA 개장 전 접수] 실패 — 개장 후 접수로 대체: " + e.getMessage()));
-        }
-
         // 개장 시각까지 대기 — 이 시점 인터럽트 시 contexts 전부가 미처리 — 사용자 알림 대상 (재기동 종료면 재개되므로 제외)
         try {
             waitFor("개장 시각", dst.waitUntilMarketOpen(Instant.now(clock)), dst);
@@ -381,29 +370,6 @@ class TradingService {
             planAndPlaceAtOpen(started, tradeDate, priceCtx);
             log.info("개장 order 생성 + INFINITE 지정가 매도 선접수 완료");
             checkpoint(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.DONE);
-            return null;
-        });
-    }
-
-    // 개장 전 접수 대상: 개장 경매 사전 접수 지원 증권사 계좌의 DCA AT_OPEN(MOO) 전략 — 계획·배정·저장·접수를 임계구역에서 수행
-    // 개장 후 기존 흐름이 같은 컨텍스트를 다시 처리해도 중복 없음 — DcaPlanInputCollector가 이력 행으로, 슬롯 로직이 기존 주문으로 거르고 placeAtOpenOrders는 PLANNED만 접수
-    private void placePreOpenDcaOrders(List<BatchContext> started, LocalDate tradeDate, TradingPriceFetcher.PriceContext priceCtx) throws InterruptedException {
-        List<BatchContext> targets = started.stream()
-                .filter(c -> c.strategy().isDca() && c.account().broker().supportsOpenAuctionOrders())
-                .toList();
-        if (targets.isEmpty()) return;
-        Map<UUID, DcaStrategyConfig> configs = dcaDetailPort.findActiveByStrategyIds(targets.stream().map(c -> c.strategy().id()).toList());
-        // MOO 규칙이 하나라도 있는 전략 — 같은 전략의 MOC 규칙은 planner가 timing으로 거른다
-        List<BatchContext> moo = targets.stream()
-                .filter(c -> configs.containsKey(c.strategy().id()) && configs.get(c.strategy().id()).rules().stream()
-                        .anyMatch(r -> r.timing() == OrderTiming.AT_OPEN))
-                .toList();
-        if (moo.isEmpty()) return;
-        runState.critical(() -> {
-            checkpoint(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.PLACING);
-            planAndPlaceAtOpen(moo, tradeDate, priceCtx);
-            // 개장 대기 동안 PLACING이 남으면 재기동 재개가 접수 도중 중단 오경고를 내므로 STARTED로 되돌린다
-            checkpoint(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.STARTED);
             return null;
         });
     }

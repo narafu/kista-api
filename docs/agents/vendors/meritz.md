@@ -49,7 +49,7 @@ adapter/out/meritz/ ← MeritzHttpClient(본문 `rsp_cd` 기반 응답 판정 �
 | LOC | `32`/`7`/단가 | `32`/`7`/단가 |
 | MOC | `32`/`7`/캡 단가(매수 MOC 대신 LOC 캡) | `34`/`7`/`0` |
 | LIMIT | `01`/`0`/단가 | `01`/`0`/단가 |
-| MOO | `01`/`0`/캡 단가(`supportsOpenAuctionOrders=false` — 개장 후 지정가 근사) | `05`/`0`/`0` 시장가(DCA "즉시 매도" 의도) |
+| MOO | `01`/`0`/캡 단가(개장 후 지정가 근사) | `05`/`0`/`0` 시장가(DCA "즉시 매도" 의도) |
 | MARKET | `IllegalArgumentException`(코인 전용) | 동일 |
 
 가격은 `setScale(2, HALF_UP).toPlainString()`(한도 4자리 이내). 단가·수량 누락은 송신 전에 차단한다.

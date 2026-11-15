@@ -7,6 +7,7 @@ import com.kista.tradingcore.trading.application.service.support.TradingBalanceL
 import com.kista.tradingcore.trading.application.service.support.TradingBatchRunState;
 import com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort;
 
+import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.trading.application.event.TradingReportReadyEvent;
 import com.kista.tradingcore.trading.application.event.BatchInterruptedEvent;
@@ -42,6 +43,8 @@ import com.kista.tradingcore.matching.domain.strategy.*;
 import com.kista.tradingcore.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
@@ -91,7 +94,6 @@ class TradingServiceTest {
     @Mock com.kista.tradingcore.privacy.application.service.PrivacyTradeValidationService privacyValidation; // 장전 점검 — 기본 이슈 없음
     @Mock DcaPlanInputCollector dcaInputCollector; // DCA 입력 수집 — 기존 시나리오는 DCA 전략이 없어 미사용
     @Mock DcaExecutionRecorder dcaExecutionRecorder;
-    @Mock StrategyDcaDetailPort dcaDetailPort; // 개장 전 접수 대상(Toss DCA MOO) 판별
     @Mock SellableQuantityPort sellableQuantityPort;
     @Mock TradingUserProfilePort tradingUserProfilePort;
     @Mock StrategyCycleVrPort strategyCycleVrPort; // VR 사이클 상세 조회 (CycleOrderComputer용)
@@ -169,7 +171,7 @@ class TradingServiceTest {
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy),
                 new VrCycleOrderStrategy(vrStrategy),
-                new DcaCycleOrderStrategy())); // VR executeBatch 테스트용 · DCA 개장 전 접수 테스트용
+                new DcaCycleOrderStrategy())); // VR executeBatch 테스트용 · DCA 개장 주문 테스트용
         CycleOrderComputer orderComputer = new CycleOrderComputer(
                 cycleStrategies, cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
                 strategyCycleVrPort, strategyVrDetailPort, orderPort, mock(com.kista.tradingcore.broker.adapter.out.marketdata.AlpacaMarketDataAdapter.class));
@@ -234,7 +236,7 @@ class TradingServiceTest {
                 priceFetcher, orderExecutor, reporter,
                 marketEventNotifier,
                 new TradingParallelRunner(0), // 순차 모드 — 기존 테스트 결정성 보존
-                batchGuard, candidatePlanner, batchRunPort, runState, balanceLoader, dcaDetailPort,
+                batchGuard, candidatePlanner, batchRunPort, runState, balanceLoader,
                 new PrivacyBaseGuard(privacyValidation, eventPublisher), cycleStrategies, cycleHistoryPort, priceComparison, FIXED);
         // 기준표 장전 점검 기본값: 이슈 없음 — 가드 발동 시나리오만 개별 stub
         lenient().when(privacyValidation.inspect(any(PrivacyTradeBase.class)))
@@ -774,23 +776,21 @@ class TradingServiceTest {
         verify(brokerOrderPort, never()).place(any(), any());
     }
 
-    // ── DCA 개장 전 접수 ──────────────────────────────────────────────────────
+    // ── DCA 개장 주문 ──────────────────────────────────────────────────────
 
     // 기존 PLANNED DCA 주문이 있는 DCA 컨텍스트 준비 — 판정은 이미 끝난 상태라 배치는 접수 경로만 탄다
-    private BatchContext dcaContext(TradingAccount account, OrderType orderType) {
+    private BatchContext dcaContext(TradingAccount account) {
         Strategy dca = new Strategy(UUID.randomUUID(), account.id(), StrategyType.DCA,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), dca.id(), STRATEGY_VERSION_ID, new BigDecimal("1000.00"),
                 null, LocalDate.now(FIXED).minusDays(1), null, null, null);
-        lenient().when(dcaDetailPort.findActiveByStrategyIds(anyCollection())).thenReturn(Map.of(dca.id(), com.kista.tradingcore.support.TradingFixtures.dcaConfig(
-                com.kista.tradingcore.support.TradingFixtures.stockDcaRule("BUY", OrderDirection.BUY, "100", orderType)))); // 키 "BUY" → leg DCA_BUY
         when(cycleHistoryPort.findLatestOneByStrategyId(dca.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         Order planned = new Order(UUID.randomUUID(), account.id(), cycle.id(), LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.MOO, OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("22.00"),
                 OrderStatus.PLANNED, null, null, null).withLeg("DCA_BUY");
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(cycle.id()), any())).thenReturn(List.of(planned));
-        // 개장 후 두 번째 조회는 이미 PLACED 상태 — PLANNED만 접수하므로 재접수 대상이 아니다(어댑터 필터 동작을 stub으로 표현)
-        when(orderPort.findAtOpenPlannedByCycleAndDate(eq(cycle.id()), any())).thenReturn(List.of(planned), List.of());
+        // 개장 후 PLANNED 주문 한 번 조회
+        when(orderPort.findAtOpenPlannedByCycleAndDate(eq(cycle.id()), any())).thenReturn(List.of(planned));
         return new BatchContext(dca, cycle, account, USER);
     }
 
@@ -801,18 +801,22 @@ class TradingServiceTest {
         when(brokerOrderPort.place(any(), eq(ref))).thenReturn(brokerResult("ORD-DCA"));
     }
 
-    @Test
-    void toss_dca_moo_waits_for_market_open() throws InterruptedException {
-        TradingAccount toss = TradingFixtures.tossTradingAccount(UUID.randomUUID(), UUID.randomUUID());
-        stubOpenBatchBasics(toss.brokerRef());
-        BatchContext ctx = dcaContext(toss, OrderType.MOO);
+    @ParameterizedTest
+    @EnumSource(value = Broker.class, names = {"TOSS", "MERITZ", "MOCK"})
+    void stock_dca_moo_is_placed_after_market_open_notification(Broker broker) throws InterruptedException {
+        TradingAccount base = TradingFixtures.tossTradingAccount(UUID.randomUUID(), UUID.randomUUID());
+        BrokerAccountRef b = base.brokerRef();
+        // 증권사만 바꾼 계좌 — 개장 대기 후 접수 순서가 증권사와 무관한지 확인
+        TradingAccount account = new TradingAccount(base.id(), base.userId(), base.nickname(),
+                new BrokerAccountRef(b.id(), b.appKey(), b.secretKey(), b.accountNo(), b.brokerAccountCode(), broker));
+        stubOpenBatchBasics(account.brokerRef());
+        BatchContext ctx = dcaContext(account);
 
         service.placeOpenOrders(List.of(ctx), PAST_DST);
 
         InOrder inOrder = inOrder(tradingUserProfilePort, brokerOrderPort);
         inOrder.verify(tradingUserProfilePort).findAllActive();
-        inOrder.verify(brokerOrderPort).place(any(), eq(toss.brokerRef()));
-        verifyNoInteractions(dcaDetailPort); // 개장 경매 사전 접수 지원 증권사가 없어 개장 전 접수 대상 판별 자체를 하지 않는다
+        inOrder.verify(brokerOrderPort).place(any(), eq(account.brokerRef()));
     }
 
     @Test
