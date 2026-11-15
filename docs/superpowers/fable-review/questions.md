@@ -212,6 +212,25 @@
 - 권고: ①. 단 T4 배포 직전 `SELECT DISTINCT skip_reason FROM trading.dca_execution`으로 주식 행에 세 값이 없는지 확인한다.
 - 멈춘 범위: 없음(T4 착수 전까지 답이 필요하다. 답이 없으면 ②로 진행해 계약을 깨지 않는다).
 
+### Q-16 운영 정리 SQL 3건(11 D4 + EPR 완료 행)을 돌릴지
+- 상태: 사용자 결정 필요(11 D4는 "SQL을 보여 준 뒤 승인"으로 이미 승인. 실행 승인만 남았다)
+- 묶음·태스크: S13 / 11 T8
+- 걸린 곳: 운영 데이터를 지우는 SQL이라 로드맵 9-4에 따라 사용자 승인 뒤에만 돌린다. 읽기 전용 count는 2026-11-15에 확인했다.
+  - ① 코드에 없는 스케줄러 락 행: `public.scheduler_locks` 7행(`fear-greed-12hourly`·`fear-greed-6hourly`·`fear-greed-daily`, trading-core로 옮겨 간 `market-calendar-monthly`·`market-calendar-startup`·`trading-close`·`trading-open`). 지침서에 없던 `trading.scheduler_locks`의 `ledger-reconciliation` 1행도 코드에 없다(`git grep` 0건).
+  - ② 옛 단일 Flyway 이력 `public.flyway_schema_history` 22행. `flyway.md`가 "롤백 증거로 보존, 수정·삭제 금지"라 적고 있어 실행하면 그 문장을 같은 작업에서 지운다.
+  - ③ EPR 완료 행: `public.event_publication` 867행, `trading.event_publication` 365행(미완료는 둘 다 0). S13에서 `completion-mode: delete`를 켰지만 설정은 이미 쌓인 행을 지우지 않는다.
+- SQL(덤프 먼저: `docker exec kista-postgres pg_dump -U kista -d kistadb -t public.scheduler_locks -t trading.scheduler_locks -t public.flyway_schema_history > /tmp/s13-cleanup.sql`):
+  ```sql
+  DELETE FROM public.scheduler_locks WHERE name IN ('fear-greed-12hourly','fear-greed-6hourly','fear-greed-daily','market-calendar-monthly','market-calendar-startup','trading-close','trading-open'); -- 기대 7
+  DELETE FROM trading.scheduler_locks WHERE name = 'ledger-reconciliation'; -- 기대 1
+  DROP TABLE public.flyway_schema_history; -- 22행
+  DELETE FROM public.event_publication WHERE completion_date IS NOT NULL; -- 기대 약 867(실행 시점에 다시 센다)
+  DELETE FROM trading.event_publication WHERE completion_date IS NOT NULL; -- 기대 약 365
+  ```
+- 선택지: ① 셋 다 돌린다(③은 S13 배포 뒤에 돌려야 다시 쌓이지 않는다) ② ①·③만 돌리고 ②(옛 이력)는 남긴다 ③ 그대로 둔다(해는 없다).
+- 권고: ①. 시점은 S13 배포 뒤 매매 시간대 밖(KST 07:00~16:00). 미완료 EPR 행(`completion_date IS NULL`)은 건드리지 않는다.
+- 멈춘 범위: 없음. 코드 변경은 S13에 들어갔다.
+
 ## Fable 대기 작업 (2026-11-15 추가)
 
 Fable 한도가 돌아오면 한 세션에서 몰아서 한다. 위에서부터 순서대로 하고, 끝난 항목에는 결과 문서와 커밋 해시를 적는다. 검수만 하고 고치지 않는다. 고칠 결함은 로드맵에 후속 묶음으로 추가한다. 산출물은 `findings/30-post-hoc-review.md` 하나에 절로 나눈다.
