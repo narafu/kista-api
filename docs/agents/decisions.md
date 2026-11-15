@@ -82,7 +82,7 @@
 
 ### 2곳 중복은 추출하지 않는다(목록)
 이유: 추출 기준(3곳 이상 + 같은 이유로 변경)에 미달한다. 대상은 아래와 같다.
-- 가격 문자열 포맷: `MeritzOrderApi`·`KisResponseParser`, 증권사 wire 포맷
+- 가격 문자열 포맷: `MeritzOrderApi`, 증권사 wire 포맷
 - 라이브·백테스트 별지점 평균: `CycleOrderComputer`·`BacktestEngine`. 공식이므로 바꿀 때 양쪽을 함께 본다
 - 페이지 슬라이싱: `StrategyHistoryQueryService`·`AccountStatisticsService`
 - 평단 필수 규칙: `BootstrapPosition`·`BacktestEngine`
@@ -119,9 +119,6 @@
 ### RestClient 설정 빈 여러 개 유지
 이유: `HttpClientTimeouts`로 이미 공용화했다. 남은 차이는 주석에 근거가 있다. 재검토 조건: 없음. (2026-11)
 
-### 거래소 코드 레지스트리 키 집합 동일(KIS·메리츠) 유지
-이유: 코드값이 증권사 wire다. 종목을 추가할 때 양쪽을 갱신한다. 재검토 조건: KIS 삭제 때 소멸. (2026-11)
-
 ### web 응답 Mapper 클래스와 DTO `from()` 병존 유지
 이유: `Order`→DTO 3종은 필드가 다르다. contract 매핑과 사용자 응답 DTO는 계약이 다르다. 재검토 조건: 02 영속·DTO 축소에서 다시 판정한다. (2026-11)
 
@@ -137,7 +134,7 @@
 ### 알림·예외 문구 속 `orderId=`, `FinanceAccountService`의 `accountId`는 접두사로 바꾸지 않는다
 이유: 금융 accountId와 trading accountId를 혼동하지 않게 하기 위해서다. 재검토 조건: 없음. (cc6db1e64)
 
-### warn 로그 4곳(`AccountTokenEvictionAdapter`·`KisPriceApi`·`MeritzPriceApi`·`CryptoOrderSynchronizer`)은 그대로 둔다
+### warn 로그 3곳(`AccountTokenEvictionAdapter`·`MeritzPriceApi`·`CryptoOrderSynchronizer`)은 그대로 둔다
 이유: 스택이 필요할 가능성이 있어 판정을 보류했다. 재검토 조건: 없음. (cc6db1e64)
 
 ### 토스 `getCommon` 429 재시도는 호출 람다(`retryOnTooManyRequests`) 안에 둔다
@@ -303,7 +300,7 @@
 이유: 회차는 INFINITE 전용 개념이다. `divisionCount`도 INFINITE에만 채운다. 재검토 조건: 없음. (2026-11-01 사용자 확정)
 
 ### 토스 체결 조회 날짜는 "US 세션일 + 1"
-이유: broker는 trading `DstInfo`를 쓸 수 없어 KIS·메리츠와 같은 규칙을 택했다. 재검토 조건: 05·06에서 calendar 모듈로 세션 판정을 모을 때. (2026-11)
+이유: broker는 trading `DstInfo`를 쓸 수 없어 메리츠와 같은 규칙을 택했다. 재검토 조건: 05·06에서 calendar 모듈로 세션 판정을 모을 때. (2026-11)
 
 ## 4. 트리거 조건부 보류
 
@@ -315,9 +312,6 @@
 
 ### 전략별 원장 상한에서 MOCK 장중 접수 주문의 시가 혜택
 트리거: 접수 시각과 1분봉 데이터를 확보할 때. (2026-10, 0e8a6847)
-
-### KIS APBK0952 취소 분류 처리
-트리거: 없음(KIS 삭제 04 단계 A로 소멸 예정). (2026-11)
 
 ### "활성 최신 버전" 정렬 기준 3종(version_no 대 created_at) 통일
 트리거: 활성 버전이 1개라는 불변식이 깨진 사례가 발견될 때. (2026-11-08)
@@ -362,7 +356,7 @@
 실행 계획 자체는 각 지침서에 있다. 여기는 뒤집지 말아야 할 방향만 둔다.
 
 ### 브로커 구성: 주문은 메리츠·토스·Mock, KIS·업비트·바이낸스는 삭제
-이유: 메리츠를 우선하는 이유는 환율·매매 수수료다. 토스는 대중적인 증권사라 주문 연결을 남긴다(2026-11-12. 2026-11-11의 "토스 축소" 결정을 대체). KIS 삭제는 KIS 활성 전략 이전이 선행 조건이다(04 W1). 바이낸스·크립토 매매·대시보드 크립토 지표는 전부 삭제한다(15, 2026-11-13). 재검토 조건: 없음. (fable 04 0절, 15 0절)
+이유: 메리츠를 우선하는 이유는 환율·매매 수수료다. 토스는 대중적인 증권사라 주문 연결을 남긴다(2026-11-12. 2026-11-11의 "토스 축소" 결정을 대체). KIS는 삭제했다(04 단계 A, 2026-11-15). 바이낸스·크립토 매매·대시보드 크립토 지표는 전부 삭제한다(15, 2026-11-13). 재검토 조건: 없음. (fable 04 0절, 15 0절)
 
 ### 공용 시세는 Alpaca, 주문 경로의 현재가는 계좌 증권사
 이유: 관리자 증권사 키로 받는 공용 시장 데이터를 없앤다(토스 키 1년 갱신 부담). 주문 경로(BUY 상한, DCA·VR 기준가)의 현재가는 계좌 증권사 시세 API이고, Alpaca는 화면과 확정 값에 쓴다. 값마다 출처는 하나다. 폴백 체인은 삭제한다. 확정 종가는 마감+20분이다. 환율은 Frankfurter 일 1회 참고환율이다. 재검토 조건: 없음. (2026-11-14, fable 14 D1~D5)
@@ -398,7 +392,7 @@
 이유: 사용자 입력 분류다. 지우려면 가계부 데이터를 이전해야 한다. 재검토 조건: 없음. (2026-11-14, fable 15 C3)
 
 ### 운영 키 목록의 원본은 `.env.example`, `API_DOMAIN`은 Caddy가 infra.env에서 받는다
-이유: 시크릿은 sops + age로 kista-infra가 관리한다. KIS 키·`CMC_API_KEY`는 추가하지 않는다(삭제 예정 코드). 재검토 조건: 없음. (2026-11-11, cross-repo 결정 3·6)
+이유: 시크릿은 sops + age로 kista-infra가 관리한다. `CMC_API_KEY`는 추가하지 않는다(삭제 예정 코드). 재검토 조건: 없음. (2026-11-11, cross-repo 결정 3·6)
 
 ## 7. 코인 경로 — 지침서 15 실행 시 이 절을 통째로 지운다
 

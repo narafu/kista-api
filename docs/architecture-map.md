@@ -28,7 +28,6 @@ flowchart TB
     end
 
     subgraph EXT["외부 API"]
-        KIS["KIS"]
         TOSS["Toss증권"]
         ALPACA["Alpaca<br/>캔들·휴장일"]
         KAKAO["Kakao OAuth"]
@@ -50,7 +49,7 @@ flowchart TB
     TRD --> PG
 
     %% 외부 API를 맨 아래 한 줄에 놓으려고 화살표 길이(-)로 rank를 맞춘다: API·SCH는 rank 2, TRD는 rank 3
-    TRD ---> KIS & TOSS & ALPACA & TG
+    TRD ---> TOSS & ALPACA & TG
     API ----> KAKAO & FCM & TG
     SCH ----> KB & FG & ALPACA & TG
 ```
@@ -87,7 +86,6 @@ flowchart LR
     end
 
     subgraph BROKER["증권·시세"]
-        KIS["KIS"]
         TOSS["Toss증권"]
         ALPACA["Alpaca<br/>캔들·휴장일"]
     end
@@ -106,7 +104,7 @@ flowchart LR
         OBJ["OCI Object Storage<br/>kista-infra-backups"]
     end
 
-    TRD --> KIS & TOSS & ALPACA
+    TRD --> TOSS & ALPACA
     SCH --> KB & FG & ALPACA
     API --> KAKAO & FCM
     API & SCH & TRD --> TG

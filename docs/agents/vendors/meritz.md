@@ -11,7 +11,7 @@ adapter/out/meritz/ ← MeritzHttpClient(본문 `rsp_cd` 기반 응답 판정 �
 ### 기본 사실
 - Base `https://openapi.imeritz.com:9443`(`meritz.base-url`, trading-core `application.yml`). 모든 요청 헤더 `authorization: Bearer <token>` + `mac_address`(고정 상수 `0242AC110002`, 값 검증 없음).
 - 계좌번호가 없다: 앱키에 계좌 1개가 묶이며 요청에 `acno`·`asno`·`acnt_pwd`를 넣으면 실패한다. UPBIT처럼 `accountNo=null`, appKey가 식별자(`Account.dedupeKeyOf`)다.
-- 토큰: `POST /oauth2/token`(form `grant_type=client_credentials&client_id&client_secret&scope=login`) → `access_token`, `expires_in`(43200), `expires_date`. 만료 전 재발급은 같은 토큰·같은 `expires_date`를 돌려준다(멱등). 만료는 **`expires_date`(KST) 기준**으로 잡는다 — `expires_in`은 상대값이 아니라 캐시가 최대 12시간 늦게 만료돼 `EGW00123`이 폭주한다. `oauth2/revoke`는 같은 앱키의 유일한 토큰을 끊으므로 호출 금지. 토큰 저장은 `broker_tokens` + `BrokerTokenCachePort`, 조정은 `DbTokenCoordinator`(KIS와 공용).
+- 토큰: `POST /oauth2/token`(form `grant_type=client_credentials&client_id&client_secret&scope=login`) → `access_token`, `expires_in`(43200), `expires_date`. 만료 전 재발급은 같은 토큰·같은 `expires_date`를 돌려준다(멱등). 만료는 **`expires_date`(KST) 기준**으로 잡는다 — `expires_in`은 상대값이 아니라 캐시가 최대 12시간 늦게 만료돼 `EGW00123`이 폭주한다. `oauth2/revoke`는 같은 앱키의 유일한 토큰을 끊으므로 호출 금지. 토큰 저장은 `broker_tokens` + `BrokerTokenCachePort`, 조정은 `DbTokenCoordinator`(Toss와 공용).
 - 숫자 필드는 문자열/숫자 혼재(`"417.0000000000"`, `36`) — 파서는 둘 다 받는다(수량을 `Integer.parseInt`하면 잔고 조회 전체가 실패).
 - 날짜(`date`, `oder_date`, `oder_sta_date`/`oder_fin_date`, `from`/`to`)는 **미국 거래일**. KST↔US 변환은 `UsTradeDates`만 쓰며 `MeritzPriceApi`·`MeritzTradingApi`가 allowlist에 있다 → constraints.md "시간 기준 정책".
 
@@ -41,13 +41,13 @@ adapter/out/meritz/ ← MeritzHttpClient(본문 `rsp_cd` 기반 응답 판정 �
 
 거래소 코드: 주문·잔고는 벤더코드 `ovrs_exch_vndr_idno`(NASDAQ `0537`, AMEX `0066`, NYSE `0321`), 시세는 `mrkt_cls_code`(`OQ`/`AX`/`NY`). 실측 TQQQ=OQ/0537, SOXL·USD·MAGX·UPRO·QLD=AX/0066. BITO·EETH=AX/0066은 같은 NYSE Arca 상장이라 넣은 값이다(실측 전). 매핑 SSOT는 `MeritzExchangeRegistry`.
 
-주문체결내역은 **주문당 1행·누적 체결**(실측 733건, `oder_no` 중복 0): `cntg_dqty`=누적 체결수량, `cntg_crnc_prc`=평균 체결가, `cntg_camt`=체결금액. `seln_byov_clcd` 1매도/2매수, `oder_rctf_cncl_cls_code` 0원주문/1정정/2취소, `ovrs_stck_oder_stat_cls_code` 0정상/1거부/2자동거부/3자동취소/4미접수. 부분 체결 후 장 마감 만료는 `3`·`ncnt_odqt=0`. `getExecutions`는 원주문 행·체결수량>0·종목 일치만 `Execution`으로 만든다(KIS와 같은 규칙).
+주문체결내역은 **주문당 1행·누적 체결**(실측 733건, `oder_no` 중복 0): `cntg_dqty`=누적 체결수량, `cntg_crnc_prc`=평균 체결가, `cntg_camt`=체결금액. `seln_byov_clcd` 1매도/2매수, `oder_rctf_cncl_cls_code` 0원주문/1정정/2취소, `ovrs_stck_oder_stat_cls_code` 0정상/1거부/2자동거부/3자동취소/4미접수. 부분 체결 후 장 마감 만료는 `3`·`ncnt_odqt=0`. `getExecutions`는 원주문 행·체결수량>0·종목 일치만 `Execution`으로 만든다.
 
 ### 주문 유형 매핑 (`oder_cls_code`/`oder_cond_cls_code`/가격)
 | kista OrderType | BUY | SELL |
 |---|---|---|
 | LOC | `32`/`7`/단가 | `32`/`7`/단가 |
-| MOC | `32`/`7`/캡 단가(KIS와 동일 — 매수 MOC 대신 LOC 캡) | `34`/`7`/`0` |
+| MOC | `32`/`7`/캡 단가(매수 MOC 대신 LOC 캡) | `34`/`7`/`0` |
 | LIMIT | `01`/`0`/단가 | `01`/`0`/단가 |
 | MOO | `01`/`0`/캡 단가(`supportsOpenAuctionOrders=false` — 개장 후 지정가 근사) | `05`/`0`/`0` 시장가(DCA "즉시 매도" 의도) |
 | MARKET | `IllegalArgumentException`(코인 전용) | 동일 |
@@ -79,6 +79,6 @@ SOXL 1주 매수 @현재가×0.5 → 즉시 취소를 LOC·지정가로 각 1회
 - 취소 오류 코드(이미 체결·이미 취소된 주문에 대한 취소 응답) — `CancelOutcome`은 목록 기반 판정만 하고 응답 코드로는 판정하지 않는다.
 
 ### 잔고 부족 거절 분류
-- SELL 매도가능수량 부족은 `rsp_cd=1543`("매도가능수량이 없습니다. 잔고를 확인해주세요.", `rsp_sub_msg` null, 2026-10-30 22:40 KST 정규장 MeritzLiveIT 미보유 QLD 1주 지정가 매도 실측, 미접수)으로 확정 거절이며, `MeritzResponse.failure`가 `isInsufficientFunds()`로 분류해 사용자 알림(`InsufficientBalanceEvent`)만 내고 관리자 알림은 내지 않는다(KIS `APBK0988`과 동일 처리). BUY 예수금 부족은 `rsp_cd=5988`("주문가능금액이 부족합니다.", `rsp_sub_msg` null, 2026-10-30 23:06 KST 정규장 MeritzLiveIT 주문가능 USD 2배 금액 SOXL 지정가 매수 실측, 미접수)으로 같은 분류다. 두 코드는 `MeritzResponse.INSUFFICIENT_FUNDS_CODES`가 SSOT.
+- SELL 매도가능수량 부족은 `rsp_cd=1543`("매도가능수량이 없습니다. 잔고를 확인해주세요.", `rsp_sub_msg` null, 2026-10-30 22:40 KST 정규장 MeritzLiveIT 미보유 QLD 1주 지정가 매도 실측, 미접수)으로 확정 거절이며, `MeritzResponse.failure`가 `isInsufficientFunds()`로 분류해 사용자 알림(`InsufficientBalanceEvent`)만 내고 관리자 알림은 내지 않는다. BUY 예수금 부족은 `rsp_cd=5988`("주문가능금액이 부족합니다.", `rsp_sub_msg` null, 2026-10-30 23:06 KST 정규장 MeritzLiveIT 주문가능 USD 2배 금액 SOXL 지정가 매수 실측, 미접수)으로 같은 분류다. 두 코드는 `MeritzResponse.INSUFFICIENT_FUNDS_CODES`가 SSOT.
 
 - 키 만료일 조회 API 없음 — 등록·교체 시점 + 1년 추정, 사용자 입력 우선(`ApiKeyExpirySource.ESTIMATED`)

@@ -137,7 +137,7 @@ UPDATE <schema>.event_publication SET listener_id = '<새 listener_id>'
 ```
 
 ### SUBMITTING 잔류 주문 정정 런북
-접수 결과 불명 주문은 `orders.status='SUBMITTING'`으로 남아 어떤 재실행도 재접수하지 않는다(관리자 알림 `[접수 결과 불명]`·`[DB 불일치]`·`[접수 결과 불명 — 리포트 제외]`). Toss는 다음 접수 경로가 선점 후 2~9분 창에서 같은 멱등키로 재요청해 자동 대사하지만, KIS·창 밖은 사람이 정정한다. 잔류 동안 그 사이클의 전략·계좌 삭제와 탈퇴 cascade는 재시도 가능한 취소 실패로 막힌다.
+접수 결과 불명 주문은 `orders.status='SUBMITTING'`으로 남아 어떤 재실행도 재접수하지 않는다(관리자 알림 `[접수 결과 불명]`·`[DB 불일치]`·`[접수 결과 불명 — 리포트 제외]`). Toss는 다음 접수 경로가 선점 후 2~9분 창에서 같은 멱등키로 재요청해 자동 대사하지만, Meritz·창 밖은 사람이 정정한다. 잔류 동안 그 사이클의 전략·계좌 삭제와 탈퇴 cascade는 재시도 가능한 취소 실패로 막힌다.
 ```sql
 -- 1. 잔류 확인 (docker exec kista-postgres psql -U kista -d kistadb)
 SELECT id, account_id, trade_date, ticker, direction, order_type, quantity, price, updated_at

@@ -320,3 +320,5 @@ KISTA는 LOC·MOC 주문, 마감 리포트, VR 롤오버, Mock 체결 판정에 
 - 단계 B에서 `supportsOpenAuctionOrders` 분기를 지웠을 때 주식 DCA의 개장 주문 테스트 기대값이 달라진다. 되돌린다(KIS만 true라는 전제가 틀린 것이다).
 
 배포: 단계 A·B·D-2는 주문 경로다. 매매 시간대 밖. D-2 배포 뒤 첫 개장 배치에서 토큰 발급 로그가 계좌당 1회인지 본다.
+
+단계 A 결과(2026-11-15): KIS 어댑터·`Broker.KIS`·관리자 시세 체인(`TossAdminPriceSource`가 `AdminMarketPricePort`를 직접 구현)을 삭제했고 trading V22가 KIS 계좌를 지운다. 미배포. 개장 경매 경로(`placePreOpenDcaOrders`)는 지원 브로커 없이 남아 단계 B가 지운다(`questions.md` Q-14).

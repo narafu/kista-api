@@ -21,7 +21,7 @@
 - ADMIN 권한 관리(seed·`/api/admin/**`·audit_logs) → `docs/agents/modules/api/admin.md`
 
 ### AES-256 암호화 위치·컬럼 크기
-- KIS 자격증명·계좌번호·텔레그램 봇 토큰·이메일은 엔티티 컬럼에 `@Convert(converter = AesStringConverter.class)`(autoApply 없음)를 명시해 암복호화한다. 어댑터·매퍼는 평문 복사만 하고 `AesCryptoService`를 직접 쓰지 않는다(`@DataJpaTest`는 `DataJpaTestBase`가 `AesCryptoService` 빈을 import)
+- 브로커 자격증명·계좌번호·텔레그램 봇 토큰·이메일은 엔티티 컬럼에 `@Convert(converter = AesStringConverter.class)`(autoApply 없음)를 명시해 암복호화한다. 어댑터·매퍼는 평문 복사만 하고 `AesCryptoService`를 직접 쓰지 않는다(`@DataJpaTest`는 `DataJpaTestBase`가 `AesCryptoService` 빈을 import)
 - AES-256 GCM + Base64는 입력 ~180자 → 출력 ~260자라 VARCHAR(255)를 넘는다. 암호화 컬럼은 Entity `length=512` 이상, Flyway도 동일
 - AES-GCM은 비결정론적이라 암호화 컬럼을 쿼리 조건에 쓰면 매칭되지 않는다 — 조회는 `*_hash`(`AccountNoHasher`) 경유, 해시는 어댑터가 평문으로 계산한다
 - 컨버터는 엔티티를 로드할 때마다 복호화한다 — 테스트·시드의 raw SQL INSERT는 반드시 `crypto.encrypt(...)` 암호문을 넣는다. 복호화 불가 값이 한 행이라도 있으면 그 엔티티를 읽는 모든 경로(배치 재개 포함)가 실패한다

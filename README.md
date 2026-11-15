@@ -5,13 +5,13 @@
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4-brightgreen)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-blue)
 
-KISTA(Key Investment Strategy & Trading Automation) — 한국투자증권(KIS)·토스증권·메리츠증권 API 기반 해외주식과 업비트·바이낸스 API 기반 코인(BTC/ETH, DCA) 자동 분할매매 SaaS의 백엔드.
+KISTA(Key Investment Strategy & Trading Automation) — 토스증권·메리츠증권 API 기반 해외주식과 업비트·바이낸스 API 기반 코인(BTC/ETH, DCA) 자동 분할매매 SaaS의 백엔드.
 프론트엔드는 별도 저장소 [`kista-ui`](https://github.com/narafu/kista-ui)(Next.js 16)이며, 같은 OCI 인스턴스에서 함께 호스팅된다.
 
 ## 주요 기능
 
 - **매매 전략**: INFINITE(무한매수) · PRIVACY(FIDA 기준 매매표) · VR(밸류 리밸런싱) · DCA(무조건 적립식, UPRO/QLD/BITO/EETH·BTC/ETH(업비트·바이낸스))
-- **증권사·거래소**: KIS · 토스증권 · 메리츠증권(관리자 설정 기본 비활성) · MOCK(모의 계좌) · 업비트(KRW 마켓 코인, DCA 전용) · 바이낸스(USDT 마켓 코인, DCA 전용, 관리자 설정 기본 비활성)
+- **증권사·거래소**: 토스증권 · 메리츠증권(관리자 설정 기본 비활성) · MOCK(모의 계좌) · 업비트(KRW 마켓 코인, DCA 전용) · 바이낸스(USDT 마켓 코인, DCA 전용, 관리자 설정 기본 비활성)
 - **매매 배치**: 개장(월~금 22:00 KST) · 마감(거래일 실제 마감 30분 전 1회 예약 — 정규장 04:30·05:30, 조기 마감일 대응) 스케쥴러가 활성 전략을 일괄 실행, 코인 DCA는 10분 주기 스케쥴러가 업비트·바이낸스 주문을 동기화·실행
 - **알림**: 사용자 텔레그램 봇 · FCM 푸시 · SSE 실시간 거래 알림
 - **부가 기능**: 계좌·전략 통계, 백테스트, 가계부, 주택/ETF 벤치마크 비교, 공포탐욕지수, 관리자 콘솔
@@ -64,4 +64,4 @@ docker compose up -d postgres redis                          # DB·Redis
 | [`docs/agents/scheduler-time-table.md`](docs/agents/scheduler-time-table.md) | 배치 실행 시각 |
 | [`docs/agents/constraints.md`](docs/agents/constraints.md) | 설계 제약·Flyway·Git 규칙 |
 | [`docs/agents/docker-infra.md`](docs/agents/docker-infra.md) | 배포·운영 런북 |
-| [`docs/agents/vendors/kis.md`](docs/agents/vendors/kis.md) · [`vendors/toss.md`](docs/agents/vendors/toss.md) | 증권사 API 연동 |
+| [`docs/agents/vendors/toss.md`](docs/agents/vendors/toss.md) · [`vendors/meritz.md`](docs/agents/vendors/meritz.md) | 증권사 API 연동 |

@@ -9,7 +9,7 @@
 - 시장 규칙(코인: MARKET만·`executionHour` 필수 / 주식: MOO|MOC만·평일만)은 `DcaRule.requireCompatible(market)`이 SSOT. 계좌 시장 ≠ 종목 시장이면 거부, 코인 계좌는 DCA만. 런타임 정책(기본 비활성)이 켜져 있어야 등록된다.
 - 중간부터 시작: `initialHoldings`·`initialAvgPrice`·`initialDeposit`(계좌 통화, null=0)을 받고 `start_amount` = 예수금 + 평단×보유(통계 원금의 기초 → stats.md). 일반 수정 PUT은 DCA `newSeed`를 거부하고 DCA 설정 PUT은 예수금을 받지 않는다 — 진행 중 증감은 `capital-injection`/`capital-withdrawal`(예수금만, 주식 수량 지정 시 400 → trading.md).
 - 주식 개장·마감 배치(`BatchContextFactory`)는 US_STOCK 계좌 전략만 담고 코인은 조용히 제외한다(코인은 별도 스케줄러). 수동 실행은 DCA를 거부하고, 미리보기는 주식 DCA만 `plan()`으로 포함한다(코인은 `DcaManualExecutionUnsupportedException`). 미리보기는 쓰기를 하지 않으며 당일 이미 판정·주문된 규칙은 후보에서 빼고 `todayOrders`로만 노출한다(같은 규칙을 같은 날 두 번 판정하지 않기 위함).
-- 개장 배치는 22:00 KST. 개장 전 접수는 `Broker.supportsOpenAuctionOrders()` 브로커만 대상이고, 접수 후 체크포인트를 STARTED로 되돌리며 이 단계 실패는 격리한다.
+- 개장 배치는 22:00 KST. 개장 전 접수는 `supportsOpenAuctionOrders()` 브로커만 대상(현재 없음, 삭제는 04 단계 B)이며 접수 후 체크포인트를 STARTED로 되돌리고 실패는 격리한다.
 - 수량: `orders.quantity/filled_quantity`·`dca_execution.quantity`·`cycle_position.holdings`는 numeric(20,8), 도메인은 BigDecimal(`Quantities.normalize`). `PlannedOrder`·매칭 공식·privacy 표는 int이고 주식 경로는 `intValueExact()`/`AccountBalance.wholeShares()`(소수면 ArithmeticException)로 정수화한다. `StrategyDetail.currentHoldings`는 Integer라 CRYPTO_KRW DCA는 null — 코인에 `wholeShares()`를 호출하지 않는다.
 
 ## 자기 주문 체결 원칙 (`TradingReporter`, 전 전략)
