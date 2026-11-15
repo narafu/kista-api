@@ -1,7 +1,7 @@
 package com.kista.tradingcore.trading.adapter.in.web;
 
 import com.kista.shared.kernel.Currency;
-import com.kista.tradingcore.trading.application.usecase.AccountLedgerTotalsUseCase;
+import com.kista.tradingcore.trading.application.service.AccountLedgerTotalsService;
 import com.kista.tradingcore.trading.domain.model.AccountLedgerTotals;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -29,7 +29,7 @@ class AccountLedgerTotalsControllerTest {
 
     @Autowired MockMvc mockMvc;
 
-    @MockitoBean AccountLedgerTotalsUseCase accountLedgerTotals;
+    @MockitoBean AccountLedgerTotalsService accountLedgerTotals;
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000020");

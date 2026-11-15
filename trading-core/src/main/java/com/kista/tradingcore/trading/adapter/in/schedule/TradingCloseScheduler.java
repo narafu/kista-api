@@ -4,7 +4,7 @@ import com.kista.shared.platform.scheduling.SchedulerJobRunner;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
-import com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase;
+import com.kista.tradingcore.trading.application.service.TradingExecutionFacade;
 import com.kista.tradingcore.trading.application.port.output.HeartbeatPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort;
@@ -38,7 +38,7 @@ import java.util.stream.Stream;
 @ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true) // local에서 끄면 운영 DB·텔레그램과 중복 알림 발생 방지
 public class TradingCloseScheduler {
 
-    private final TradingExecutionUseCase useCase;
+    private final TradingExecutionFacade useCase;
     private final StrategyPort strategyPort;        // ACTIVE 전략 목록 조회
     private final SchedulerLockService schedulerLockService;
     private final BatchContextFactory contextFactory;

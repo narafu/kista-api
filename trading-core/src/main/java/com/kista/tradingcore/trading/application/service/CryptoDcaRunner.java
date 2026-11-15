@@ -8,7 +8,6 @@ import com.kista.tradingcore.trading.application.port.output.StrategyDcaDetailPo
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.tradingcore.trading.application.port.output.TradingUserProfilePort;
-import com.kista.tradingcore.trading.application.usecase.CryptoDcaExecutionUseCase;
 import com.kista.tradingcore.trading.domain.model.BatchContext;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
@@ -35,7 +34,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-class CryptoDcaRunner implements CryptoDcaExecutionUseCase {
+public class CryptoDcaRunner {
 
     private final StrategyPort strategyPort;
     private final AccountPort accountPort;
@@ -49,7 +48,7 @@ class CryptoDcaRunner implements CryptoDcaExecutionUseCase {
     // ponytail: in-memory, resets on restart — persist if restart floods matter
     private final Map<String, LocalDate> lastReported = new ConcurrentHashMap<>(); // (대상|메시지) → 마지막 알림 KST 일자
 
-    @Override
+    // 코인 DCA 10분 틱 실행 — 계좌별 주문 동기화 후 라운드 실행
     public void runTick(LocalDateTime nowKst) {
         LocalDate today = nowKst.toLocalDate();
         lastReported.values().removeIf(d -> !d.equals(today)); // 지난 날짜 항목 정리

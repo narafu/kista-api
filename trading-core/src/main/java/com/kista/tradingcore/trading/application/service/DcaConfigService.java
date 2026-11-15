@@ -8,7 +8,6 @@ import com.kista.tradingcore.trading.application.port.output.StrategyDcaDetailPo
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.service.support.OwnedStrategy;
 import com.kista.tradingcore.trading.application.port.output.StrategyVersionPort;
-import com.kista.tradingcore.trading.application.usecase.DcaConfigUseCase;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyVersion;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +21,7 @@ import java.util.UUID;
 // DCA 설정 수정 — 기존 사이클·주문의 strategy_version_id는 옛(soft-deleted) 버전을 그대로 가리키며, 실행 경로는 활성 버전을 직접 읽어 영향이 없다
 @Service
 @RequiredArgsConstructor
-class DcaConfigService implements DcaConfigUseCase {
+public class DcaConfigService {
 
     private final StrategyPort strategyPort;
     private final AccountPort accountPort;
@@ -30,7 +29,7 @@ class DcaConfigService implements DcaConfigUseCase {
     private final StrategyDcaDetailPort dcaDetailPort;
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
-    @Override
+    // DCA 규칙 설정 변경 — 새 strategy_version + 규칙 행, 사이클 유지. ruleKey null=신규 규칙, 기존 키는 보존(없는 키는 400)
     @Transactional
     public void updateConfig(UUID strategyId, UUID requesterId, DcaStrategyConfig requested) {
         OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);

@@ -1,7 +1,7 @@
 package com.kista.tradingcore.trading.adapter.in.web;
 
 import com.kista.tradingcore.trading.adapter.in.web.dto.AccountLedgerTotalsResponse;
-import com.kista.tradingcore.trading.application.usecase.AccountLedgerTotalsUseCase;
+import com.kista.tradingcore.trading.application.service.AccountLedgerTotalsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -19,7 +19,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AccountLedgerTotalsController {
 
-    private final AccountLedgerTotalsUseCase accountLedgerTotals; // 원장 합산 조회
+    private final AccountLedgerTotalsService accountLedgerTotals; // 원장 합산 조회
 
     @Operation(summary = "계좌 원장 합산 조회")
     @ApiResponses({

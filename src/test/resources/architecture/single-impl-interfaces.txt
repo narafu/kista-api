@@ -83,15 +83,3 @@ com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort
 com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort
 com.kista.tradingcore.trading.application.port.output.TradingPolicySettingsPort
 com.kista.tradingcore.trading.application.port.output.TradingUserProfilePort
-com.kista.tradingcore.trading.application.usecase.AccountLedgerTotalsUseCase
-com.kista.tradingcore.trading.application.usecase.CryptoDcaExecutionUseCase
-com.kista.tradingcore.trading.application.usecase.DcaConfigUseCase
-com.kista.tradingcore.trading.application.usecase.DcaExecutionQuery
-com.kista.tradingcore.trading.application.usecase.InjectCapitalUseCase
-com.kista.tradingcore.trading.application.usecase.ManualTradeCorrectionUseCase
-com.kista.tradingcore.trading.application.usecase.StrategyUseCase
-com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase
-com.kista.tradingcore.trading.application.usecase.TradingPolicyUseCase
-com.kista.tradingcore.trading.application.usecase.UserTradingDataEraseUseCase
-com.kista.tradingcore.trading.application.usecase.VrReconfigureUseCase
-com.kista.tradingcore.trading.application.usecase.WithdrawCapitalUseCase

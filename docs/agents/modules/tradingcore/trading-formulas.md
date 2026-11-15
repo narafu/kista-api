@@ -127,7 +127,7 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
   - 인출식(`recurringAmount < 0`): `initialValue + initialDeposit >= abs(recurringAmount) × 100 × (4 / intervalWeeks)` 필수 — 운영 중 재설정으로 `recurringAmount`를 인출식으로 바꾸는 경우도 `VrReconfigureService`가 동일 규칙 재검증
 - **개장 금액 계약**: `initialDeposit` = 사이클 개장 USD pool(개장 `CyclePosition.deposit`), `startAmount` = 개장 예수금 + 개장 보유분 시장가, `poolLimit` = 개장 pool × `poolLimitRate` (scale=2 HALF_UP). 보유분 시장가를 pool에 포함하지 않는다.
 - **종료 금액 계약**: VR 롤오버 `endAmount` = 마감 예수금 + 보유분 종가 평가액(scale=2 HALF_UP). 시작 후 재설정(강제 롤오버)은 이전 사이클을 자본 조정 전 포지션의 총자산으로 종료하고 새 사이클을 자본 조정 후 총자산으로 시작해 주입/인출을 이전 사이클 손익에 포함하지 않는다.
-- **운영 중 재설정** (`PUT /api/trading-cycles/{id}/vr-config`, `VrReconfigureUseCase`/`VrReconfigureService`): 밴드폭·주기·적립금·램프 파라미터 수정 + 선택적 투자금 추가/인출(수량/예수금)을 "새 `strategy_vr_version` 발급 + 강제 롤오버(현재 사이클 종료→새 사이클 즉시 생성)" 단일 메커니즘으로 처리. VR 전용, 소유권 검증 필수
+- **운영 중 재설정** (`PUT /api/trading-cycles/{id}/vr-config`, `VrReconfigureService`): 밴드폭·주기·적립금·램프 파라미터 수정 + 선택적 투자금 추가/인출(수량/예수금)을 "새 `strategy_vr_version` 발급 + 강제 롤오버(현재 사이클 종료→새 사이클 즉시 생성)" 단일 메커니즘으로 처리. VR 전용, 소유권 검증 필수
   - 시작 전 재설정(`!currentCycle.hasStartedBy(nextTradeDate)`, `StrategyCycle.hasStartedBy` — 배치·미리보기와 같은 술어)은 새 사이클을 만들지 않고 첫 사이클을 in-place 갱신한다(`CycleSnapshotCreator.reconfigureVrCycleBeforeStart` — 버전 교체·`startAmount`·최신 포지션(`updateBalance`)·RESET 이력(차액이 있을 때)·사이클 VR 상세, startDate 유지, 램프 weeks는 최초 사이클 기준(음수면 0), 새 사이클 시작 알림 없음). 시작 후 재설정은 강제 롤오버이며 옛 사이클 종료일 = 새 사이클 시작일 = 오늘(KST, nextTradeDate 아님 — 하루 겹침이 stats 연속성 판정을 깬다)
   - 램프 시계(경과주수)는 재설정해도 리셋하지 않음 — 항상 전략 최초 사이클 startDate 기준
   - 순수 파라미터 수정: V·holdings·deposit 이월. 수량 주입 +N주(단가 Pc): `holdings+=N`, `avgPrice` 가중평균, `V+=N×현재가`. 수량 인출 -N주: holdings·V 감소, 잔여 평단가 유지. 예수금 주입/인출은 deposit만 증감하고 V는 불변

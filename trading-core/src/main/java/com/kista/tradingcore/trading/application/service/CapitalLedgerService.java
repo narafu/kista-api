@@ -11,7 +11,6 @@ import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.service.support.OwnedStrategy;
-import com.kista.tradingcore.trading.application.usecase.InjectCapitalUseCase;
 import com.kista.tradingcore.trading.domain.model.CycleCapitalEvent;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.DepositAmounts;
@@ -45,7 +44,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
-class CapitalLedgerService implements InjectCapitalUseCase {
+public class CapitalLedgerService {
 
     private static final String NO_ACTIVE_CYCLE = "진행 중인 사이클이 없어 투자금을 추가할 수 없습니다.";
     private static final String NO_ACTIVE_CYCLE_WITHDRAW = "진행 중인 사이클이 없어 투자금을 인출할 수 없습니다.";
@@ -67,7 +66,7 @@ class CapitalLedgerService implements InjectCapitalUseCase {
     private final ApplicationEventPublisher eventPublisher; // stats 캐시 무효화 이벤트 발행
     private final CycleCapitalEventPort cycleCapitalEventPort; // 투자금 추가·인출 이력 기록
 
-    @Override
+    // 진행 중인 PRIVACY/INFINITE 사이클에 예수금·주식 추가 — 사이클 유지, 포지션 스냅샷 append, startAmount 가산
     public void inject(UUID strategyId, UUID requesterId, InjectCapitalCommand cmd) {
         OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
         Strategy strategy = owned.strategy();

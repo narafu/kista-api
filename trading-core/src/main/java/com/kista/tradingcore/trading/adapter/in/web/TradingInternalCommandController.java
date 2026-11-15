@@ -2,7 +2,7 @@ package com.kista.tradingcore.trading.adapter.in.web;
 
 import com.kista.shared.contract.trading.TradeCorrectionRequest;
 import com.kista.shared.contract.trading.TradeCorrectionResponse;
-import com.kista.tradingcore.trading.application.usecase.ManualTradeCorrectionUseCase;
+import com.kista.tradingcore.trading.application.service.ManualTradeCorrectionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class TradingInternalCommandController {
 
-    private final ManualTradeCorrectionUseCase manualTradeCorrectionUseCase;
+    private final ManualTradeCorrectionService manualTradeCorrectionUseCase;
 
     @Operation(summary = "관리자 수동 체결 보정")
     @PostMapping("/trade-corrections")

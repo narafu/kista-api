@@ -1,7 +1,7 @@
 package com.kista.tradingcore.trading.adapter.in.event;
 
 import com.kista.shared.kernel.UserDeletedEvent;
-import com.kista.tradingcore.trading.application.usecase.UserTradingDataEraseUseCase;
+import com.kista.tradingcore.trading.application.service.UserTradingDataEraseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -19,7 +19,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class TradingUserCascadeListener {
 
-    private final UserTradingDataEraseUseCase eraser; // 단계별 트랜잭션 경계를 가진 정리 유스케이스
+    private final UserTradingDataEraseService eraser; // 단계별 트랜잭션 경계를 가진 정리 유스케이스
 
     // fallbackExecution — 재발행(UserEventRepublisher)은 트랜잭션 안이지만, 트랜잭션 밖 발행이 생겨도 조용히 버려지지 않게 한다
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)

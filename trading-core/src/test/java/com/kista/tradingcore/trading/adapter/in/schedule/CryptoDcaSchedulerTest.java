@@ -3,7 +3,7 @@ package com.kista.tradingcore.trading.adapter.in.schedule;
 import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.tradingcore.trading.application.port.output.HeartbeatPort;
-import com.kista.tradingcore.trading.application.usecase.CryptoDcaExecutionUseCase;
+import com.kista.tradingcore.trading.application.service.CryptoDcaRunner;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -24,7 +24,7 @@ import static org.mockito.Mockito.when;
 class CryptoDcaSchedulerTest {
 
     SchedulerLockService lock = mock(SchedulerLockService.class);
-    CryptoDcaExecutionUseCase useCase = mock(CryptoDcaExecutionUseCase.class);
+    CryptoDcaRunner useCase = mock(CryptoDcaRunner.class);
     HeartbeatPort heartbeat = mock(HeartbeatPort.class);
     CryptoDcaScheduler scheduler = new CryptoDcaScheduler(useCase, lock, heartbeat, FixedClockTestConfig.FIXED);
 

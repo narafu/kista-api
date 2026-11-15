@@ -1,15 +1,15 @@
 package com.kista.tradingcore.trading.adapter.in.web;
 
 import com.kista.tradingcore.trading.adapter.in.web.dto.*;
-import com.kista.tradingcore.trading.application.usecase.DcaConfigUseCase;
-import com.kista.tradingcore.trading.application.usecase.DcaExecutionQuery;
+import com.kista.tradingcore.trading.application.service.DcaConfigService;
+import com.kista.tradingcore.trading.application.service.DcaExecutionQueryService;
 import com.kista.tradingcore.trading.domain.model.DcaExecutionFilter;
 import com.kista.shared.kernel.OrderDirection;
-import com.kista.tradingcore.trading.application.usecase.InjectCapitalUseCase;
-import com.kista.tradingcore.trading.application.usecase.WithdrawCapitalUseCase;
-import com.kista.tradingcore.trading.application.usecase.StrategyUseCase;
-import com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase;
-import com.kista.tradingcore.trading.application.usecase.VrReconfigureUseCase;
+import com.kista.tradingcore.trading.application.service.CapitalLedgerService;
+import com.kista.tradingcore.trading.application.service.CapitalWithdrawalService;
+import com.kista.tradingcore.trading.application.service.StrategyService;
+import com.kista.tradingcore.trading.application.service.TradingExecutionFacade;
+import com.kista.tradingcore.trading.application.service.VrReconfigureService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -37,13 +37,13 @@ import com.kista.shared.kernel.StrategyTicker;
 @RequiredArgsConstructor
 public class TradingCycleController {
 
-    private final StrategyUseCase tradingCycle;                  // CRUD + pause/resume + 이력·주문·시드 미리보기
-    private final TradingExecutionUseCase tradingExecution;      // 수동 실행 + 주문 취소
-    private final VrReconfigureUseCase vrReconfigure;            // VR 전략 운영 중 재설정
-    private final InjectCapitalUseCase injectCapital;           // PRIVACY·INFINITE·DCA 진행 중 사이클 투자금 추가
-    private final WithdrawCapitalUseCase withdrawCapital;       // PRIVACY·INFINITE·DCA 진행 중 사이클 투자금 인출
-    private final DcaConfigUseCase dcaConfig;                    // DCA 설정 수정
-    private final DcaExecutionQuery dcaExecutionQuery;           // DCA 회차 이력 조회
+    private final StrategyService tradingCycle;                  // CRUD + pause/resume + 이력·주문·시드 미리보기
+    private final TradingExecutionFacade tradingExecution;      // 수동 실행 + 주문 취소
+    private final VrReconfigureService vrReconfigure;            // VR 전략 운영 중 재설정
+    private final CapitalLedgerService injectCapital;           // PRIVACY·INFINITE·DCA 진행 중 사이클 투자금 추가
+    private final CapitalWithdrawalService withdrawCapital;       // PRIVACY·INFINITE·DCA 진행 중 사이클 투자금 인출
+    private final DcaConfigService dcaConfig;                    // DCA 설정 수정
+    private final DcaExecutionQueryService dcaExecutionQuery;           // DCA 회차 이력 조회
     private final Clock clock;                                   // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 로그인 사용자의 전 계좌 전략 목록 — 모바일 전략 탭용

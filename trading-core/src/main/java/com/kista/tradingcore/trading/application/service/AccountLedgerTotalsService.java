@@ -9,7 +9,6 @@ import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.broker.application.service.CryptoExchanges;
 import com.kista.tradingcore.trading.application.service.support.UnassignedCashCalculator;
 import com.kista.tradingcore.trading.application.service.support.UnassignedCashCalculator.SeedHolder;
-import com.kista.tradingcore.trading.application.usecase.AccountLedgerTotalsUseCase;
 import com.kista.tradingcore.trading.domain.model.AccountLedgerTotals;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -25,14 +24,14 @@ import java.util.UUID;
 // 시세·잔고 실패는 fail-open: 해당 필드만 null (부분합은 내보내지 않는다)
 @Service
 @RequiredArgsConstructor
-class AccountLedgerTotalsService implements AccountLedgerTotalsUseCase {
+public class AccountLedgerTotalsService {
 
     private final AccountPort accountPort;               // 소유권 검증
     private final UnassignedCashCalculator calculator;   // 시드 점유 전략·원장 목록, 미배정 현금
     private final BrokerPricePort brokerPricePort;       // 주식 계좌 현재가
     private final CryptoExchanges cryptoExchanges;       // 코인 계좌 현재가
 
-    @Override
+    // 계좌 원장 합산 조회 — 소유권 검증 포함
     public AccountLedgerTotals get(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         Currency currency = account.broker().getCurrency(); // 계좌 통화 — 반올림 scale 기준

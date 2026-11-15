@@ -2,7 +2,7 @@ package com.kista.tradingcore.trading.adapter.in.web;
 
 import com.kista.shared.support.FixedClockTestConfig;
 import tools.jackson.databind.ObjectMapper;
-import com.kista.tradingcore.trading.application.usecase.ManualTradeCorrectionUseCase;
+import com.kista.tradingcore.trading.application.service.ManualTradeCorrectionService;
 import com.kista.tradingcore.trading.domain.model.ManualTradeCorrectionCommand;
 import com.kista.shared.platform.security.InternalTokenAuthFilter;
 import com.kista.shared.platform.security.JwtAuthFilter;
@@ -40,7 +40,7 @@ class TradingInternalCommandControllerTest {
 
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean ManualTradeCorrectionUseCase manualTradeCorrectionUseCase;
+    @MockitoBean ManualTradeCorrectionService manualTradeCorrectionUseCase;
 
     private static final String VALID_TOKEN = "test-internal-token";
 

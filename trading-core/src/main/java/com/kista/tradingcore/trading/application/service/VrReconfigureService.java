@@ -16,7 +16,6 @@ import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.trading.domain.model.StrategyCycleVrDetail;
 import com.kista.tradingcore.matching.domain.model.StrategyVrDetail;
-import com.kista.tradingcore.trading.application.usecase.VrReconfigureUseCase;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
@@ -45,7 +44,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-class VrReconfigureService implements VrReconfigureUseCase {
+public class VrReconfigureService {
 
     private final StrategyPort strategyPort;
     private final AccountPort accountPort;
@@ -60,7 +59,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
     private final MarketCalendarPort marketCalendarPort; // 주식 거래일 경계
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
-    @Override
+    // VR 전략 운영 중 재설정 — 새 버전 발급 + 강제 롤오버(현재 사이클 종료→새 사이클 즉시 생성)
     public void reconfigure(UUID strategyId, UUID requesterId, ReconfigureVrCommand cmd) {
         OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
         Strategy strategy = owned.strategy();

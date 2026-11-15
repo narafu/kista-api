@@ -6,7 +6,7 @@ import com.kista.shared.kernel.UserDeletedEvent;
 import com.kista.shared.kernel.UserNotifyProfileChangedEvent;
 import com.kista.shared.platform.crypto.AesCryptoService;
 import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
-import com.kista.tradingcore.trading.application.usecase.UserTradingDataEraseUseCase;
+import com.kista.tradingcore.trading.application.service.UserTradingDataEraseService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -56,7 +56,7 @@ class UserCascadeEndToEndIT {
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired AesCryptoService crypto;
     @Autowired ObjectMapper objectMapper;
-    @MockitoSpyBean UserTradingDataEraseUseCase eraser;          // 정리 실패 주입용
+    @MockitoSpyBean UserTradingDataEraseService eraser;          // 정리 실패 주입용
     @MockitoBean TradingErrorReportPort errorReportPort;    // 관리자 텔레그램 대신 호출 검증
 
     private final UUID userId = UUID.randomUUID();

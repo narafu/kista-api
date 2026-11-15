@@ -1,7 +1,7 @@
 package com.kista.tradingcore.trading.adapter.in.web;
 
 import com.kista.shared.kernel.TradingPolicySettings;
-import com.kista.tradingcore.trading.application.usecase.TradingPolicyUseCase;
+import com.kista.tradingcore.trading.application.service.TradingPolicyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class TradingPolicyInternalController {
 
-    private final TradingPolicyUseCase tradingPolicyUseCase;
+    private final TradingPolicyService tradingPolicyUseCase;
 
     @Operation(summary = "매매 런타임 정책 조회", description = "증권사별 신규 등록 허용·전략 타입별 생성 정책. X-Internal-Token 필수.")
     @GetMapping

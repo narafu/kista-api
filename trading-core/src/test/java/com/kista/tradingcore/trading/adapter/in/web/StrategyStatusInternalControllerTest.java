@@ -8,7 +8,7 @@ import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
-import com.kista.tradingcore.trading.application.usecase.StrategyUseCase;
+import com.kista.tradingcore.trading.application.service.StrategyService;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.shared.platform.security.InternalTokenAuthFilter;
 import com.kista.shared.platform.security.JwtAuthFilter;
@@ -47,7 +47,7 @@ class StrategyStatusInternalControllerTest {
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean AccountPort accountPort;
     @MockitoBean StrategyPort strategyPort;
-    @MockitoBean StrategyUseCase strategyUseCase;
+    @MockitoBean StrategyService strategyUseCase;
 
     private static final String VALID_TOKEN = "test-internal-token";
     private static final UUID ACCOUNT_ID = UUID.randomUUID();

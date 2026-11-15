@@ -9,7 +9,6 @@ import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.domain.model.*;
 import com.kista.tradingcore.matching.domain.model.*;
-import com.kista.tradingcore.trading.application.usecase.StrategyUseCase;
 import com.kista.tradingcore.trading.application.port.output.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,7 +37,7 @@ import com.kista.shared.kernel.StrategyCycleSeedType;
 @Service
 @RequiredArgsConstructor
 @Transactional
-class StrategyService implements StrategyUseCase {
+public class StrategyService {
 
     private final StrategyPort strategyPort;
     private final StrategyVersionPort strategyVersionPort;
@@ -58,7 +57,6 @@ class StrategyService implements StrategyUseCase {
     private final StrategyUpdateWriter updateWriter;               // update DB 쓰기 (전일종가 HTTP를 트랜잭션 밖에 두기 위해 분리)
     private final Clock clock;                                     // 당일(KST) 기준
 
-    @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
         StrategyDetail detail = creationService.register(userId, accountId, cmd);
@@ -66,7 +64,6 @@ class StrategyService implements StrategyUseCase {
         return detail;
     }
 
-    @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 증권사 주문 취소 HTTP 포함 — DB 쓰기는 StrategyStateWriter 짧은 트랜잭션
     public void delete(UUID strategyId, UUID requesterId) {
         OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
@@ -85,7 +82,6 @@ class StrategyService implements StrategyUseCase {
         log.info("[strategyId={}] 전략 삭제: requesterId={}, cancelledOrders={}", strategyId, requesterId, cancelled.cancelledCount());
     }
 
-    @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 증권사 주문 취소 HTTP 포함 — DB 쓰기는 StrategyStateWriter 짧은 트랜잭션
     public void pause(UUID strategyId, UUID requesterId) {
         OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
@@ -107,7 +103,6 @@ class StrategyService implements StrategyUseCase {
                 strategyId, cancelled.cancelledCount(), cancelled.failedCount());
     }
 
-    @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 증권사 주문 취소 HTTP 포함 — DB 쓰기는 StrategyStateWriter 짧은 트랜잭션
     public void archive(UUID strategyId, UUID requesterId) {
         OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
@@ -151,7 +146,6 @@ class StrategyService implements StrategyUseCase {
         }
     }
 
-    @Override
     public void resume(UUID strategyId, UUID requesterId) {
         Strategy strategy = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId).strategy();
         strategy.requireNotArchived(); // 보관은 한 방향 — 재개 불가
@@ -197,7 +191,7 @@ class StrategyService implements StrategyUseCase {
         log.info("[strategyId={}] 재개 — 종료된 사이클 재오픈: seed={} ({})", strategy.id(), seed, strategy.cycleSeedType());
     }
 
-    @Override
+    // 로그인 사용자의 전 계좌 전략 목록 (계좌 무관 집계) — 모바일 전략 탭용
     @Transactional(readOnly = true)
     public List<StrategyDetail> listByUserId(UUID userId, boolean includeArchived) {
         List<Account> accounts = accountPort.findByUserId(userId);
@@ -212,14 +206,12 @@ class StrategyService implements StrategyUseCase {
         return detailAssembler.toDetails(strategies, marketByAccountId);
     }
 
-    @Override
     @Transactional(readOnly = true)
     public List<StrategyDetail> listByAccountId(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         return detailAssembler.toDetails(strategyPort.findByAccountId(accountId).stream().filter(s -> !s.isArchived()).toList(), Map.of(accountId, account.broker().getMarket()));
     }
 
-    @Override
     @Transactional(readOnly = true)
     public StrategyDetail getById(UUID strategyId, UUID requesterId) {
         OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
@@ -228,7 +220,6 @@ class StrategyService implements StrategyUseCase {
         return detailAssembler.toDetail(strategy, account.broker().getMarket());
     }
 
-    @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // INFINITE 최소 시드 검사의 전일종가 HTTP는 트랜잭션 밖 — 소유권·잠금·쓰기는 StrategyUpdateWriter 트랜잭션
     public StrategyDetail update(UUID strategyId, UUID requesterId, UpdateStrategyCommand cmd) {
         BigDecimal minSeed = null;
@@ -245,7 +236,7 @@ class StrategyService implements StrategyUseCase {
 
     // ── 조회 전용 (stats에서 이관 — 전략 소유 read) ─────────────────────────────
 
-    @Override
+    // 전략 등록/수정 폼용 최소시드·기준가 미리보기 (등록 시점 minRequiredDeposit 계산과 동일 경로)
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public StrategySeedPreview strategySeedPreview(
             UUID accountId, UUID requesterId,
@@ -253,7 +244,7 @@ class StrategyService implements StrategyUseCase {
         return historyQueryService.strategySeedPreview(accountId, requesterId, type, ticker, divisionCount);
     }
 
-    @Override
+    // 전략(사이클) 기준 거래 이력 조회 — 커서 기반 페이지네이션
     @Transactional(readOnly = true)
     public CycleHistoryPage getByStrategy(UUID strategyId, UUID requesterId,
                                           LocalDate from, LocalDate to,
@@ -261,7 +252,7 @@ class StrategyService implements StrategyUseCase {
         return historyQueryService.getByStrategy(strategyId, requesterId, from, to, cursor, size);
     }
 
-    @Override
+    // 전략(사이클) 기준 기간 내 주문 내역 조회 — 사용자 전략 상세 화면용
     @Transactional(readOnly = true)
     public List<Order> getOrdersByStrategy(UUID strategyId, UUID requesterId, LocalDate from, LocalDate to) {
         return historyQueryService.getOrdersByStrategy(strategyId, requesterId, from, to);

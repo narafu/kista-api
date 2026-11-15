@@ -3,7 +3,7 @@ package com.kista.tradingcore.trading.adapter.in.web;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
-import com.kista.tradingcore.trading.application.usecase.StrategyUseCase;
+import com.kista.tradingcore.trading.application.service.StrategyService;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.shared.kernel.StrategyStatus;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,7 +23,7 @@ public class StrategyStatusInternalController {
 
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
-    private final StrategyUseCase strategyUseCase; // 사용자 재개와 동일 경로 — 종료된(좀비) 사이클 재오픈 포함
+    private final StrategyService strategyUseCase; // 사용자 재개와 동일 경로 — 종료된(좀비) 사이클 재오픈 포함
 
     @Operation(summary = "전략 상태 변경(일시중지/재개)", description = "관리자 일시중지/재개 전용. 소유권 불일치 시 400. X-Internal-Token 필수.")
     @PatchMapping("/status")

@@ -3,7 +3,7 @@ package com.kista.tradingcore.trading.adapter.in.schedule;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.tradingcore.trading.application.port.output.HeartbeatPort;
-import com.kista.tradingcore.trading.application.usecase.CryptoDcaExecutionUseCase;
+import com.kista.tradingcore.trading.application.service.CryptoDcaRunner;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 @ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true) // local에서 끄면 운영 DB·텔레그램과 중복 방지
 public class CryptoDcaScheduler {
 
-    private final CryptoDcaExecutionUseCase useCase;
+    private final CryptoDcaRunner useCase;
     private final SchedulerLockService schedulerLockService;
     private final HeartbeatPort heartbeatPort; // dead-man's switch 핑
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입

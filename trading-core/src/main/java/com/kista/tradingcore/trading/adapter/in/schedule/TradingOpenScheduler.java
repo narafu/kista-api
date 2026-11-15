@@ -4,7 +4,7 @@ import com.kista.shared.platform.scheduling.SchedulerJobRunner;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
-import com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase;
+import com.kista.tradingcore.trading.application.service.TradingExecutionFacade;
 import com.kista.tradingcore.trading.application.port.output.HeartbeatPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
@@ -31,7 +31,7 @@ public class TradingOpenScheduler {
 
     static final LocalTime CRON_TIME = LocalTime.of(22, 0); // cron 발화 시각 — 아래 @Scheduled cron(22:00)과 같아야 한다(TradingBatchResumer 참조)
 
-    private final TradingExecutionUseCase useCase;
+    private final TradingExecutionFacade useCase;
     private final StrategyPort strategyPort;
     private final SchedulerLockService schedulerLockService;
     private final BatchContextFactory contextFactory;

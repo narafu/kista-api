@@ -29,7 +29,7 @@ shared.platform 공용 인프라 leaf(OPEN)
 # trading-core 프로세스 (kista-trading) — trading-core 9 + shared 3
 matching        주문생성 커널(순수 계산)                 kernel
 broker          증권사 연동(메리츠·토스·KIS·Mock 등)   domain/port/application
-trading         주문·사이클 실행·전략 설정               domain/usecase/port/schedule/event
+trading         주문·사이클 실행·전략 설정               domain/port/schedule/event
 stats           통계·백테스트·포트폴리오 조회            domain/port
 notify          매매 알림 리스너·게이트웨이              (없음)
 marketcalendar  미국 시장 휴장일                         domain/port

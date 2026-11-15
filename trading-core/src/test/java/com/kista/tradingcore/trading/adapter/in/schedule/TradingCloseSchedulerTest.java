@@ -12,7 +12,7 @@ import com.kista.tradingcore.trading.domain.model.BatchContext;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
-import com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase;
+import com.kista.tradingcore.trading.application.service.TradingExecutionFacade;
 import com.kista.tradingcore.trading.application.port.output.HeartbeatPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
@@ -52,7 +52,7 @@ import com.kista.shared.kernel.StrategyCycleSeedType;
 @ExtendWith(MockitoExtension.class)
 class TradingCloseSchedulerTest {
 
-    @Mock TradingExecutionUseCase useCase;
+    @Mock TradingExecutionFacade useCase;
     @Mock StrategyPort strategyPort;
     @Mock SchedulerLockService schedulerLockService;
     @Mock BatchContextFactory contextFactory;

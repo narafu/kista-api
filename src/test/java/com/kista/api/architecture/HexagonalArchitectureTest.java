@@ -71,7 +71,7 @@ class HexagonalArchitectureTest {
                     .or(resideInAnyPackage(VENDOR_MODEL_PACKAGES))
                     .or(IS_ENTITY).or(simpleNameEndingWith("JpaRepository")).as("인프라 타입");
     // 제거 대기 목록(single-impl-interfaces.txt)의 상한 — 목록에 새 항목을 더해 통과시키는 것을 막는다
-    private static final int PENDING_REMOVAL_CEILING = 94;
+    private static final int PENDING_REMOVAL_CEILING = 82;
     // 구현이 다른 모듈에 있어 순환을 끊는 포트(decisions.md "포트 역전(DIP)")
     private static final Set<String> DEPENDENCY_INVERSION_PORTS = Set.of(
             "com.kista.api.user.application.port.output.ApprovalPolicyPort",

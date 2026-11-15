@@ -1,7 +1,7 @@
 package com.kista.tradingcore.trading.adapter.in.event;
 
 import com.kista.shared.kernel.UserDeletedEvent;
-import com.kista.tradingcore.trading.application.usecase.UserTradingDataEraseUseCase;
+import com.kista.tradingcore.trading.application.service.UserTradingDataEraseService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
@@ -18,7 +18,7 @@ import static org.mockito.Mockito.inOrder;
 @ExtendWith(MockitoExtension.class)
 class TradingUserCascadeListenerTest {
 
-    @Mock UserTradingDataEraseUseCase eraser;
+    @Mock UserTradingDataEraseService eraser;
     @InjectMocks TradingUserCascadeListener listener;
 
     private final UUID userId = UUID.randomUUID();

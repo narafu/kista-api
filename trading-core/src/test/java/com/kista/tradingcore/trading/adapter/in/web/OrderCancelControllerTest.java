@@ -1,7 +1,7 @@
 package com.kista.tradingcore.trading.adapter.in.web;
 
 import com.kista.tradingcore.trading.domain.model.OrderCancelException;
-import com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase;
+import com.kista.tradingcore.trading.application.service.TradingExecutionFacade;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -28,7 +28,7 @@ class OrderCancelControllerTest {
 
     @Autowired MockMvc mockMvc;
 
-    @MockitoBean TradingExecutionUseCase tradingExecution;
+    @MockitoBean TradingExecutionFacade tradingExecution;
 
     private static final UUID ORDER_ID = UUID.fromString("00000000-0000-0000-0000-000000000099");
 

@@ -1,6 +1,6 @@
 package com.kista.tradingcore.trading.adapter.in.web;
 
-import com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase;
+import com.kista.tradingcore.trading.application.service.TradingExecutionFacade;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +18,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OrderCancelController {
 
-    private final TradingExecutionUseCase tradingExecution;
+    private final TradingExecutionFacade tradingExecution;
 
     // 특정 주문 1건 취소 — PLANNED는 DB 취소, PLACED는 증권사 취소 후 DB 취소, 그 외 상태는 409
     @Operation(summary = "개별 주문 취소")

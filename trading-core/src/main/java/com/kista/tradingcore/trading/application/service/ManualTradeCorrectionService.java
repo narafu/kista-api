@@ -20,7 +20,6 @@ import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
-import com.kista.tradingcore.trading.application.usecase.ManualTradeCorrectionUseCase;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
@@ -46,7 +45,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional
-class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
+public class ManualTradeCorrectionService {
 
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
@@ -60,7 +59,6 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
     private static final int CRYPTO_SCALE = 8; // 코인 수량 소수 자릿수 상한 (업비트)
     private final CycleOrderStrategies cycleOrderStrategies; // 청산 시 사이클 종료 여부(endsCycleOnLiquidation) SSOT
 
-    @Override
     public ManualTradeCorrectionResult correctManualFills(ManualTradeCorrectionCommand command) {
         SelectionChain.Selection sel = SelectionChain.resolveAndValidate(
                 accountPort, strategyPort, command.accountId(), command.strategyId(), command.userId());

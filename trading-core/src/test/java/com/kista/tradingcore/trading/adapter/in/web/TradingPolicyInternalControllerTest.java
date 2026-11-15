@@ -5,7 +5,7 @@ import com.kista.shared.platform.security.JwtAuthFilter;
 import com.kista.shared.platform.security.SecurityConfig;
 import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.shared.kernel.TradingPolicySettings;
-import com.kista.tradingcore.trading.application.usecase.TradingPolicyUseCase;
+import com.kista.tradingcore.trading.application.service.TradingPolicyService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -39,7 +39,7 @@ class TradingPolicyInternalControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean TradingPolicyUseCase tradingPolicyUseCase;
+    @MockitoBean TradingPolicyService tradingPolicyUseCase;
 
     private static final String VALID_TOKEN = "test-internal-token";
 
