@@ -273,3 +273,37 @@ ui 코드 변경은 필요 없다. ui가 부르는 `/api/auth` 경로 6개(`kaka
 - **ui 요청(로그아웃 때 AT가 실제로 막히려면)**: ui 프록시 `app/api/auth/logout/route.ts:18-27`은 RT 쿠키만 보내고 `Authorization`을 보내지 않는다(RT가 없으면 api를 부르지도 않는다). 그래서 로그아웃해도 AT의 jti는 한 번도 블랙리스트에 들어가지 않았고, 그 파일의 주석 "AT 블랙리스트 등재"는 사실과 다르다. api는 이제 AT만 와도 막으므로 ui가 `Authorization: Bearer <AT 쿠키>`를 함께 보내면 된다. 순서가 있다: 지금은 만료된 AT를 실으면 `JwtAuthFilter`가 컨트롤러 전에 401로 끊어 RT 삭제까지 건너뛴다(`RootSecurityPolicyTest.authRoutes_invalidTokenStays401WithErrorBody`가 고정한 기존 동작). 그래서 ① api가 먼저 `POST /api/auth/logout`을 무효 토큰 익명 통과 목록(`anonymousFallbackMatchers`)에 넣고 ② 그 배포 뒤 ui가 AT를 싣는다. ①은 이번 범위(13 5절의 5건) 밖이라 하지 않았다 — 사용자 승인 대기.
 - PENDING 차단(`role` 클레임 제거, 허용 경로 9개)은 이번에 하지 않았다. E절·G절 회신의 내용은 그대로 유효하다.
 
+
+## I. 05 단계 M 전환 배포에서 나온 레포 간 항목 (2026-11-15, fable-api 재검토)
+
+근거는 `findings/29-merge-readiness.md` 부록 D(kista-infra 2026-11-15 `7191500` 기준 읽기 전용 조사), 런북은 `guides/05-modules-and-processes.md` 14-3절. kista-infra는 이 세션에서 고치지 않았다.
+
+### I-1. kista-infra가 전환 전에 브랜치로 준비할 것 (main에는 전환 당일 3단계에서 넣는다)
+
+- `state/kista-api.yml`의 `roles` 키를 `kista-worker`·`kista-web` 둘로 바꾼다. **값은 그때의 옛 SHA 그대로 둔다** — `resolve-request.sh:39-43`이 요청이 state보다 새것일 때만 채택하므로, 새 SHA를 미리 적으면 수동 reconcile이 "변경 없음"으로 끝난다.
+- 같은 커밋에서 role 3개가 박힌 픽스처를 본다: `.github/tests/{reconcile,drift,request}.bats`, `README.md`의 배포 구성도. 픽스처가 실제 state 파일을 읽지 않으면 고칠 것이 없을 수 있다 — bats를 돌려 판단한다.
+- 이 커밋이 main에 들어가는 순간부터 kista-api의 push는 새 role로 자동 배포된다. 그래서 옛 `kista-scheduler`·`kista-trading`을 정지한 **뒤에** 넣는다(먼저 넣으면 worker와 옛 role이 함께 돈다). state는 `reconcile.yml`만 쓰는 파일이라, 진행 중인 `deploy-kista-api` 실행이 없을 때 넣는다.
+
+### I-2. 전환이 기대는 kista-infra의 지금 동작 (바꾸면 05 14-3절을 같이 고친다)
+
+| 동작 | 위치 | 전환에서의 쓰임 |
+|---|---|---|
+| 번들의 `roles`와 state의 role 키가 다르면 서버를 건드리기 전에 실패 | `build-bundle.sh:17-20` | M 합병 push가 자동으로 배포되지 않게 하는 유일한 장치 |
+| roles에서 빠진 서비스의 컨테이너를 지우지 않는다(`--remove-orphans` 없음) | `reconcile.sh:142` | 옛 컨테이너는 사람이 `docker stop`·`rm` 한다. 정지해 둔 옛 컨테이너가 롤백 수단이다 |
+| 자동 롤백은 직전 release의 compose로 되돌린다 | `reconcile.sh:76` | 새 role 이름은 직전 compose에 없어 실패한다(exit 2). 전환의 롤백은 서버에서 `reconcile.sh kista-api <옛 release id>` 직접 실행 |
+| 수동 `Reconcile App`은 state보다 옛 SHA를 무시한다 | `resolve-request.sh:39-43,70-74` | 워크플로로는 롤백할 수 없다 |
+| role 이미지 변수는 role 이름에서 만든다(`KISTA_WORKER_IMAGE`) | `state-lib.sh:22` | api compose의 변수 이름이 여기에 맞아야 한다 |
+| 앱 reconcile에는 매매 시간대 가드가 없다 | `server-deploy.yml:103-114` | 시간대는 사람이 지킨다 |
+| 릴리스 5개 보존, `previous` 심링크 | `reconcile.sh:182-199` | 전환 전 `current`의 release id를 적어 둔다 |
+
+### I-3. 전환 뒤에 따로 할 것 (kista-infra)
+
+- 엔진 대역 `lb_try_duration` 5초: 지금 `Caddyfile:9`의 `(upstream)` 스니펫이 전 대역 120초를 준다. 인자를 하나 더 받게 하거나 엔진용 스니펫을 따로 둔다(infra 지침서 03 5-5절, api 05 7절). api 스니펫의 `handle_errors`(`ENGINE_RESTARTING`)와 같은 배포.
+- `reconcile.yml:50` 주석과 `timeout-minutes: 45`의 "role 3개" 전제.
+- drift-check는 전환 중에는 조용하다(옛 컨테이너를 전부 정지하므로). 무중단 변형을 고르면 `kista-api: 고아 kista-api` 알림이 한 번 온다.
+
+### I-4. 의심 사항 (확인하지 못했다)
+
+- api `deploy/server/README.md`의 롤백 절("state를 그 SHA로 수정·커밋한 뒤 dispatch")은 `resolve-request.sh`의 로직으로는 "변경 없음"이 된다. 실행해 보지는 않았다. 맞다면 README를 "서버에서 `reconcile.sh <app> <release id>`"로 고친다(infra README의 수동 복구 절과 같게).
+- 자동 배포를 잠시 끄는 스위치가 두 레포 어디에도 없다. 전환은 I-2 첫 줄로 버티지만, 다음에 role 구성이 또 바뀔 일이 있으면 워크플로 변수 하나(`DEPLOY_PAUSED`)를 두는 편이 낫다 — 지금은 만들지 않는다.
+- api `deploy/server/docker-compose.yml:80` 주석("`TradingSchedulerInternalController`가 게이팅 없이 항상 노출")은 코드와 다르다(`:21`에 게이트가 있다). `compose-invariants.bats`는 재발행 플래그를 `kista-trading`만 단언해 `constraints.md`의 서술보다 좁다. 둘 다 M의 배포 파일 수정에서 없어진다.

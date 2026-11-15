@@ -1,6 +1,6 @@
 # 지침서 05. 코드베이스 통합과 모듈 재구성 — 실행 지침
 
-> **실행 세션은 먼저 맨 끝의 13절 "실행 전 보정"과 `00-roadmap.md` 9절(공통 규칙)을 읽는다.** 본문과 다르면 그쪽이 우선한다. (2026-11-14)
+> **실행 세션은 먼저 맨 끝의 14절 "2차 실행 전 보정"(2026-11-15), 13절 "실행 전 보정", `00-roadmap.md` 9절(공통 규칙)을 읽는다.** 서로 다르면 14절 → 13절 → 본문 순으로 우선한다. 4-3절(전환 배포)은 14-3절이 대체한다.
 
 작성 2026-11-11, **전면 개정 2026-11-12** (Fable). 이 문서는 Fable 없이 Opus/Sonnet이 실행하는 것을 전제로 쓴다.
 
@@ -345,3 +345,293 @@ market  benchmark  finance  notification  ops  platform  app(모듈 아님: 앱 
 - R ↔ T 순환 빈 참조: 순환을 만드는 호출 가운데 web 쪽에서 엔진으로 가는 호출을 읽기 전용 `api` 인터페이스 호출로, 엔진에서 web 쪽으로 가는 호출을 이벤트로 바꾼다. 그래도 안 풀리면 단계 M 브랜치를 합치지 않고 순환 경로(빈 이름 사슬)를 `questions.md`에 "사용자 결정 필요"로 적는다. `@Lazy`로 넘기지 않는다.
 - 탈퇴 cascade가 EPR 행 없이 실행된다: M9에서 T 리스너 둘(`TradingUserCascadeListener`·`UserNotifyProfileSyncListener`)이 `@TransactionalEventListener`로 남아 있고 발행 지점이 트랜잭션 안인지 본다. 고쳐도 EPR 행이 남지 않으면 스트림 경로를 그대로 둘 수는 없다(한 컨텍스트에서는 같은 이벤트를 서로 재발행해 순환한다 — 2절의 M4 위험). 대안은 Q-06의 선택지 1이다: 컨슈머가 trading 내부 전용 이벤트로 재발행하고 T 리스너가 그 타입을 듣는다. 리스너 파라미터 타입이 바뀌므로 배포 직전 EPR 미완료 행 0건을 확인한다.
 - 전환 뒤 주문 수·금액이 미리보기와 다르다, worker가 둘 떴다, EPR 미완료 행이 줄지 않는다: 4-3절의 롤백을 사용자에게 요청한다. 원인을 찾기 전에 다시 전환하지 않는다.
+
+## 14. 2차 실행 전 보정 (2026-11-15, Fable — 본문·13절과 다르면 이 절이 우선)
+
+Fable이 마지막으로 본 절이다. 측정 원본은 `findings/29-merge-readiness.md`(위험·충돌·M 목록 재측정, kista-infra 배포 구성 원본은 부록 D). 13절의 정정 가운데 이 절이 다시 고친 것: 가드 줄 번호(규칙 이름으로 찾는다), M9 삭제 목록, M12, M14, 4-3 전체.
+
+### 14-1. 순서 결정
+
+```
+P3 → P4            (W2. 지금 시작한다. 04 A를 기다리지 않는다)
+04 단계 A(KIS 삭제)  (P3·P4와 다른 세션에서 병행 가능. M 브랜치를 만들기 전에 main에 들어가 있어야 한다)
+15 단계 A(코인 삭제) (아래 조건이 맞으면 M 앞, 아니면 M 관찰 뒤)
+M 브랜치 → 전환 배포(14-3) → 2거래일 관찰
+X → R → G
+```
+
+| 결정 | 이유 | 반대 순서의 비용 |
+|---|---|---|
+| **P3·P4는 지금 한다** | M4(search_path)·M10(role 가드)의 선행이다. KIS·코인 전용 파일에는 native SQL이 0개라 04 A·15를 기다려도 줄어드는 작업이 없다(`findings/29` 3-2) | 기다리면 M이 그만큼 늦어질 뿐이다 |
+| **04 A를 M 앞에 둔다** | ① 1-1 원칙의 전제 가운데 토큰 발급 경합(M3)이 KIS에만 있다. 지우면 사라진다 ② 운영 데이터를 지우는 SQL과 가드 5곳 수정이 M 관찰 기간과 겹치지 않는다 ③ 사용자 쪽 작업이 끝나 외부 대기가 없다 | M을 먼저 하면 지울 파일 25개를 합병 때 한 번 더 만지고(yml 키 3, 빈 12, `ApplicationContextLoadTest`의 저장소 수), 전환 직후 이상이 생겼을 때 원인 후보에 KIS 삭제가 섞인다 |
+| **15는 조건부로 M 앞** | 코인 삭제는 M 항목을 없애지 않는다(구조 작업이라). 줄어드는 것은 빈 41개, 10분 틱 스케줄러, X6 호출처 2개다. 한편 15 단계 A는 kista-ui 코인 화면 제거 배포(`cross-repo.md` G1), S16, 사용자의 정책 비활성(15 단계 P ②)을 기다린다 | 15를 무조건 앞에 두면 ui 일정이 M을 막는다. 15를 무조건 뒤에 두면 전환 당일 `crypto-dca` 틱이 10분마다 돌고, 합병 때 코인 파일 100여 개를 옮긴다 |
+| P6은 따로 할 일이 없다 | 삭제 목록이 14-2로 확정됐다 | — |
+
+**15의 판정 규칙(실행 세션이 스스로 정한다):** P3·P4·04 A가 main에 들어간 날, 15 단계 A의 선행 넷(S17 배포 ✅, 사용자 단계 P ①✅·②, ui G1 배포, S16)이 전부 끝나 있으면 15 단계 A를 M 앞에 한다. 하나라도 남았으면 기다리지 않고 M 브랜치를 시작하고, 15는 M의 2거래일 관찰이 끝난 뒤에 한다. M 브랜치를 시작한 뒤에는 15를 끼워 넣지 않는다.
+
+같이 지킬 것:
+
+- M 브랜치가 열려 있는 동안 main에 들어가도 되는 것은 문서와 긴급 수정뿐이다. 합병 브랜치는 파일 대부분을 건드려 rebase 비용이 크다. 다른 묶음(S7·S9·S13·N8 등)은 M 브랜치 시작 전이나 전환 뒤로 미룬다.
+- 전환 주에는 N9(06 T3~)·N19(14 T3 시세 전환)를 배포하지 않는다. S11·S15 T2의 관찰(2026-11-16~18)이 끝난 뒤에 전환한다.
+- P3·P4·04 A는 동작이 같으므로 배포 승인 대상이 아니다(9-4). 단 P4는 env 먼저(`KISTA_ROLE`을 3 role compose에 넣는 배포 → 코드 배포), 04 A의 데이터 SQL은 사용자 승인 뒤다.
+
+### 14-2. M 커밋 목록 보정 (4-1절 표에 덮어쓴다)
+
+| # | 보정 |
+|---|---|
+| M1 | 이미지는 원래 1개다. 할 일은 root에 `implementation(project(":trading-core"))`, T의 `bootJar` 끄고 `jar` 켜기, `Dockerfile`의 `:trading-core:bootJar`·`trading-core.jar` 복사·`APP_JAR` 삭제, compose의 `APP_JAR`·`SERVER_PORT` 삭제. `shared/build.gradle.kts`의 `bootJar` 설정도 같이 본다 |
+| M2 | `@EntityScan`·`@EnableJpaRepositories`는 지금 없다(기본 스캔). 새로 넣는다. `@ConfigurationPropertiesScan`은 `com.kista.tradingcore`만 주면 된다(R은 쓰지 않는다) |
+| M3 | 값이 다른 키는 11개고 전부 `findings/10` B-1에 있다. 표에 없는 한쪽 키 6개는 R 값을 그대로 둔다(prod 값은 양쪽이 같다). `spring.application.name`은 `kista-api`, `server.port` 8080, `spring.data.redis.url`·`cors.allowed-origins`는 R 쪽 정의 |
+| M5 | `SPRING_FLYWAY_BASELINE_ON_MIGRATE`는 어디에도 없다. 대체 프로퍼티를 만들지 않는다. **M 브랜치에는 마이그레이션 파일을 하나도 넣지 않는다**(롤백이 스키마와 무관해야 한다 — 14-3). `public.scheduler_locks`·`trading.event_publication` drop은 단계 X 뒤의 별도 배포다 |
+| M6 | 락 이름 R 8·T 7, 겹침 0. 운영 `public.scheduler_locks`에 `trading-open`·`trading-close` 등 낡은 행이 있지만 `trading` 쪽 테이블을 쓰므로 영향이 없다. 건드리지 않는다 |
+| M9 | 삭제 대상 확정: ① T `AppErrorStreamPublisher` + R `AppErrorStreamConsumer`(테스트 각 1, `flows.yml:1530,1540`) ② R `UserEventStreamPublisher`, T `UserEventStreamConsumer`·`UserDeletedStreamConsumer`·`UserNotifyProfileStreamConsumer`·`UserEventRepublisher`·`UserEventStreamBridge`(테스트 9개, `flows.yml:593,601-602,1193`) ③ **R `api.web.UserEventResubmitScheduler`를 지우고 T 쪽을 남긴다** — T가 `AccountDeletedEvent`까지 거르는 상위집합이고 이미 `adapter/in/schedule`에 있어 13절의 "옮긴다"가 필요 없다. R 쪽 테스트(`UserEventResubmitSchedulerTest`·`UserEventResubmitEndToEndIT`)의 단언 가운데 T 테스트에 없는 것만 옮긴다 ④ T `ClockConfig`(가드의 FQCN 예외 한 줄) ⑤ **`ExceptionReporter` 한 벌 — T `TradingExceptionReporter`를 지우고 R `ApiExceptionReporter`를 남긴다**(13절에 없던 항목. 안 지우면 `NoUniqueBeanDefinitionException`). `app_error_logs` context의 caller 값이 매매 쪽 오류도 `ApiExceptionReporter`로 찍히게 된다 — 알고 넘어간다. `PlainDecimalSerializer`는 없다 |
+| M10 | 신설 대상 전부 0건에서 시작한다(P4가 `kista.role`·`@ConditionalOnWorkerRole`을 먼저 만든다). `RoleRoutes`·`RoleRoutingGuard`는 인터페이스를 두지 않는다(`PENDING_REMOVAL_CEILING` 여유 0) |
+| M11 | worker의 `INTERNAL_API_BASE_URL`은 `http://localhost:8080`이다. `@Scheduled` 잡이 내부 API를 부르는 일은 없지만, worker로 라우팅되는 `/api/admin/scheduler/**`의 수동 트리거가 내부 HTTP를 거쳐 자기 자신을 부른다. web은 `http://kista-worker:8080` |
+| M12 | "R → T 금지" 규칙은 원래 없다. 고칠 것: `ApplicationContextLoadTest`의 "trading-core 빈이 없다" 단언 삭제와 저장소 수 합산, `TradingApplicationContextLoadTest`의 단언을 그쪽으로 합치기, `TradingApplication` 코드 참조 4파일, `RootDataJpaTestBase` 상속 19개, `OpenApiSchemaNameCollisionTest` 두 벌을 한 벌로(두 패키지를 함께 스캔해야 R·T 사이 충돌을 잡는다), `OpenApiNullMarkedRecordContractTest` 두 벌 |
+| M13 | `MarketSessionResponse`는 이미 풀렸다. `Market`·`InvestmentPoint`는 합친 스펙을 한 번 받아 보고 충돌할 때만 `@Schema(name)`을 단다 |
+| M14 | 가상 스레드가 켜져 있다(`spring.threads.virtual.enabled: true`). `spring.task.scheduling.pool.size`를 넣지 않는다. 확인만 한다: 컨텍스트의 `TaskScheduler` 빈이 `SimpleAsyncTaskScheduler`인지. `ThreadPoolTaskScheduler`면 크기 4를 준다. Hikari는 `maximum-pool-size: ${DB_POOL_MAX:5}`로 두고 compose에서 worker만 10(DB `max_connections` 100, 지금 사용 7). 힙: web `-Xmx1280m`·`mem_limit 2048m`, worker `-Xmx2048m`·`mem_limit 3072m`, 둘 다 `MaxMetaspaceSize=384m`(합친 컨텍스트라 320m에서 올린다) |
+| 배포 파일 | 같은 브랜치에서: `deploy/server/{docker-compose.yml,roles,bluegreen,README.md}`, `caddy/kista-api.caddy`(upstream 이름만. `lb_try_duration`·`handle_errors`는 넣지 않는다 — 14-3 끝), `deploy/hooks/pre-apply.sh`(매핑을 `kista-worker) schema=public`으로, `kista-web`은 건너뜀), `.github/scripts/detect-deploy-scope.sh`(플래그를 `verify`·`config`·`web`·`worker`로. jar가 하나이므로 main 소스가 바뀌면 web·worker 둘 다), `.github/tests/{compose-invariants,deploy-plan,pre-apply}.bats`. compose 이미지 변수 이름은 `KISTA_WORKER_IMAGE`·`KISTA_WEB_IMAGE`여야 한다(kista-infra가 role 이름에서 만든다). `compose-invariants.bats`에 "재발행 플래그는 `kista-worker`만 true, `kista-web`에는 없다"를 넣는다(지금 가드는 trading 한 줄만 본다) |
+
+M 브랜치 완료 판정에 더한다:
+
+1. 빈 DB에서 `kista.role=all`로 기동 성공.
+2. **로컬 2 프로세스 리허설**: 같은 jar를 `KISTA_ROLE=worker`(8081)와 `KISTA_ROLE=web`(8080)으로 띄워 ① worker 로그에 스케줄 등록과 `market-calendar-startup` 락 획득 ② web 로그에 스케줄 등록 없음 ③ web에 엔진 경로를 치면 503 `WRONG_ROLE` ④ dev 사용자 탈퇴 → `public.event_publication`에 `TradingUserCascadeListener` 행이 생기고 완료됨 ⑤ `stream:user.deleted`·`stream:app.error`의 `XLEN`이 늘지 않음. 이때 본 worker·web의 기동 로그 줄을 14-3의 5·6단계 기대값으로 적어 둔다(이 문서의 해당 칸을 채운다).
+3. `deploy-plan.bats`에 "state의 role 키가 옛 이름(`kista-api`·`kista-scheduler`·`kista-trading`)이고 새 플래그가 켜진 경우 role SHA가 바뀌지 않는다"를 넣는다(14-3의 안전 장치가 여기에 기댄다).
+
+### 14-3. 전환 런북 (4-3절을 대체한다)
+
+kista-infra의 지금 동작(`findings/29` 부록 D)이 4-3절 초안과 다른 점:
+
+- **자동 배포를 끄는 스위치가 없다.** skip 토큰도 경로 필터도 없다. 대신 `build-bundle.sh:17`이 "번들의 `roles`와 state의 role 키가 다르면" 서버를 건드리기 전에 실패한다. 전환은 이 실패를 안전 장치로 쓴다.
+- `plan-deploy.sh:46`은 state의 role 이름에서 `kista-`를 뗀 문자열을 `detect-deploy-scope.sh`의 플래그 키로 쓴다. state 키와 플래그 이름이 같은 시점에 바뀌어야 한다.
+- reconcile의 자동 롤백은 직전 release의 compose로 되돌리는데 거기에는 새 role이 없다. 이름이 바뀌는 배포가 실패하면 수동 복구다.
+- infra의 `Reconcile App` 수동 실행은 state보다 옛 SHA를 무시한다. 롤백은 서버에서 `reconcile.sh`를 직접 부른다.
+- `pre-apply.sh`는 모르는 role 이름을 건너뛴다. M 브랜치가 매핑을 고쳐야 전환 배포에서 EPR 검사가 돈다.
+- Caddy 스니펫 설치와 reload는 reconcile이 모든 role 통과 뒤 스스로 한다.
+- `lb_try_duration`은 지금 전 대역 120초(`kista-infra/Caddyfile:9`), 게이트는 role당 최대 5분, compose healthcheck `start_period` 180초.
+
+**초안과 다르게 정한 것 — 옛 `kista-api`도 내린다(전체 정지).** 초안은 가계부·로그인을 살리려고 옛 `kista-api`를 끝까지 뒀다. 그러면 ① 옛 api가 전환 중에 발행한 사용자 이벤트가 소비자 없는 스트림으로 가서 사라지고(새 코드는 스트림을 읽지 않는다) ② 옛 리스너 id의 EPR 행이 새로 쌓이며 ③ 메모리가 겹치고 ④ 고아 알림이 온다. 활성 사용자가 2명이고 창이 토요일 낮이다. 15~20분 전체 정지가 이 넷을 다 없앤다. 사용자가 무중단을 원하면 14-3 끝의 "옛 api를 살려 두는 변형"을 쓴다.
+
+**일시:** 토요일 KST 09:00~12:00(금요일 마감 리포트 뒤, 월요일 22:00 개장 배치까지 약 60시간). 미국장 조기 폐장·휴장 주여도 무방하다. 평일이면 KST 09:00~15:00. **사용자가 정한다.**
+
+**역할:** 사용자 = 일시 결정, 각 관문의 go/no-go, push·workflow 실행, 브라우저 확인. 실행 세션(kista-api) = 읽기 전용 조회, 사용자가 그 자리에서 승인한 서버 쓰기 명령(`docker stop/start/rm`, EPR SQL). kista-infra 세션 = state 키 커밋(D-0 3단계)과 그 레포의 테스트. 운영 쓰기는 한 단계씩 승인받는다.
+
+#### D-7 ~ D-1 (준비)
+
+| # | 누가 | 할 일 | 확인 |
+|---|---|---|---|
+| a | 실행 세션 | M 브랜치 완성, 14-2의 완료 판정 3개 통과 | 전체 검증 통과, 리허설 기록 |
+| b | 실행 세션 | 배포 전 확인표(로드맵 9-4)를 사용자에게 보고: 이 런북, 리허설에서 얻은 기대 로그, M 브랜치에 마이그레이션 0개(`git diff main --stat -- '*.sql'`가 비어 있음) | 사용자 승인 |
+| c | kista-infra 세션 | state 키 변경 커밋을 **브랜치로** 준비(`cross-repo.md` I-1). main에는 아직 넣지 않는다 | infra bats 통과 |
+| d | 사용자 | D-1 낮(매매 시간대 밖)에 M 브랜치를 main에 합치고 push | 아래 e |
+| e | 실행 세션 | push 뒤 `Server Deploy` 실행을 본다. **기대: infra `Reconcile App`이 "deploy/server/roles와 state의 role 목록이 다름"으로 실패하고 텔레그램 `[배포 실패]`가 온다. 서버는 그대로다.** `ssh kista-server 'docker ps --format "{{.Names}} {{.Image}}"'`의 이미지 SHA가 push 전과 같아야 한다 | 다르면 즉시 중단·보고(전환이 자동으로 시작된 것이다) |
+| f | 사용자 | api `Server Deploy`를 수동 실행(`build_only=true`)해 M 커밋의 이미지를 만든다 | `docker manifest inspect ghcr.io/narafu/kista-api:<M SHA>` 성공 |
+
+d 이후 전환이 끝날 때까지 kista-api main에 다른 커밋을 push하지 않는다(push해도 e와 같은 이유로 배포는 실패하지만 알림이 온다).
+
+#### D-0 (전환. 괄호는 예상 소요)
+
+**0. 사전 확인 — 읽기 전용 (5분).** 하나라도 어긋나면 그날은 하지 않는다.
+
+```bash
+ssh kista-server 'date; docker ps --format "{{.Names}}\t{{.Status}}"; readlink /opt/kista-api/current; ls /opt/kista-api/releases'
+ssh kista-server 'docker exec -i kista-postgres psql -U kista -d kistadb -At' <<'SQL'
+select 'epr', 'trading', count(*) from trading.event_publication where completion_date is null
+union all select 'epr', 'public', count(*) from public.event_publication where completion_date is null;
+select 'lock', name, lock_until > now() as held, finished_at from trading.scheduler_locks where name in ('trading-open','trading-close');
+select 'submitting', count(*) from trading.orders where status = 'SUBMITTING';
+select 'err', coalesce(max(created_at)::text, '-') from public.app_error_logs;
+SQL
+ssh kista-server 'docker exec kista-infra-redis-1 sh -c "for s in stream:user.deleted stream:user.notify-profile.changed stream:app.error stream:user.push-notification.requested; do echo \$s; redis-cli XLEN \$s; redis-cli XPENDING \$s \$(redis-cli XINFO GROUPS \$s | sed -n 2p); done"'
+```
+
+| 기대값 | no-go |
+|---|---|
+| 컨테이너 3개(`kista-api-kista-api-N`·`kista-scheduler`·`kista-trading`) healthy | 하나라도 아니면 |
+| EPR 미완료 두 스키마 모두 0 | 0이 아니면 10분 뒤 재확인, 그래도 남으면 no-go(2026-11-15 기준 0) |
+| `trading-open`·`trading-close` 모두 `held = f` | `t`면 배치가 도는 중이다 |
+| `SUBMITTING` 0 | 0이 아니면 |
+| 스트림 4종 pending 0 | 0이 아니면 |
+| `current`가 가리키는 release id를 적는다(**옛 release id**, 롤백에 쓴다). `XLEN` 네 값과 `app_error_logs` 최신 시각도 적는다 | — |
+
+사용자: 브라우저에서 전략 한 개의 주문 미리보기 화면을 캡처해 둔다(장이 닫혀 있어 전환 뒤에도 같은 값이어야 한다).
+
+**1. 정지 (2~8분).** 사용자 go 뒤. 삭제(`rm`)하지 않는다 — 정지된 컨테이너가 가장 빠른 롤백 수단이다.
+
+```bash
+ssh kista-server 'docker stop $(docker ps -q --filter label=com.docker.compose.project=kista-api --filter label=com.docker.compose.service=kista-api)'   # 35초 이내
+ssh kista-server 'docker stop kista-scheduler'    # 최대 200초
+# 스트림 pending 0을 한 번 더 확인한 뒤(0단계의 redis 명령)
+ssh kista-server 'docker stop kista-trading'      # 최대 200초
+ssh kista-server 'docker ps --format "{{.Names}}" | grep -c "kista-api-kista-api\|kista-scheduler\|kista-trading"'   # 기대 0
+```
+
+이 시점부터 API 전체가 502다. UptimeRobot 경보가 온다(예상된 것).
+
+**2. EPR 이관 (1분).** 0단계의 SELECT를 다시 돌린다. 두 스키마 모두 0이면 이 단계는 없다. `trading` 쪽이 0이 아니면(1단계 정지 중에 생긴 행) 사용자 승인 뒤:
+
+```sql
+insert into public.event_publication select * from trading.event_publication where completion_date is null returning id;
+```
+
+돌려받은 id를 적는다. `public` 쪽에 `UserEventStreamPublisher` 리스너의 미완료 행이 있으면 no-go(M9가 그 리스너를 지웠다. pre-apply 훅도 여기서 막는다) — 롤백하고 그 행이 소진된 뒤 다시 잡는다.
+
+**3. state 키 전환 (2분).** kista-infra 세션이 c의 브랜치를 main에 합쳐 push한다. `state/kista-api.yml`의 `roles`가 `kista-worker`·`kista-web` 두 키가 되고 값은 **지금의 옛 SHA 그대로**다(요청이 state보다 새것이어야 채택된다).
+
+**4. reconcile 시작 (1분).** 사용자가 kista-infra의 `Reconcile App`을 수동 실행한다.
+
+```bash
+gh workflow run reconcile.yml -R narafu/kista-infra -f app=kista-api -f config=<M SHA> -f roles="kista-worker=<M SHA> kista-web=<M SHA>"
+```
+
+`force`는 주지 않는다(pre-apply 훅이 `public.event_publication`을 새 소스와 대조한다). 훅이 막으면 no-go → 롤백.
+
+**5. worker (3~5분).** reconcile이 `roles` 순서대로 worker부터 올린다.
+
+```bash
+ssh kista-server 'docker ps --filter name=kista-worker --format "{{.Status}}"'      # 기대: Up … (healthy)
+ssh kista-server 'docker logs kista-worker 2>&1 | grep -E "Started ApiApplication|ERROR|WARN.*(Flyway|role)" | tail -20'
+echo "select name, locked_at, finished_at from trading.scheduler_locks where name = 'market-calendar-startup'" | ssh kista-server 'docker exec -i kista-postgres psql -U kista -d kistadb -At'
+```
+
+| 기대값 | no-go |
+|---|---|
+| 5분 안에 healthy | 게이트 실패(reconcile이 exit 1·2) |
+| `Started ApiApplication` 1줄, ERROR 0줄 | ERROR가 있으면 내용을 보고 판단. `BeanDefinition`·`Flyway`·`Schema-validation`이면 no-go |
+| `market-calendar-startup`의 `locked_at`이 방금 시각 | 옛 시각이면 worker 전용 빈이 뜨지 않은 것이다 → no-go |
+| 리허설에서 적어 둔 스케줄 등록·재개 로그 줄(14-2 완료 판정 2) | 없으면 no-go |
+
+**6. web과 Caddy (3~5분).** reconcile이 이어서 web을 올리고 스니펫을 설치·reload한다.
+
+```bash
+gh run list -R narafu/kista-infra --workflow reconcile.yml -L 1      # 기대: completed success, 이어서 state 커밋 deploy(kista-api): …
+ssh kista-server 'docker ps --format "{{.Names}}\t{{.Status}}\t{{.Image}}" | grep kista-'
+ssh kista-server 'cat /opt/kista-infra/routes/kista-api.caddy | grep reverse_proxy'   # 기대: kista-worker 2줄, kista-web 1줄
+curl -s -o /dev/null -w '%{http_code}\n' https://<API 도메인>/api/meta               # 기대 200 (web)
+curl -s -o /dev/null -w '%{http_code}\n' https://<API 도메인>/api/trading-cycles     # 기대 401 (worker까지 닿음. 502·503이면 no-go)
+ssh kista-server 'docker logs $(docker ps -q --filter label=com.docker.compose.service=kista-web) 2>&1 | grep -ciE "scheduled|TradingBatchResumer"'   # 기대: 리허설의 web 값(스케줄 등록 없음)
+```
+
+**7. 기능 확인 (10분).** 사용자가 브라우저로: 로그인, 가계부 조회, 전략 목록, 0단계에서 캡처한 주문 미리보기(값이 같아야 한다), 관리자 스케줄러 상태 화면. 실행 세션은:
+
+```sql
+select count(*) from public.app_error_logs where created_at > '<0단계의 최신 시각>';            -- 기대 0
+select count(*) from public.event_publication where completion_date is null;                 -- 기대 0
+select count(*) from trading.event_publication where completion_date is null;                -- 기대 0(이후 여기에는 행이 생기지 않는다)
+```
+
+Redis `XLEN stream:user.deleted`·`stream:user.notify-profile.changed`·`stream:app.error`가 0단계 값과 같아야 한다(발행자가 없어졌다). `stream:user.push-notification.requested`는 단계 X까지 쓰이므로 늘 수 있다.
+
+**8. 확정 또는 롤백.** 7단계까지 전부 맞으면 go: 옛 컨테이너를 지운다.
+
+```bash
+ssh kista-server 'docker rm kista-scheduler kista-trading $(docker ps -aq --filter label=com.docker.compose.project=kista-api --filter label=com.docker.compose.service=kista-api)'
+ssh kista-server 'docker ps -a --format "{{.Names}}\t{{.Status}}" | grep kista-'    # 기대: kista-worker, kista-api-kista-web-N, kista-ui-…만
+```
+
+**시간:** 1단계 시작부터 6단계 끝까지 15~25분이 전체 정지 구간이다. **1단계 시작 뒤 45분이 지나도 6단계가 끝나지 않으면 원인을 찾지 말고 롤백한다.**
+
+#### 롤백 (10~15분)
+
+8단계에서 옛 컨테이너를 지우기 전이면 언제든 가능하다. M 브랜치에 마이그레이션이 없으므로 스키마는 그대로다.
+
+1. 새 role을 내리고 지운다: `docker stop kista-worker $(docker ps -q --filter label=com.docker.compose.service=kista-web)` → 같은 대상 `docker rm`. `docker ps`에 둘 다 없는 것을 확인한다.
+2. EPR을 되돌린다(사용자 승인). worker가 `public`에 남긴 매매 쪽 미완료 행은 옛 `kista-trading`이 읽지 못한다.
+   ```sql
+   select id, listener_id from public.event_publication where completion_date is null and listener_id like 'com.kista.tradingcore.%';
+   -- 2단계에서 복사한 id가 여기 있으면 public에서 지운다(trading의 원본이 재발행된다)
+   delete from public.event_publication where id in (<2단계에서 적은 id>) and completion_date is null;
+   -- 전환 뒤에 새로 생긴 행은 trading으로 옮긴다
+   with moved as (delete from public.event_publication where completion_date is null and listener_id like 'com.kista.tradingcore.%' returning *)
+   insert into trading.event_publication select * from moved;
+   ```
+   2단계에서 복사한 행 가운데 worker가 이미 완료한 것은 `trading` 원본에도 완료를 찍지 않으면 한 번 더 실행된다. 그런 행이 있으면 id와 리스너를 사용자에게 보이고 정한다(알림 중복은 감수, 주문 취소·데이터 삭제 리스너면 원본을 지운다).
+3. 옛 release로 되돌린다: `ssh kista-server 'nohup bash /opt/kista-infra/bin/reconcile.sh kista-api <옛 release id>'`. 정지해 둔 옛 컨테이너 3개가 다시 뜨고 Caddy 스니펫이 옛것으로 돌아간다. 실패하면 `docker start kista-trading` → healthy → `docker start <옛 api 컨테이너>` → `docker start kista-scheduler` 순으로 직접 올리고 `/opt/kista-api/releases/<옛 id>/caddy/kista-api.caddy`를 `/opt/kista-infra/routes/`에 복사한 뒤 `docker exec kista-infra-caddy-1 caddy reload --config /etc/caddy/Caddyfile`.
+4. 0단계의 확인을 다시 돌려 3 role healthy와 EPR을 본다.
+5. kista-infra 세션: state 키 커밋(과 성공했다면 자동 state 커밋)을 되돌려 3 role 키·옛 SHA로 맞춘다.
+6. 사용자: kista-api main에서 M 합병 커밋을 `git revert`하고 push한다(3 role 플래그가 돌아와 되돌린 코드가 정상 배포된다). 그 전에는 main에 push하지 않는다.
+7. 원인을 `questions.md`에 "사용자 결정 필요"로 적는다. 원인을 찾기 전에 다시 전환하지 않는다.
+
+8단계(옛 컨테이너 삭제) 뒤에 되돌려야 하면 1·2·5·6은 같고 3은 `reconcile.sh kista-api <옛 release id>`만 쓴다(이미지를 다시 받는다).
+
+#### 전환 뒤
+
+- 관찰 2거래일(월요일 22:00 개장 배치부터). 볼 것: 개장·마감 배치의 주문 수와 금액(전략별로 직전 거래일과 같은 꼴), `trading.scheduler_locks`의 `trading-open`·`trading-close`가 한 번씩만 잡혔는지(`locked_by`가 하나), 텔레그램 리포트 1통씩, `app_error_logs`, EPR 미완료 0, healthchecks.io 핑. 관찰 결과를 로드맵 N1 칸에 적는다.
+- 첫 일반 배포에서 web의 blue/green 교체가 처음 돈다(전환 때는 실행 중 컨테이너가 없어 stop-first로 떴다). 교체 중 web이 2개 뜨는 것이 정상이다.
+- 하지 않고 넘긴 것(안정된 뒤 따로): 엔진 대역 `lb_try_duration` 5초와 `handle_errors`의 `ENGINE_RESTARTING` 응답(7절. kista-infra `Caddyfile`의 `(upstream)` 스니펫이 인자를 더 받아야 한다 — `cross-repo.md` I-3), Caddy 내부 리스너와 ui의 `API_BASE_URL` 단일화, Grafana 대시보드의 role 구분.
+
+#### 옛 api를 살려 두는 변형 (사용자가 무중단을 고른 경우에만)
+
+1단계에서 `kista-api`를 내리지 않고 7단계 뒤에 내린다. 더할 것: ① 전환 창 동안 가입·승인·프로필·알림 설정을 바꾸지 않는다(바꾸면 그 이벤트는 사라진다. 전환 뒤 `select count(*) from trading.user_notify_profile p join public.users u on u.id = p.user_id where p.updated_at < u.updated_at`로 어긋남을 본다) ② 7단계에서 `public.event_publication`의 미완료 행 가운데 `listener_id like '%UserEventStreamPublisher%'`를 확인하고 사용자 승인 뒤 지운다 ③ 메모리 합계가 한도를 넘지 않는지 `docker stats`로 본다 ④ `kista-api: 고아 kista-api` 텔레그램이 한 번 온다. 매매 화면은 어느 쪽이든 worker가 뜰 때까지 응답하지 않는다.
+
+### 14-4. 판단 지점의 기본값과 멈출 조건 (9·10절과 13절의 표에 더한다)
+
+처리 순서는 로드맵 9-5 그대로다: 되돌린다 → 이 표의 기본값 → 없으면 그 태스크만 멈추고 사용자. "멈춘다"는 그 커밋을 합치지 않고 `questions.md`에 "사용자 결정 필요"로 적는다는 뜻이다.
+
+**단계 M — 코드**
+
+| 판단 지점 | 기본값(묻지 않는다) | 멈추고 묻는다 |
+|---|---|---|
+| `ConflictingBeanDefinitionException` | 표에 있는 것(`ClockConfig`, `UserEventResubmitScheduler`)은 14-2대로 한 벌 삭제. 표에 없는 새 이름이면 두 클래스의 본문을 비교해 같으면 T 쪽 삭제, 다르면 T 쪽에 `@Component("trading…")` 명시 이름 | 두 벌의 동작이 다르고 어느 쪽이 맞는지 테스트로 가릴 수 없을 때 |
+| `NoUniqueBeanDefinitionException` | `ExceptionReporter`는 14-2. 그 밖에는 중복 구현을 지운다. `@Primary`·`@Qualifier`로 덮지 않는다 | 두 구현이 서로 다른 일을 해서 둘 다 필요할 때(그러면 타입을 나눠야 한다 — 설계 변경) |
+| 순환 빈 참조 | 13절의 대체 경로 | 그래도 안 풀리면 |
+| `ApplicationModules.verify()` 실패 | M은 새 모듈 간 참조를 만들지 않는다. 실패는 대개 ID 개명(`trading-notify`·`trading-web`) 누락이나 삭제한 클래스를 가리키던 `allowedDependencies`다. 그것만 고친다 | R 모듈이 T 모듈 내부를 새로 참조해야만 통과할 때(범위를 넘었다) |
+| yml 값 충돌 | B-1 표 → 표에 없으면 14-2의 M3(R 값) → prod 값이 서로 다르면 worker(옛 trading) 값 | prod 값이 다르고 그 키가 주문·보안·토큰에 닿을 때(`jwt.*`, `crypto.*`, `internal.api.*`, `app.trading.*`) |
+| `Schema-validation` 실패 | 엔티티에 `@Table(schema=)` 추가 | 실제 컬럼이 엔티티와 다를 때(합병과 무관한 기존 드리프트 — 따로 보고) |
+| Flyway 2벌이 이력 테이블을 새로 만들려 한다 | 빈 정의의 `table`·`defaultSchema`·`locations`를 지금 yml 값과 글자 그대로 맞춘다. baseline 옵션을 켜지 않는다 | 운영과 같은 이력을 가진 로컬 DB에서 `migrate`가 "적용할 것 없음"이 아닐 때 |
+| 가드가 막는다 | 로드맵 9-3. FQCN·패키지 문자열·개수는 고친다. 규칙의 뜻과 부딪히면 그 항목을 하지 않는다 | 가드를 지우지 않으면 합병 자체가 안 될 때 |
+| 구현 하나짜리 인터페이스가 필요해 보인다 | 만들지 않는다(구체 클래스) | — |
+| 동작 보존 테스트가 기대값을 바꿔야 통과한다 | 되돌린다. 예외: `app_error_logs` caller 값(14-2 M9)과 저장소 수·모듈 수 같은 구조 단언 | 응답 상태·본문·주문 값이 바뀔 때 |
+| 합친 스펙에 스키마명 충돌 | `@Schema(name=)`을 **내부·관리자 쪽** 타입에 단다(ui가 읽는 공개 스키마 이름은 그대로) | 공개 스키마 이름을 바꿔야만 할 때 |
+| 리허설에서 탈퇴 cascade가 EPR 행 없이 돈다 | 13절의 대체 경로 | 그 뒤에도 |
+| M 브랜치에 마이그레이션이 필요해 보인다 | 넣지 않는다. 필요한 변경은 M 앞(P 단계)이나 관찰 뒤로 뺀다 | 마이그레이션 없이는 기동이 안 될 때 |
+| M이 너무 크다 | 쪼갤 수 있는 것은 미리 main에 넣는다: M9의 ④⑤는 못 뺀다(두 앱이 각자 필요). M13의 `@Schema` 이름, M12의 테스트 기반 클래스 통합(`RootDataJpaTestBase` → `DataJpaTestBase`)은 M 앞에 따로 넣어도 된다 | — |
+
+**단계 M — 전환 당일.** 14-3의 no-go 칸이 전부다. 실행 세션이 스스로 정하는 것은 "no-go면 롤백을 요청한다"뿐이고, 운영 쓰기(정지·기동·삭제·SQL)는 전부 그 자리에서 사용자 승인을 받는다. 기대값과 다른데 no-go 칸에 없는 경우에는 진행하지 않고 값을 보여 준다.
+
+| 판단 지점 | 기본값 | 멈추고 묻는다 |
+|---|---|---|
+| 0단계에서 EPR 미완료가 0이 아니다 | 10분 기다렸다 재확인. 리스너 id가 새 소스에도 있으면 진행 가능(2단계 이관) | 지워진 리스너(`UserEventStreamPublisher`)의 행이면 그날은 하지 않는다 |
+| D-1의 push에서 배포가 실패하지 않고 진행됐다 | 즉시 `docker ps`로 상태를 보고 사용자에게 알린다. 손대지 않는다 | 항상 |
+| worker가 healthy인데 스케줄 등록 로그가 없다 | no-go | — |
+| worker가 둘 떴거나 옛 scheduler·trading이 실행 중이다 | 새 worker를 먼저 내린다(옛것이 원래 주인이다) → 롤백 | 항상 보고 |
+| reconcile이 exit 2(수동 복구) | 롤백 절차 3번의 직접 기동 경로 | 항상 보고 |
+| 월요일 개장 배치의 주문 수·금액이 직전 거래일의 꼴과 다르다 | 원인이 시세·사이클 진행으로 설명되면 기록만 | 설명되지 않으면 그날 마감 배치 전에 롤백 여부를 묻는다 |
+
+**단계 X**
+
+| 판단 지점 | 기본값 | 멈추고 묻는다 |
+|---|---|---|
+| 직접 호출로 바꾸려는 대상이 NamedInterface로 공개돼 있지 않다 | 대상 서비스에 `@NamedInterface("api")`를 단다(S6이 3개 서비스에 쓴 방식). 패키지를 통째로 공개하지 않는다 | — |
+| `InternalApiContractTest`의 핸들러 하한(`> 20`)이 깨진다 | 그 커밋에서 하한을 남은 수에 맞춘다. contract 타입이 FIDA만 남으면 X8을 당겨 테스트를 지운다 | — |
+| `CaddyRoutingTest`의 "root 경로는 엔진 대역에 걸리지 않는다"가 깨진다(X1) | 테스트를 `RoleRoutes` 기준으로 다시 쓴다: 엔진 모듈 컨트롤러 경로 ⊆ 엔진 matcher, 그 밖 ∩ 엔진 matcher = ∅ | Caddy 정규식으로 표현되지 않는 경로 조합이 나올 때(경로를 바꿔야 한다 → ui 계약) |
+| 엔드포인트를 web → worker 대역으로 옮긴다 | 옮긴다. ui는 Caddy 뒤라 주소가 같다 | ui가 `TRADING_API_BASE_URL`로 직접 치는 경로면 `cross-repo.md`에 적고 같은 날 배포를 요청 |
+| X2에서 예외 쌍을 합치니 응답 `code`가 달라진다 | 지금 ui가 받는 `code`를 유지한다(`ExceptionResponseTableTest`가 기준) | `ErrorCode` 상수를 없애야 할 때 |
+| X6에서 활성 사용자 id 목록을 `IN`으로 넘긴다 | 그대로 한다(활성 사용자 2명) | — |
+| X6의 호출처 수가 13절·`findings/29`와 다르다 | 착수 때 grep한 값으로 한다(15가 끝났으면 `CryptoTradeNotifier`·`CryptoDcaRunner`가 없다) | — |
+| X7에서 FCM 자격증명이 worker에 필요하다 | 이미 있다(세 role이 같은 `.env`를 쓴다). compose를 고치지 않는다 | — |
+| X7의 `user_notify_profile` drop | 코드 삭제 배포 뒤 2거래일을 보고 다음 배포에서(expand/contract) | drop SQL은 운영 데이터 삭제라 승인 |
+| 스트림을 지우는 배포 직전 pending이 0이 아니다 | 그날은 배포하지 않는다(9-4) | 사흘 연속이면 |
+| web·worker가 잠깐 다른 SHA로 돈다(reconcile이 worker → web 순서) | Pub/Sub `trade.event` 페이로드와 Redis 키 형식은 한 배포에서 필드를 추가만 한다. 삭제·개명은 두 배포로 나눈다 | — |
+
+**단계 R**
+
+| 판단 지점 | 기본값 | 멈추고 묻는다 |
+|---|---|---|
+| 이벤트·리스너 패키지를 옮기는 배포(⑤·⑦) | pre-apply 훅이 고아가 될 미완료 행을 막는다(M에서 매핑을 고쳤다). 배포 직전 `public.event_publication` 미완료 0을 확인하고 push를 요청한다. 훅이 막으면 소진을 기다린다 | 하루가 지나도 남으면: `listener_id` UPDATE(리스너만 옮김·멱등)냐 삭제냐를 행 목록과 함께 묻는다 |
+| 옮기려는 타입 이름이 저장돼 있을 수 있다 | 옮기기 전에 grep: `@Enumerated`는 상수 이름만이라 안전, EPR `serialized_event`와 Redis 페이로드에 FQCN(`@class`)이 실리는지 한 건 조회로 본다. 실리면 EPR 절차를 탄다 | Redis에 FQCN이 든 장기 보관 키가 있을 때 |
+| kernel 타입의 새 집이 애매하다 | `findings/10` I절 표의 "원 소유". 쓰는 모듈이 셋 이상이고 행위 없는 값이면 platform | 옮기면 모듈 순환이 생길 때 — 그 타입은 kernel에 남기고 넘어간다(13절 기본값) |
+| ⑥에서 공개 범위를 줄이니 `verify()`가 깨진다 | 깨진 참조를 `api`에 올리지 말고 호출 쪽이 `api` 서비스를 쓰게 고친다. 한 모듈씩 | 도메인 타입을 통째로 공개해야만 풀릴 때 — 그 모듈은 지금 공개 범위를 유지하고 `decisions.md`에 이유를 적는다 |
+| ⑦ 패키지 루트 rename | 가장 마지막. 한 커밋·한 배포. 직전에 EPR 미완료 0, web·worker 같은 SHA로 함께 | 15·N8·N9 등 다른 큰 작업이 열려 있으면 미룬다 |
+| `HexagonalArchitectureTest` 줄 번호가 지침서와 다르다 | 규칙 이름으로 찾는다(13절 표의 줄 번호는 S6 뒤 밀렸다. `ClockConfig` FQCN은 `:210-211`) | — |
+| 14의 `MarketDataPort`·Alpaca 어댑터를 `market`으로 옮긴다 | 인터페이스를 만들지 않는다(Q-12). 클래스만 옮긴다 | — |
+
+### 14-5. 단계 X·R의 전제 확인 (2026-11-15)
+
+- X1: R 내부 HTTP 어댑터 11개(market 2, benchmark 2, admin 7), 메서드 28. T 내부 핸들러 30(컨트롤러 13) — 본문의 31에서 1 줄었다.
+- X6: `TradingUserProfilePort` 주입처 14곳(알림 notifier 6, `TradingUserProfiles`, `UserNotifyProfileSyncListener`, `BatchContextFactory`, `UserNotifyProfilePersistenceAdapter`, `CryptoDcaRunner`, `MarketEventNotifier`, `StrategyCreationService`, `UserTradingDataEraseService`). X7의 채널 판정 줄 번호는 낡았다 — `includesFcm`으로 찾는다.
+- X8: `shared.contract` 타입 19개. 남는 것은 FIDA 2개(`FidaOrderRequest`·`FidaOrderResponse`)와, 단계 X 뒤에도 role 경계를 넘는 `notify`의 `TradeEventEnvelope`·`TradeEventMessage`(worker → web Pub/Sub). 뒤의 둘은 본문 X8이 빠뜨렸다 — 지우지 말고 notification 모듈의 `events`로 옮긴다.
+- R: `shared.kernel` 타입 42개, 그중 이벤트 4개 + `platform.scheduling.SchedulerLifecycleEvent`. EPR 대상 리스너는 R 16·T 20개. 이벤트 클래스 34개 가운데 22개가 `tradingcore.*.application.event`·`api.*.application.event`에 있어 ⑦에서 전부 FQCN이 바뀐다.
+- 6절 규칙 7("1,500줄 미만 모듈은 3단 패키지를 강제하지 않는다")과 `PENDING_REMOVAL_CEILING`: 지금 82/82다. R ⑥(01 단계 C와 묶음)에서 포트를 지울 때마다 목록과 상한을 같이 내린다.
+- 8절 단계 C의 선행은 넷에서 셋이 됐다(`findings/29` 1-3): 메리츠 호출 간격의 공유, `remaining()`을 사이클 행 락 안에서 구하기, 유일 제약 위반의 409 매핑. 토큰 lease 일반화는 KIS 삭제로 빠진다. 여전히 하지 않는다.
+- 11절의 "`AccountBudgetLock` JVM 락 유지"에 덧붙인다: 주석의 "계좌 row FOR UPDATE로 승격"은 틀린 방향이다. 불변식이 사이클 단위라 승격한다면 사이클 행 락이다. 지금은 주석만 "엔진 단일 프로세스 전제(05 1-1)"로 고친다(단계 R의 문서 반영 때).
