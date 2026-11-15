@@ -2,8 +2,6 @@ package com.kista.api.benchmark.application.service;
 
 import com.kista.api.benchmark.domain.model.HousingBenchmarkPrice;
 import com.kista.api.benchmark.domain.model.HousingPriceIndex;
-import com.kista.api.benchmark.application.usecase.FetchHousingBenchmarkUseCase;
-import com.kista.api.benchmark.application.usecase.FetchHousingPriceIndexUseCase;
 import com.kista.api.benchmark.application.port.output.HousingBenchmarkFeedPort;
 import com.kista.api.benchmark.application.port.output.HousingBenchmarkPricePort;
 import com.kista.api.benchmark.application.port.output.HousingPriceIndexPort;
@@ -20,14 +18,14 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-class HousingBenchmarkService implements FetchHousingBenchmarkUseCase, FetchHousingPriceIndexUseCase {
+public class HousingBenchmarkService {
 
     private final HousingBenchmarkFeedPort feedPort;
     private final HousingBenchmarkPricePort pricePort;
     private final HousingPriceIndexPort indexPort;
     private final ApplicationEventPublisher eventPublisher;
 
-    @Override
+    // KB Land 주택 벤치마크 데이터를 조회해 저장
     public void fetchAndSave() {
         try {
             // KB Land API에서 최근 1년치 지역별 아파트 5분위 매매평균가격을 가져와 upsert한다.
@@ -40,7 +38,7 @@ class HousingBenchmarkService implements FetchHousingBenchmarkUseCase, FetchHous
         }
     }
 
-    @Override
+    // KB Land 주간 아파트 매매가격지수 데이터를 조회해 저장 — years: 조회 기간(년)
     public void fetchAndSave(int years) {
         try {
             // KB Land API에서 지정 기간(년)의 지역별 주간 아파트 매매가격지수를 가져와 upsert한다.

@@ -1,6 +1,6 @@
 package com.kista.api.benchmark.adapter.in.redis;
 
-import com.kista.api.benchmark.application.usecase.BenchmarkUseCase;
+import com.kista.api.benchmark.application.service.BenchmarkService;
 import com.kista.shared.contract.notify.TradeEventEnvelope;
 import com.kista.shared.platform.redis.RedisPubSubConfig;
 import jakarta.annotation.PostConstruct;
@@ -21,7 +21,7 @@ import tools.jackson.databind.ObjectMapper;
 class TradeEventBenchmarkCacheInvalidator implements MessageListener {
 
     private final RedisMessageListenerContainer listenerContainer;
-    private final BenchmarkUseCase benchmarkUseCase;
+    private final BenchmarkService benchmarkUseCase;
     private final ObjectMapper objectMapper;
 
     @PostConstruct

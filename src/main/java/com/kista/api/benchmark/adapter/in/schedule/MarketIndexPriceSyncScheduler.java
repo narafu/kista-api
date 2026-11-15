@@ -3,7 +3,7 @@ package com.kista.api.benchmark.adapter.in.schedule;
 import com.kista.shared.platform.scheduling.SchedulerJobRunner;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.shared.kernel.TimeZones;
-import com.kista.api.benchmark.application.usecase.SyncMarketIndexPricesUseCase;
+import com.kista.api.benchmark.application.service.MarketIndexPriceSyncService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -16,7 +16,7 @@ import java.time.Duration;
 @ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true)
 public class MarketIndexPriceSyncScheduler {
 
-    private final SyncMarketIndexPricesUseCase syncMarketIndexPricesUseCase;
+    private final MarketIndexPriceSyncService syncMarketIndexPricesUseCase;
     private final SchedulerJobRunner jobRunner;
     private final SchedulerLockService schedulerLockService;
 

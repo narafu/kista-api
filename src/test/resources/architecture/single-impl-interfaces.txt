@@ -25,10 +25,6 @@ com.kista.api.benchmark.application.port.output.HousingPriceIndexPort
 com.kista.api.benchmark.application.port.output.IndexPriceFeedPort
 com.kista.api.benchmark.application.port.output.IndexPricePort
 com.kista.api.benchmark.application.port.output.InvestmentPointsPort
-com.kista.api.benchmark.application.usecase.BenchmarkUseCase
-com.kista.api.benchmark.application.usecase.FetchHousingBenchmarkUseCase
-com.kista.api.benchmark.application.usecase.FetchHousingPriceIndexUseCase
-com.kista.api.benchmark.application.usecase.SyncMarketIndexPricesUseCase
 com.kista.api.finance.application.port.output.AssetSnapshotPort
 com.kista.api.finance.application.port.output.FinanceAccountPort
 com.kista.api.finance.application.port.output.FinanceBudgetPort

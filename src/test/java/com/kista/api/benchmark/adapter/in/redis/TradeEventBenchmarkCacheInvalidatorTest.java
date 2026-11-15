@@ -1,6 +1,6 @@
 package com.kista.api.benchmark.adapter.in.redis;
 
-import com.kista.api.benchmark.application.usecase.BenchmarkUseCase;
+import com.kista.api.benchmark.application.service.BenchmarkService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -20,7 +20,7 @@ import static org.mockito.Mockito.verify;
 class TradeEventBenchmarkCacheInvalidatorTest {
 
     @Mock RedisMessageListenerContainer listenerContainer;
-    @Mock BenchmarkUseCase benchmarkUseCase;
+    @Mock BenchmarkService benchmarkUseCase;
 
     private TradeEventBenchmarkCacheInvalidator invalidator() {
         return new TradeEventBenchmarkCacheInvalidator(listenerContainer, benchmarkUseCase, new ObjectMapper());

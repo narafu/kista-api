@@ -3,7 +3,6 @@ package com.kista.api.benchmark.application.service;
 import com.kista.shared.platform.cache.TtlResultCache;
 import com.kista.shared.kernel.Currency;
 import com.kista.api.benchmark.domain.model.*;
-import com.kista.api.benchmark.application.usecase.BenchmarkUseCase;
 import com.kista.api.benchmark.application.port.output.*;
 import org.springframework.stereotype.Service;
 
@@ -18,7 +17,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Service
-class BenchmarkService implements BenchmarkUseCase {
+public class BenchmarkService {
 
     private static final String SEOUL_REGION_CODE = "1100000000";
     // 실제 KB Land 데이터는 2008-12부터 존재 — 여유 있는 안전 하한
@@ -53,12 +52,11 @@ class BenchmarkService implements BenchmarkUseCase {
             UUID userId, BenchmarkAssetType assetType, BenchmarkScope scope, UUID strategyId, Currency currency,
             String regionCode, String symbol, LocalDate from, LocalDate to) {}
 
-    @Override
+    // 체결 발생 시 해당 사용자의 벤치마크 비교 캐시만 비운다 (trade.event 구독자가 호출)
     public void invalidateUserCache(UUID userId) {
         statsResultCache.invalidateIf(key -> key instanceof BenchmarkComparisonKey k && k.userId().equals(userId));
     }
 
-    @Override
     public BenchmarkComparison getHousingBenchmarkComparison(
             UUID userId, BenchmarkScope scope, UUID strategyId, Currency currency,
             String regionCode, LocalDate from, LocalDate to) {
@@ -112,7 +110,7 @@ class BenchmarkService implements BenchmarkUseCase {
                 scope, ctx.selectedStrategy(), ctx.currency(), benchmark, snappedPoints, indexByDate);
     }
 
-    @Override
+    // ETF(SPY/QQQ/QLD/IBIT/ETHA) 벤치마크 비교 — 계산 로직은 getHousingBenchmarkComparison과 공유
     public BenchmarkComparison getEtfBenchmarkComparison(
             UUID userId, BenchmarkScope scope, UUID strategyId, Currency currency,
             EtfBenchmarkSymbol symbol, LocalDate from, LocalDate to) {
@@ -156,7 +154,7 @@ class BenchmarkService implements BenchmarkUseCase {
         return body.withCurrentExchangeRate(fetchCurrentExchangeRate());
     }
 
-    @Override
+    // from/to null 허용 (null이면 전체 구간). regionCode null이면 서울 기본값. 투자 데이터와 무관한 원본 시계열
     public List<HousingBenchmarkPrice> getHousingBenchmarkSeries(LocalDate from, LocalDate to, String regionCode) {
         EffectiveRange range = EffectiveRange.of(from, to, LocalDate.now(clock));
         // 지역 미지정 시 서울 기본값 — KB Land 지역 카탈로그는 DB 동적 조회(getHousingBenchmarkRegions) 대상이라 하드코딩 enum 아님
@@ -165,7 +163,7 @@ class BenchmarkService implements BenchmarkUseCase {
                 HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE, effectiveRegionCode, range.from(), range.to());
     }
 
-    @Override
+    // from/to null 허용 (null이면 전체 구간). regionCode null이면 서울 기본값. 투자 데이터와 무관한 원본 주간 매매가격지수 시계열
     public List<HousingPriceIndex> getHousingPriceIndexSeries(LocalDate from, LocalDate to, String regionCode) {
         EffectiveRange range = EffectiveRange.of(from, to, LocalDate.now(clock));
         // 지역 미지정 시 서울 기본값 — KB Land 지역 카탈로그는 DB 동적 조회(getHousingBenchmarkRegions) 대상이라 하드코딩 enum 아님
@@ -174,7 +172,7 @@ class BenchmarkService implements BenchmarkUseCase {
                 HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX, effectiveRegionCode, range.from(), range.to());
     }
 
-    @Override
+    // from/to null 허용 (null이면 전체 구간). symbol은 필수. 투자 데이터와 무관한 원본 일별 종가 시계열
     public List<IndexPrice> getEtfPriceSeries(LocalDate from, LocalDate to, EtfBenchmarkSymbol symbol) {
         EffectiveRange range = EffectiveRange.of(from, to, LocalDate.now(clock));
         return indexPricePort.findBySymbolAndRange(symbol.name(), range.from(), range.to());
@@ -192,7 +190,7 @@ class BenchmarkService implements BenchmarkUseCase {
         }
     }
 
-    @Override
+    // 시계열 조회에 사용 가능한 지역 카탈로그 (KB Land 제공 지역 그대로, 하드코딩 아님)
     public List<HousingBenchmarkRegion> getHousingBenchmarkRegions() {
         return housingPriceIndexPort.findDistinctRegions(HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX);
     }

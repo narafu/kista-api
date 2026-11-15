@@ -2,7 +2,6 @@ package com.kista.api.benchmark.application.service;
 
 import com.kista.api.benchmark.domain.model.EtfBenchmarkSymbol;
 import com.kista.api.benchmark.domain.model.IndexPrice;
-import com.kista.api.benchmark.application.usecase.SyncMarketIndexPricesUseCase;
 import com.kista.api.benchmark.application.port.output.IndexPriceFeedPort;
 import com.kista.api.benchmark.application.port.output.IndexPricePort;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +16,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-class MarketIndexPriceSyncService implements SyncMarketIndexPricesUseCase {
+public class MarketIndexPriceSyncService {
 
     private static final LocalDate EARLIEST_INDEX_DATE = LocalDate.of(2000, 1, 1);
 
@@ -25,7 +24,7 @@ class MarketIndexPriceSyncService implements SyncMarketIndexPricesUseCase {
     private final IndexPriceFeedPort indexPriceFeedPort;
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
-    @Override
+    // ETF 벤치마크 지수 종가를 조회해 저장
     public void syncAndSave() {
         List<String> failed = new ArrayList<>();
         for (EtfBenchmarkSymbol symbol : EtfBenchmarkSymbol.values()) {

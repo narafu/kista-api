@@ -3,7 +3,7 @@ package com.kista.api.benchmark.adapter.in.schedule;
 import com.kista.shared.platform.scheduling.SchedulerJobRunner;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.shared.kernel.TimeZones;
-import com.kista.api.benchmark.application.usecase.FetchHousingPriceIndexUseCase;
+import com.kista.api.benchmark.application.service.HousingBenchmarkService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -22,7 +22,7 @@ public class KbLandPriceIndexScheduler {
     private static final int RECENT_YEARS = 2;
     private static final int FULL_REFRESH_YEARS = 20;
 
-    private final FetchHousingPriceIndexUseCase fetchHousingPriceIndexUseCase;
+    private final HousingBenchmarkService fetchHousingPriceIndexUseCase;
     private final SchedulerJobRunner jobRunner;
     private final SchedulerLockService schedulerLockService;
 

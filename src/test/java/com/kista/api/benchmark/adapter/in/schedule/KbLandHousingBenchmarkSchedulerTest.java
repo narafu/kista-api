@@ -2,7 +2,7 @@ package com.kista.api.benchmark.adapter.in.schedule;
 
 import com.kista.shared.platform.scheduling.SchedulerJobRunner;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
-import com.kista.api.benchmark.application.usecase.FetchHousingBenchmarkUseCase;
+import com.kista.api.benchmark.application.service.HousingBenchmarkService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -17,7 +17,7 @@ class KbLandHousingBenchmarkSchedulerTest {
 
     @Test
     void run_acquiresLockAndRunsHousingBenchmarkFetchJob() throws Exception {
-        FetchHousingBenchmarkUseCase useCase = mock(FetchHousingBenchmarkUseCase.class);
+        HousingBenchmarkService useCase = mock(HousingBenchmarkService.class);
         SchedulerJobRunner jobRunner = mock(SchedulerJobRunner.class);
         SchedulerLockService lockService = mock(SchedulerLockService.class);
         KbLandHousingBenchmarkScheduler scheduler = new KbLandHousingBenchmarkScheduler(useCase, jobRunner, lockService);

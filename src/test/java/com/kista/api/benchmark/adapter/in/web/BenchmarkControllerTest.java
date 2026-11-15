@@ -2,7 +2,7 @@ package com.kista.api.benchmark.adapter.in.web;
 
 import com.kista.shared.kernel.Currency;
 import com.kista.api.benchmark.domain.model.*;
-import com.kista.api.benchmark.application.usecase.BenchmarkUseCase;
+import com.kista.api.benchmark.application.service.BenchmarkService;
 import com.kista.api.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -32,7 +32,7 @@ class BenchmarkControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean BenchmarkUseCase userStats;
+    @MockitoBean BenchmarkService userStats;
 
     private static final UUID USER_ID = UUID.randomUUID();
 

@@ -2,7 +2,7 @@ package com.kista.api.benchmark.adapter.in.schedule;
 
 import com.kista.shared.platform.scheduling.SchedulerJobRunner;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
-import com.kista.api.benchmark.application.usecase.FetchHousingPriceIndexUseCase;
+import com.kista.api.benchmark.application.service.HousingBenchmarkService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -17,7 +17,7 @@ class KbLandPriceIndexSchedulerTest {
 
     @Test
     void run_acquiresLockAndRunsRecentYearsFetchJob() throws Exception {
-        FetchHousingPriceIndexUseCase useCase = mock(FetchHousingPriceIndexUseCase.class);
+        HousingBenchmarkService useCase = mock(HousingBenchmarkService.class);
         SchedulerJobRunner jobRunner = mock(SchedulerJobRunner.class);
         SchedulerLockService lockService = mock(SchedulerLockService.class);
         KbLandPriceIndexScheduler scheduler = new KbLandPriceIndexScheduler(useCase, jobRunner, lockService);
@@ -41,7 +41,7 @@ class KbLandPriceIndexSchedulerTest {
 
     @Test
     void runFullRefresh_acquiresSeparateLockAndRunsTwentyYearFetchJob() throws Exception {
-        FetchHousingPriceIndexUseCase useCase = mock(FetchHousingPriceIndexUseCase.class);
+        HousingBenchmarkService useCase = mock(HousingBenchmarkService.class);
         SchedulerJobRunner jobRunner = mock(SchedulerJobRunner.class);
         SchedulerLockService lockService = mock(SchedulerLockService.class);
         KbLandPriceIndexScheduler scheduler = new KbLandPriceIndexScheduler(useCase, jobRunner, lockService);

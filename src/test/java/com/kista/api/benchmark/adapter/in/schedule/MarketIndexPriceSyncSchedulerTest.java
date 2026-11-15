@@ -2,7 +2,7 @@ package com.kista.api.benchmark.adapter.in.schedule;
 
 import com.kista.shared.platform.scheduling.SchedulerJobRunner;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
-import com.kista.api.benchmark.application.usecase.SyncMarketIndexPricesUseCase;
+import com.kista.api.benchmark.application.service.MarketIndexPriceSyncService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -17,7 +17,7 @@ class MarketIndexPriceSyncSchedulerTest {
 
     @Test
     void run_acquiresLockAndRunsMarketIndexPriceSyncJob() throws Exception {
-        SyncMarketIndexPricesUseCase useCase = mock(SyncMarketIndexPricesUseCase.class);
+        MarketIndexPriceSyncService useCase = mock(MarketIndexPriceSyncService.class);
         SchedulerJobRunner jobRunner = mock(SchedulerJobRunner.class);
         SchedulerLockService lockService = mock(SchedulerLockService.class);
         MarketIndexPriceSyncScheduler scheduler = new MarketIndexPriceSyncScheduler(useCase, jobRunner, lockService);
@@ -39,7 +39,7 @@ class MarketIndexPriceSyncSchedulerTest {
 
     @Test
     void runNow_sharesCronLockAndRunsManualJob() throws Exception {
-        SyncMarketIndexPricesUseCase useCase = mock(SyncMarketIndexPricesUseCase.class);
+        MarketIndexPriceSyncService useCase = mock(MarketIndexPriceSyncService.class);
         SchedulerJobRunner jobRunner = mock(SchedulerJobRunner.class);
         SchedulerLockService lockService = mock(SchedulerLockService.class);
         MarketIndexPriceSyncScheduler scheduler = new MarketIndexPriceSyncScheduler(useCase, jobRunner, lockService);

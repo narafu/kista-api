@@ -3,7 +3,7 @@ package com.kista.api.benchmark.adapter.in.schedule;
 import com.kista.shared.platform.scheduling.SchedulerJobRunner;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.shared.kernel.TimeZones;
-import com.kista.api.benchmark.application.usecase.FetchHousingBenchmarkUseCase;
+import com.kista.api.benchmark.application.service.HousingBenchmarkService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -17,7 +17,7 @@ import java.time.Duration;
 @ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true)
 public class KbLandHousingBenchmarkScheduler {
 
-    private final FetchHousingBenchmarkUseCase fetchHousingBenchmarkUseCase;
+    private final HousingBenchmarkService fetchHousingBenchmarkUseCase;
     private final SchedulerJobRunner jobRunner;
     private final SchedulerLockService schedulerLockService;
 
