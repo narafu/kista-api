@@ -180,3 +180,16 @@ ArchUnit 규칙은 다음으로 바꾼다. 지키려는 성질을 패키지가 �
 - 가드 보정: `notify_must_stay_pure_outbound_gateway`의 금지 대상을 지운 usecase 패키지에서 `application.service`로 바꿨다(그대로 두면 공회전). `web_must_stay_pure_inbound_sink`는 `mainClasses`만 본다(실 컨텍스트 IT가 서비스로 픽스처를 만든다).
 - 주입 필드·파라미터 이름(`xxxUseCase`)은 치환 커밋과 분리한 이름 정리 커밋에서 타입 이름(`xxxService`)으로 맞췄다. 타입이 서비스가 아닌 `useCase` 필드(`CryptoDcaRunner`, `TradingExecutionFacade` 소비처)와 테스트 메서드·`DisplayName`·`TokenUseCaseTestConfig` 이름은 남겼다.
 - **단계 C로 넘김**: `interfaces_must_earn_their_keep`은 `application.port.output`·`application.usecase`만 본다. usecase 패키지가 사라졌으니 단일 구현 인터페이스를 다른 패키지(`application.service`, `adapter`)에 새로 만들면 잡히지 않는다. 단계 C 5번에서 가드를 켤 때 대상을 `com.kista`의 모든 인터페이스(:shared 포트·함수형 인터페이스 등은 허용 목록)로 넓힌다.
+
+단계 B 마지막 항목에 대한 답(Fable, 2026-11-15 — `findings/29` 2-3):
+
+- **넓힌다. 시점은 단계 C의 5번이 아니라 단계 C의 첫 커밋이다.** 지금 대상 밖에 있는 단일 구현 인터페이스는 2개뿐이다(`shared.platform.security.TokenBlacklistPort`, `broker.adapter.out.toss.TossTokenStore` — 최상위 인터페이스 151개를 센 결과, 중첩 인터페이스는 세지 않았다). 포트를 지우는 동안 새 인터페이스가 다른 패키지에 생기는 것을 막으려면 지우기 전에 넓혀야 한다. 로드맵 9-3대로 지금 걸리는 것을 제거 대기 목록에 넣고 켠다. `PENDING_REMOVAL_CEILING`은 그때 한 번만 올리고(82 + 새로 걸린 수) 그 뒤로는 내리기만 한다.
+- **대상**: `mainClasses`의 최상위 인터페이스 전부(`com.kista.api`·`com.kista.tradingcore`·`com.kista.shared`). 패키지 이름으로 고르지 않는다. 중첩 인터페이스는 지금처럼 대상 밖이다(단계 C를 시작할 때 한 번 세어 단일 구현이 5개를 넘으면 다시 정한다).
+- **영구 예외는 이름 목록이 아니라 술어로 둔다.** 이름 목록은 새 항목을 넣을 때마다 "이것도 예외인가"를 다시 판단하게 만든다. 아래에 해당하면 구현 수를 세지 않는다.
+  1. 프레임워크가 구현을 만든다: `org.springframework.data.repository.Repository`의 하위(`*JpaRepository`), 애노테이션 타입.
+  2. `sealed` 인터페이스(값 타입의 합 — `DcaDecision` 등).
+  3. `@FunctionalInterface`가 붙어 있다(람다·메서드 참조가 구현이다 — `ProblemResponder`). 추상 메서드가 하나라는 사실만으로는 통과시키지 않는다. 애노테이션을 붙여 의도를 밝힌 것만 통과한다.
+  4. 유일한 구현이 인터페이스와 다른 Modulith 모듈이나 다른 Gradle 프로젝트에 있다(모듈 간 역전, 프로세스 계약). 이것은 ArchUnit으로 계산할 수 있다. 지금의 수기 상수 `DEPENDENCY_INVERSION_PORTS`(4개)와 ":shared는 통째로 제외"를 이 술어 하나로 바꾸고, 바꾸는 커밋에서 계산 결과가 지금 4개를 포함하는지 단언으로 확인한다. `:shared` 안에 구현이 하나뿐인 인터페이스(`TokenBlacklistPort`)는 이 술어를 통과하지 못하므로 제거 대기로 들어간다 — 맞는 결과다.
+- **통과 조건**: 위 술어에 해당하거나, main의 구현 클래스가 2개 이상이다. 테스트 대역은 세지 않는다(`TossTokenStore`의 테스트 fake는 구현으로 치지 않는다).
+- **`single-impl-interfaces.txt`의 기준은 하나다: 제거 대기.** 줄어들기만 한다. "유지하기로 한 단일 구현"을 여기에 넣지 않는다. 유지할 이유가 위 술어로 표현되지 않으면 그 이유를 `decisions.md`에 적고 테스트 상수 한 곳(이름 + 한 줄 사유)에 둔다. 지금은 그런 항목이 없다.
+- **단계 C 4번의 적용 범위**: "모듈 밖에서 `adapter/out`을 참조하게 되면 인터페이스를 유지한다"는 기존 포트를 지울 때의 규칙이다. 새로 만드는 단일 구현 외부 연동(`AlpacaMarketDataAdapter`, Q-12)에는 적용하지 않는다. 그 대신 타입 단위 `@NamedInterface`로 공개 창구를 한 클래스로 좁히고 public 시그니처에 도메인 타입만 쓴다.

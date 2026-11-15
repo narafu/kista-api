@@ -327,3 +327,8 @@ T2 실행 결과(2026-11-15, S15, 미배포 — **관찰 대기(배포일부터 
 - 읽을 때 주의: `prevClose`의 old는 전일 종가 조회가 실패하면 현재가로 대체된 값이다(지금 동작). 그날 diffPct가 크면 같은 시각의 "전일 종가" 경고 로그를 먼저 본다.
 - 관찰 명령(운영, 읽기 전용): `ssh kista-server "docker logs kista-trading --since 24h 2>&1 | grep -F '[시세 비교]'"`. kind별로 보려면 뒤에 `| grep 'kind=close+20'`. 비교 호출 자체의 실패는 `grep -F '시세 비교' | grep '건너뜁니다'`.
 - 통과 기준은 8절 T2 행과 이 절의 "T2의 판정" 그대로다: `prevClose` 전부 diffPct 0, `current` |diffPct| ≤ 0.5, `close+20`은 SOXL·USD·QLD diffPct 0·TQQQ 차이 0.02달러 이내이고 `new=null`이 없어야 한다. `close+10`은 참고값이다(무료 등급은 최근 15분을 주지 않아 +10분에는 봉이 덜 찼을 수 있다).
+
+- **구현 평가 2회차에서 더한 것(2026-11-15, `findings/29` 2-2, `questions.md` Q-12·Q-13)**:
+  - T3의 첫 작업으로 `AlpacaMarketDataAdapter`의 이름을 벤더 중립으로 바꾼다(예: `MarketDataClient`, 패키지 `broker.adapter.out.marketdata`와 `@NamedInterface("marketdata")`는 그대로). 지금 main 소비처가 `PriceSourceComparison` 1곳이라 가장 싸다. 본 경로를 옮긴 뒤에는 소비 코드 전체에 벤더 이름이 퍼진다.
+  - T3 착수 전에 사용자에게 로컬 토스 키로 `GET /api/v1/prices` 1회 호출을 요청한다(실행 세션이 직접 부르지 않는다). 되면 토스 계좌도 계좌 증권사 현재가를 쓴다. 답이 없거나 안 되면 6절의 대체 경로(Alpaca 현재가)로 가되, 이것은 3-5절 "주문 경로의 현재가는 계좌 증권사"의 예외이므로 `vendors/toss.md`에 "토스 전략을 등록하기 전에 현재가 출처를 다시 확인한다"를 적고 로드맵 N19 칸에도 남긴다. 운영 토스 전략은 2026-11-15 기준 0건이다.
+  - T2 관찰에 "비교 호출 때문에 메리츠 한도에 걸리지 않는지"를 더한다: `docker logs kista-trading --since 24h 2>&1 | grep -ciE "BrokerRateLimit|429"`가 0이어야 한다. 0이 아니면 비교 호출의 현재가 2곳을 끄고 전일 종가·확정 종가 비교만 남긴다.
