@@ -1,5 +1,6 @@
 package com.kista.api.admin.adapter.out.internal;
 
+import com.kista.api.admin.domain.model.PrivacyBaseCreateResult;
 import com.kista.api.admin.application.port.output.PrivacyQueryPort;
 import com.kista.shared.contract.privacy.FidaOrderRequest;
 import com.kista.shared.contract.privacy.PrivacyBaseUpdateRequest;
@@ -87,7 +88,7 @@ class PrivacyQueryHttpAdapterTest {
                 new BigDecimal("100.0"), BigDecimal.ZERO, null, 0,
                 List.of(new FidaOrderRequest.PlannedOrder(OrderDirection.BUY, OrderType.LOC, 10, new BigDecimal("95.0"))));
 
-        PrivacyQueryPort.CreateBaseResult result = adapter.createBase(command);
+        PrivacyBaseCreateResult result = adapter.createBase(command);
 
         assertThat(result.created()).isTrue();
         assertThat(result.view().id()).isEqualTo(id);
@@ -122,7 +123,7 @@ class PrivacyQueryHttpAdapterTest {
         FidaOrderRequest command = new FidaOrderRequest(LocalDate.of(2026, 1, 1), StrategyTicker.SOXL,
                 new BigDecimal("100.0"), BigDecimal.ZERO, null, 0, List.of());
 
-        PrivacyQueryPort.CreateBaseResult result = adapter.createBase(command);
+        PrivacyBaseCreateResult result = adapter.createBase(command);
 
         assertThat(result.created()).isFalse();
     }

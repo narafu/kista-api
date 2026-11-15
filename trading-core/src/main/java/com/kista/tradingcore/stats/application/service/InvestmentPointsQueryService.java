@@ -1,6 +1,6 @@
 package com.kista.tradingcore.stats.application.service;
 
-import com.kista.tradingcore.stats.domain.model.Scope;
+import com.kista.tradingcore.stats.domain.model.InvestmentPointsScope;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
@@ -43,13 +43,13 @@ public class InvestmentPointsQueryService {
 
     // 원본 BenchmarkService.buildInvestmentContext(private)를 그대로 이식 — 소유권 검증까지
     // 이 메서드가 담당하므로(authorizeIfStrategyScope 대체) api 쪽은 사전검증을 하지 않는다.
-    public InvestmentPointsResult fetch(UUID userId, Scope scope, UUID strategyId, Currency currency,
+    public InvestmentPointsResult fetch(UUID userId, InvestmentPointsScope scope, UUID strategyId, Currency currency,
                                         LocalDate from, LocalDate to) {
         LocalDate effectiveTo = to != null ? to : LocalDate.now(clock);
         Strategy selectedStrategy = null;
         Currency resultCurrency = currency;
         List<Strategy> strategies;
-        if (scope == Scope.STRATEGY) {
+        if (scope == InvestmentPointsScope.STRATEGY) {
             selectedStrategy = strategyPort.findByIdOrThrow(strategyId);
             // 소유 검증으로 읽은 계좌의 통화 — 벤치마크가 투자 통화 표기에 쓴다
             resultCurrency = accountPort.requireOwnedAccount(selectedStrategy.accountId(), userId).broker().getCurrency();
@@ -72,7 +72,7 @@ public class InvestmentPointsQueryService {
                 ? from
                 : cycles.stream().map(StrategyCycle::startDate).min(LocalDate::compareTo).orElse(effectiveTo);
         Instant toInstant = KstDays.endExclusive(effectiveTo);
-        List<CyclePosition> rawPositions = scope == Scope.STRATEGY
+        List<CyclePosition> rawPositions = scope == InvestmentPointsScope.STRATEGY
                 ? cyclePositionPort.findByStrategyAndRange(strategyId, Instant.EPOCH, toInstant)
                 : cyclePositionPort.findByUserAndRange(userId, Instant.EPOCH, toInstant);
 

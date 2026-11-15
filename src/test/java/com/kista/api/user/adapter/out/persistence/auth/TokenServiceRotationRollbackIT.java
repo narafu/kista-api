@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 // InvalidRefreshTokenException(unchecked)을 던지는데, refresh()에 noRollbackFor가 없으면
 // 클래스 레벨 @Transactional 기본 롤백 규칙에 의해 방금 실행한 세션 폐기(delete)까지 롤백되어
 // 재사용 공격 탐지가 무력화됨 — Mockito 단위 테스트는 실제 트랜잭션 프록시를 거치지 않아 이 버그를 못 잡음
-// TokenService(application 레이어, package-private)는 TokenUseCaseTestConfig를 통해 TokenUseCase로 노출받음
+// TokenService(application 레이어, package-private)는 TokenUseCaseTestConfig를 통해 빈으로 노출받음
 // (adapter → application 참조는 ArchUnit 허용 방향, 반대 방향만 금지되어 있어 패키지 위치를 이쪽으로 둠)
 @Tag("integration")
 @Import({RefreshTokenPortTestConfig.class, TokenUseCaseTestConfig.class})

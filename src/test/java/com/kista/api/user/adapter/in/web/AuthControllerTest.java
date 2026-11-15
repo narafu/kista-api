@@ -81,7 +81,7 @@ class AuthControllerTest {
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isNoContent());
 
-        verify(userUseCase).deleteMe(USER_ID); // UseCase 실제 호출 검증
+        verify(userUseCase).deleteMe(USER_ID); // 서비스 실제 호출 검증
     }
 
     @Test

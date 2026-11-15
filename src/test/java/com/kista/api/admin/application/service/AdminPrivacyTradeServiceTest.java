@@ -1,6 +1,6 @@
 package com.kista.api.admin.application.service;
 
-import com.kista.api.admin.domain.model.CreateResult;
+import com.kista.api.admin.domain.model.PrivacyBaseCreateResult;
 import com.kista.api.admin.application.port.output.AuditLogPort;
 import com.kista.api.admin.application.port.output.PrivacyQueryPort;
 import com.kista.shared.contract.privacy.FidaOrderRequest;
@@ -45,9 +45,9 @@ class AdminPrivacyTradeServiceTest {
                 new BigDecimal("28.50"), BigDecimal.ZERO, null, 0, List.of());
         PrivacyTradeBaseResponse view = new PrivacyTradeBaseResponse(BASE_ID, LocalDate.of(2026, 6, 10), "SOXL",
                 new BigDecimal("28.50"), BigDecimal.ZERO, null, 0, List.of());
-        when(privacyQueryPort.createBase(command)).thenReturn(new PrivacyQueryPort.CreateBaseResult(view, true));
+        when(privacyQueryPort.createBase(command)).thenReturn(new PrivacyBaseCreateResult(view, true));
 
-        CreateResult result = service.createBase(ADMIN_ID, command);
+        PrivacyBaseCreateResult result = service.createBase(ADMIN_ID, command);
 
         assertThat(result.view()).isEqualTo(view);
         assertThat(result.created()).isTrue();

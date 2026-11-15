@@ -251,15 +251,15 @@ class HexagonalArchitectureTest {
     }
 
     @Test
-    @DisplayName("notify는 순수 아웃바운드 게이트웨이 — 다른 모듈 유스케이스와 web.client(RestClient)에 의존하지 않는다")
+    @DisplayName("notify는 순수 아웃바운드 게이트웨이 — 다른 모듈 서비스와 web.client(RestClient)에 의존하지 않는다")
     void notify_must_stay_pure_outbound_gateway() {
-        // 텔레그램 봇 명령 채널(승인/거절·조회)은 admin.adapter.in.telegram으로 이전됐다. notify가 유스케이스를 호출하거나
+        // 텔레그램 봇 명령 채널(승인/거절·조회)은 admin.adapter.in.telegram으로 이전됐다. notify가 다른 모듈 서비스를 호출하거나
         // 다른 프로세스를 HTTP로 조회하는 순간 알림 게이트웨이가 다시 인바운드 명령 채널이 된다 —
         // 사용자 조회는 UserPort·이벤트로, 텔레그램 전송·getMe는 platform.telegram.TelegramHttpClient가 맡는다.
         ArchRule rule = noClasses()
                 .that().resideInAPackage("com.kista.api.notify..")
                 .should().dependOnClassesThat().resideInAnyPackage(
-                        "com.kista..application.usecase..", "org.springframework.web.client..");
+                        "com.kista..application.service..", "org.springframework.web.client..");
         rule.check(classes);
     }
 
@@ -283,13 +283,13 @@ class HexagonalArchitectureTest {
         // tradingcore.web은 root web과 대칭인 trading-core 앱셸이라 같은 규칙을 적용한다.
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("com.kista.api.web..", "com.kista.tradingcore.web..")
-                .and().haveSimpleNameNotEndingWith("IT") // 실 컨텍스트 IT는 서비스를 직접 호출해 픽스처를 만든다
                 .should().dependOnClassesThat()
                 .resideInAnyPackage(
                         "com.kista..application.service..",
                         "com.kista..adapter.out.."
                 );
-        rule.check(classes);
+        // 앱셸 규칙은 운영 코드만 본다 — 테스트(IT)는 픽스처로 서비스를 직접 쓴다
+        rule.check(mainClasses);
     }
 
     @Test

@@ -1,6 +1,6 @@
 ## com.kista.api.notify (`:api`)
 
-Spring Modulith 모듈(CLOSED) — Telegram/FCM **순수 아웃바운드 알림 게이트웨이**. 자체 UseCase 없음, 다른 모듈 유스케이스·trading-core HTTP 호출 0 (가드: `HexagonalArchitectureTest.notify_must_stay_pure_outbound_gateway` — `..application.usecase..`·`org.springframework.web.client..` 의존 금지). "port"·"domain" 공개, 나머지 internal.
+Spring Modulith 모듈(CLOSED) — Telegram/FCM **순수 아웃바운드 알림 게이트웨이**. 자체 서비스 없음, 다른 모듈 서비스·trading-core HTTP 호출 0 (가드: `HexagonalArchitectureTest.notify_must_stay_pure_outbound_gateway` — `..application.service..`·`org.springframework.web.client..` 의존 금지). "port"·"domain" 공개, 나머지 internal.
 
 - `NotificationRecipient`는 notify가 실제로 읽는 필드만 담은 notify 소유 투영이다. notify 안에서 `User`/`UserSettings`는 gateway 어댑터에서만 import하고 변환은 `NotificationRecipients.from(User)` 한 곳이 맡는다.
 - 알림 유형 무관 사용자 채널 라우팅은 `UserChannelNotifier`가 단일 지점이다 — 설정 게이트(`UserSettings.isNotificationEnabled`) 뒤 텔레그램·FCM leg를 각자 try/catch로 격리해 한쪽 실패가 다른 쪽·호출자로 전파되지 않는다. 새 알림 유형의 리스너는 (유형, 제목, 본문) 매핑만 하고 여기에 위임하며 라우팅을 복제하지 않는다. FCM 라우팅 판정은 `UserPushNotificationAdapter`(`PushNotificationPort`)가 단일 지점이고 `FcmAdapter.send`는 package-private이다.

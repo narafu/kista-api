@@ -1,6 +1,6 @@
 package com.kista.tradingcore.stats.application.service;
 
-import com.kista.tradingcore.stats.domain.model.Scope;
+import com.kista.tradingcore.stats.domain.model.InvestmentPointsScope;
 import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
@@ -96,7 +96,7 @@ class InvestmentPointsQueryServiceTest {
                         depositSnapshot(cycle.id(), "100.00", "2026-01-05T01:00:00Z"),
                         depositSnapshot(cycle.id(), "110.00", "2026-02-23T01:00:00Z")));
 
-        InvestmentPointsResult result = service.fetch(USER_ID, Scope.STRATEGY,
+        InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsScope.STRATEGY,
                 STRATEGY_ID, Currency.USD, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(result.selectedStrategy()).isEqualTo(STRATEGY);
@@ -114,7 +114,7 @@ class InvestmentPointsQueryServiceTest {
         when(strategyCyclePort.findByStrategyIds(Set.of(STRATEGY_ID))).thenReturn(List.of());
         when(cyclePositionPort.findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any())).thenReturn(List.of());
 
-        InvestmentPointsResult result = service.fetch(USER_ID, Scope.STRATEGY,
+        InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsScope.STRATEGY,
                 STRATEGY_ID, Currency.USD, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(result.currency()).isEqualTo(Currency.USDT);
@@ -128,7 +128,7 @@ class InvestmentPointsQueryServiceTest {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenThrow(new SecurityException("계좌에 대한 접근 권한이 없습니다"));
 
-        assertThatThrownBy(() -> service.fetch(USER_ID, Scope.STRATEGY,
+        assertThatThrownBy(() -> service.fetch(USER_ID, InvestmentPointsScope.STRATEGY,
                 STRATEGY_ID, Currency.USD, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23)))
                 .isInstanceOf(SecurityException.class);
 
@@ -151,7 +151,7 @@ class InvestmentPointsQueryServiceTest {
                 depositSnapshot(cycle.id(), "100.00", "2026-01-05T01:00:00Z"),
                 depositSnapshot(cycle.id(), "184.20", "2026-02-23T01:00:00Z")));
 
-        InvestmentPointsResult result = service.fetch(USER_ID, Scope.PORTFOLIO,
+        InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsScope.PORTFOLIO,
                 null, Currency.USD, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(result.selectedStrategy()).isNull();
@@ -175,7 +175,7 @@ class InvestmentPointsQueryServiceTest {
                 depositSnapshot(cycle.id(), "100.00", "2026-01-05T01:00:00Z"),
                 depositSnapshot(cycle.id(), "200.00", "2026-01-06T01:00:00Z")));
 
-        InvestmentPointsResult result = service.fetch(USER_ID, Scope.PORTFOLIO, null, Currency.USD,
+        InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsScope.PORTFOLIO, null, Currency.USD,
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 6));
 
         assertThat(idsCaptor.getValue()).containsExactlyInAnyOrder(STRATEGY_ID, dca.id());
@@ -195,7 +195,7 @@ class InvestmentPointsQueryServiceTest {
         when(strategyPort.findByAccountIds(List.of(binanceId))).thenReturn(Map.of(binanceId, List.of(binanceStrategy)));
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of());
 
-        InvestmentPointsResult result = service.fetch(USER_ID, Scope.PORTFOLIO, null,
+        InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsScope.PORTFOLIO, null,
                 Currency.USDT, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(result.currency()).isEqualTo(Currency.USDT);
@@ -223,10 +223,10 @@ class InvestmentPointsQueryServiceTest {
         when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any()))
                 .thenReturn(java.util.stream.Stream.concat(usdt.stream(), usd.stream()).toList());
 
-        InvestmentPointsResult mixed = service.fetch(USER_ID, Scope.PORTFOLIO, null,
+        InvestmentPointsResult mixed = service.fetch(USER_ID, InvestmentPointsScope.PORTFOLIO, null,
                 Currency.USDT, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 6));
         when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(usdt);
-        InvestmentPointsResult only = service.fetch(USER_ID, Scope.PORTFOLIO, null,
+        InvestmentPointsResult only = service.fetch(USER_ID, InvestmentPointsScope.PORTFOLIO, null,
                 Currency.USDT, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 6));
 
         assertThat(mixed.points()).isEqualTo(only.points());
@@ -239,7 +239,7 @@ class InvestmentPointsQueryServiceTest {
         when(strategyCyclePort.findByStrategyIds(Set.of(STRATEGY_ID))).thenReturn(List.of());
         when(cyclePositionPort.findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any())).thenReturn(List.of());
 
-        InvestmentPointsResult result = service.fetch(USER_ID, Scope.STRATEGY,
+        InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsScope.STRATEGY,
                 STRATEGY_ID, Currency.USD, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(result.currency()).isEqualTo(Currency.USDT);
@@ -249,7 +249,7 @@ class InvestmentPointsQueryServiceTest {
     void PORTFOLIO_계좌_없는_통화는_빈_points를_반환한다() {
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(USER_ID)));
 
-        InvestmentPointsResult result = service.fetch(USER_ID, Scope.PORTFOLIO, null,
+        InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsScope.PORTFOLIO, null,
                 Currency.JPY, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(result.points()).isEmpty();
@@ -265,7 +265,7 @@ class InvestmentPointsQueryServiceTest {
         when(cyclePositionPort.findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any()))
                 .thenReturn(List.of(depositSnapshot(cycle.id(), "100.00", "2026-01-15T01:00:00Z")));
 
-        InvestmentPointsResult result = service.fetch(USER_ID, Scope.STRATEGY,
+        InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsScope.STRATEGY,
                 STRATEGY_ID, Currency.USD, null, LocalDate.of(2026, 2, 23));
 
         assertThat(result.effectiveFrom()).isEqualTo(LocalDate.of(2026, 1, 15));
@@ -295,7 +295,7 @@ class InvestmentPointsQueryServiceTest {
                         new BigDecimal("-350"), BigDecimal.ZERO, new BigDecimal("-350"),
                         Instant.parse("2026-11-07T02:47:14.286694Z"))));
 
-        InvestmentPointsResult result = service.fetch(USER_ID, Scope.STRATEGY,
+        InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsScope.STRATEGY,
                 STRATEGY_ID, Currency.USD, LocalDate.of(2026, 11, 6), LocalDate.of(2026, 11, 7));
 
         // 수정 전에는 11-07 수익률이 약 -19.4%(1,288.55 -> 1,038.49)로 보였다
@@ -317,7 +317,7 @@ class InvestmentPointsQueryServiceTest {
                         new BigDecimal("100"), BigDecimal.ZERO, new BigDecimal("100"),
                         Instant.parse("2026-11-08T02:00:00Z"))));
 
-        InvestmentPointsResult result = service.fetch(USER_ID, Scope.STRATEGY,
+        InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsScope.STRATEGY,
                 STRATEGY_ID, Currency.USD, LocalDate.of(2026, 11, 5), LocalDate.of(2026, 11, 8));
 
         // 복원 없이는 11-06에 +10%, 11-08에 -9%로 보인다

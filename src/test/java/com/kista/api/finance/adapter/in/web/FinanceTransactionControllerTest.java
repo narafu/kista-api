@@ -79,7 +79,7 @@ class FinanceTransactionControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/api/finance/transactions/" + savedId));
 
-        // shareToGroup 미지정 시 기본 false로 usecase 호출
+        // shareToGroup 미지정 시 기본 false로 서비스 호출
         verify(transactionUseCase).create(eq(USER_ID), eq(false), any(FinanceTransactionCommand.class));
     }
 

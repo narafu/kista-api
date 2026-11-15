@@ -1,6 +1,6 @@
 package com.kista.api.admin.adapter.in.web;
 
-import com.kista.api.admin.domain.model.CreateResult;
+import com.kista.api.admin.domain.model.PrivacyBaseCreateResult;
 import com.kista.shared.platform.security.InternalTokenAuthFilter;
 import com.kista.shared.platform.security.JwtAuthFilter;
 import com.kista.shared.platform.security.SecurityConfig;
@@ -108,7 +108,7 @@ class AdminPrivacyTradeControllerTest {
         var view = new PrivacyTradeBaseResponse(id, LocalDate.of(2026, 6, 10), "SOXL",
                 new BigDecimal("28.50"), new BigDecimal("0"), null, 0, List.of());
         when(adminPrivacyTrade.createBase(eq(ADMIN_UUID), any()))
-                .thenReturn(new CreateResult(view, true));
+                .thenReturn(new PrivacyBaseCreateResult(view, true));
 
         mockMvc.perform(post("/api/admin/privacy-trade-bases")
                         .with(authentication(adminToken(ADMIN_UUID)))
@@ -128,7 +128,7 @@ class AdminPrivacyTradeControllerTest {
         var view = new PrivacyTradeBaseResponse(id, LocalDate.of(2026, 6, 10), "SOXL",
                 new BigDecimal("28.50"), new BigDecimal("0"), null, 0, List.of());
         when(adminPrivacyTrade.createBase(eq(ADMIN_UUID), any()))
-                .thenReturn(new CreateResult(view, false));
+                .thenReturn(new PrivacyBaseCreateResult(view, false));
 
         mockMvc.perform(post("/api/admin/privacy-trade-bases")
                         .with(authentication(adminToken(ADMIN_UUID)))

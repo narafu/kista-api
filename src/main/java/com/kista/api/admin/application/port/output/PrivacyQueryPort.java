@@ -1,5 +1,6 @@
 package com.kista.api.admin.application.port.output;
 
+import com.kista.api.admin.domain.model.PrivacyBaseCreateResult;
 import com.kista.shared.contract.privacy.FidaOrderRequest;
 import com.kista.shared.contract.privacy.PrivacyBaseUpdateRequest;
 import com.kista.shared.contract.privacy.PrivacyOrderAddRequest;
@@ -16,8 +17,7 @@ public interface PrivacyQueryPort {
 
     // FIDA 오류 대응 수동 등록 — 기존 POST /api/internal/fida-orders(FidaOrderController) 재사용.
     // 응답 body(FidaOrderResponse)엔 created 플래그가 없어(id echo만) HTTP 상태코드(201/200)로 판정한다.
-    record CreateBaseResult(PrivacyTradeBaseResponse view, boolean created) {}
-    CreateBaseResult createBase(FidaOrderRequest command);
+    PrivacyBaseCreateResult createBase(FidaOrderRequest command);
 
     PrivacyTradeBaseResponse updateBase(UUID baseId, PrivacyBaseUpdateRequest command);
 

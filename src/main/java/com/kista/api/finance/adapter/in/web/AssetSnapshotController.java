@@ -33,7 +33,7 @@ import java.util.UUID;
 public class AssetSnapshotController {
 
     private final AssetSnapshotService assetSnapshotUseCase;
-    // 응답 보강(카테고리명·계좌명·최상위 카테고리 ID) 전용 읽기 조회 — UseCase 외 out-port 직접 의존은
+    // 응답 보강(카테고리명·계좌명·최상위 카테고리 ID) 전용 읽기 조회 — 서비스 외 out-port 직접 의존은
     // 이 컨트롤러에 한해 의도적 예외다 (plan §5.5 참고)
     private final FinanceCategoryPort financeCategoryPort;
     private final FinanceAccountPort financeAccountPort;

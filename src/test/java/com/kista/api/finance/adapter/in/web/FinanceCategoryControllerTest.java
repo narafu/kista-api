@@ -93,7 +93,7 @@ class FinanceCategoryControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/api/finance/categories/" + savedId));
 
-        // shareToGroup 미지정이면 기본값 false로 usecase에 전달
+        // shareToGroup 미지정이면 기본값 false로 서비스에 전달
         verify(categoryUseCase).create(eq(USER_ID), eq(false), any(FinanceCategoryCommand.class));
     }
 

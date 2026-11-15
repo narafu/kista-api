@@ -1,6 +1,6 @@
 package com.kista.api.admin.application.service;
 
-import com.kista.api.admin.domain.model.CreateResult;
+import com.kista.api.admin.domain.model.PrivacyBaseCreateResult;
 import com.kista.api.admin.application.port.output.AuditLogPort;
 import com.kista.api.admin.application.port.output.PrivacyQueryPort;
 import com.kista.shared.contract.privacy.FidaOrderRequest;
@@ -28,13 +28,13 @@ public class AdminPrivacyTradeService {
     private final PrivacyQueryPort privacyQueryPort;
     private final AuditLogPort auditLogPort;
 
-    public CreateResult createBase(UUID adminId, FidaOrderRequest command) {
-        PrivacyQueryPort.CreateBaseResult result = privacyQueryPort.createBase(command);
+    public PrivacyBaseCreateResult createBase(UUID adminId, FidaOrderRequest command) {
+        PrivacyBaseCreateResult result = privacyQueryPort.createBase(command);
         auditLogPort.log(adminId, "PRIVACY_BASE_CREATE", "PRIVACY_TRADE_BASE", result.view().id(),
                 Map.of("releaseDate", command.releaseDate().toString(),
                         "ticker", command.ticker().name(),
                         "created", String.valueOf(result.created())));
-        return new CreateResult(result.view(), result.created());
+        return result;
     }
 
     public PrivacyTradeBaseResponse updateBase(UUID adminId, UUID baseId, PrivacyBaseUpdateRequest command) {

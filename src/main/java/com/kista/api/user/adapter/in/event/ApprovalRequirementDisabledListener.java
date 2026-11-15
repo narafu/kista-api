@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-// 승인 설정 OFF 전환 cascade — admin이 UserUseCase를 직접 호출하던 것을 이벤트 구독으로 전환(admin↔user 빈 순환 해소).
+// 승인 설정 OFF 전환 cascade — admin이 UserService를 직접 호출하던 것을 이벤트 구독으로 전환(admin↔user 빈 순환 해소).
 // AFTER_COMMIT 시점엔 원본 트랜잭션이 종료돼 있으므로 REQUIRES_NEW로 새 트랜잭션을 연다.
 @Component
 @RequiredArgsConstructor

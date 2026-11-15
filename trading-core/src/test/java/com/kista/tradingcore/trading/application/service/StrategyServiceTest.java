@@ -82,7 +82,7 @@ class StrategyServiceTest {
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     @Mock StrategyVrDetailPort strategyVrDetailPort;       // VR 버전 상세 포트
     @Mock StrategyCycleVrPort strategyCycleVrPort;         // VR 사이클 상세 포트
-    @Mock VrStrategyDetailService vrStrategyDetailService;      // trading "usecase" — buildSummary/findSummary는 포뮬러를 담고 있어 테스트에서 재구현하지 않고 직접 모킹
+    @Mock VrStrategyDetailService vrStrategyDetailService;      // trading 서비스 — buildSummary/findSummary는 포뮬러를 담고 있어 테스트에서 재구현하지 않고 직접 모킹
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CyclePositionPort cyclePositionPort;
     @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;

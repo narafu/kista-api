@@ -40,7 +40,7 @@ class RuntimeSettingsService implements ApprovalPolicyPort {
         RuntimeSettings effective = benchmarksProvided ? requested : requested.withBenchmarks(previous.benchmarks());
         RuntimeSettings saved = settingsPort.save(effective);
         // 승인 설정을 끄는 순간 PENDING 사용자 일괄 승인이 필요 — admin↔user 빈 순환을 피하려
-        // UserUseCase를 직접 호출하지 않고 커밋 후 이벤트로 위임한다(user 모듈이 구독해 처리).
+        // UserService를 직접 호출하지 않고 커밋 후 이벤트로 위임한다(user 모듈이 구독해 처리).
         if (previous.approvalRequired() && !saved.approvalRequired()) {
             eventPublisher.publishEvent(new ApprovalRequirementDisabledEvent());
         }

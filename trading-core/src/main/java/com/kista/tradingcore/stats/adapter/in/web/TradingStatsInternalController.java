@@ -1,6 +1,6 @@
 package com.kista.tradingcore.stats.adapter.in.web;
 
-import com.kista.tradingcore.stats.domain.model.Scope;
+import com.kista.tradingcore.stats.domain.model.InvestmentPointsScope;
 import com.kista.shared.contract.stats.InvestmentPointsResponse;
 import com.kista.tradingcore.stats.application.service.BrokerStatisticsService;
 import com.kista.tradingcore.stats.application.service.InvestmentPointsQueryService;
@@ -29,7 +29,7 @@ public class TradingStatsInternalController {
     @GetMapping("/investment-points")
     public InvestmentPointsResponse getInvestmentPoints(
             @RequestParam UUID userId,
-            @RequestParam Scope scope,
+            @RequestParam InvestmentPointsScope scope,
             @RequestParam(required = false) UUID strategyId,
             @RequestParam(defaultValue = "USD") Currency currency, // STRATEGY scope는 무시(전략 계좌 통화 사용)
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

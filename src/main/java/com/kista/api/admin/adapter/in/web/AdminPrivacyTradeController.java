@@ -1,6 +1,6 @@
 package com.kista.api.admin.adapter.in.web;
 
-import com.kista.api.admin.domain.model.CreateResult;
+import com.kista.api.admin.domain.model.PrivacyBaseCreateResult;
 import com.kista.api.admin.adapter.in.web.dto.AdminPrivacyBaseResponse;
 import com.kista.api.admin.application.service.AdminPrivacyTradeService;
 import com.kista.api.admin.application.service.AdminQueryService;
@@ -61,7 +61,7 @@ public class AdminPrivacyTradeController {
     public ResponseEntity<AdminPrivacyBaseResponse> createBase(
             @AuthenticationPrincipal UUID adminId,
             @RequestBody @Valid FidaOrderRequest command) {
-        CreateResult result = adminPrivacyTrade.createBase(adminId, command);
+        PrivacyBaseCreateResult result = adminPrivacyTrade.createBase(adminId, command);
         AdminPrivacyBaseResponse body = AdminPrivacyBaseResponse.from(result.view());
         if (!result.created()) return ResponseEntity.ok(body);
         return ResponseEntity.created(URI.create("/api/admin/privacy-trade-bases/" + result.view().id())).body(body);

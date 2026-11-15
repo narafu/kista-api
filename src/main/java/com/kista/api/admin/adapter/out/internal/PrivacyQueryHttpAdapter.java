@@ -8,6 +8,7 @@ import com.kista.shared.contract.privacy.PrivacyOrderAddRequest;
 import com.kista.shared.contract.privacy.PrivacyOrderUpdateRequest;
 import com.kista.shared.contract.privacy.PrivacyTradeBaseResponse;
 import com.kista.api.admin.domain.model.AdminPrivacyTradeConflictException;
+import com.kista.api.admin.domain.model.PrivacyBaseCreateResult;
 import com.kista.shared.platform.internalapi.InternalApiErrorDetails;
 import com.kista.shared.platform.internalapi.InternalApiStatusHandlers;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +40,7 @@ class PrivacyQueryHttpAdapter implements PrivacyQueryPort {
     }
 
     @Override
-    public CreateBaseResult createBase(FidaOrderRequest command) {
+    public PrivacyBaseCreateResult createBase(FidaOrderRequest command) {
         // 기존 FidaOrderController(POST /api/internal/fida-orders)를 그대로 호출 — 응답 body(FidaOrderResponse)엔
         // 주문 명세 id가 없어(echo 전용) 상태코드로 created만 판정하고, 전체 view는 id로 재조회한다.
         RestClient.ResponseSpec spec = internalApiWriteRestClient.post()
@@ -63,7 +64,7 @@ class PrivacyQueryHttpAdapter implements PrivacyQueryPort {
                 .uri("/api/internal/privacy/trade-bases/{id}", id)
                 .retrieve()
                 .body(PrivacyTradeBaseResponse.class);
-        return new CreateBaseResult(view, created);
+        return new PrivacyBaseCreateResult(view, created);
     }
 
     @Override
