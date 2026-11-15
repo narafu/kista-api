@@ -233,3 +233,17 @@ WHERE o.order_leg = 'INFINITE_MOC_SELL' AND o.timing = 'AT_OPEN'
 배포 뒤 첫 개장 배치에서 볼 것: Q-05의 비교표에 있는 두 전략의 LOC 가격이 "후" 열과 같은지(현재가에 따라 cap 값은 다를 수 있다), 수량이 "전"과 같은지. 다르면 로드맵 9-5의 1번.
 
 Q-04(리버스 첫날 MOC가 이틀 연속 나갈 수 있음)는 그대로 두기로 정해졌다. 운영에서 실제로 일어나면(같은 전략에 `INFINITE_MOC_SELL`이 연속 두 거래일) 관리자 알림 없이 지나가므로, 배포 뒤 첫 주에 위 ②를 `status = 'FILLED'`로 바꿔 한 번 본다.
+
+### 원문 재대조에서 나온 태스크 (2026-11-15 — `findings/28-formulas-vs-laor.md`)
+
+기준 문헌이 quantstack에서 라오어 원문(`docs/reference/laor/`)으로 바뀐 뒤 다시 대조했다. 1절 표의 판정 중 원문 기준으로 바뀐 것은 F5(별지점 쪽 먼저 — `2fe2fa152`로 반영, 판정 유지)와 F10의 세 항목이다: 예산 소진 MOC는 KISTA 고유가 아니라 원문 규칙이고, 종료 `≥`와 별지점 5행은 "허용 범위"가 아니라 불일치다. F6은 결론은 그대로이고 근거가 바뀐다("4.0이 쿼터손절을 대체했다"는 원문 본문에 없다. 원문 R p.1의 진입 규칙이 근거다).
+
+T8·T9는 공식 변경이라 6절대로 사용자 결정 없이 하지 않는다. 결정이 나면 4절의 공통 규칙(원문 값을 기대값으로 한 테스트 먼저, 리팩토링과 분리)과 로드맵 9-4(전후 비교표, 매매 시간대 밖 배포)를 따른다. `2fe2fa152`는 이 절차 없이 배포됐다. 같은 일을 되풀이하지 않는다.
+
+| # | 태스크 | 모델 | 완료 판정 |
+|---|---|---|---|
+| T8 | 리버스 별지점을 "현재 사이클 원장 5행"이 아니라 "직전 5거래일 종가"로 계산한다(findings/28 I-1). 지금은 사이클 초반에 5행 미만 평균이 되고 등록 개장 행이 한 행을 차지한다. 종가 출처는 공용 시세 일봉(14 T3 전환 뒤에는 Alpaca)이고 조회 실패 시 지금 방식으로 떨어지는지, 그날 리버스 주문을 내지 않는지를 먼저 정한다. `BacktestEngine.STAR_POINT_WINDOW` 경로는 이미 종가 5개라 운영만 바뀐다. **사용자 결정 필요**: ① 바꾼다 ② 지금 방식 유지(이유를 `trading-formulas.md` 1-7에 적는다). 결정 전 권고는 ①이다 — 보유를 가진 채 재등록한 전략이 바로 리버스에 들어가는 운영 사례(`01a1dcd7`)가 있다 | Opus | `./gradlew :trading-core:test --tests 'com.kista.tradingcore.trading.application.service.CycleOrderComputer*' 2>&1 \| grep -E "FAILED\|BUILD"` + 리버스 진행 전략의 전후 비교표 |
+| T9 | 리버스 종료 조건을 원문대로 `종가 > round2(평단 × (1 − 목표수익률))`로 바꾼다(`ReverseModePosition.shouldExit`, findings/28 I-5). 종가가 임계와 정확히 같은 날만 달라진다. **사용자 결정 필요**: ① 바꾼다 ② `≥` 유지. 권고는 ①(원문 문장이 분명하고 바꾸면 돈이 덜 움직인다)이지만 급하지 않다. T8과 같은 배포에 싣는다 | Sonnet | `./gradlew :trading-core:test --tests 'com.kista.tradingcore.matching.*' 2>&1 \| grep -E "FAILED\|BUILD"` |
+| T10 | 문서만. `trading-formulas.md`에 ① 1-1의 종목 문장에 "원문은 TQQQ·SOXL만 다룬다. USD·MAGX와 30분할은 같은 일반식을 적용한 KISTA 확장" ② 2-2에 "V′의 pool은 적립·인출 반영 전 예수금(`VrCycleRolloverService`)" ③ 1-3 "일반모드 최종회차" 행에 "원문은 재진입 시 첫날 MOC 1회, KISTA는 2회가 될 수 있다(Q-04에서 유지)"를 넣는다. `bash .github/scripts/check-doc-budget.sh`를 돌린다 | Sonnet | 문서 검토 |
+
+하지 않기로 한 것(다시 제안하지 않는다): 아래 단계 3건과 지정가 22:00 접수는 2026-11-15 소유자 결정으로 유지, 가격 cap 1.05는 백로그 P-04의 재평가 대상, 최소 1주 보장은 주문 0건 정지를 막는 장치라 유지, VR 기본값은 2026-11-12 사용자 확인으로 유지.
