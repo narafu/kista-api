@@ -1,7 +1,7 @@
 package com.kista.tradingcore.trading.application.service;
 
 import com.kista.tradingcore.account.application.port.output.AccountOpenOrderCancelPort;
-import com.kista.tradingcore.account.application.usecase.AccountUseCase;
+import com.kista.tradingcore.account.application.service.AccountService;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
@@ -37,7 +37,7 @@ class UserTradingDataEraseServiceTest {
     @Mock CyclePositionPort cyclePositionPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock StrategyPort strategyPort;
-    @Mock AccountUseCase accountUseCase;
+    @Mock AccountService accountUseCase;
     @Mock TradingUserProfilePort tradingUserProfilePort;
 
     @InjectMocks UserTradingDataEraseService eraser;

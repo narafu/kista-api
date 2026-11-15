@@ -4,7 +4,7 @@ import com.kista.tradingcore.account.adapter.in.web.dto.AccountRequest;
 import com.kista.tradingcore.account.adapter.in.web.dto.AccountResponse;
 import com.kista.tradingcore.account.adapter.in.web.dto.CredentialsRequest;
 import com.kista.tradingcore.account.adapter.in.web.dto.TestConnectionRequest;
-import com.kista.tradingcore.account.application.usecase.AccountUseCase;
+import com.kista.tradingcore.account.application.service.AccountService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -25,7 +25,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AccountController {
 
-    private final AccountUseCase accountUseCase;
+    private final AccountService accountUseCase;
 
     // 내 계좌 목록 조회 (민감정보 마스킹)
     @Operation(summary = "내 계좌 목록 조회", description = "로그인한 사용자의 전체 계좌 목록 반환. 계좌번호는 마지막 4자리만 노출.")

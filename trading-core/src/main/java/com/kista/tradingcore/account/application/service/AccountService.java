@@ -10,7 +10,6 @@ import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.account.domain.model.RegisterAccountCommand;
 import com.kista.tradingcore.account.domain.model.UpdateAccountCommand;
 import com.kista.tradingcore.account.domain.model.UpdateCredentialsCommand;
-import com.kista.tradingcore.account.application.usecase.AccountUseCase;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.application.port.output.AccountOpenOrderCancelPort;
 import com.kista.tradingcore.account.application.port.output.BrokerEnabledPort;
@@ -18,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.modulith.NamedInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +35,8 @@ import java.util.concurrent.ThreadLocalRandom;
 @Service
 @RequiredArgsConstructor
 @Transactional
-class AccountService implements AccountUseCase {
+@NamedInterface("api")
+public class AccountService {
 
     private static final int MAX_ACCOUNTS_PER_USER = 10;
 
@@ -47,7 +48,6 @@ class AccountService implements AccountUseCase {
     private final AccountDeletionWriter deletionWriter; // 계좌 삭제 DB 쓰기 (취소 HTTP를 트랜잭션 밖에 두기 위해 분리)
     private final Clock clock; // API 키 만료일 추정·입력 검증 기준 시각
 
-    @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // Toss accountSeq 조회 HTTP 호출 포함 — 트랜잭션 없이 실행 (단건 저장은 JPA auto-commit)
     public Account register(UUID userId, RegisterAccountCommand cmd) {
         // broker 미지정 시 KIS 기본값 적용 후 신규 등록 정책을 확인한다.
@@ -115,7 +115,6 @@ class AccountService implements AccountUseCase {
 
     private static final String DEDUPE_UNIQUE_INDEX = "uq_accounts_account_no_hash"; // accounts.account_no_hash(중복 판정 키 해시) 부분 unique 인덱스
 
-    @Override
     public Account update(UUID accountId, UUID requesterId, UpdateAccountCommand cmd) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         // 수정 요청은 등록 전용 제약(@Pattern 계좌번호 등) 때문에 @Valid 없이 받는다 — 별명 필수만 여기서 확인
@@ -128,7 +127,7 @@ class AccountService implements AccountUseCase {
         return accountPort.save(manual != null ? renamed.withApiKeyExpiresAt(manual) : renamed);
     }
 
-    @Override
+    // 계좌 API 키 교체 — 소유권 → 연결 테스트 통과 시 저장·만료일 갱신. 실패 시 BrokerCredentialException(422)
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 증권사 검증 HTTP 포함 — 트랜잭션 없이 실행(단건 저장은 JPA auto-commit)
     public Account updateCredentials(UUID accountId, UUID requesterId, UpdateCredentialsCommand cmd) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
@@ -170,7 +169,6 @@ class AccountService implements AccountUseCase {
         return saved;
     }
 
-    @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 증권사 주문 취소 HTTP 포함 — DB 쓰기는 AccountDeletionWriter 짧은 트랜잭션
     public void delete(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
@@ -182,7 +180,7 @@ class AccountService implements AccountUseCase {
         log.info("[accountId={}] 계좌 삭제: requesterId={}", accountId, requesterId);
     }
 
-    @Override
+    // 사용자 탈퇴 정리 — 증권사 토큰 하드 삭제 + 계좌 일괄 소프트 삭제 (호출자 트랜잭션 합류)
     public void deleteAllByUserId(UUID userId) {
         // 소프트 삭제 후엔 @SQLRestriction이 계좌를 숨기므로 토큰 대상 ID를 먼저 확보한다
         List<UUID> accountIds = accountPort.findByUserId(userId).stream().map(Account::id).toList();
@@ -190,13 +188,12 @@ class AccountService implements AccountUseCase {
         accountPort.deleteByUserId(userId);
     }
 
-    @Override
     @Transactional(readOnly = true)
     public List<Account> listByUser(UUID userId) {
         return accountPort.findByUserId(userId);
     }
 
-    @Override
+    // 등록 전 사전 검증 — 어느 계좌의 토큰 캐시도 건드리지 않는다. 실패 시 BrokerCredentialException throw
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 외부 API 호출 — 트랜잭션 불필요
     public void test(Broker requestedBroker, String appKey, String appSecret) {
         Broker broker = brokerOrDefault(requestedBroker); // 미지정 시 KIS — 등록(register)과 같은 기본값

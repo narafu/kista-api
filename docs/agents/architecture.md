@@ -34,7 +34,7 @@ stats           통계·백테스트·포트폴리오 조회            domain/u
 notify          매매 알림 리스너·게이트웨이              (없음)
 marketcalendar  미국 시장 휴장일                         domain/port
 privacy         FIDA 기준 매매표 SSOT                    domain/port/api/event
-account         계좌 자격증명·브로커 연결                domain/usecase/port/event
+account         계좌 자격증명·브로커 연결                domain/api/port/event
 web             전역 web 앱셸                            (없음)
 ```
 shared 외 모듈은 전부 CLOSED. 모듈 문서 경로는 `modules/api/<ID>.md`·`modules/shared/<ID>.md`·`modules/tradingcore/<ID>.md`.

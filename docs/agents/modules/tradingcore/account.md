@@ -1,6 +1,6 @@
 ## com.kista.tradingcore.account (`:trading-core`)
 
-Spring Modulith 모듈(CLOSED) — 계좌 자격증명·브로커 연결. "domain"·"usecase"·"port"·"event" 4개 NamedInterface, service·adapter internal. `Account`와 `Strategy`(trading 소유)는 별도 aggregate이며 계좌에는 전략 속성이 없다 → `trading.md` "Account ↔ Strategy 분리".
+Spring Modulith 모듈(CLOSED) — 계좌 자격증명·브로커 연결. "domain"·"api"(AccountService 타입 단위)·"port"·"event" 4개 NamedInterface, 나머지 service·adapter internal. `Account`와 `Strategy`(trading 소유)는 별도 aggregate이며 계좌에는 전략 속성이 없다 → `trading.md` "Account ↔ Strategy 분리".
 
 - `Account.dedupeKey()`가 전역 중복 판정 키 SSOT다 — 키 전용 브로커(`Broker.isKeyOnlyCredentials()`: 업비트·메리츠·바이낸스)는 appKey, 그 외 계좌번호. `account_no_hash` = HMAC(`dedupeKey()`)이고 `account_no`는 NULL 허용(업비트). 업비트 등록 시 accountNo 처리 → `vendors/upbit.md` "기본 사실".
 - 포트 역전: `BrokerEnabledPort`(정책 소유자 trading `TradingPolicyService`가 구현), `AccountOpenOrderCancelPort`(주문 소유자 trading이 구현 — 실패 건수 > 0이면 `AccountService.delete()`가 삭제를 중단해 증권사에 주문이 남지 않게 한다).

@@ -71,7 +71,7 @@ class HexagonalArchitectureTest {
                     .or(resideInAnyPackage(VENDOR_MODEL_PACKAGES))
                     .or(IS_ENTITY).or(simpleNameEndingWith("JpaRepository")).as("인프라 타입");
     // 제거 대기 목록(single-impl-interfaces.txt)의 상한 — 목록에 새 항목을 더해 통과시키는 것을 막는다
-    private static final int PENDING_REMOVAL_CEILING = 132;
+    private static final int PENDING_REMOVAL_CEILING = 131;
     // 구현이 다른 모듈에 있어 순환을 끊는 포트(decisions.md "포트 역전(DIP)")
     private static final Set<String> DEPENDENCY_INVERSION_PORTS = Set.of(
             "com.kista.api.user.application.port.output.ApprovalPolicyPort",
@@ -335,7 +335,7 @@ class HexagonalArchitectureTest {
                 "com.kista.tradingcore.trading.application.service.support.StrategyHistoryQueryService", // 소유권 검증
                 "com.kista.tradingcore.trading.application.service.ManualTradeCorrectionService", // 소유권 검증
                 "com.kista.tradingcore.trading.application.service.AccountOpenOrderCanceller",   // 계좌 삭제 전 미체결 주문 취소(account 정의 포트가 Account를 넘김)
-                "com.kista.tradingcore.trading.application.service.UserTradingDataEraseService", // 탈퇴 미체결 취소(AccountUseCase.listByUser → AccountOpenOrderCancelPort가 Account를 받음)
+                "com.kista.tradingcore.trading.application.service.UserTradingDataEraseService", // 탈퇴 미체결 취소(AccountService.listByUser → AccountOpenOrderCancelPort가 Account를 받음)
                 "com.kista.tradingcore.trading.application.service.DcaConfigService",            // 소유권 검증 + 계좌 브로커 시장 규칙 검증
                 "com.kista.tradingcore.trading.application.service.CapitalLedgerService",     // 소유권 검증 + 계좌 통화(금액 자릿수·문구)·코인 여부
                 "com.kista.tradingcore.trading.application.service.AccountLedgerTotalsService",  // 소유권 검증 + 계좌 통화(반올림)·코인 여부(시세 소스)

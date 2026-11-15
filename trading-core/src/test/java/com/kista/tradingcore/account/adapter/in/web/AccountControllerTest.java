@@ -3,7 +3,7 @@ package com.kista.tradingcore.account.adapter.in.web;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.account.domain.model.RegisterAccountCommand;
-import com.kista.tradingcore.account.application.usecase.AccountUseCase;
+import com.kista.tradingcore.account.application.service.AccountService;
 import com.kista.shared.kernel.Broker;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -37,7 +37,7 @@ class AccountControllerTest {
 
     @Autowired MockMvc mockMvc;
 
-    @MockitoBean AccountUseCase accountUseCase;
+    @MockitoBean AccountService accountUseCase;
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
 

@@ -71,7 +71,6 @@ com.kista.api.user.application.usecase.UserProfileUseCase
 com.kista.api.user.application.usecase.UserSettingsUseCase
 com.kista.api.user.application.usecase.UserUseCase
 com.kista.tradingcore.account.application.port.output.AccountPort
-com.kista.tradingcore.account.application.usecase.AccountUseCase
 com.kista.tradingcore.broker.application.port.output.AccountTokenEvictionPort
 com.kista.tradingcore.broker.application.port.output.AdminMarketPricePort
 com.kista.tradingcore.broker.application.port.output.BrokerStatisticsPort

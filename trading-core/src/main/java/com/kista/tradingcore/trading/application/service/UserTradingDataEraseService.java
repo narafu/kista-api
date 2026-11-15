@@ -1,7 +1,7 @@
 package com.kista.tradingcore.trading.application.service;
 
 import com.kista.tradingcore.account.application.port.output.AccountOpenOrderCancelPort;
-import com.kista.tradingcore.account.application.usecase.AccountUseCase;
+import com.kista.tradingcore.account.application.service.AccountService;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
@@ -32,7 +32,7 @@ class UserTradingDataEraseService implements UserTradingDataEraseUseCase {
     private final CyclePositionPort cyclePositionPort;
     private final StrategyCyclePort strategyCyclePort;
     private final StrategyPort strategyPort;
-    private final AccountUseCase accountUseCase;                   // 계좌 목록 + 소프트 삭제·증권사 토큰 삭제 (account 모듈 소유)
+    private final AccountService accountUseCase;                   // 계좌 목록 + 소프트 삭제·증권사 토큰 삭제 (account 모듈 소유)
     private final TradingUserProfilePort tradingUserProfilePort;   // user_notify_profile 복제본 tombstone
 
     // 1단계: 계좌마다 전략 PAUSED + 증권사 미체결 취소(HTTP — 트랜잭션 밖). PAUSED가 먼저 기록돼 이후 정리가 실패해도 배치가 새 주문을 내지 않는다.
