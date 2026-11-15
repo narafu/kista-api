@@ -198,7 +198,7 @@ public class TossPriceApi {
     }
 
     // 특정 거래일 확정 종가 — 일봉 캔들에서 해당 날짜 봉의 종가를 직접 조회 (라이브 현재가와 무관)
-    // 실패/미발행 시 현재가로 폴백 (KIS KisPriceApi.getClosingPrice와 동일 정책)
+    // 실패/미발행 시 현재가로 폴백 
     public BigDecimal getClosingPrice(StrategyTicker ticker, LocalDate tradeDate) {
         return fetchConfirmedClose(ticker, tradeDate).orElseGet(() -> {
             log.warn("Toss {} 확정 종가 없음 — 현재가로 폴백: tradeDate={}", ticker, tradeDate);
@@ -211,7 +211,7 @@ public class TossPriceApi {
         return fetchConfirmedCandle(ticker, tradeDate).map(BrokerCandle::close);
     }
 
-    // Toss 캔들 date()는 US 세션일 기준이라 KST 거래일 D → US 세션 D-1로 변환 (KIS fetchConfirmedClose와 동일 규칙)
+    // Toss 캔들 date()는 US 세션일 기준이라 KST 거래일 D → US 세션 D-1로 변환
     // 봉 날짜가 기대 US 세션일과 다르면(미발행 등) filter에서 탈락 → Optional.empty()
     // public — 모의계좌(MockBrokerAdapter)가 OHLC 체결 판정에 사용
     public Optional<BrokerCandle> fetchConfirmedCandle(StrategyTicker ticker, LocalDate tradeDate) {

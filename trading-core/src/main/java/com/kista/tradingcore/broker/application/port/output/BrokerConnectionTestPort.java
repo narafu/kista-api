@@ -12,6 +12,6 @@ public interface BrokerConnectionTestPort {
     // 자격증명 검증 (OAuth 토큰 발급 시도) — 어느 계좌의 토큰 캐시도 건드리지 않는다. 실패 시 BrokerCredentialException
     void verifyCredentials(String appKey, String secretKey);
 
-    // 자격증명+계좌 검증 후 보조 식별자·키 만료일 반환 (KIS: 둘 다 null, Toss: accountSeq, 업비트: accountNo 무시·만료일). 실패 시 BrokerCredentialException
+    // 자격증명+계좌 검증 후 보조 식별자·키 만료일 반환 (Meritz·Mock: 둘 다 null, Toss: accountSeq, 업비트: accountNo 무시·만료일). 실패 시 BrokerCredentialException
     BrokerAccountVerification verifyAccount(String appKey, String secretKey, String accountNo);
 }

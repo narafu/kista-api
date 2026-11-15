@@ -43,7 +43,7 @@ class PortfolioServiceTest {
     static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     static final LocalDate FROM = LocalDate.of(2026, 1, 1);
     static final LocalDate TO = LocalDate.of(2026, 1, 31);
-    final UUID kisAccountId = UUID.randomUUID();
+    final UUID stockAccountId = UUID.randomUUID();
     final UUID binanceAccountId = UUID.randomUUID();
 
     private Account account(UUID id, Broker broker) {
@@ -54,20 +54,20 @@ class PortfolioServiceTest {
     }
 
     private void stubAccounts() {
-        Account kis = account(kisAccountId, Broker.KIS);
+        Account toss = account(stockAccountId, Broker.TOSS);
         Account binance = account(binanceAccountId, Broker.BINANCE);
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(kis, binance));
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(toss, binance));
     }
 
     @Test
     void getCurrent는_계좌_통화를_붙인다() {
         stubAccounts();
-        CyclePositionHistoryEntry kis = entry(kisAccountId, StrategyTicker.SOXL, StrategyType.INFINITE);
+        CyclePositionHistoryEntry toss = entry(stockAccountId, StrategyTicker.SOXL, StrategyType.INFINITE);
         CyclePositionHistoryEntry coin = entry(binanceAccountId, StrategyTicker.ETH, StrategyType.DCA);
-        when(cyclePositionPort.findLatestPerStrategyByUser(USER_ID)).thenReturn(List.of(kis, coin));
+        when(cyclePositionPort.findLatestPerStrategyByUser(USER_ID)).thenReturn(List.of(toss, coin));
 
         assertThat(sut.getCurrent(USER_ID)).containsExactly(
-                new PortfolioPosition(kis, Currency.USD), new PortfolioPosition(coin, Currency.USDT));
+                new PortfolioPosition(toss, Currency.USD), new PortfolioPosition(coin, Currency.USDT));
     }
 
     @Test
@@ -83,12 +83,12 @@ class PortfolioServiceTest {
     @Test
     void getHistory는_계좌_통화를_붙인다() {
         stubAccounts();
-        Order kis = order(kisAccountId, StrategyTicker.TQQQ);
+        Order toss = order(stockAccountId, StrategyTicker.TQQQ);
         Order coin = order(binanceAccountId, StrategyTicker.ETH);
-        when(orderPort.findByUser(USER_ID, FROM, TO)).thenReturn(List.of(kis, coin));
+        when(orderPort.findByUser(USER_ID, FROM, TO)).thenReturn(List.of(toss, coin));
 
         assertThat(sut.getHistory(USER_ID, FROM, TO)).containsExactly(
-                new PortfolioOrder(kis, Currency.USD), new PortfolioOrder(coin, Currency.USDT));
+                new PortfolioOrder(toss, Currency.USD), new PortfolioOrder(coin, Currency.USDT));
     }
 
     @Test

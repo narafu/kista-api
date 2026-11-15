@@ -16,7 +16,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-@DisplayName("계좌 토큰 제거 — KIS DB + Toss Redis")
+@DisplayName("계좌 토큰 제거 — Toss DB + Toss Redis")
 class AccountTokenEvictionAdapterTest {
 
     private final BrokerTokenCachePort cachePort = mock(BrokerTokenCachePort.class);
@@ -24,8 +24,8 @@ class AccountTokenEvictionAdapterTest {
     private final AccountTokenEvictionAdapter adapter = new AccountTokenEvictionAdapter(cachePort, tokenStore);
 
     @Test
-    @DisplayName("KIS 토큰을 지우고 계좌마다 Toss scope를 무효화하며, Redis 실패는 다음 계좌 처리를 막지 않는다")
-    void evictsKisAndEveryTossScope() {
+    @DisplayName("Toss 토큰을 지우고 계좌마다 Toss scope를 무효화하며, Redis 실패는 다음 계좌 처리를 막지 않는다")
+    void evictsTossAndEveryTossScope() {
         UUID failing = UUID.randomUUID();
         UUID next = UUID.randomUUID();
         doThrow(new TossApiException("Toss token Redis 무효화 실패", null))

@@ -92,7 +92,7 @@ class AdminObservabilityControllerTest {
     @Test
     void listErrorLogs_adminRole_returns200_with_list() throws Exception {
         AppErrorLog log = new AppErrorLog(
-                UUID.randomUUID(), "KisApiException", "KIS 오류", "stack...",
+                UUID.randomUUID(), "TossApiException", "Toss 오류", "stack...",
                 Map.of("caller", "TradingService"), Instant.now()
         );
         when(adminQueryService.listErrorLogs(eq(100), eq(Instant.EPOCH), any(Instant.class))).thenReturn(List.of(log));
@@ -100,7 +100,7 @@ class AdminObservabilityControllerTest {
         mockMvc.perform(get("/api/admin/logs/errors")
                         .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].errorType").value("KisApiException"));
+                .andExpect(jsonPath("$[0].errorType").value("TossApiException"));
     }
 
     @Test

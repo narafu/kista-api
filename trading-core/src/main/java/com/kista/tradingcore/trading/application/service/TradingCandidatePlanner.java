@@ -113,7 +113,7 @@ class TradingCandidatePlanner {
         return candidates;
     }
 
-    // 잔고 로드 — KIS·Toss 모두 cycle_position DB 이력 사용 (전략 공식 기준)
+    // 잔고 로드 — 모든 증권사 cycle_position DB 이력 사용 (전략 공식 기준)
     private AccountBalance loadBalance(Strategy strategy, TradingAccount account) {
         AccountBalance balance = balanceLoader.loadBalanceOrThrow(strategy);
         log.info("[accountId={}] 잔고 조회: {} {}주, 통합주문가능금액 ${}",

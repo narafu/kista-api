@@ -46,23 +46,23 @@ class TelegramAdapterTest {
     void notifyError_예외_메시지를_관리자_알림_문구로_감싸_전송한다() {
         ArgumentCaptor<String> textCaptor = ArgumentCaptor.forClass(String.class);
 
-        adapter.notifyError(new RuntimeException("KIS API 호출 실패"));
+        adapter.notifyError(new RuntimeException("Toss API 호출 실패"));
 
         verify(telegramHttpClient).sendMessage(org.mockito.ArgumentMatchers.eq("chat-123"), textCaptor.capture(),
                 org.mockito.ArgumentMatchers.eq("test-token"));
         assertThat(textCaptor.getValue())
                 .contains("⚠️ 관리자 알림")
-                .contains("KIS API 호출 실패");
+                .contains("Toss API 호출 실패");
     }
 
     @Test
     void notifyError_AppErrorRaisedEvent를_발행해_오류_로그_저장을_위임한다() {
-        adapter.notifyError(new RuntimeException("KIS API 호출 실패"));
+        adapter.notifyError(new RuntimeException("Toss API 호출 실패"));
 
         ArgumentCaptor<AppErrorRaisedEvent> captor = ArgumentCaptor.forClass(AppErrorRaisedEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());
         assertThat(captor.getValue().errorType()).isEqualTo("RuntimeException");
-        assertThat(captor.getValue().message()).isEqualTo("KIS API 호출 실패");
+        assertThat(captor.getValue().message()).isEqualTo("Toss API 호출 실패");
         assertThat(captor.getValue().context()).containsEntry("caller", "TelegramAdapter");
     }
 
@@ -70,8 +70,8 @@ class TelegramAdapterTest {
     void notifyError_리스너_예외에도_관리자_알림은_발송된다() {
         doThrow(new IllegalStateException("리스너 실패")).when(eventPublisher).publishEvent(any(AppErrorRaisedEvent.class));
 
-        adapter.notifyError(new RuntimeException("KIS API 호출 실패"));
+        adapter.notifyError(new RuntimeException("Toss API 호출 실패"));
 
-        verify(telegramHttpClient).sendMessage(eq("chat-123"), contains("KIS API 호출 실패"), eq("test-token"));
+        verify(telegramHttpClient).sendMessage(eq("chat-123"), contains("Toss API 호출 실패"), eq("test-token"));
     }
 }

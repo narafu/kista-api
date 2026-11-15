@@ -15,12 +15,12 @@ class BrokerAccountRefTest {
     @DisplayName("toString은 appKey·secretKey·계좌번호 평문을 노출하지 않는다")
     void toString_masks_credentials() {
         UUID id = UUID.randomUUID();
-        BrokerAccountRef ref = new BrokerAccountRef(id, "PLAIN-APP-KEY", "PLAIN-SECRET-KEY", "74420614-01", null, Broker.KIS);
+        BrokerAccountRef ref = new BrokerAccountRef(id, "PLAIN-APP-KEY", "PLAIN-SECRET-KEY", "74420614-01", null, Broker.TOSS);
 
         String text = ref.toString();
 
         assertThat(text)
                 .doesNotContain("PLAIN-APP-KEY", "PLAIN-SECRET-KEY", "74420614")
-                .isEqualTo("BrokerAccountRef[id=" + id + ", broker=KIS, accountNo=****1401, appKey=***, secretKey=***]");
+                .isEqualTo("BrokerAccountRef[id=" + id + ", broker=TOSS, accountNo=****1401, appKey=***, secretKey=***]");
     }
 }

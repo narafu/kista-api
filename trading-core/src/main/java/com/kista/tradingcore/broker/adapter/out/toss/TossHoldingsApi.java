@@ -128,7 +128,7 @@ class TossHoldingsApi {
                 BUYING_POWER_PATH, account, params,
                 new ParameterizedTypeReference<TossResult<BuyableAmountResponse>>() {});
         if (wrapper == null || wrapper.result() == null || wrapper.result().cashBuyingPower() == null) {
-            // KIS KisTradingApi.getMargin()과 동일 처리 — 조용한 0 반환은 잔고 부족으로 오판정될 수 있어 예외로 전파
+            // 조용한 0 반환은 잔고 부족으로 오판정될 수 있어 예외로 전파
             throw new TossApiException("Toss 매수가능금액 응답 없음: currency=" + currencyCode, null);
         }
         return new BigDecimal(wrapper.result().cashBuyingPower());
@@ -166,7 +166,7 @@ class TossHoldingsApi {
 
     // ── TossSellableQuantityPort ───────────────────────────────────────────────
 
-    // 미체결 매도를 빼지 않은 보유 수량(포트 계약 — KIS ovrs_cblc_qty·Mock과 동일). /sellable-quantity는 미체결 매도를 이미 뺀
+    // 미체결 매도를 빼지 않은 보유 수량(포트 계약 — Mock과 동일). /sellable-quantity는 미체결 매도를 이미 뺀
     // 순수량이라(2026-10-17 실측: 보유 30·미체결 매도 1 → 29) 배정이 DB PLACED SELL 예약을 한 번 더 빼는 이중 차감이 된다
     public SellableQuantity getSellableQuantity(StrategyTicker ticker, BrokerAccountRef account) {
         TossResult<HoldingsResponse> wrapper = tossHttpClient.get(

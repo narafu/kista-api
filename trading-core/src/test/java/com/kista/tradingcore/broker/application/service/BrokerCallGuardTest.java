@@ -35,7 +35,7 @@ class BrokerCallGuardTest {
     @Test
     @DisplayName("증권사 타입 예외는 래핑하지 않고 그대로 전파한다 — 503/422/429 상태코드 보존")
     void wrap_brokerTypedException_rethrownAsIs() {
-        RuntimeException apiFailure = new com.kista.tradingcore.support.StubBrokerApiException("KIS", "KIS 토큰 발급 실패");
+        RuntimeException apiFailure = new com.kista.tradingcore.support.StubBrokerApiException("TOSS", "Toss 토큰 발급 실패");
         RuntimeException credential = new BrokerCredentialException();
         RuntimeException rateLimit = new BrokerRateLimitException();
 

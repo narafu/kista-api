@@ -115,7 +115,7 @@ class UnassignedCashCalculatorTest {
 
     @Test
     void applies_to_every_broker_except_mock() {
-        assertThat(UnassignedCashCalculator.applies(Broker.KIS)).isTrue();
+        assertThat(UnassignedCashCalculator.applies(Broker.TOSS)).isTrue();
         assertThat(UnassignedCashCalculator.applies(Broker.UPBIT)).isTrue();
         assertThat(UnassignedCashCalculator.applies(Broker.BINANCE)).isTrue();
         assertThat(UnassignedCashCalculator.applies(Broker.MOCK)).isFalse();

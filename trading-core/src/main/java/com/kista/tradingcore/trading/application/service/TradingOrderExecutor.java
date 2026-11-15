@@ -129,8 +129,7 @@ class TradingOrderExecutor {
     }
 
     // 주문 목록을 개별 접수 — 건별로 선점(SUBMITTING) 후 접수, 실패·선점 경합 주문은 건너뛰고 다음 주문 계속
-    // 계좌(앱키) 단위 호출 간격 게이트는 KisHttpClient.executeWithRetry가 전담(경로: place() → KisOrderApi → KisHttpClient.post()) — 여기서 별도 페이싱 불필요
-    private PlaceResult placeEach(List<Order> unordered, TradingAccount account, Instant cutoff) {
+        private PlaceResult placeEach(List<Order> unordered, TradingAccount account, Instant cutoff) {
         // INFINITE 보정 주문은 마지막에 접수 — 증권사는 접수 시 지정가 전체를 묶으므로 예수금이 모자라면 거절이 보정에만 생기고 base는 접수된다
         // (조회 순서가 비결정적이라 명시 정렬, 정렬은 안정적이라 나머지 순서는 유지)
         List<Order> orders = unordered.stream()
@@ -159,7 +158,7 @@ class TradingOrderExecutor {
             } else if (submission.outcome() == OrderSubmitter.Outcome.INSUFFICIENT_FUNDS) {
                 insufficient.add(p);
             }
-            // KisHttpClient의 호출 간격 게이트가 대기 중 인터럽트를 감지하면 확정 거절로 전파한다 — 이 주문만
+            // 어댑터 HTTP 클라이언트가 대기 중 인터럽트를 감지하면 확정 거절로 전파한다 — 이 주문만
             // FAILED로 남기고 나머지 주문은 중단한다
             if (Thread.currentThread().isInterrupted()) {
                 log.warn("[accountId={}] 인터럽트 감지 — 남은 주문 접수 중단", account.id());

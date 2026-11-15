@@ -162,7 +162,7 @@ class CryptoPortfolioServiceTest {
 
     @Test
     void stockAccountIsRejected() {
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.kisAccount(ACCOUNT_ID, USER_ID));
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.stockAccount(ACCOUNT_ID, USER_ID));
 
         assertThatThrownBy(() -> service.getCryptoPortfolio(ACCOUNT_ID, USER_ID)).isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(exchanges);
@@ -196,7 +196,7 @@ class CryptoPortfolioServiceTest {
 
     @Test
     void currentPricesRejectStockAccount() {
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.kisAccount(ACCOUNT_ID, USER_ID));
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.stockAccount(ACCOUNT_ID, USER_ID));
 
         assertThatThrownBy(() -> service.getCurrentPrices(ACCOUNT_ID, USER_ID, List.of(StrategyTicker.BTC)))
                 .isInstanceOf(IllegalArgumentException.class);

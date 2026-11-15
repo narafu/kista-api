@@ -11,8 +11,8 @@ public record PresentBalanceResult(
         BigDecimal totalAsset,      // output3: tot_asst_amt (총자산 — KRW)
         BigDecimal totalEvalProfit,    // output3: tot_evlu_pfls_amt (총평가손익 — KRW)
         BigDecimal totalReturnRate,    // output3: evlu_erng_rt1 (총수익률 %)
-        BigDecimal depositActual,   // USD 예수금 (TOSS: 실 USD 예수금, KIS: margin 조회값)
-        BigDecimal exchangeRateKrwPerUsd  // 환율 (1 USD = ? KRW, TOSS: 실값, KIS: margin 조회값)
+        BigDecimal depositActual,   // USD 예수금 (TOSS: 실 USD 예수금)
+        BigDecimal exchangeRateKrwPerUsd  // 환율 (1 USD = ? KRW, TOSS: 실값)
 ) {
     public record Item(
             StrategyTicker ticker,             // pdno: 종목코드
@@ -35,7 +35,7 @@ public record PresentBalanceResult(
 
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
-    // Toss 전용 집계 팩토리 — 종목별 평가·손익·수익률 및 KRW 환산 총자산·총수익률 계산 (KIS는 API가 총계를 내려줌)
+    // Toss 전용 집계 팩토리 — 종목별 평가·손익·수익률 및 KRW 환산 총자산·총수익률 계산
     public static PresentBalanceResult aggregateToss(
             List<TossHolding> holdings,
             BigDecimal deposit,

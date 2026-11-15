@@ -95,7 +95,7 @@ class TradingReporterTest {
         // TRADING_ALERT 기본 활성 — USER/TOSS_USER 모두 notificationPrefs 비어있어 isNotificationEnabled()가 true 반환
     }
 
-    // PLACED 주문 픽스처 — id·externalOrderId 지정 (KIS 계좌/사이클 기준)
+    // PLACED 주문 픽스처 — id·externalOrderId 지정 (Toss 계좌/사이클 기준)
     private static Order placedOrder(UUID id, String externalOrderId, int quantity) {
         return new Order(id, ACCOUNT.id(), CYCLE.id(), TODAY, StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
@@ -386,7 +386,7 @@ class TradingReporterTest {
     }
 
     @Test
-    void KIS_계좌도_잔여_PLACED_주문을_취소한다() {
+    void 토스_계좌도_잔여_PLACED_주문을_취소한다() {
         UUID orderId = UUID.randomUUID();
         Order order = placedOrder(orderId, "E1", 5);
         when(executionPort.getExecutions(TODAY, TODAY, StrategyTicker.SOXL, ACCOUNT_REF)).thenReturn(List.of());
@@ -397,7 +397,7 @@ class TradingReporterTest {
     }
 
     @Test
-    void KIS_취소가_이미취소_경합이면_관리자_알림없이_넘어간다() {
+    void 토스_취소가_이미취소_경합이면_관리자_알림없이_넘어간다() {
         UUID orderId = UUID.randomUUID();
         Order order = placedOrder(orderId, "E1", 5);
         doReturn(CancelOutcome.ALREADY_CANCELED)

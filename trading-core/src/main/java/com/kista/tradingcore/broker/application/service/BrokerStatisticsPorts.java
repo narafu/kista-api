@@ -23,7 +23,7 @@ public class BrokerStatisticsPorts {
         log.info("BrokerStatisticsPorts 초기화: {}", ports.keySet());
     }
 
-    // 통계 기능을 지원하지 않는 증권사(KIS/MOCK 등)는 빈 Optional — 호출측이 400 사유를 결정한다
+    // 통계 기능을 지원하지 않는 증권사(MOCK 등)는 빈 Optional — 호출측이 400 사유를 결정한다
     public Optional<BrokerStatisticsPort> find(Broker broker) {
         return Optional.ofNullable(ports.get(broker));
     }

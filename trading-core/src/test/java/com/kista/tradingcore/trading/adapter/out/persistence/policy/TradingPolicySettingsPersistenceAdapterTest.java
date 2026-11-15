@@ -102,8 +102,8 @@ class TradingPolicySettingsPersistenceAdapterTest {
 
         assertThat(loaded.brokerEnabled(Broker.UPBIT)).isFalse();
         assertThat(loaded.brokers().get(Broker.UPBIT).allowedIp()).isEqualTo("168.107.63.152");
-        assertThat(loaded.brokers().get(Broker.KIS).allowedIp()).isNull();
-        assertThat(loaded.brokerEnabled(Broker.KIS)).isTrue();
+        assertThat(loaded.brokers().get(Broker.TOSS).allowedIp()).isNull();
+        assertThat(loaded.brokerEnabled(Broker.TOSS)).isTrue();
     }
 
     @Test

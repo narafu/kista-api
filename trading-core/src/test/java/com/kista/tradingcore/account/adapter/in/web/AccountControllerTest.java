@@ -62,7 +62,7 @@ class AccountControllerTest {
         // void 메서드 — 기본 doNothing() stub, 성공 시 204 반환
         mockMvc.perform(post("/api/accounts/connection-tests")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"broker\":\"KIS\",\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
+                        .content("{\"broker\":\"TOSS\",\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isNoContent());
     }
@@ -81,12 +81,12 @@ class AccountControllerTest {
     @Test
     void testConnection_disabledBroker_returns400() throws Exception {
         // 서비스의 증권사 비활성 검증 예외는 사용자 입력 오류로 노출한다.
-        doThrow(new IllegalArgumentException("한국투자증권 신규 계좌 등록이 비활성화되어 있습니다."))
+        doThrow(new IllegalArgumentException("토스증권 신규 계좌 등록이 비활성화되어 있습니다."))
                 .when(accountService).test(any(), anyString(), anyString());
 
         mockMvc.perform(post("/api/accounts/connection-tests")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"broker\":\"KIS\",\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
+                        .content("{\"broker\":\"TOSS\",\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isBadRequest());
     }
@@ -95,7 +95,7 @@ class AccountControllerTest {
     void testConnection_anonymous_returns401() throws Exception {
         mockMvc.perform(post("/api/accounts/connection-tests")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"broker\":\"KIS\",\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
+                        .content("{\"broker\":\"TOSS\",\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
                         .with(csrf()))
                 .andExpect(status().isUnauthorized());
     }
@@ -117,19 +117,19 @@ class AccountControllerTest {
     }
 
     @Test
-    void register_kisAccount_returns201() throws Exception {
-        // KIS 계좌 등록: AccountService.register()가 verifyAccount 통합 처리
+    void register_stockAccount_returns201() throws Exception {
+        // Toss 계좌 등록: AccountService.register()가 verifyAccount 통합 처리
         when(accountService.register(any(UUID.class), any(RegisterAccountCommand.class)))
                 .thenReturn(new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID),
-                        "KIS계좌", "74420614", "appKey", "appSecret", null, Broker.KIS, null, null));
+                        "토스계좌", "74420614", "appKey", "appSecret", null, Broker.TOSS, null, null));
 
         mockMvc.perform(post("/api/accounts")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"nickname\":\"KIS계좌\",\"accountNo\":\"74420614-01\"," +
+                        .content("{\"nickname\":\"토스계좌\",\"accountNo\":\"74420614-01\"," +
                                 "\"appKey\":\"appKey\",\"secretKey\":\"appSecret\"}")
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.broker").value("KIS"))
+                .andExpect(jsonPath("$.broker").value("TOSS"))
                 .andExpect(jsonPath("$.currency").value("USD"));
     }
 
@@ -168,7 +168,7 @@ class AccountControllerTest {
 
         mockMvc.perform(post("/api/accounts")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"nickname\":\"KIS계좌\",\"accountNo\":\"74420614-01\"," +
+                        .content("{\"nickname\":\"토스계좌\",\"accountNo\":\"74420614-01\"," +
                                 "\"appKey\":\"appKey\",\"secretKey\":\"appSecret\"}")
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isConflict())
@@ -247,23 +247,23 @@ class AccountControllerTest {
     void registerPassesApiKeyExpiresOn() throws Exception {
         when(accountService.register(any(UUID.class), any(RegisterAccountCommand.class)))
                 .thenReturn(new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID),
-                        "KIS계좌", "74420614", "appKey", "appSecret", null, Broker.KIS, null, null));
+                        "토스계좌", "74420614", "appKey", "appSecret", null, Broker.TOSS, null, null));
 
         mockMvc.perform(post("/api/accounts")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"nickname\":\"KIS계좌\",\"accountNo\":\"74420614-01\"," +
+                        .content("{\"nickname\":\"토스계좌\",\"accountNo\":\"74420614-01\"," +
                                 "\"appKey\":\"appKey\",\"secretKey\":\"appSecret\",\"apiKeyExpiresOn\":\"2027-03-01\"}")
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isCreated());
         verify(accountService).register(eq(UUID.fromString(USER_ID)), eq(new RegisterAccountCommand(
-                "KIS계좌", "74420614-01", "appKey", "appSecret", null, java.time.LocalDate.of(2027, 3, 1))));
+                "토스계좌", "74420614-01", "appKey", "appSecret", null, java.time.LocalDate.of(2027, 3, 1))));
     }
 
     @Test
     void updateCredentialsPassesApiKeyExpiresOn() throws Exception {
         UUID id = UUID.randomUUID();
         when(accountService.updateCredentials(eq(id), eq(UUID.fromString(USER_ID)), any()))
-                .thenReturn(new Account(id, UUID.fromString(USER_ID), "KIS", null, "ak", "sk", null, Broker.KIS, null, null));
+                .thenReturn(new Account(id, UUID.fromString(USER_ID), "TOSS", null, "ak", "sk", null, Broker.TOSS, null, null));
 
         mockMvc.perform(put("/api/accounts/{id}/credentials", id)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -278,7 +278,7 @@ class AccountControllerTest {
     void updateWithoutExpiryKeepsExisting() throws Exception {
         UUID id = UUID.randomUUID();
         when(accountService.update(eq(id), eq(UUID.fromString(USER_ID)), any()))
-                .thenReturn(new Account(id, UUID.fromString(USER_ID), "새이름", null, "ak", "sk", null, Broker.KIS, null, null));
+                .thenReturn(new Account(id, UUID.fromString(USER_ID), "새이름", null, "ak", "sk", null, Broker.TOSS, null, null));
 
         mockMvc.perform(put("/api/accounts/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)

@@ -48,7 +48,7 @@ class OrderSubmitterTest {
     @Mock ApplicationEventPublisher eventPublisher;
 
     static final BrokerAccountRef ACCOUNT_REF = new BrokerAccountRef(
-            UUID.randomUUID(), "key", "secret", "74420614", null, Broker.KIS);
+            UUID.randomUUID(), "key", "secret", "74420614", null, Broker.TOSS);
     static final UUID ORDER_ID = UUID.randomUUID();
     static final Order ORDER = new Order(ORDER_ID, ACCOUNT_REF.id(), UUID.randomUUID(), LocalDate.now(),
             StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(3),

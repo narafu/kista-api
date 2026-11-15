@@ -69,7 +69,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
 
         jdbcTemplate.update(
                 "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
-                accountId, userId, "테스트계좌", "KIS", "74420614", "01", "key", "secret");
+                accountId, userId, "테스트계좌", "TOSS", "74420614", "01", "key", "secret");
     }
 
     @Test
@@ -411,7 +411,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         jdbcTemplate.update(
                 "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at, deleted_at) "
                         + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now(), ?)",
-                accId, ownerUserId, "테스트계좌-" + accId, "KIS", accountNo, "01", "key", "secret",
+                accId, ownerUserId, "테스트계좌-" + accId, "TOSS", accountNo, "01", "key", "secret",
                 deleted ? Timestamp.from(Instant.now()) : null);
     }
 
@@ -612,17 +612,17 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
     void 전략별_최신_포지션을_반환한다() {
         Instant base = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(1, ChronoUnit.HOURS);
         UUID binanceId = insertBrokerAccount("BINANCE");
-        UUID kisCycle = insertChain(accountId, "INFINITE", "SOXL", false);
+        UUID tossCycle = insertChain(accountId, "INFINITE", "SOXL", false);
         UUID coinCycle = insertChain(binanceId, "DCA", "ETH", false);
-        insertPosition(kisCycle, new BigDecimal("100.00"), base, false);
-        UUID kisLatest = insertPosition(kisCycle, new BigDecimal("200.00"), base.plusSeconds(60), false);
+        insertPosition(tossCycle, new BigDecimal("100.00"), base, false);
+        UUID tossLatest = insertPosition(tossCycle, new BigDecimal("200.00"), base.plusSeconds(60), false);
         insertPosition(coinCycle, new BigDecimal("1.00"), base, false);
         UUID coinLatest = insertPosition(coinCycle, new BigDecimal("2.00"), base.plusSeconds(60), false);
 
         List<CyclePositionHistoryEntry> result = cyclePositionAdapter.findLatestPerStrategyByUser(userId);
 
-        assertThat(result).extracting(CyclePositionHistoryEntry::id).containsExactlyInAnyOrder(kisLatest, coinLatest);
-        assertThat(result).filteredOn(e -> e.id().equals(kisLatest)).singleElement()
+        assertThat(result).extracting(CyclePositionHistoryEntry::id).containsExactlyInAnyOrder(tossLatest, coinLatest);
+        assertThat(result).filteredOn(e -> e.id().equals(tossLatest)).singleElement()
                 .satisfies(e -> assertThat(e.accountId()).isEqualTo(accountId));
         assertThat(result).filteredOn(e -> e.id().equals(coinLatest)).singleElement()
                 .satisfies(e -> {

@@ -28,7 +28,7 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
-// KIS/Toss 공통 통계 + 계좌 스코프 사이클 이력 조회
+// 증권사 공통 통계 + 계좌 스코프 사이클 이력 조회
 // (전략 스코프 이력·주문·시드 미리보기는 trading StrategyService 소유)
 @Service
 @RequiredArgsConstructor
@@ -41,7 +41,7 @@ public class AccountStatisticsService {
     private final BrokerPricePort brokerPricePort;
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
-    // 체결기준현재잔고 — KIS: CTRP6504R+TTTC2101R 보정 포함 / Toss: 보유종목+예수금 직접 산출
+    // 체결기준현재잔고 — Toss: 보유종목+예수금 직접 산출
     public PresentBalanceResult getPresentBalance(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         return BrokerCallGuard.wrap("잔고 조회", () ->

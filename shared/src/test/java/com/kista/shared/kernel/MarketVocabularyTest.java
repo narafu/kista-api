@@ -14,7 +14,7 @@ class MarketVocabularyTest {
     void brokersCarryMarketAndCurrency() {
         assertThat(Broker.UPBIT.getMarket()).isEqualTo(Market.CRYPTO_KRW);
         assertThat(Broker.UPBIT.getCurrency()).isEqualTo(Currency.KRW);
-        for (Broker stock : new Broker[]{Broker.KIS, Broker.TOSS, Broker.MOCK}) {
+        for (Broker stock : new Broker[]{Broker.TOSS, Broker.MOCK}) {
             assertThat(stock.getMarket()).isEqualTo(Market.US_STOCK);
             assertThat(stock.getCurrency()).isEqualTo(Currency.USD);
         }
@@ -75,11 +75,11 @@ class MarketVocabularyTest {
         assertThat(Broker.MERITZ.isKeyOnlyCredentials()).isTrue();
         assertThat(Broker.BINANCE.isKeyOnlyCredentials()).isTrue();
         assertThat(Broker.BINANCE.getCurrency()).isEqualTo(Currency.USDT);
-        for (Broker b : new Broker[]{Broker.KIS, Broker.TOSS, Broker.MOCK}) assertThat(b.isKeyOnlyCredentials()).isFalse();
+        for (Broker b : new Broker[]{Broker.TOSS, Broker.MOCK}) assertThat(b.isKeyOnlyCredentials()).isFalse();
         assertThat(Arrays.stream(Broker.values()).filter(Broker::isApiKeyExpiring))
-                .containsExactlyInAnyOrder(Broker.UPBIT, Broker.KIS, Broker.TOSS, Broker.MERITZ);
+                .containsExactlyInAnyOrder(Broker.UPBIT, Broker.TOSS, Broker.MERITZ);
         assertThat(Broker.UPBIT.getApiKeyExpirySource()).isEqualTo(ApiKeyExpirySource.BROKER_API);
-        assertThat(Stream.of(Broker.KIS, Broker.TOSS, Broker.MERITZ).map(Broker::getApiKeyExpirySource))
+        assertThat(Stream.of(Broker.TOSS, Broker.MERITZ).map(Broker::getApiKeyExpirySource))
                 .containsOnly(ApiKeyExpirySource.ESTIMATED);
         assertThat(Stream.of(Broker.MOCK, Broker.BINANCE).map(Broker::getApiKeyExpirySource))
                 .containsOnly(ApiKeyExpirySource.NONE);

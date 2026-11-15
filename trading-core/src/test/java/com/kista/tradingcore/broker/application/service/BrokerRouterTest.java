@@ -28,44 +28,44 @@ import static org.mockito.Mockito.when;
 @DisplayName("BrokerRouter 단위 테스트")
 class BrokerRouterTest {
 
-    BrokerCapabilitiesPort kis = mock(BrokerCapabilitiesPort.class);
+    BrokerCapabilitiesPort meritz = mock(BrokerCapabilitiesPort.class);
     BrokerCapabilitiesPort toss = mock(BrokerCapabilitiesPort.class);
     AdminMarketPricePort admin = mock(AdminMarketPricePort.class);
     BrokerRouter router;
 
     @BeforeEach
     void setUp() {
-        when(kis.supports()).thenReturn(Broker.KIS);
+        when(meritz.supports()).thenReturn(Broker.MERITZ);
         when(toss.supports()).thenReturn(Broker.TOSS);
-        router = new BrokerRouter(List.of(kis, toss), admin);
+        router = new BrokerRouter(List.of(meritz, toss), admin);
     }
 
     @Test
     @DisplayName("account.broker()에 맞는 어댑터로 위임한다")
     void routesByBroker() {
-        BrokerAccountRef kisRef = ref(Broker.KIS);
+        BrokerAccountRef meritzRef = ref(Broker.MERITZ);
         BrokerAccountRef tossRef = ref(Broker.TOSS);
-        BigDecimal kisPrice = new BigDecimal("10.00");
+        BigDecimal meritzPrice = new BigDecimal("10.00");
         BigDecimal tossPrice = new BigDecimal("20.00");
-        when(kis.getPrice(StrategyTicker.SOXL, kisRef)).thenReturn(kisPrice);
+        when(meritz.getPrice(StrategyTicker.SOXL, meritzRef)).thenReturn(meritzPrice);
         when(toss.getPrice(StrategyTicker.SOXL, tossRef)).thenReturn(tossPrice);
 
-        assertThat(router.getPrice(StrategyTicker.SOXL, kisRef)).isSameAs(kisPrice);
+        assertThat(router.getPrice(StrategyTicker.SOXL, meritzRef)).isSameAs(meritzPrice);
         assertThat(router.getPrice(StrategyTicker.SOXL, tossRef)).isSameAs(tossPrice);
-        verify(kis).getPrice(StrategyTicker.SOXL, kisRef);
+        verify(meritz).getPrice(StrategyTicker.SOXL, meritzRef);
         verify(toss).getPrice(StrategyTicker.SOXL, tossRef);
     }
 
     @Test
     @DisplayName("getPrevCloses: 관리자 시세 우선, 누락 종목만 계좌 어댑터로 조회해 합친다")
     void prevClosesAdminFirstThenAccountForMissing() {
-        BrokerAccountRef kisRef = ref(Broker.KIS);
+        BrokerAccountRef meritzRef = ref(Broker.MERITZ);
         when(admin.getPrevCloses(List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("1")));
-        when(kis.getPrevCloses(List.of(StrategyTicker.TQQQ), kisRef))
+        when(meritz.getPrevCloses(List.of(StrategyTicker.TQQQ), meritzRef))
                 .thenReturn(Map.of(StrategyTicker.TQQQ, new BigDecimal("2")));
 
-        var result = router.getPrevCloses(List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ), kisRef);
+        var result = router.getPrevCloses(List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ), meritzRef);
 
         assertThat(result).containsEntry(StrategyTicker.SOXL, new BigDecimal("1"))
                 .containsEntry(StrategyTicker.TQQQ, new BigDecimal("2"));
@@ -74,12 +74,12 @@ class BrokerRouterTest {
     @Test
     @DisplayName("getPrevCloses: 관리자가 전부 채우면 계좌 어댑터는 호출하지 않는다")
     void prevClosesAdminCoversAll() {
-        BrokerAccountRef kisRef = ref(Broker.KIS);
+        BrokerAccountRef meritzRef = ref(Broker.MERITZ);
         when(admin.getPrevCloses(List.of(StrategyTicker.SOXL))).thenReturn(Map.of(StrategyTicker.SOXL, BigDecimal.ONE));
 
-        router.getPrevCloses(List.of(StrategyTicker.SOXL), kisRef);
+        router.getPrevCloses(List.of(StrategyTicker.SOXL), meritzRef);
 
-        verify(kis, never()).getPrevCloses(any(), any());
+        verify(meritz, never()).getPrevCloses(any(), any());
     }
 
     @Test
@@ -95,14 +95,14 @@ class BrokerRouterTest {
     @Test
     @DisplayName("getClosingPrices: 관리자 우선, 누락 종목만 계좌 어댑터로 조회한다")
     void closingPricesAdminFirstThenAccountForMissing() {
-        BrokerAccountRef kisRef = ref(Broker.KIS);
+        BrokerAccountRef meritzRef = ref(Broker.MERITZ);
         LocalDate d = LocalDate.of(2026, 10, 14);
         List<StrategyTicker> both = List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ);
         when(admin.getClosingPrices(both, d)).thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("1")));
-        when(kis.getClosingPrices(List.of(StrategyTicker.TQQQ), d, kisRef))
+        when(meritz.getClosingPrices(List.of(StrategyTicker.TQQQ), d, meritzRef))
                 .thenReturn(Map.of(StrategyTicker.TQQQ, new BigDecimal("2")));
 
-        var result = router.getClosingPrices(both, d, kisRef);
+        var result = router.getClosingPrices(both, d, meritzRef);
 
         assertThat(result).containsEntry(StrategyTicker.SOXL, new BigDecimal("1"))
                 .containsEntry(StrategyTicker.TQQQ, new BigDecimal("2"));
@@ -125,42 +125,42 @@ class BrokerRouterTest {
     @Test
     @DisplayName("getPrices: 관리자 우선, 누락 종목만 계좌 어댑터로 조회해 합친다")
     void pricesAdminFirstThenAccountForMissing() {
-        BrokerAccountRef kisRef = ref(Broker.KIS);
+        BrokerAccountRef meritzRef = ref(Broker.MERITZ);
         List<StrategyTicker> both = List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ);
         when(admin.getPrices(both)).thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("1")));
-        when(kis.getPrices(List.of(StrategyTicker.TQQQ), kisRef)).thenReturn(Map.of(StrategyTicker.TQQQ, new BigDecimal("2")));
+        when(meritz.getPrices(List.of(StrategyTicker.TQQQ), meritzRef)).thenReturn(Map.of(StrategyTicker.TQQQ, new BigDecimal("2")));
 
-        assertThat(router.getPrices(both, kisRef)).containsEntry(StrategyTicker.SOXL, new BigDecimal("1"))
+        assertThat(router.getPrices(both, meritzRef)).containsEntry(StrategyTicker.SOXL, new BigDecimal("1"))
                 .containsEntry(StrategyTicker.TQQQ, new BigDecimal("2"));
     }
 
     @Test
     @DisplayName("currentPrices: 계좌 어댑터로 직접 보내고 관리자 시세를 부르지 않는다")
     void currentPricesSkipsAdmin() {
-        BrokerAccountRef kisRef = ref(Broker.KIS);
+        BrokerAccountRef meritzRef = ref(Broker.MERITZ);
         List<StrategyTicker> tickers = List.of(StrategyTicker.SOXL);
-        when(kis.currentPrices(kisRef, tickers)).thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("9")));
+        when(meritz.currentPrices(meritzRef, tickers)).thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("9")));
 
-        assertThat(router.currentPrices(kisRef, tickers)).containsEntry(StrategyTicker.SOXL, new BigDecimal("9"));
+        assertThat(router.currentPrices(meritzRef, tickers)).containsEntry(StrategyTicker.SOXL, new BigDecimal("9"));
         verify(admin, never()).getPrices(any());
     }
 
     @Test
     @DisplayName("getPrice 단건: 관리자 값이 있으면 그대로, 없으면 계좌 단건 조회로 폴백")
     void priceSingleAdminThenAccount() {
-        BrokerAccountRef kisRef = ref(Broker.KIS);
+        BrokerAccountRef meritzRef = ref(Broker.MERITZ);
         when(admin.getPrices(List.of(StrategyTicker.SOXL))).thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("5")));
-        when(kis.getPrice(StrategyTicker.TQQQ, kisRef)).thenReturn(new BigDecimal("7"));
+        when(meritz.getPrice(StrategyTicker.TQQQ, meritzRef)).thenReturn(new BigDecimal("7"));
 
-        assertThat(router.getPrice(StrategyTicker.SOXL, kisRef)).isEqualByComparingTo("5");
-        assertThat(router.getPrice(StrategyTicker.TQQQ, kisRef)).isEqualByComparingTo("7");
-        verify(kis, never()).getPrice(StrategyTicker.SOXL, kisRef);
+        assertThat(router.getPrice(StrategyTicker.SOXL, meritzRef)).isEqualByComparingTo("5");
+        assertThat(router.getPrice(StrategyTicker.TQQQ, meritzRef)).isEqualByComparingTo("7");
+        verify(meritz, never()).getPrice(StrategyTicker.SOXL, meritzRef);
     }
 
     @Test
     @DisplayName("다건: 계좌 보충이 실패해도 관리자 결과가 있으면 부분 결과를 반환한다")
     void multiKeepsAdminPartialWhenAccountFails() {
-        BrokerAccountRef kisRef = ref(Broker.KIS);
+        BrokerAccountRef meritzRef = ref(Broker.MERITZ);
         LocalDate d = LocalDate.of(2026, 10, 14);
         List<StrategyTicker> both = List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ);
         List<StrategyTicker> missing = List.of(StrategyTicker.TQQQ);
@@ -168,51 +168,51 @@ class BrokerRouterTest {
         when(admin.getPrices(both)).thenReturn(soxl);
         when(admin.getPrevCloses(both)).thenReturn(soxl);
         when(admin.getClosingPrices(both, d)).thenReturn(soxl);
-        when(kis.getPrices(missing, kisRef)).thenThrow(new RuntimeException("실패"));
-        when(kis.getPrevCloses(missing, kisRef)).thenThrow(new RuntimeException("실패"));
-        when(kis.getClosingPrices(missing, d, kisRef)).thenThrow(new RuntimeException("실패"));
+        when(meritz.getPrices(missing, meritzRef)).thenThrow(new RuntimeException("실패"));
+        when(meritz.getPrevCloses(missing, meritzRef)).thenThrow(new RuntimeException("실패"));
+        when(meritz.getClosingPrices(missing, d, meritzRef)).thenThrow(new RuntimeException("실패"));
 
-        assertThat(router.getPrices(both, kisRef)).containsOnlyKeys(StrategyTicker.SOXL);
-        assertThat(router.getPrevCloses(both, kisRef)).containsOnlyKeys(StrategyTicker.SOXL);
-        assertThat(router.getClosingPrices(both, d, kisRef)).containsOnlyKeys(StrategyTicker.SOXL);
+        assertThat(router.getPrices(both, meritzRef)).containsOnlyKeys(StrategyTicker.SOXL);
+        assertThat(router.getPrevCloses(both, meritzRef)).containsOnlyKeys(StrategyTicker.SOXL);
+        assertThat(router.getClosingPrices(both, d, meritzRef)).containsOnlyKeys(StrategyTicker.SOXL);
     }
 
     @Test
     @DisplayName("다건: 계좌 보충의 인증 예외는 관리자 결과가 있어도 그대로 전파한다")
     void multiPropagatesCredentialEvenWithAdminPartial() {
-        BrokerAccountRef kisRef = ref(Broker.KIS);
+        BrokerAccountRef meritzRef = ref(Broker.MERITZ);
         List<StrategyTicker> both = List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ);
         List<StrategyTicker> missing = List.of(StrategyTicker.TQQQ);
         when(admin.getPrices(both)).thenReturn(Map.of(StrategyTicker.SOXL, BigDecimal.ONE));
-        when(kis.getPrices(missing, kisRef)).thenThrow(new BrokerCredentialException());
+        when(meritz.getPrices(missing, meritzRef)).thenThrow(new BrokerCredentialException());
 
-        assertThatThrownBy(() -> router.getPrices(both, kisRef)).isInstanceOf(BrokerCredentialException.class);
+        assertThatThrownBy(() -> router.getPrices(both, meritzRef)).isInstanceOf(BrokerCredentialException.class);
     }
 
     @Test
     @DisplayName("다건: 계좌 보충의 호출 한도 예외는 관리자 결과가 있으면 부분 결과를 반환하고, 비어 있으면 전파한다")
     void multiKeepsAdminPartialOnRateLimit() {
-        BrokerAccountRef kisRef = ref(Broker.KIS);
+        BrokerAccountRef meritzRef = ref(Broker.MERITZ);
         List<StrategyTicker> both = List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ);
         List<StrategyTicker> missing = List.of(StrategyTicker.TQQQ);
         when(admin.getPrices(both))
                 .thenReturn(Map.of(StrategyTicker.SOXL, BigDecimal.ONE))
                 .thenReturn(Map.of());
-        when(kis.getPrices(missing, kisRef)).thenThrow(new BrokerRateLimitException());
-        when(kis.getPrices(both, kisRef)).thenThrow(new BrokerRateLimitException());
+        when(meritz.getPrices(missing, meritzRef)).thenThrow(new BrokerRateLimitException());
+        when(meritz.getPrices(both, meritzRef)).thenThrow(new BrokerRateLimitException());
 
-        assertThat(router.getPrices(both, kisRef)).containsOnlyKeys(StrategyTicker.SOXL);
-        assertThatThrownBy(() -> router.getPrices(both, kisRef)).isInstanceOf(BrokerRateLimitException.class);
+        assertThat(router.getPrices(both, meritzRef)).containsOnlyKeys(StrategyTicker.SOXL);
+        assertThatThrownBy(() -> router.getPrices(both, meritzRef)).isInstanceOf(BrokerRateLimitException.class);
     }
 
     @Test
     @DisplayName("다건: 관리자 결과가 비어 있으면 계좌 조회 예외를 그대로 전파한다")
     void multiPropagatesAccountFailureWhenAdminEmpty() {
-        BrokerAccountRef kisRef = ref(Broker.KIS);
+        BrokerAccountRef meritzRef = ref(Broker.MERITZ);
         List<StrategyTicker> one = List.of(StrategyTicker.SOXL);
-        when(kis.getPrices(one, kisRef)).thenThrow(new IllegalStateException("503"));
+        when(meritz.getPrices(one, meritzRef)).thenThrow(new IllegalStateException("503"));
 
-        assertThatThrownBy(() -> router.getPrices(one, kisRef)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> router.getPrices(one, meritzRef)).isInstanceOf(IllegalStateException.class);
     }
 
     @Test

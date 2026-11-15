@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 import java.util.Optional;
 
-// StrategyTicker ↔ 업비트 마켓 코드(KRW-BTC) — 어댑터 디테일(KisExchangeRegistry와 같은 방식). 새 코인 추가 시 양쪽 갱신
+// StrategyTicker ↔ 업비트 마켓 코드(KRW-BTC) — 어댑터 디테일(어댑터 디테일). 새 코인 추가 시 양쪽 갱신
 @Component
 class UpbitMarketRegistry {
 

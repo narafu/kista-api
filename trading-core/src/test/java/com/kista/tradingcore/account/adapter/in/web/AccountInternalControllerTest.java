@@ -70,6 +70,6 @@ class AccountInternalControllerTest {
 
     private Account mockAccount(UUID id) {
         return new Account(id, UUID.randomUUID(), "테스트계좌", "74420614-01",
-                "key", "secret", null, Broker.KIS, Instant.parse("2026-07-01T00:00:00Z"), null);
+                "key", "secret", null, Broker.TOSS, Instant.parse("2026-07-01T00:00:00Z"), null);
     }
 }

@@ -41,7 +41,7 @@ class RuntimeConfigControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.auth.approvalRequired").value(true))
-                .andExpect(jsonPath("$.brokers.KIS.enabled").value(true))
+                .andExpect(jsonPath("$.brokers.TOSS.enabled").value(true))
                 .andExpect(jsonPath("$.strategies.INFINITE.fields.divisionCount.allowedValues[2]").value(40))
                 .andExpect(jsonPath("$.strategies.VR.fields.recurringMode.defaultValue").value("HOLD"))
                 .andExpect(jsonPath("$.strategies.INFINITE.fields.recurringMode").doesNotExist())

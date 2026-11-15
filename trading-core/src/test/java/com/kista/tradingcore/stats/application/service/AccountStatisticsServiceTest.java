@@ -53,7 +53,7 @@ class AccountStatisticsServiceTest {
         service = new AccountStatisticsService(
                 accountPort, cyclePositionPort, orderPort, portfolioPort, pricePort, FixedClockTestConfig.FIXED);
         // 실제 Account record — account.toBrokerRef()가 인스턴스 메서드
-        Account account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Broker.KIS, null, null);
+        Account account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Broker.TOSS, null, null);
         lenient().when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
     }
 

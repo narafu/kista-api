@@ -33,14 +33,14 @@ class AppErrorStreamPublisherTest {
         when(redisTemplate.opsForStream()).thenReturn((StreamOperations) streamOperations);
         AppErrorStreamPublisher publisher = new AppErrorStreamPublisher(redisTemplate, new ObjectMapper());
 
-        publisher.onAppErrorRaised(new AppErrorRaisedEvent("KisApiException", "연결 오류", "at foo()",
+        publisher.onAppErrorRaised(new AppErrorRaisedEvent("TossApiException", "연결 오류", "at foo()",
                 Map.of("caller", "TradingExceptionHandler")));
 
         ArgumentCaptor<MapRecord<String, Object, Object>> captor = ArgumentCaptor.forClass(MapRecord.class);
         verify(streamOperations).add(captor.capture(), any(XAddOptions.class));
         assertThat(captor.getValue().getStream()).isEqualTo(RedisStreamConfig.APP_ERROR_STREAM);
         String payload = captor.getValue().getValue().get("payload").toString();
-        assertThat(payload).contains("\"errorType\":\"KisApiException\"").contains("TradingExceptionHandler");
+        assertThat(payload).contains("\"errorType\":\"TossApiException\"").contains("TradingExceptionHandler");
     }
 
     // Redis 장애로 XADD가 실패해도 오류 보고가 원래 요청 처리를 깨뜨리지 않는다

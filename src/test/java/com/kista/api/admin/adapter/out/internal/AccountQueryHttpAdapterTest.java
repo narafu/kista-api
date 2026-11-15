@@ -68,7 +68,7 @@ class AccountQueryHttpAdapterTest {
         server.enqueue(new MockResponse.Builder()
                 .code(200).addHeader("Content-Type", "application/json")
                 .body("""
-                    [{"id":"%s","userId":"%s","accountNo":"74420614-01","broker":"KIS","createdAt":"2026-07-01T00:00:00Z"}]
+                    [{"id":"%s","userId":"%s","accountNo":"74420614-01","broker":"TOSS","createdAt":"2026-07-01T00:00:00Z"}]
                     """.formatted(id, userId))
                 .build());
 
@@ -79,7 +79,7 @@ class AccountQueryHttpAdapterTest {
         assertThat(view.id()).isEqualTo(id);
         assertThat(view.userId()).isEqualTo(userId);
         assertThat(view.accountNo()).isEqualTo("74420614-01");
-        assertThat(view.broker()).isEqualTo(Broker.KIS);
+        assertThat(view.broker()).isEqualTo(Broker.TOSS);
     }
 
     @Test

@@ -51,7 +51,7 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
 
         jdbcTemplate.update(
                 "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
-                accountId, userId, "테스트계좌", "KIS", "74420614", "01", "key", "secret");
+                accountId, userId, "테스트계좌", "TOSS", "74420614", "01", "key", "secret");
     }
 
     @Test
@@ -103,7 +103,7 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
         UUID aid = UUID.randomUUID();
         jdbcTemplate.update(
                 "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
-                aid, uid, "계좌", "KIS", "74420614" + aid, "01", "key", "secret");
+                aid, uid, "계좌", "TOSS", "74420614" + aid, "01", "key", "secret");
         if (profileActive != null) {
             jdbcTemplate.update(
                     "INSERT INTO trading.user_notify_profile (user_id, notification_prefs, is_active, updated_at) VALUES (?, '{}', ?, now())",

@@ -89,7 +89,7 @@ class RuntimeSettingsPersistenceAdapterTest {
     void loadDropsLegacyTradingSections() throws Exception {
         ObjectNode root = (ObjectNode) objectMapper.valueToTree(RuntimeSettings.defaults());
         root.put("approvalRequired", false);
-        root.putObject("brokers").putObject("KIS").put("enabled", false);
+        root.putObject("brokers").putObject("TOSS").put("enabled", false);
         root.putObject("strategies");
         RuntimeSettingsEntity entity = new RuntimeSettingsEntity(
                 RuntimeSettingsPersistenceAdapter.SETTING_KEY, objectMapper.writeValueAsString(root));

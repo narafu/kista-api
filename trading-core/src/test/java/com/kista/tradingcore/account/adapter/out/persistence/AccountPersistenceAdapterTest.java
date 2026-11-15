@@ -47,7 +47,7 @@ class AccountPersistenceAdapterTest {
         e.setAppKey("appKey");
         e.setSecretKey("appSecret");
         e.setBrokerAccountCode("01");
-        e.setBroker(Broker.KIS);
+        e.setBroker(Broker.TOSS);
         return e;
     }
 
@@ -71,7 +71,7 @@ class AccountPersistenceAdapterTest {
         // given: id=null 신규 계좌 (10개 필드)
         Account newAccount = new Account(null, userId, "테스트계좌",
                 "74420614", "appKey", "appSecret", null,
-                Broker.KIS, null, null);
+                Broker.TOSS, null, null);
 
         AccountEntity saved = accountEntityWithId(accountId);
         when(accountJpaRepository.save(any())).thenReturn(saved);

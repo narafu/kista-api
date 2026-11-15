@@ -17,7 +17,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 class AccountTokenEvictionAdapter implements AccountTokenEvictionPort {
 
-    private final BrokerTokenCachePort brokerTokenCachePort; // KIS broker_tokens(DB) 캐시
+    private final BrokerTokenCachePort brokerTokenCachePort; // broker_tokens(DB) 캐시
     private final TossTokenStore tossTokenStore; // Toss Redis canonical 저장소
 
     @Override

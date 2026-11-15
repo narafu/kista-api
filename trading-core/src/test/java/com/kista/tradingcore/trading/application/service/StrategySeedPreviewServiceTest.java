@@ -80,7 +80,7 @@ class StrategySeedPreviewServiceTest {
                 null, null, null, null,
                 accountPort, null, null, strategyHistoryQueryService, null, null, null, null, null, null, null, null, null);
         // 실제 Account record — account.toBrokerRef()가 인스턴스 메서드라 mock(Account.class)로는 null 반환됨
-        account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Broker.KIS, null, null);
+        account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Broker.TOSS, null, null);
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
     }
 

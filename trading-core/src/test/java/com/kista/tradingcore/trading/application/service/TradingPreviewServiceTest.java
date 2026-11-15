@@ -83,7 +83,7 @@ class TradingPreviewServiceTest {
 
     TradingPreviewService service;
 
-    static final Account ACCOUNT = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
+    static final Account ACCOUNT = TradingFixtures.stockAccount(UUID.randomUUID(), UUID.randomUUID());
     static final TradingAccount TRADING_ACCOUNT = TradingAccount.from(ACCOUNT); // 서비스가 소유권 검증 후 변환해 넘기는 투영
 
     static final Strategy STRATEGY = new Strategy(

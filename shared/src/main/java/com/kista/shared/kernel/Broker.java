@@ -9,7 +9,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum Broker {
     TOSS("토스증권",    "토스", Market.US_STOCK, false, ApiKeyExpirySource.ESTIMATED),  // 토스증권 Open API
-    KIS("한국투자증권", "한투", Market.US_STOCK, false, ApiKeyExpirySource.ESTIMATED),  // 한국투자증권 Open API
     MOCK("모의계좌",    "모의", Market.US_STOCK, false, ApiKeyExpirySource.NONE),  // 증권사 연동 없는 DB 기반 모의매매
     UPBIT("업비트",     "업비트", Market.CRYPTO_KRW, true, ApiKeyExpirySource.BROKER_API), // 업비트 Open API (KRW 마켓 코인)
     MERITZ("메리츠증권", "메리츠", Market.US_STOCK, true, ApiKeyExpirySource.ESTIMATED), // 메리츠증권 Open API (해외주식, 앱키에 계좌 종속)
@@ -19,7 +18,7 @@ public enum Broker {
     private final String shortLabel; // UI 모바일 약칭
     private final Market market;     // 거래 시장 — 종목 시장과 일치해야 전략 생성 가능
     private final boolean keyOnlyCredentials; // 계좌번호 없이 앱키가 계좌를 식별(중복 판정 키=appKey) — 업비트·메리츠·바이낸스
-    private final ApiKeyExpirySource apiKeyExpirySource; // API 키 만료일 출처 — 업비트는 API 조회, KIS·토스·메리츠는 추정(+1년)·사용자 입력
+    private final ApiKeyExpirySource apiKeyExpirySource; // API 키 만료일 출처 — 업비트는 API 조회, 토스·메리츠는 추정(+1년)·사용자 입력
 
     // API 키 만료가 있는 거래소 여부
     public boolean isApiKeyExpiring() {
@@ -36,8 +35,8 @@ public enum Broker {
         return market.isCrypto();
     }
 
-    // 개장 경매 주문(MOO/LOO)을 개장 전에 접수할 수 있는 증권사 — KIS만 31/32 지원, Toss·MOCK은 개장 후 지정가 근사
+    // 개장 경매 사전 접수 지원 증권사 없음 — 경로 삭제는 04 단계 B
     public boolean supportsOpenAuctionOrders() {
-        return this == KIS;
+        return false;
     }
 }

@@ -25,7 +25,7 @@ public record Order(
         BigDecimal quantity,             // 주문 수량 — 주식은 정수 값, 코인은 소수 8자리
         BigDecimal price,                // 주문 가격 (LOC/MOC는 참고용, 실제 체결가 아님)
         OrderStatus status,              // 주문 상태
-        String externalOrderId,          // 증권사 부여 주문 번호 (KIS: ODNO, Toss: orderId), PLACED 이후 설정
+        String externalOrderId,          // 증권사 부여 주문 번호 (Toss: orderId), PLACED 이후 설정
         BigDecimal filledQuantity,       // 체결 수량 (null=미확인, 0=미체결)
         BigDecimal filledPrice           // 체결 가중평균가 (null=미체결)
 ) {

@@ -80,7 +80,7 @@ class OrderCancelServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(brokerPort.cancel(any(), any())).thenReturn(CancelOutcome.CANCELLED); // 기본: 취소 접수
-        ownedAccount = TradingFixtures.kisAccount(accountId, requesterId);
+        ownedAccount = TradingFixtures.stockAccount(accountId, requesterId);
         cycle = new Strategy(cycleId, accountId, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         currentCycle = new StrategyCycle(strategyCycleId, cycleId, BigDecimal.valueOf(1000),
@@ -156,7 +156,7 @@ class OrderCancelServiceTest {
     }
 
     @Test
-    @DisplayName("cancelByCycle: KIS 취소 일부 실패 시 best-effort → CancelResult(1, 1)")
+    @DisplayName("cancelByCycle: Toss 취소 일부 실패 시 best-effort → CancelResult(1, 1)")
     void cancelByCycle_partialFailure() {
         Order order1 = placedOrder(UUID.randomUUID(), "ORD_1");
         Order order2 = placedOrder(UUID.randomUUID(), "ORD_2");
@@ -166,9 +166,9 @@ class OrderCancelServiceTest {
         when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
         when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate(ZonedDateTime.now(FIXED)))))
                 .thenReturn(List.of(order1, order2));
-        // order1은 성공, order2는 KIS 오류
+        // order1은 성공, order2는 Toss 오류
         doReturn(CancelOutcome.CANCELLED).when(brokerPort).cancel(eq(cancelOf(order1)), any());
-        doThrow(new RuntimeException("KIS 오류")).when(brokerPort).cancel(eq(cancelOf(order2)), any());
+        doThrow(new RuntimeException("Toss 오류")).when(brokerPort).cancel(eq(cancelOf(order2)), any());
 
         CancelResult result = service.cancelByCycle(cycleId, requesterId);
 

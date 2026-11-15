@@ -23,6 +23,6 @@ class CryptoExchangesTest {
 
         assertThat(exchanges.of(Broker.UPBIT)).isSameAs(upbit);
         assertThat(exchanges.of(Broker.BINANCE)).isSameAs(binance);
-        assertThatThrownBy(() -> exchanges.of(Broker.KIS)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> exchanges.of(Broker.TOSS)).isInstanceOf(IllegalArgumentException.class);
     }
 }

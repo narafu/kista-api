@@ -38,7 +38,7 @@ public class AccountController {
     }
 
     // 계좌 등록 (AES-256 암호화 저장)
-    @Operation(summary = "계좌 등록", description = "KIS/Toss 계좌 및 자격증명을 AES-256 암호화하여 저장.")
+    @Operation(summary = "계좌 등록", description = "증권사 계좌 및 자격증명을 AES-256 암호화하여 저장.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "등록 성공"),
             @ApiResponse(responseCode = "400", description = "이미 등록된 계좌이거나 잘못된 요청"),
@@ -53,7 +53,7 @@ public class AccountController {
     }
 
     // 계좌 수정 (소유권 검증)
-    @Operation(summary = "계좌 수정", description = "별명을 수정. 계좌번호 및 KIS 자격증명은 수정 불가.")
+    @Operation(summary = "계좌 수정", description = "별명을 수정. 계좌번호 및 자격증명은 수정 불가.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "수정 성공"),
             @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),

@@ -69,7 +69,7 @@ class UserCascadeEndToEndIT {
     void setUp() {
         // 계좌(암호화 컬럼) → 전략 ACTIVE → 버전 → 사이클 → 오늘 PLANNED 주문(증권사 호출 없이 DB 삭제로 취소됨) → 활성 프로필 복제본
         jdbcTemplate.update("INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, 'KIS', ?, '01', ?, ?, now(), now())",
+                        + "VALUES (?, ?, ?, 'TOSS', ?, '01', ?, ?, now(), now())",
                 accountId, userId, "탈퇴IT", crypto.encrypt("74420614-01"), crypto.encrypt("key"), crypto.encrypt("secret"));
         jdbcTemplate.update("INSERT INTO strategy (id, account_id, type, ticker, status, cycle_seed_type, created_at, updated_at) VALUES (?, ?, 'VR', 'SOXL', 'ACTIVE', 'NONE', now(), now())",
                 strategyId, accountId);

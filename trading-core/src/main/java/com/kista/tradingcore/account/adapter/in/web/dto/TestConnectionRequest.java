@@ -6,7 +6,7 @@ import org.jspecify.annotations.Nullable;
 
 // 증권사 연결 테스트 요청 body
 public record TestConnectionRequest(
-        @Schema(description = "증권사", example = "KIS")
+        @Schema(description = "증권사", example = "TOSS")
         @Nullable Broker broker,
         @Schema(description = "증권사 앱 키 (신규 자격증명 테스트 시)")
         @Nullable String appKey,

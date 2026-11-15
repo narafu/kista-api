@@ -45,9 +45,9 @@ public final class TradingFixtures {
         return new TradingUserProfile(userId, Map.of(), null, null);
     }
 
-    // 기본 KIS 계좌 (accountNo/appKey/secretKey 기본값 고정)
-    public static Account kisAccount(UUID id, UUID userId) {
-        return new Account(id, userId, "테스트계좌", "74420614", "key", "secret", null, Broker.KIS, null, null);
+    // 기본 주식 계좌(TOSS, brokerAccountCode 없음 — accountNo/appKey/secretKey 기본값 고정)
+    public static Account stockAccount(UUID id, UUID userId) {
+        return new Account(id, userId, "테스트계좌", "74420614", "key", "secret", null, Broker.TOSS, null, null);
     }
 
     // 기본 Toss 계좌 (accountNo/appKey/secretKey/brokerAccountCode 기본값 고정)
@@ -65,9 +65,9 @@ public final class TradingFixtures {
         return new Account(id, userId, "바이낸스", null, "binance-key", "binance-secret", null, Broker.BINANCE, null, null);
     }
 
-    // 배치 경로용 KIS 계좌 투영 — kisAccount와 동일 값
+    // 배치 경로용 주식 계좌 투영 — stockAccount와 동일 값
     public static TradingAccount tradingAccount(UUID id, UUID userId) {
-        return TradingAccount.from(kisAccount(id, userId));
+        return TradingAccount.from(stockAccount(id, userId));
     }
 
     // 배치 경로용 업비트 계좌 투영 — upbitAccount와 동일 값

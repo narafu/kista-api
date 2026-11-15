@@ -43,14 +43,14 @@ public class AccountService {
     private final AccountPort accountPort;
     private final BrokerConnectionTesters connectionTesters; // 증권사별 연결테스트 라우터
     private final BrokerEnabledPort brokerEnabledPort; // 증권사 신규 등록 허용 여부 (trading TradingPolicyService가 구현 — 정책 소유자)
-    private final AccountTokenEvictionPort accountTokenEvictionPort; // 키 교체·탈퇴 시 증권사 토큰 캐시(KIS DB·Toss Redis) 제거
+    private final AccountTokenEvictionPort accountTokenEvictionPort; // 키 교체·탈퇴 시 증권사 토큰 캐시(Meritz DB·Toss Redis) 제거
     private final AccountOpenOrderCancelPort openOrderCancelPort; // 계좌 삭제 전 미체결 주문 취소 (trading이 구현)
     private final AccountDeletionWriter deletionWriter; // 계좌 삭제 DB 쓰기 (취소 HTTP를 트랜잭션 밖에 두기 위해 분리)
     private final Clock clock; // API 키 만료일 추정·입력 검증 기준 시각
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // Toss accountSeq 조회 HTTP 호출 포함 — 트랜잭션 없이 실행 (단건 저장은 JPA auto-commit)
     public Account register(UUID userId, RegisterAccountCommand cmd) {
-        // broker 미지정 시 KIS 기본값 적용 후 신규 등록 정책을 확인한다.
+        // broker 미지정 시 MOCK 기본값 적용 후 신규 등록 정책을 확인한다.
         Broker broker = brokerOrDefault(cmd.broker());
         requireBrokerEnabled(broker);
         // 사용자 입력 만료일은 증권사 검증 호출 전에 거른다
@@ -90,10 +90,10 @@ public class AccountService {
                     .findAny()
                     .ifPresent(a -> { throw new Account.DuplicateAccountException(resolvedAccountNo); });
         }
-        // 증권사별 자격증명+계좌 검증 — KIS: 계좌번호 소유, Toss: accountSeq, 업비트: 키 만료일
+        // 증권사별 자격증명+계좌 검증 — Toss: accountSeq, 업비트: 키 만료일
         BrokerAccountVerification verified = connectionTesters.of(broker)
                 .verifyAccount(appKey, secretKey, accountNo);
-        // 만료일 결정 — 업비트는 API 값, KIS·토스·메리츠는 입력값 또는 추정(+1년), 그 외 없음
+        // 만료일 결정 — 업비트는 API 값, 토스·메리츠는 입력값 또는 추정(+1년), 그 외 없음
         Instant apiKeyExpiresAt = switch (broker.getApiKeyExpirySource()) {
             case BROKER_API -> verified.apiKeyExpiresAt();
             case ESTIMATED -> manual != null ? manual : estimatedExpiry();
@@ -141,7 +141,7 @@ public class AccountService {
                 && accountPort.existsByDedupeKey(cmd.appKey())) {
             throw new Account.DuplicateAccountException(cmd.appKey());
         }
-        // 키 교체는 신규 등록이 아니라 requireBrokerEnabled를 적용하지 않는다 — KIS는 저장된 계좌번호 소유까지 검증
+        // 키 교체는 신규 등록이 아니라 requireBrokerEnabled를 적용하지 않는다 — 저장된 계좌 소유까지 검증
         BrokerAccountVerification verified = connectionTesters.of(account.broker())
                 .verifyAccount(cmd.appKey(), cmd.secretKey(), account.accountNo());
         if (account.broker() == Broker.TOSS && !Objects.equals(verified.brokerAccountCode(), account.brokerAccountCode())) {
@@ -164,7 +164,7 @@ public class AccountService {
             if (cause == null || !cause.contains(DEDUPE_UNIQUE_INDEX)) throw e;
             throw new Account.DuplicateAccountException(cmd.appKey());
         }
-        accountTokenEvictionPort.evict(List.of(accountId)); // 옛 키로 발급된 KIS·Toss 토큰 캐시 제거
+        accountTokenEvictionPort.evict(List.of(accountId)); // 옛 키로 발급된 Meritz·Toss 토큰 캐시 제거
         log.info("[accountId={}] 계좌 키 교체: broker={}", accountId, account.broker());
         return saved;
     }
@@ -196,14 +196,14 @@ public class AccountService {
     // 등록 전 사전 검증 — 어느 계좌의 토큰 캐시도 건드리지 않는다. 실패 시 BrokerCredentialException throw
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 외부 API 호출 — 트랜잭션 불필요
     public void test(Broker requestedBroker, String appKey, String appSecret) {
-        Broker broker = brokerOrDefault(requestedBroker); // 미지정 시 KIS — 등록(register)과 같은 기본값
+        Broker broker = brokerOrDefault(requestedBroker); // 미지정 시 MOCK — 등록(register)과 같은 기본값
         requireBrokerEnabled(broker);
         connectionTesters.of(broker).verifyCredentials(appKey, appSecret);
     }
 
-    // broker 미지정 기본값(KIS) — 등록·연결 테스트 공용
+    // broker 미지정 기본값(MOCK — 증권사 연동 없는 모의계좌) — 등록·연결 테스트 공용
     private static Broker brokerOrDefault(Broker broker) {
-        return broker != null ? broker : Broker.KIS;
+        return broker != null ? broker : Broker.MOCK;
     }
 
     private void requireBrokerEnabled(Broker broker) {
@@ -230,7 +230,7 @@ public class AccountService {
         return ZonedDateTime.now(clock).withZoneSameInstant(TimeZones.KST).plusYears(1).toInstant();
     }
 
-    // MOCK 계좌 등록용 합성 계좌번호 생성 — KIS 형식(XXXXXXXX-XX)을 재사용해 기존 표시·마스킹 로직과 호환
+    // MOCK 계좌 등록용 합성 계좌번호 생성 — XXXXXXXX-XX 형식으로 만들어 기존 표시·마스킹 로직과 호환
     // 충돌 시(전역 유니크 제약) 재시도 — 공간이 넓어(10^10) 실질적으로 1회 안에 끝나지만 방어적으로 유한 재시도한다
     private String generateMockAccountNo() {
         for (int attempt = 0; attempt < 10; attempt++) {

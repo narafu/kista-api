@@ -2,7 +2,7 @@ package com.kista.tradingcore.support;
 
 import com.kista.tradingcore.broker.domain.model.BrokerApiException;
 
-// broker 밖 테스트용 벤더 중립 BrokerApiException — KisApiException/TossApiException 등 벤더 타입을 테스트에 들이지 않기 위한 최소 서브클래스
+// broker 밖 테스트용 벤더 중립 BrokerApiException — TossApiException/TossApiException 등 벤더 타입을 테스트에 들이지 않기 위한 최소 서브클래스
 public class StubBrokerApiException extends BrokerApiException {
 
     // 벤더 표기 미지정 — 응답 title이 필요 없는 테스트용

@@ -267,7 +267,7 @@ class StrategyServiceTest {
     }
 
     private Account ownerAccount() {
-        return TradingFixtures.kisAccount(ACCOUNT_ID, USER_ID);
+        return TradingFixtures.stockAccount(ACCOUNT_ID, USER_ID);
     }
 
     private TradingUserProfile activeUserProfile() {
@@ -1163,8 +1163,8 @@ class StrategyServiceTest {
     void listByUserId_aggregatesStrategiesAcrossAccounts() {
         UUID accountAId = UUID.randomUUID();
         UUID accountBId = UUID.randomUUID();
-        Account accountA = new Account(accountAId, USER_ID, "계좌A", "11111111", "k", "s", null, Broker.KIS, null, null);
-        Account accountB = new Account(accountBId, USER_ID, "계좌B", "22222222", "k", "s", null, Broker.KIS, null, null);
+        Account accountA = new Account(accountAId, USER_ID, "계좌A", "11111111", "k", "s", null, Broker.TOSS, null, null);
+        Account accountB = new Account(accountBId, USER_ID, "계좌B", "22222222", "k", "s", null, Broker.TOSS, null, null);
 
         UUID strategyAId = UUID.randomUUID();
         UUID strategyBId = UUID.randomUUID();
@@ -2763,9 +2763,9 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
 
     @Test
     @DisplayName("주식 계좌에 코인 종목은 시장 불일치로 거부된다 — 중간부터 시작 소수 보유보다 시장 검증이 먼저")
-    void register_btcOnKisAccount_rejectedAsMarketMismatch() {
+    void register_btcOnTossAccount_rejectedAsMarketMismatch() {
         stubDcaPolicyWithCrypto();
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.kisAccount(ACCOUNT_ID, USER_ID));
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.stockAccount(ACCOUNT_ID, USER_ID));
 
         // 시장 검증이 BootstrapPosition보다 늦으면 "정수여야" 문구가 먼저 나온다
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,

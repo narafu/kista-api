@@ -269,7 +269,7 @@ class TossHoldingsApiTest {
     @Test
     @DisplayName("판매 가능 수량은 미체결 매도를 빼지 않은 보유 수량 — /sellable-quantity(순수량)를 쓰면 배정이 PLACED SELL을 이중 차감한다")
     void getSellableQuantity_returnsHoldingQuantityNotNetSellable() {
-        // 실측(2026-10-17): 보유 30·미체결 매도 1일 때 /sellable-quantity=29 — 포트 계약(KIS ovrs_cblc_qty·Mock과 동일)은 총량 30
+        // 실측(2026-10-17): 보유 30·미체결 매도 1일 때 /sellable-quantity=29 — 포트 계약(Toss ovrs_cblc_qty·Mock과 동일)은 총량 30
         var item = new TossHoldingsApi.HoldingItem("SOXL", "30", "101", "100.33");
         when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(new TossResult<>(new TossHoldingsApi.HoldingsResponse(List.of(item))));

@@ -150,8 +150,8 @@ class TradingCycleControllerTest {
     }
 
     @Test
-    void executeManually_kisApiError_returns503() throws Exception {
-        doThrow(new StubBrokerApiException("KIS API 연결 오류"))
+    void executeManually_brokerApiError_returns503() throws Exception {
+        doThrow(new StubBrokerApiException("Toss API 연결 오류"))
                 .when(tradingExecution).executeManually(any(), any());
 
         mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)

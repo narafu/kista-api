@@ -63,7 +63,7 @@ class ManualTradingServiceTest {
     @Mock AccountPort accountPort;
     @Mock OrderPort orderPort;
     @Mock PrivacyTradePort privacyTradePort;
-    @Mock BrokerPricePort kisPricePort;      // BrokerPricePort 직접 mock (KisPricePort 삭제됨)
+    @Mock BrokerPricePort tossPricePort;      // BrokerPricePort 직접 mock (TossPricePort 삭제됨)
     @Mock CyclePositionPort cyclePositionPort;
     @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
@@ -84,7 +84,7 @@ class ManualTradingServiceTest {
     TradingOrderPlanner orderPlanner;
 
     static final UUID REQUESTER_ID = UUID.randomUUID();
-    static final Account ACCOUNT = TradingFixtures.kisAccount(UUID.randomUUID(), REQUESTER_ID);
+    static final Account ACCOUNT = TradingFixtures.stockAccount(UUID.randomUUID(), REQUESTER_ID);
     static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.toBrokerRef();
     static final Strategy STRATEGY = new Strategy(
             UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
@@ -117,9 +117,9 @@ class ManualTradingServiceTest {
                 cycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
                 strategyCycleVrPort, strategyVrDetailPort, orderPort, mock(com.kista.tradingcore.broker.adapter.out.marketdata.AlpacaMarketDataAdapter.class));
         orderPlanner = new TradingOrderPlanner(orderPort);
-        priceFetcher = new TradingPriceFetcher(kisPricePort, eventPublisher, privacyTradePort);
+        priceFetcher = new TradingPriceFetcher(tossPricePort, eventPublisher, privacyTradePort);
         planBuilder = new StrategyOrderPlanBuilder(
-                balanceLoader, kisPricePort, privacyTradePort, orderComputer, cycleStrategies, privacyBaseGuard, orderPort, null);
+                balanceLoader, tossPricePort, privacyTradePort, orderComputer, cycleStrategies, privacyBaseGuard, orderPort, null);
         priceCapper = new BuyOrderPriceCapper(
                 orderPort, orderPlanner, cycleStrategies, strategyCyclePort);
         ledgerBudget = new StrategyLedgerBudget(cyclePositionPort, orderPort, mock(TradingBatchRunPort.class), cycleStrategies);
@@ -146,10 +146,10 @@ class ManualTradingServiceTest {
                 .thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 40)));
         // planBuilder는 INFINITE/VR 둘 다 requiresPrevClose()=true라 전일종가를 항상 조회한다(BrokerPricePort.getPrevClose 경유,
         // priceFetcher.fetchPriceSnapshots와 별도) — holdings>0인 기존 픽스처는 이 값을 쓰지 않지만 VR referencePrice 폴백에는 필요
-        lenient().when(kisPricePort.getPrevClose(eq(StrategyTicker.SOXL), eq(ACCOUNT_REF)))
+        lenient().when(tossPricePort.getPrevClose(eq(StrategyTicker.SOXL), eq(ACCOUNT_REF)))
                 .thenReturn(new BigDecimal("20.00"));
         // 캡 판단용 현재가 — 기존 주문 픽스처 가격(22.00)에 캡(×1.05=23.10)이 걸리지 않는 기본값(개별 테스트가 필요 시 override)
-        lenient().when(kisPricePort.getPrices(anyList(), eq(ACCOUNT_REF)))
+        lenient().when(tossPricePort.getPrices(anyList(), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("22.00")));
     }
 
@@ -355,7 +355,7 @@ class ManualTradingServiceTest {
                     return original.stream().map(o -> o.withPrice(new BigDecimal("52.50"))).toList();
                 });
         // 캡 판단용 현재가 50.00 → cap = 52.50
-        when(kisPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
+        when(tossPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("50.00")));
         // 원장 deposit=60.00 — 캡 전(100.00)은 부족, 캡 후(52.50)는 충분
         stubLedger(new BigDecimal("60.00"));
@@ -388,7 +388,7 @@ class ManualTradingServiceTest {
                     List<PlannedOrder> original = invocation.getArgument(2);
                     return original.stream().map(o -> o.withPrice(new BigDecimal("52.50"))).toList();
                 });
-        when(kisPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
+        when(tossPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("50.00")));
         // 원장 deposit=10.00 — 캡 후 금액(52.50)조차 초과
         stubLedger(new BigDecimal("10.00"));
@@ -410,7 +410,7 @@ class ManualTradingServiceTest {
                 .withLeg("INFINITE_EARLY_AVG_BUY");
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyTemplate.toPlanned()));
-        when(kisPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
+        when(tossPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
                 .thenThrow(new RuntimeException("시세 오류"));
         // TradingPriceFetcher는 포트 실패를 삼키고 관리자 알림을 발행한다 — 그 발행마저 실패해 fetchPrices가 던지는 경로
         doThrow(new RuntimeException("알림 발행 실패")).when(eventPublisher).publishEvent(any(Object.class));
@@ -516,7 +516,7 @@ class ManualTradingServiceTest {
         when(strategyVrDetailPort.findByStrategyVersionId(vrVersionId)).thenReturn(Optional.of(vrDetail));
         when(orderPort.sumFilledBuyAmountByCycleId(vrCycle.id())).thenReturn(BigDecimal.ZERO);
         // buildOrders: LIMIT + AT_OPEN 주문 반환 — 수동실행은 currentPrice=null 전달하지만
-        // setUp()의 전역 kisPricePort 스텁이 SOXL 전일종가 20.00을 반환 → referencePrice=20.00(대체), currentPrice(live)=null
+        // setUp()의 전역 tossPricePort 스텁이 SOXL 전일종가 20.00을 반환 → referencePrice=20.00(대체), currentPrice(live)=null
         when(vrStrategy.buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), eq(new BigDecimal("20.00")), any()))
                 .thenReturn(List.of(vrBuyTemplate.toPlanned(), vrSellTemplate.toPlanned()));
 
@@ -551,7 +551,7 @@ class ManualTradingServiceTest {
         when(orderPort.findAtOpenPlannedByCycleAndDate(eq(fx.vrCycle().id()), any()))
                 .thenReturn(List.of(fx.vrBuyPlanned(), fx.vrSellPlanned()));
         // BUY cap 판단용 최신 현재가 재조회 — placeAtOpenOrdersIfMarketOpen 내부에서 fetchPrices 호출
-        when(kisPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
+        when(tossPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("21.00")));
 
         List<Order> result = service.execute(fx.vrStrat().id(), REQUESTER_ID);
@@ -571,7 +571,7 @@ class ManualTradingServiceTest {
         stubSelectedSession(Instant.now(FIXED).minusSeconds(3600), Instant.now(FIXED).plusSeconds(3600));
         when(orderPort.findAtOpenPlannedByCycleAndDate(eq(fx.vrCycle().id()), any()))
                 .thenReturn(List.of(fx.vrBuyPlanned(), fx.vrSellPlanned()));
-        when(kisPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
+        when(tossPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
                 .thenThrow(new RuntimeException("시세 오류"));
         // TradingPriceFetcher가 포트 실패를 삼키고 발행하는 알림마저 실패해 fetchPrices가 던지는 경로
         doThrow(new RuntimeException("알림 발행 실패")).when(eventPublisher).publishEvent(any(Object.class));

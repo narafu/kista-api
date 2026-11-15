@@ -43,7 +43,7 @@ public class TradingOpenScheduler {
     private final MarketCalendarPort marketCalendarPort;
     private final TradingErrorReportPort errorReportPort;
 
-    @Scheduled(cron = "0 0 22 * * MON-FRI", zone = TimeZones.KST_ID) // 월~금 22:00 KST — DST 개장 30분 전(KIS DCA MOO 개장 전 접수), 비DST는 waitUntilMarketOpen 90분 대기
+    @Scheduled(cron = "0 0 22 * * MON-FRI", zone = TimeZones.KST_ID) // 월~금 22:00 KST — DST 개장 30분 전(DCA MOO 개장 전 접수), 비DST는 waitUntilMarketOpen 90분 대기
     public void run() throws InterruptedException {
         LocalDate tradeDate = LocalDate.now(clock.withZone(TimeZones.KST)).plusDays(1);
         closeScheduler.schedule(tradeDate);

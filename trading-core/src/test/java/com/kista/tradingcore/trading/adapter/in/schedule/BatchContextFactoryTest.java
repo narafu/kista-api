@@ -61,7 +61,7 @@ class BatchContextFactoryTest {
     }
 
     private Account mockAccount(UUID accountId) {
-        return TradingFixtures.kisAccount(accountId, USER_ID);
+        return TradingFixtures.stockAccount(accountId, USER_ID);
     }
 
     private TradingUserProfile mockUserProfile() {

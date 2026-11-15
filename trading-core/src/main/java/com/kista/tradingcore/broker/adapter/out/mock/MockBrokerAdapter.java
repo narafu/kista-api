@@ -158,7 +158,7 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
     // 동일 로직을 broker 소유 타입(PlacedOrderView/BrokerCandle)으로 재구현한다(PersistenceSupport/DstInfo 부분 복제와 동일 기준)
     private static boolean fills(PlacedOrderView order, BrokerCandle candle) {
         boolean buy = order.direction() == OrderDirection.BUY;
-        // MOO 매수는 DCA 캡 지정가를 달고 온다 — 운영(KIS LOO)처럼 시가가 캡을 넘으면 미체결
+        // MOO 매수는 DCA 캡 지정가를 달고 온다 — 운영처럼 시가가 캡을 넘으면 미체결
         if (order.orderType() == OrderType.MOO) return !buy || order.price() == null || candle.open().compareTo(order.price()) <= 0;
         if (order.orderType() == OrderType.MOC) return true; // 시장가 — 항상 체결
         if (order.orderType() == OrderType.LIMIT) {

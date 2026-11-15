@@ -92,9 +92,9 @@ class StatisticsControllerTest {
     }
 
     @Test
-    void prices_returns_503_on_kis_error() throws Exception {
+    void prices_returns_503_on_broker_error() throws Exception {
         when(accountStatistics.getPrices(any(), any(), any()))
-                .thenThrow(new StubBrokerApiException("KIS API 오류"));
+                .thenThrow(new StubBrokerApiException("Toss API 오류"));
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/prices")
                         .param("tickers", "TQQQ")

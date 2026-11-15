@@ -98,7 +98,7 @@ class VrReconfigureServiceTest {
     void setUp() {
         service = new VrReconfigureService(strategyPort, accountPort, strategyCyclePort, strategyVrDetailPort, strategyCycleVrPort,
                 cyclePositionPort, pricePort, cycleSnapshotCreator, orderCancelService, eventPublisher, marketCalendarPort, FIXED);
-        account = TradingFixtures.kisAccount(accountId, requesterId);
+        account = TradingFixtures.stockAccount(accountId, requesterId);
         vrStrategy = new Strategy(strategyId, accountId, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         currentCycle = new StrategyCycle(cycleId, strategyId, strategyVersionId,

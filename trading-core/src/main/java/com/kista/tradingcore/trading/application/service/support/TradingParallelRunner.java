@@ -38,7 +38,7 @@ public class TradingParallelRunner {
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             List<Callable<Optional<T>>> callables = tasks.stream()
                     .map(task -> (Callable<Optional<T>>) () -> {
-                        // 같은 계좌의 동시 호출 상한 — KIS rate limit·Toss 공유 토큰 갱신 경합 완화
+                        // 같은 계좌의 동시 호출 상한 — Toss 공유 토큰 갱신 경합 완화
                         Semaphore gate = gates.computeIfAbsent(task.groupKey(),
                                 _ -> new Semaphore(maxConcurrentPerGroup));
                         gate.acquire();

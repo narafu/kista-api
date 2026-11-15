@@ -52,7 +52,7 @@ class StrategyCycleVrPersistenceAdapterTest extends DataJpaTestBase {
 
         jdbcTemplate.update(
                 "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
-                accountId, userId, "테스트계좌", "KIS", "74420614", "01", "key", "secret");
+                accountId, userId, "테스트계좌", "TOSS", "74420614", "01", "key", "secret");
     }
 
     // 계좌당 활성 종목 유니크 인덱스 때문에 전략마다 다른 종목을 쓴다

@@ -36,7 +36,7 @@ class BrokerTokenPersistenceAdapterTest extends DataJpaTestBase {
         // broker_tokens.account_id → accounts(id) FK 충족을 위한 선행 삽입
         jdbcTemplate.update(
                 "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
-                accountId, userId, "테스트계좌", "KIS", "74420614", "01", "key", "secret");
+                accountId, userId, "테스트계좌", "TOSS", "74420614", "01", "key", "secret");
 
         TestTransaction.flagForCommit();
         TestTransaction.end();

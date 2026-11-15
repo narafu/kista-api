@@ -34,12 +34,12 @@ class AppErrorStreamConsumerTest {
         when(redisTemplate.opsForStream()).thenReturn((StreamOperations) streamOperations);
         AppErrorStreamConsumer consumer = new AppErrorStreamConsumer(connectionFactory, redisTemplate, new ObjectMapper(), appErrorLogPort);
         MapRecord<String, String, String> record = record("""
-                {"errorType":"KisApiException","message":"연결 오류","stackTrace":"at foo()","context":{"caller":"TradingExceptionHandler"}}
+                {"errorType":"TossApiException","message":"연결 오류","stackTrace":"at foo()","context":{"caller":"TradingExceptionHandler"}}
                 """);
 
         consumer.handle(record);
 
-        verify(appErrorLogPort).save("KisApiException", "연결 오류", "at foo()", Map.of("caller", "TradingExceptionHandler"));
+        verify(appErrorLogPort).save("TossApiException", "연결 오류", "at foo()", Map.of("caller", "TradingExceptionHandler"));
         verify(streamOperations).acknowledge(RedisStreamConfig.APP_ERROR_STREAM, RedisStreamConfig.ROOT_CONSUMER_GROUP, record.getId());
     }
 

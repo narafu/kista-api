@@ -24,7 +24,7 @@ class TradingPolicySettingsTest {
         assertThat(settings.strategy(StrategyType.PRIVACY).ticker())
                 .isEqualTo(new StrategyFieldSettings<>(false, List.of(StrategyTicker.SOXL), StrategyTicker.SOXL));
         assertThat(settings.strategy(StrategyType.VR).recurringMode().defaultValue()).isEqualTo(RecurringMode.HOLD);
-        assertThat(settings.brokerEnabled(Broker.KIS)).isTrue();
+        assertThat(settings.brokerEnabled(Broker.TOSS)).isTrue();
     }
 
     @Test
@@ -32,7 +32,7 @@ class TradingPolicySettingsTest {
         BrokerSettings upbit = TradingPolicySettings.defaults().brokers().get(Broker.UPBIT);
         assertThat(upbit.enabled()).isFalse();
         assertThat(upbit.allowedIp()).isEqualTo("168.107.63.152");
-        assertThat(TradingPolicySettings.defaults().brokers().get(Broker.KIS).allowedIp()).isNull();
+        assertThat(TradingPolicySettings.defaults().brokers().get(Broker.TOSS).allowedIp()).isNull();
     }
 
     @Test
@@ -60,7 +60,7 @@ class TradingPolicySettingsTest {
         TradingPolicySettings defaults = TradingPolicySettings.defaults();
 
         assertThatThrownBy(() -> new TradingPolicySettings(
-                Map.of(Broker.KIS, new BrokerSettings(true, null)), defaults.strategies()))
+                Map.of(Broker.TOSS, new BrokerSettings(true, null)), defaults.strategies()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("broker");
         assertThatThrownBy(() -> new TradingPolicySettings(defaults.brokers(),

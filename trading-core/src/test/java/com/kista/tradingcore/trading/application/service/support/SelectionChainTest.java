@@ -44,7 +44,7 @@ class SelectionChainTest {
     private final UUID strategyId = UUID.randomUUID();
 
     private Account account() {
-        return TradingFixtures.kisAccount(accountId, userId);
+        return TradingFixtures.stockAccount(accountId, userId);
     }
 
     private Strategy strategy() {

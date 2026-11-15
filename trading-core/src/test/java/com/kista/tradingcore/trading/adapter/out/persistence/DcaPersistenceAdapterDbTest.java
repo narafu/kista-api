@@ -52,7 +52,7 @@ class DcaPersistenceAdapterDbTest extends DataJpaTestBase {
         versionId = UUID.randomUUID();
         // FK 선행 행: account → strategy → strategy_version
         jdbc.update("INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
-                accountId, UUID.randomUUID(), "테스트계좌", "KIS", "74420614", "01", "key", "secret");
+                accountId, UUID.randomUUID(), "테스트계좌", "TOSS", "74420614", "01", "key", "secret");
         jdbc.update("INSERT INTO strategy (id, account_id, type, ticker, status, cycle_seed_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, now(), now())",
                 strategyId, accountId, "DCA", "UPRO", "ACTIVE", "NONE");
         jdbc.update("INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, ?, now())",

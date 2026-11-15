@@ -79,10 +79,10 @@ class ApiKeyExpirySchedulerTest {
 
     @Test
     void meritzAccountWithExpiryIsPublished() {
-        // 추정 만료일(ESTIMATED) 증권사도 점검 대상 — 메리츠·KIS 모두 발행
+        // 추정 만료일(ESTIMATED) 증권사도 점검 대상 — 메리츠·Toss 모두 발행
         Account meritz = new Account(UUID.randomUUID(), UUID.randomUUID(), "메리츠", "n", "a", "s", null, Broker.MERITZ, now, now.plus(Duration.ofDays(7)));
-        Account kis = new Account(UUID.randomUUID(), UUID.randomUUID(), "KIS", "n", "a", "s", null, Broker.KIS, now, now);
-        when(accountPort.findAll()).thenReturn(List.of(meritz, kis));
+        Account toss = new Account(UUID.randomUUID(), UUID.randomUUID(), "TOSS", "n", "a", "s", null, Broker.TOSS, now, now);
+        when(accountPort.findAll()).thenReturn(List.of(meritz, toss));
 
         scheduler.publishDue();
 

@@ -54,7 +54,7 @@ class TradingReporter {
         // 장마감 후에도 체결 가능한 잔여 PLACED 주문을 취소 — 애프터마켓 체결이 CANCELLED로 오기록되는 것을 방지
         cancelUnresolvedOrders(mainOrders, account);
 
-        // today는 KST — KIS는 어댑터에서 toUtc 변환, Toss는 KST 날짜 그대로 전달
+        // today는 KST — Toss는 KST 날짜 그대로 전달
         List<Execution> executions = executionPort.getExecutions(today, today, strategy.ticker(), account.brokerRef());
         // 원장 = 우리 매매 원칙의 기록, 외부 매매는 수동 보정으로만 반영 — 자기 주문(externalOrderId) 체결만 사용
         // 당일 취소된 주문(CANCELLED)도 부분 체결분이 있을 수 있어 자기 주문에 포함 — 수동 체결 보정 FILLED 행(UNKNOWN_LEG)은 포지션을 직접 기록했으므로 제외

@@ -30,7 +30,7 @@ class InternalApiClientConfigTest {
     }
 
     // trade-corrections 등 쓰기 경로 빈 — 브로커 동기 호출을 감싸므로
-    // 공용 읽기 빈과 별도로 존재해야 한다 (finding: KIS/Toss 브로커 타임아웃 상한이 공용
+    // 공용 읽기 빈과 별도로 존재해야 한다 (finding: Toss/Toss 브로커 타임아웃 상한이 공용
     // 10초 타임아웃과 같거나 넘어서는 문제)
     @Test
     void 쓰기_전용_클라이언트_빈이_생성된다() {

@@ -5,7 +5,7 @@ import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 
-// KIS 토큰 DB 캐시(broker_tokens) 포트 — Toss 토큰은 Redis(TossTokenStore)라 쓰지 않는다. 계좌 단위 제거는 AccountTokenEvictionPort 경유
+// 토큰 DB 캐시(broker_tokens) 포트 — Toss 토큰은 Redis(TossTokenStore)라 쓰지 않는다. 계좌 단위 제거는 AccountTokenEvictionPort 경유
 public interface BrokerTokenCachePort {
     // invalidateToken 호출 시 DB에 저장할 센티널 값 — findValidToken이 과거 만료 시각으로 인해 캐시 미스를 유도
     String INVALIDATED_TOKEN = "EXPIRED";

@@ -59,56 +59,56 @@ WHERE NOT EXISTS (SELECT 1 FROM finance.finance_budgets fb -- 같은 연초 시�
                     AND fb.apply_start_date = date_trunc('year', (now() AT TIME ZONE 'Asia/Seoul')::date)::date)
 ON CONFLICT (id) DO NOTHING;
 
--- ── 누적자산추이(equity-curve)용: KIS [시드] 전략(PAUSED)의 진행 중 사이클에 평일 일별 포지션 스냅샷 ──
--- equity-curve는 MOCK 계좌를 제외하므로 KIS 시드 사이클에 쌓는다. PAUSED라 스케쥴러가 건드리지 않는다
+-- ── 누적자산추이(equity-curve)용: 토스 [시드] 전략(PAUSED)의 진행 중 사이클에 평일 일별 포지션 스냅샷 ──
+-- equity-curve는 MOCK 계좌를 제외하므로 토스 시드 사이클에 쌓는다. PAUSED라 스케쥴러가 건드리지 않는다
 -- 스냅샷 시각은 04:30 KST 마감 배치와 동일, 보유 100주·평단 30 고정, 종가만 완만한 사인파로 변동
--- 전제: KIS [시드] 계좌·전략은 바로 아래 블록이 만든다(자격증명이 가짜라 재개(resume) 금지)
--- KIS [시드] 계좌: API 등록은 KIS 실연결 검증(verifyAccount)이라 불가 — MOCK [시드] 계좌의 AES 암호문(로컬 키로 암호화된 가짜 값)을 복사한다
+-- 전제: 토스 [시드] 계좌·전략은 바로 아래 블록이 만든다(자격증명이 가짜라 재개(resume) 금지)
+-- 토스 [시드] 계좌: API 등록은 Toss 실연결 검증(verifyAccount)이라 불가 — MOCK [시드] 계좌의 AES 암호문(로컬 키로 암호화된 가짜 값)을 복사한다
 -- account_no_hash는 NULL(부분 UNIQUE 인덱스 대상 밖). MOCK 계좌가 없으면(API 등록 실패) 생략된다
 INSERT INTO trading.accounts (id, user_id, nickname, broker, account_no, app_key, secret_key)
-SELECT md5('dev-seed:kis:account')::uuid, a.user_id, '[시드] KIS 계좌', 'KIS', a.account_no, a.app_key, a.secret_key
+SELECT md5('dev-seed:toss:account')::uuid, a.user_id, '[시드] 토스 계좌', 'TOSS', a.account_no, a.app_key, a.secret_key
 FROM trading.accounts a
 WHERE a.user_id = '00000000-0000-0000-0000-000000000001' AND a.broker = 'MOCK'
   AND a.nickname LIKE '[시드]%' AND a.deleted_at IS NULL
 ORDER BY a.created_at LIMIT 1
 ON CONFLICT (id) DO NOTHING;
 
--- KIS [시드] 전략: INFINITE SOXL PAUSED, 60일 전 시작한 진행 중 사이클 + 개장 포지션(equity-curve 기준 예수금)
+-- 토스 [시드] 전략: INFINITE SOXL PAUSED, 60일 전 시작한 진행 중 사이클 + 개장 포지션(equity-curve 기준 예수금)
 INSERT INTO trading.strategy (id, account_id, type, ticker, status, cycle_seed_type)
-SELECT md5('dev-seed:kis:strategy')::uuid, a.id, 'INFINITE', 'SOXL', 'PAUSED', 'NONE'
-FROM trading.accounts a WHERE a.id = md5('dev-seed:kis:account')::uuid
+SELECT md5('dev-seed:toss:strategy')::uuid, a.id, 'INFINITE', 'SOXL', 'PAUSED', 'NONE'
+FROM trading.accounts a WHERE a.id = md5('dev-seed:toss:account')::uuid
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO trading.strategy_version (id, strategy_id, version_no)
-SELECT md5('dev-seed:kis:version')::uuid, s.id, 1
-FROM trading.strategy s WHERE s.id = md5('dev-seed:kis:strategy')::uuid
+SELECT md5('dev-seed:toss:version')::uuid, s.id, 1
+FROM trading.strategy s WHERE s.id = md5('dev-seed:toss:strategy')::uuid
 ON CONFLICT DO NOTHING;
 
 INSERT INTO trading.strategy_infinite_version (strategy_version_id, division_count)
 SELECT v.id, 20
-FROM trading.strategy_version v WHERE v.id = md5('dev-seed:kis:version')::uuid
+FROM trading.strategy_version v WHERE v.id = md5('dev-seed:toss:version')::uuid
 ON CONFLICT DO NOTHING;
 
 INSERT INTO trading.strategy_cycle (id, strategy_id, strategy_version_id, start_amount, open_amount, start_date, created_at)
-SELECT md5('dev-seed:kis:cycle')::uuid, v.strategy_id, v.id, 6000, 6000, d.start_date, d.start_date::timestamp AT TIME ZONE 'Asia/Seoul'
+SELECT md5('dev-seed:toss:cycle')::uuid, v.strategy_id, v.id, 6000, 6000, d.start_date, d.start_date::timestamp AT TIME ZONE 'Asia/Seoul'
 FROM trading.strategy_version v
 CROSS JOIN LATERAL (SELECT (now() AT TIME ZONE 'Asia/Seoul')::date - 60 AS start_date) d
-WHERE v.id = md5('dev-seed:kis:version')::uuid
+WHERE v.id = md5('dev-seed:toss:version')::uuid
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO trading.cycle_position (id, strategy_cycle_id, deposit, closing_price, avg_price, holdings, created_at)
-SELECT md5('dev-seed:kis:pos:open')::uuid, c.id, 3000, 30.00, NULL, 0, c.created_at
-FROM trading.strategy_cycle c WHERE c.id = md5('dev-seed:kis:cycle')::uuid
+SELECT md5('dev-seed:toss:pos:open')::uuid, c.id, 3000, 30.00, NULL, 0, c.created_at
+FROM trading.strategy_cycle c WHERE c.id = md5('dev-seed:toss:cycle')::uuid
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO trading.cycle_position_infinite (cycle_position_id, is_reverse_mode)
-SELECT p.id, false FROM trading.cycle_position p WHERE p.id = md5('dev-seed:kis:pos:open')::uuid
+SELECT p.id, false FROM trading.cycle_position p WHERE p.id = md5('dev-seed:toss:pos:open')::uuid
 ON CONFLICT (cycle_position_id) DO NOTHING;
 
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM trading.accounts WHERE user_id = '00000000-0000-0000-0000-000000000001'
-                   AND broker = 'KIS' AND nickname LIKE '[시드]%' AND deleted_at IS NULL) THEN
-        RAISE NOTICE 'KIS [시드] 계좌 없음 — equity-curve 포지션·관리자 주문 시드 생략';
+                   AND broker = 'TOSS' AND nickname LIKE '[시드]%' AND deleted_at IS NULL) THEN
+        RAISE NOTICE '토스 [시드] 계좌 없음 — equity-curve 포지션·관리자 주문 시드 생략';
     END IF;
 END $$;
 
@@ -123,7 +123,7 @@ JOIN trading.accounts a ON a.id = s.account_id
 JOIN LATERAL (SELECT deposit FROM trading.cycle_position
               WHERE strategy_cycle_id = c.id AND deleted_at IS NULL ORDER BY created_at LIMIT 1) p ON true
 CROSS JOIN generate_series(c.start_date + 1, (now() AT TIME ZONE 'Asia/Seoul')::date - 1, interval '1 day') d
-WHERE a.user_id = '00000000-0000-0000-0000-000000000001' AND a.broker = 'KIS'
+WHERE a.user_id = '00000000-0000-0000-0000-000000000001' AND a.broker = 'TOSS'
   AND a.nickname LIKE '[시드]%' AND s.status = 'PAUSED'
   AND c.end_date IS NULL AND c.deleted_at IS NULL AND s.deleted_at IS NULL AND a.deleted_at IS NULL
   AND extract(isodow FROM d) < 6;
@@ -136,8 +136,8 @@ INSERT INTO trading.cycle_position_infinite (cycle_position_id, is_reverse_mode)
 SELECT id, false FROM seed_positions WHERE type = 'INFINITE'
 ON CONFLICT (cycle_position_id) DO NOTHING;
 
--- ── 관리자 주문 관리용: KIS [시드] 전략의 최근 10 평일 종결 주문 ──
--- 종결 상태(FILLED·CANCELLED·FAILED)만 — PLACED/PLANNED는 KIS 대상 동기화·취소 경로가 실호출할 수 있어 넣지 않는다
+-- ── 관리자 주문 관리용: 토스 [시드] 전략의 최근 10 평일 종결 주문 ──
+-- 종결 상태(FILLED·CANCELLED·FAILED)만 — PLACED/PLANNED는 증권사 대상 동기화·취소 경로가 실호출할 수 있어 넣지 않는다
 -- 당일 PLACED 주문은 MOCK 전략을 스케쥴러가 실행하며 자연 생성된다
 INSERT INTO trading.orders (id, account_id, strategy_cycle_id, trade_date, ticker, order_type, timing, direction,
                             price, quantity, status, external_order_id, filled_quantity, filled_price)
@@ -154,7 +154,7 @@ CROSS JOIN generate_series((now() AT TIME ZONE 'Asia/Seoul')::date - 14, (now() 
 CROSS JOIN (VALUES (1, 'BUY', 28.15, 4, 'FILLED'), (2, 'BUY', 27.50, 5, 'CANCELLED'),
                    (3, 'SELL', 30.97, 42, 'FAILED'))
     AS o(seq, direction, price, quantity, status)
-WHERE a.user_id = '00000000-0000-0000-0000-000000000001' AND a.broker = 'KIS'
+WHERE a.user_id = '00000000-0000-0000-0000-000000000001' AND a.broker = 'TOSS'
   AND a.nickname LIKE '[시드]%' AND s.status = 'PAUSED'
   AND c.end_date IS NULL AND c.deleted_at IS NULL AND s.deleted_at IS NULL AND a.deleted_at IS NULL
   AND extract(isodow FROM d) < 6

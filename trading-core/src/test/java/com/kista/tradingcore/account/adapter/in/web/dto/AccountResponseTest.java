@@ -13,7 +13,7 @@ class AccountResponseTest {
 
     @Test
     void currencyIsDerivedFromBroker() {
-        Account kis = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
-        assertThat(AccountResponse.from(kis).currency()).isEqualTo(Broker.KIS.getCurrency().name());
+        Account toss = TradingFixtures.stockAccount(UUID.randomUUID(), UUID.randomUUID());
+        assertThat(AccountResponse.from(toss).currency()).isEqualTo(Broker.TOSS.getCurrency().name());
     }
 }

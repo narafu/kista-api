@@ -27,7 +27,7 @@ class BrokerRouter implements PortfolioPort, MarginPort, SellableQuantityPort,
         BrokerOrderCorrectionPort, ExecutionPort, BrokerPricePort {
 
     private final Map<Broker, BrokerCapabilitiesPort> adapters;
-    private final AdminMarketPricePort adminPrices; // 관리자 키 시세(Toss → KIS), 부분 결과
+    private final AdminMarketPricePort adminPrices; // 관리자 키 시세(Toss), 부분 결과
 
     BrokerRouter(List<BrokerCapabilitiesPort> adapters, AdminMarketPricePort adminPrices) {
         this.adminPrices = adminPrices;

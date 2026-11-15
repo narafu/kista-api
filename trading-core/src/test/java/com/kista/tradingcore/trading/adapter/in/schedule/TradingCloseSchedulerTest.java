@@ -209,7 +209,7 @@ class TradingCloseSchedulerTest {
     void run_executeBatchException_publishesFailedLifecycleEvent() throws InterruptedException {
         Strategy strategy = mockStrategy();
         BatchContext context = new BatchContext(strategy, mockStrategyCycle(strategy.id()), mockAccount(), mockUser());
-        RuntimeException ex = new RuntimeException("KIS API 호출 실패");
+        RuntimeException ex = new RuntimeException("Toss API 호출 실패");
 
         when(strategyPort.findAllActive()).thenReturn(List.of(strategy));
         when(contextFactory.buildAll(any())).thenReturn(List.of(context));
@@ -221,7 +221,7 @@ class TradingCloseSchedulerTest {
         ArgumentCaptor<SchedulerLifecycleEvent> captor = ArgumentCaptor.forClass(SchedulerLifecycleEvent.class);
         verify(events, org.mockito.Mockito.times(2)).publishEvent(captor.capture());
         assertThat(captor.getAllValues().get(1).phase()).isEqualTo(SchedulerLifecycleEvent.Phase.FAILED);
-        assertThat(captor.getAllValues().get(1).errorMessage()).isEqualTo("KIS API 호출 실패");
+        assertThat(captor.getAllValues().get(1).errorMessage()).isEqualTo("Toss API 호출 실패");
         verify(heartbeatPort, never()).pingClose(); // 실패한 배치는 완료 신호를 보내지 않는다 — dead-man's switch가 감지
     }
 

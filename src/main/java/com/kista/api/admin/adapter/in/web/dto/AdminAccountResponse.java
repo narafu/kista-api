@@ -22,7 +22,7 @@ public record AdminAccountResponse(
         String nickname,        // Account.nickname
         @Schema(description = "마스킹된 계좌번호", example = "****1234")
         @Nullable String accountNoMasked, // "****1234"
-        @Schema(description = "브로커 코드", example = "KIS")
+        @Schema(description = "브로커 코드", example = "TOSS")
         @Nullable String broker,          // Broker.name()
         @Schema(description = "계좌에 등록된 전략 목록")
         List<AdminStrategyResponse> strategies

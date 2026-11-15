@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReentrantLock;
 
-// account_id 키 broker_tokens 캐시 — 재발급이 이전 토큰을 무효화하지 않는 브로커(KIS·메리츠) 공용.
+// account_id 키 broker_tokens 캐시 — 재발급이 이전 토큰을 무효화하지 않는 브로커(메리츠 등) 공용.
 // JVM-local 더블체크락 + PostgreSQL broker_tokens 캐시. Toss(TossDistributedTokenCoordinator, Redis 분산 lease+fencing)와
 // 같은 TokenCoordinator 계약을 구현하지만 메커니즘은 다르다 — 재발급이 비파괴적이라 인스턴스 간
 // 분산 조정이 불필요하다. 이 비대칭은 의도된 설계다(docs/agents/vendors/toss.md "토큰·인증", docs/agents/modules/broker.md adapter/out/internal 항목 참고).

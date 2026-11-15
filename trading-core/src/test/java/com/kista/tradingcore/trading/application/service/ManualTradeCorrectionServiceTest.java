@@ -84,7 +84,7 @@ class ManualTradeCorrectionServiceTest {
 
     @Test
     void correctManualFills_liquidatingSell_savesFilledOrdersAndPausesStrategy() {
-        Account account = new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, Broker.KIS, null, null);
+        Account account = new Account(ACCOUNT_ID, USER_ID, "TOSS", "12345678", "app", "secret", null, Broker.TOSS, null, null);
         Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
                 StrategyTicker.SOXL, StrategyCycleSeedType.MAX);
         StrategyCycle cycle = new StrategyCycle(CYCLE_ID, STRATEGY_ID, VERSION_ID, new BigDecimal("6989.00"),
@@ -131,7 +131,7 @@ class ManualTradeCorrectionServiceTest {
     }
 
     private void stubGuardFixture(List<Order> ordersOnDate) {
-        stubGuardFixture(ordersOnDate, Broker.KIS);
+        stubGuardFixture(ordersOnDate, Broker.TOSS);
     }
 
     // 기본 픽스처는 postClose 이전 시각(2026-01-06 04:00 KST)으로 돌려 리포트 창 가드를 통과시킨다 — 번호 없는 보정 가드 테스트용
@@ -142,7 +142,7 @@ class ManualTradeCorrectionServiceTest {
 
     // FIXED 시각(12:00 KST, postClose 이후) 그대로인 픽스처 — 마감 리포트 창 가드 테스트용
     private void stubWindowFixture(List<Order> ordersOnDate, Broker broker) {
-        Account account = new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, broker, null, null);
+        Account account = new Account(ACCOUNT_ID, USER_ID, "TOSS", "12345678", "app", "secret", null, broker, null, null);
         Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
                 StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(CYCLE_ID, STRATEGY_ID, VERSION_ID, new BigDecimal("6989.00"),
@@ -241,7 +241,7 @@ class ManualTradeCorrectionServiceTest {
 
     @Test
     void correctManualFills_sellQuantityGreaterThanHoldings_throws() {
-        Account account = new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, Broker.KIS, null, null);
+        Account account = new Account(ACCOUNT_ID, USER_ID, "TOSS", "12345678", "app", "secret", null, Broker.TOSS, null, null);
         Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
                 StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(CYCLE_ID, STRATEGY_ID, VERSION_ID, new BigDecimal("6989.00"),
@@ -374,7 +374,7 @@ class ManualTradeCorrectionServiceTest {
     }
 
     private Account account() {
-        return new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, Broker.KIS, null, null);
+        return new Account(ACCOUNT_ID, USER_ID, "TOSS", "12345678", "app", "secret", null, Broker.TOSS, null, null);
     }
 
     private Strategy privacy() {
@@ -420,7 +420,7 @@ class ManualTradeCorrectionServiceTest {
 
     @Test
     void reportWindow_afterPostCloseUnreportedWithStrategyOrder_rejected() {
-        stubWindowFixture(List.of(orderWithLeg("LOC_BUY")), Broker.KIS);
+        stubWindowFixture(List.of(orderWithLeg("LOC_BUY")), Broker.TOSS);
         when(batchRunPort.isReported(TODAY, STRATEGY_ID)).thenReturn(false);
 
         assertThatThrownBy(() -> service.correctManualFills(guardCommand(TODAY.minusDays(1), "EXT-1")))
@@ -432,7 +432,7 @@ class ManualTradeCorrectionServiceTest {
 
     @Test
     void reportWindow_alreadyReported_passes() {
-        stubWindowFixture(List.of(orderWithLeg("LOC_BUY")), Broker.KIS);
+        stubWindowFixture(List.of(orderWithLeg("LOC_BUY")), Broker.TOSS);
         when(batchRunPort.isReported(TODAY, STRATEGY_ID)).thenReturn(true);
 
         service.correctManualFills(guardCommand(TODAY.minusDays(1), "EXT-1"));
@@ -442,7 +442,7 @@ class ManualTradeCorrectionServiceTest {
 
     @Test
     void reportWindow_onlyUnknownLegOrdersToday_passes() {
-        stubWindowFixture(List.of(orderWithLeg(Order.UNKNOWN_LEG)), Broker.KIS);
+        stubWindowFixture(List.of(orderWithLeg(Order.UNKNOWN_LEG)), Broker.TOSS);
 
         service.correctManualFills(guardCommand(TODAY.minusDays(1), "EXT-1"));
 
@@ -462,7 +462,7 @@ class ManualTradeCorrectionServiceTest {
 
     @Test
     void reportWindow_pausedWithOnlyUnplacedOrders_passes() {
-        stubWindowFixture(List.of(orderWithLegAndExternalId("LOC_BUY", null)), Broker.KIS);
+        stubWindowFixture(List.of(orderWithLegAndExternalId("LOC_BUY", null)), Broker.TOSS);
         stubPaused();
 
         service.correctManualFills(guardCommand(TODAY.minusDays(1), "EXT-1"));
@@ -472,7 +472,7 @@ class ManualTradeCorrectionServiceTest {
 
     @Test
     void reportWindow_pausedWithPlacedOrder_rejected() {
-        stubWindowFixture(List.of(orderWithLegAndExternalId("LOC_BUY", "EXT-0")), Broker.KIS);
+        stubWindowFixture(List.of(orderWithLegAndExternalId("LOC_BUY", "EXT-0")), Broker.TOSS);
         stubPaused();
 
         assertThatThrownBy(() -> service.correctManualFills(guardCommand(TODAY.minusDays(1), "EXT-1")))

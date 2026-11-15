@@ -75,7 +75,7 @@ class TradingStatsServiceTest {
     private static Account testAccount() {
         return new Account(ACCOUNT_ID, USER_ID, "테스트계좌",
                 "74420614", "appKey", "appSecret", null,
-                Broker.KIS, null, null);
+                Broker.TOSS, null, null);
     }
 
     private void stubUserWithStrategy() {
@@ -286,7 +286,7 @@ class TradingStatsServiceTest {
         Strategy otherAccountStrategy = new Strategy(otherStrategyId, otherAccountId, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         Account otherAccount = new Account(otherAccountId, USER_ID, "두번째계좌",
-                "11112222", "appKey", "appSecret", null, Broker.KIS, null, null);
+                "11112222", "appKey", "appSecret", null, Broker.TOSS, null, null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), otherAccount));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID, otherAccountId))).thenReturn(Map.of(
                 ACCOUNT_ID, List.of(STRATEGY), otherAccountId, List.of(otherAccountStrategy)));
@@ -677,12 +677,12 @@ class TradingStatsServiceTest {
         assertThat(summary.totalUnrealizedPnl()).isEqualByComparingTo("30.00"); // 평가 130 - 원금 100
     }
 
-    // 통화별 합산 검증용 — KIS(USD)·BINANCE(USDT)·UPBIT(KRW)·MOCK 계좌 각 1개에 진행 중 DCA 사이클을 두고 원금을 100/200/300/400으로 구분한다
-    private record MultiCurrency(Account kis, Account binance, Account upbit, Account mock,
+    // 통화별 합산 검증용 — Toss(USD)·BINANCE(USDT)·UPBIT(KRW)·MOCK 계좌 각 1개에 진행 중 DCA 사이클을 두고 원금을 100/200/300/400으로 구분한다
+    private record MultiCurrency(Account toss, Account binance, Account upbit, Account mock,
                                  Map<UUID, StrategyCycle> cycleByAccount) {}
 
     private MultiCurrency stubMultiCurrencyUser() {
-        Account kis = testAccount();
+        Account toss = testAccount();
         Account binance = new Account(UUID.randomUUID(), USER_ID, "바이낸스", null, "k", "s", null, Broker.BINANCE, null, null);
         Account upbit = new Account(UUID.randomUUID(), USER_ID, "업비트", "n", "k", "s", null, Broker.UPBIT, null, null);
         Account mock = new Account(UUID.randomUUID(), USER_ID, "모의", "0", "k", "s", null, Broker.MOCK, null, null);
@@ -691,14 +691,14 @@ class TradingStatsServiceTest {
         Map<UUID, Strategy> strategyByAccount = new java.util.LinkedHashMap<>();
         String[] principals = {"100", "200", "300", "400"};
         int i = 0;
-        for (Account a : List.of(kis, binance, upbit, mock)) {
+        for (Account a : List.of(toss, binance, upbit, mock)) {
             Strategy s = new Strategy(UUID.randomUUID(), a.id(), StrategyType.DCA, StrategyStatus.ACTIVE,
                     StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
             accounts.put(a.id(), a);
             strategyByAccount.put(a.id(), s);
             cycleByAccount.put(a.id(), activeCycle(s.id(), principals[i++], "2026-06-01"));
         }
-        lenient().when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(kis, binance, upbit, mock));
+        lenient().when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(toss, binance, upbit, mock));
         lenient().when(strategyPort.findByAccountIds(any())).thenAnswer(inv -> {
             Map<UUID, List<Strategy>> result = new java.util.HashMap<>();
             for (UUID id : (java.util.Collection<UUID>) inv.getArgument(0)) result.put(id, List.of(strategyByAccount.get(id)));
@@ -708,7 +708,7 @@ class TradingStatsServiceTest {
             java.util.Collection<UUID> ids = inv.getArgument(0);
             return cycleByAccount.values().stream().filter(c -> ids.contains(c.strategyId())).toList();
         });
-        return new MultiCurrency(kis, binance, upbit, mock, cycleByAccount);
+        return new MultiCurrency(toss, binance, upbit, mock, cycleByAccount);
     }
 
     @Test
@@ -720,7 +720,7 @@ class TradingStatsServiceTest {
         assertThat(statsService.getSummary(USER_ID, Currency.KRW).activePrincipal()).isEqualByComparingTo("300");
         assertThat(statsService.getCyclePerformances(USER_ID, null, null, null, null, 0, 10).items())
                 .extracting(CyclePerformance::accountId)
-                .containsExactlyInAnyOrder(m.kis().id(), m.binance().id(), m.upbit().id(), m.mock().id());
+                .containsExactlyInAnyOrder(m.toss().id(), m.binance().id(), m.upbit().id(), m.mock().id());
     }
 
     @Test

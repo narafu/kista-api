@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
 
 import static java.math.BigDecimal.ZERO;
 
-// KIS CTRP6504R 응답(PresentBalanceResult) → kista-ui 통합 포맷 DTO
+// 브로커 잔고 응답(PresentBalanceResult) → kista-ui 통합 포맷 DTO
 // PresentBalanceResult의 camelCase 필드를 kista-ui PortfolioSnapshot 타입과 일치하도록 정규화
 public record PortfolioSummaryResponse(
         @Schema(description = "종목별 잔고 목록")
@@ -43,7 +43,7 @@ public record PortfolioSummaryResponse(
     // 계좌 전체 요약 — PresentBalanceResult output3 필드
     @Schema(name = "PortfolioSummaryDto")
     public record SummaryDto(
-            @Schema(description = "총자산 (KRW — KIS tot_asst_amt 원본 값)")
+            @Schema(description = "총자산 (KRW)")
             BigDecimal totalAsset,           // tot_asst_amt: 총자산 (KRW)
             @Schema(description = "총평가손익 (KRW)")
             BigDecimal totalEvalProfit,         // tot_evlu_pfls_amt: 총평가손익 (KRW)

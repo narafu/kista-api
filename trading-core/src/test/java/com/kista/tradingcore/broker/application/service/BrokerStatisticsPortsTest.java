@@ -22,7 +22,7 @@ class BrokerStatisticsPortsTest {
         BrokerStatisticsPorts sut = new BrokerStatisticsPorts(List.of(toss));
 
         assertThat(sut.find(Broker.TOSS)).containsSame(toss);
-        assertThat(sut.find(Broker.KIS)).isEmpty();
+        assertThat(sut.find(Broker.MERITZ)).isEmpty();
         assertThat(sut.find(Broker.MOCK)).isEmpty();
     }
 }

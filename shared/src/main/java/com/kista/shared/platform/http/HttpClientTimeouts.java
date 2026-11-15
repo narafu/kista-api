@@ -21,7 +21,7 @@ public final class HttpClientTimeouts {
         return factory;
     }
 
-    // body가 있는 POST에서 401 등 오류 응답을 재시도해야 하는 어댑터(KIS/Toss 주문)용 —
+    // body가 있는 POST에서 401 등 오류 응답을 재시도해야 하는 어댑터(Toss 주문)용 —
     // HttpURLConnection은 스트리밍 모드(POST body 존재 시)에서 401을 즉시
     // HttpRetryException("cannot retry due to server authentication, in streaming mode")로 던져
     // HttpClientErrorException 캐치·토큰 재발급 재시도 로직에 도달하지 못한다.

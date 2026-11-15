@@ -13,7 +13,7 @@ public record BrokerAccountRef(
         String appKey,
         String secretKey,
         String accountNo,
-        String brokerAccountCode, // KIS: null, TOSS: accountSeq
+        String brokerAccountCode, // TOSS: accountSeq
         Broker broker              // 라우팅 키
 ) {
 

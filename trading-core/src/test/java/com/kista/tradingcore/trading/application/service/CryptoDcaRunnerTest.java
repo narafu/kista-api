@@ -96,9 +96,9 @@ class CryptoDcaRunnerTest {
 
     @Test
     void onlyCryptoDcaStrategiesAreRun() {
-        Account kis = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
+        Account toss = TradingFixtures.stockAccount(UUID.randomUUID(), UUID.randomUUID());
         Account upbit = TradingFixtures.upbitAccount(UUID.randomUUID(), UUID.randomUUID());
-        add(kis, StrategyType.DCA, true);
+        add(toss, StrategyType.DCA, true);
         add(upbit, StrategyType.INFINITE, true);
         Strategy dca = add(upbit, StrategyType.DCA, true);
         tick();

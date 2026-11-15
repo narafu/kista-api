@@ -53,7 +53,7 @@ class OrderSubmissionReconcilerTest {
     static final LocalDate TRADE_DATE = LocalDate.of(2026, 10, 17);
     static final UUID CYCLE_ID = UUID.randomUUID();
     static final TradingAccount TOSS = account(Broker.TOSS);
-    static final TradingAccount KIS = account(Broker.KIS);
+    static final TradingAccount MERITZ = account(Broker.MERITZ); // 멱등키 재요청 미지원 증권사
 
     private static TradingAccount account(Broker broker) {
         return new TradingAccount(UUID.randomUUID(), UUID.randomUUID(), "계좌",
@@ -121,11 +121,11 @@ class OrderSubmissionReconcilerTest {
     }
 
     @Test
-    @DisplayName("KIS — 멱등키가 없어 재요청 없이 알림")
-    void kis_alertsWithoutResend() {
+    @DisplayName("Meritz — 멱등키가 없어 재요청 없이 알림")
+    void noIdempotencyKey_alertsWithoutResend() {
         Order order = stubLeftover(Duration.ofMinutes(5));
 
-        reconciler().reconcile(CYCLE_ID, TRADE_DATE, KIS);
+        reconciler().reconcile(CYCLE_ID, TRADE_DATE, MERITZ);
 
         verify(brokerPort, never()).place(any(), any());
         expectUnresolvedAlert(order);
@@ -180,12 +180,12 @@ class OrderSubmissionReconcilerTest {
 
     @Test
     @DisplayName("같은 잔류 주문은 접수 경로를 여러 번 타도 알림 1회")
-    void kis_sameLeftover_alertsOnce() {
+    void sameLeftover_alertsOnce() {
         Order order = stubLeftover(Duration.ofMinutes(5));
         OrderSubmissionReconciler reconciler = reconciler();
 
-        reconciler.reconcile(CYCLE_ID, TRADE_DATE, KIS);
-        reconciler.reconcile(CYCLE_ID, TRADE_DATE, KIS);
+        reconciler.reconcile(CYCLE_ID, TRADE_DATE, MERITZ);
+        reconciler.reconcile(CYCLE_ID, TRADE_DATE, MERITZ);
 
         verify(eventPublisher, times(1)).publishEvent(any(Object.class));
         expectUnresolvedAlert(order);

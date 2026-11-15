@@ -53,8 +53,8 @@ class AccountLedgerTotalsServiceTest {
                 new BigDecimal(holdings), null, null));
     }
 
-    private Account kis() {
-        Account account = TradingFixtures.kisAccount(accountId, userId);
+    private Account toss() {
+        Account account = TradingFixtures.stockAccount(accountId, userId);
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
         return account;
     }
@@ -65,7 +65,7 @@ class AccountLedgerTotalsServiceTest {
 
     @Test
     void sums_deposit_and_evaluation_of_non_archived_strategies() {
-        kis();
+        toss();
         holders(holder(accountId, StrategyTicker.SOXL, "100", "3"), holder(accountId, StrategyTicker.SOXL, "50", "2"),
                 holder(accountId, StrategyTicker.TQQQ, "10", "0"));
         when(brokerPricePort.getPrices(any(), any())).thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("10")));
@@ -82,7 +82,7 @@ class AccountLedgerTotalsServiceTest {
 
     @Test
     void evaluation_null_when_priced_ticker_missing() {
-        kis();
+        toss();
         holders(holder(accountId, StrategyTicker.SOXL, "100", "3"), holder(accountId, StrategyTicker.TQQQ, "20", "1"));
         when(brokerPricePort.getPrices(any(), any())).thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("10"))); // TQQQ 가격 누락
 
@@ -94,7 +94,7 @@ class AccountLedgerTotalsServiceTest {
 
     @Test
     void evaluation_null_when_price_call_fails() {
-        kis();
+        toss();
         holders(holder(accountId, StrategyTicker.SOXL, "100", "3"));
         when(brokerPricePort.getPrices(any(), any())).thenThrow(new StubBrokerApiException("시세 장애"));
 
@@ -103,7 +103,7 @@ class AccountLedgerTotalsServiceTest {
 
     @Test
     void zero_holdings_skips_price_call() {
-        kis();
+        toss();
         holders(holder(accountId, StrategyTicker.SOXL, "100", "0"));
 
         assertThat(service.get(accountId, userId).evaluation()).isEqualByComparingTo("0");
@@ -112,7 +112,7 @@ class AccountLedgerTotalsServiceTest {
 
     @Test
     void unassigned_null_when_balance_lookup_fails() {
-        kis();
+        toss();
         holders(holder(accountId, StrategyTicker.SOXL, "100", "0"));
         when(calculator.available(any(BrokerAccountRef.class), any(BigDecimal.class))).thenThrow(new StubBrokerApiException("잔고 장애"));
 
@@ -123,9 +123,9 @@ class AccountLedgerTotalsServiceTest {
 
     @Test
     void unassigned_null_for_mock_without_balance_lookup() {
-        Account kis = kis();
+        Account toss = toss();
         holders(holder(accountId, StrategyTicker.SOXL, "100", "0"));
-        Account mock = new Account(accountId, userId, "모의", kis.accountNo(), kis.appKey(), kis.secretKey(), null, Broker.MOCK, null, null);
+        Account mock = new Account(accountId, userId, "모의", toss.accountNo(), toss.appKey(), toss.secretKey(), null, Broker.MOCK, null, null);
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(mock);
         assertThat(service.get(accountId, userId).unassignedCash()).isNull();
         verify(calculator, never()).available(any(BrokerAccountRef.class), any(BigDecimal.class));

@@ -44,7 +44,7 @@ class BrokerProblemDetails implements ProblemDetailMappingContributor {
         return Map.of(BrokerApiException.class, (ex, reporter) -> brokerUnavailable((BrokerApiException) ex, reporter));
     }
 
-    // 모든 증권사 API 실패를 벤더 중립 503으로 — title은 벤더 표기("KIS API Error"/"Toss API Error"), 저장은 보고 빈에 위임
+    // 모든 증권사 API 실패를 벤더 중립 503으로 — title은 벤더 표기("Toss API Error" 등), 저장은 보고 빈에 위임
     private static ResponseEntity<ProblemDetail> brokerUnavailable(BrokerApiException ex, ExceptionReporter reporter) {
         reporter.report(ex);
         log.error("{} API 오류: {}", ex.vendorLabel(), ex.getMessage(), ex);

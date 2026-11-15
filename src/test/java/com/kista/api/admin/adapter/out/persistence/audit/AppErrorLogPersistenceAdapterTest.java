@@ -60,7 +60,7 @@ class AppErrorLogPersistenceAdapterTest {
     @Test
     void findRecent_returns_mapped_list() {
         AppErrorLogEntity entity = new AppErrorLogEntity(
-                null, "KisApiException", "KIS 오류", "stack", Map.of("caller", "TradingService"), null
+                null, "TossApiException", "Toss 오류", "stack", Map.of("caller", "TradingService"), null
         );
         Instant from = Instant.EPOCH;
         Instant to = Instant.now();
@@ -69,7 +69,7 @@ class AppErrorLogPersistenceAdapterTest {
         List<AppErrorLog> result = adapter.findRecent(50, from, to);
 
         assertThat(result).hasSize(1);
-        assertThat(result.getFirst().errorType()).isEqualTo("KisApiException");
+        assertThat(result.getFirst().errorType()).isEqualTo("TossApiException");
         assertThat(result.getFirst().context()).containsKey("caller");
     }
 }

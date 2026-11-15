@@ -13,7 +13,7 @@ public record Execution(
         int quantity,                   // 체결 수량
         BigDecimal price,               // 체결 단가 (USD)
         BigDecimal amount,              // 체결 금액 (시장 통화) = price × quantity
-        String externalOrderId          // 증권사 주문 번호 (KIS: ODNO)
+        String externalOrderId          // 증권사 주문 번호 (증권사 주문번호)
 ) {
     // 관리자 수동 체결 보정용 — amount = price × quantity 내부 계산
     public static Execution ofManualFill(LocalDate tradeDate, StrategyTicker ticker, OrderDirection direction,

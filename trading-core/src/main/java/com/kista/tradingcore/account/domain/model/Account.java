@@ -13,16 +13,16 @@ public record Account(
         UUID userId,           // FK → users.id
         String nickname,       // 계좌 별칭
         String accountNo,      // 계좌번호 (복호화된 값) — 업비트는 null
-        String appKey,      // API 앱 키 — KIS App Key / Toss Client ID / 업비트 Access Key (복호화된 값)
-        String secretKey,   // API 앱 시크릿 — KIS Secret Key / Toss Client Secret / 업비트 Secret Key (복호화된 값)
-        String brokerAccountCode, // 증권사 API 보조 식별자 — KIS: null(accountNo에 통합), TOSS: accountSeq
-        Broker broker,            // 증권사 (기본: KIS)
+        String appKey,      // API 앱 키 — Toss Client ID / 업비트 Access Key (복호화된 값)
+        String secretKey,   // API 앱 시크릿 — Toss Client Secret / 업비트 Secret Key (복호화된 값)
+        String brokerAccountCode, // 증권사 API 보조 식별자 — TOSS: accountSeq
+        Broker broker,            // 증권사 (미지정 시 MOCK)
         Instant createdAt,        // DB created_at, 신규 등록 시 null
-        Instant apiKeyExpiresAt   // 거래소 API 키 만료 시각 — 업비트는 API 조회, KIS·토스·메리츠는 추정(+1년)·사용자 입력
+        Instant apiKeyExpiresAt   // 거래소 API 키 만료 시각 — 업비트는 API 조회, 토스·메리츠는 추정(+1년)·사용자 입력
 ) {
     // 목록 표시용 증권사 순서 — 운영 중심(메리츠·바이낸스) 먼저, 목록에 없는 증권사는 맨 뒤
     private static final List<Broker> DISPLAY_BROKER_ORDER =
-            List.of(Broker.MERITZ, Broker.BINANCE, Broker.TOSS, Broker.KIS, Broker.UPBIT, Broker.MOCK);
+            List.of(Broker.MERITZ, Broker.BINANCE, Broker.TOSS, Broker.UPBIT, Broker.MOCK);
 
     // 계좌 목록 표시 순서 — 증권사 → 등록순(createdAt, 동률은 시간순 UUID v7 id)
     public static final Comparator<Account> DISPLAY_ORDER = Comparator

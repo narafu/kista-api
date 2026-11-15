@@ -58,7 +58,7 @@ class LedgerUniqueConstraintIT extends DataJpaTestBase {
         cycleId = UUID.randomUUID();
         // FK 선행 행: accounts → strategy → strategy_version → strategy_cycle(열린 사이클 1개)
         jdbc.update("INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
-                accountId, UUID.randomUUID(), "테스트계좌", "KIS", accountId.toString().substring(0, 8), "01", "key", "secret");
+                accountId, UUID.randomUUID(), "테스트계좌", "TOSS", accountId.toString().substring(0, 8), "01", "key", "secret");
         jdbc.update("INSERT INTO strategy (id, account_id, type, ticker, status, cycle_seed_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, now(), now())",
                 strategyId, accountId, "PRIVACY", "SOXL", "ACTIVE", "NONE");
         jdbc.update("INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, ?, now())",

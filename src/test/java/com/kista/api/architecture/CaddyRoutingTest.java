@@ -38,7 +38,7 @@ class CaddyRoutingTest {
     private static final Pattern SCHEDULER_ROUTE = loadRoute("@scheduler");
 
     @Test
-    void tradingCorePublicPathsAreRoutedToKistaTrading() {
+    void tradingCorePublicPathsAreRoutedToTosstaTrading() {
         var paths = controllerPaths("trading-core/build/classes/java/main");
 
         // 디렉토리가 비어있으면(:trading-core:compileJava 미실행 등) 공허하게 통과하는 걸 방지
@@ -67,7 +67,7 @@ class CaddyRoutingTest {
     // 스케쥴러 수동 트리거는 깊이와 무관하게 kista-scheduler로 가야 한다 — `/**` path 매처가 2단 경로(kbland-price-index/full-refresh)를
     // 놓쳐 kista-api(스케쥴러 빈 없음)로 새던 결함 재발 방지
     @Test
-    void schedulerPathsAreRoutedToKistaScheduler() {
+    void schedulerPathsAreRoutedToTosstaScheduler() {
         var schedulerPaths = controllerPaths("build/classes/java/main").stream()
                 .filter(p -> p.startsWith(SCHEDULER_PREFIX))
                 .toList();

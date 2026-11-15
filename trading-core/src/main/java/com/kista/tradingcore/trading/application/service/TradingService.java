@@ -51,7 +51,7 @@ class TradingService {
     private final TradingBatchRunPort batchRunPort;            // 재개 체크포인트 (단계 기록·리포트 마커 조회)
     private final TradingBatchRunState runState;               // 협조적 종료 — 배치 스레드·임계구역 등록
     private final TradingBalanceLoader balanceLoader;          // 리포트 재개 시 사전 잔고(최신 cycle_position) 재구성
-    private final StrategyDcaDetailPort dcaDetailPort;         // 개장 전 접수 대상(KIS DCA MOO) 판별용 DCA 설정 조회
+    private final StrategyDcaDetailPort dcaDetailPort;         // 개장 전 접수 대상(DCA MOO) 판별용 DCA 설정 조회
     private final PrivacyBaseGuard privacyBaseGuard;           // PRIVACY 기준표 장전 점검 — 이슈 시 신규 PRIVACY 주문 생성 차단
     private final CycleOrderStrategies cycleOrderStrategies;   // 리포트 재개 대상 판정 — 주문 0건이어도 롤오버 판정이 필요한 전략(VR)
     private final CyclePositionPort cyclePositionPort;       // 리포트 직전 최신 포지션 재조회 — 계획~리포트 사이 append된 스냅샷 보존
@@ -155,7 +155,7 @@ class TradingService {
 
         // 확정 종가 조회 + 리포트 — 임계구역
         runState.critical(() -> {
-            // 장 마감 후 확정 종가 일괄 조회 (라이브 현재가 아님 — KIS는 dailyprice, Toss/MOCK은 일봉 캔들 기반 확정 종가)
+            // 장 마감 후 확정 종가 일괄 조회 (라이브 현재가 아님 — Toss/MOCK은 일봉 캔들 기반 확정 종가)
             Map<StrategyTicker, BigDecimal> closingPrices = priceFetcher.fetchClosingPrices(priceCtx.cycleTickers(), today, priceCtx.priceAccount());
             priceComparison.closes(priceCtx.cycleTickers(), closingPrices, usSessionDate(today));
             // recordAndNotifyExecutions — 전략별: 체결 조회 + 이력 저장 + 알림
@@ -357,12 +357,12 @@ class TradingService {
         TradingPriceFetcher.PriceContext priceCtx = screenPrivacyBase(priceFetcher.loadPriceContext(started, tradeDate), tradeDate, "개장 배치");
         priceComparison.afterLoad(started, priceCtx, usSessionDate(tradeDate)); // 병행 비교 로그 — 배치 결과에 쓰지 않는다
 
-        // KIS DCA MOO/LOO는 개장 경매 참여를 위해 개장 전에 접수한다 — 나머지 AT_OPEN은 개장 후 기존 흐름
+        // 개장 경매 사전 접수 지원 증권사의 DCA MOO/LOO는 개장 전에 접수한다 — 나머지 AT_OPEN은 개장 후 기존 흐름
         try {
             placePreOpenDcaOrders(started, tradeDate, priceCtx);
         } catch (RuntimeException e) {
             // 실패해도 INFINITE/VR 개장 접수를 막지 않는다 — DCA 컨텍스트는 개장 후 기존 흐름이 접수
-            log.error("KIS DCA 개장 전 접수 실패 — 개장 후 접수로 대체", e);
+            log.error("DCA 개장 전 접수 실패 — 개장 후 접수로 대체", e);
             eventPublisher.publishEvent(new TradingErrorEvent(null, "[DCA 개장 전 접수] 실패 — 개장 후 접수로 대체: " + e.getMessage()));
         }
 
@@ -385,7 +385,7 @@ class TradingService {
         });
     }
 
-    // 개장 전 접수 대상: KIS 계좌의 DCA AT_OPEN(MOO) 전략 — 계획·배정·저장·접수를 임계구역에서 수행
+    // 개장 전 접수 대상: 개장 경매 사전 접수 지원 증권사 계좌의 DCA AT_OPEN(MOO) 전략 — 계획·배정·저장·접수를 임계구역에서 수행
     // 개장 후 기존 흐름이 같은 컨텍스트를 다시 처리해도 중복 없음 — DcaPlanInputCollector가 이력 행으로, 슬롯 로직이 기존 주문으로 거르고 placeAtOpenOrders는 PLANNED만 접수
     private void placePreOpenDcaOrders(List<BatchContext> started, LocalDate tradeDate, TradingPriceFetcher.PriceContext priceCtx) throws InterruptedException {
         List<BatchContext> targets = started.stream()

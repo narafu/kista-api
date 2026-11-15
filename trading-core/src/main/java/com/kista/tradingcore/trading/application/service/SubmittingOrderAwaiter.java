@@ -16,7 +16,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 // 취소 경로가 접수 중(SUBMITTING) 주문을 만나면 접수 결과가 정해질 때까지 유한 대기 — 결과를 확인한 뒤에 취소·실패를 판정한다
-// 60초: KIS 호출 간격 게이트(최대 20초)+읽기 7초+401 재시도(게이트 재통과) ≈ 54초, Toss 10초×4회+백오프 ≈ 42초를 덮는다
+// 60초: Toss 10초×4회+백오프 ≈ 42초를 덮는다
 @Component
 class SubmittingOrderAwaiter {
 

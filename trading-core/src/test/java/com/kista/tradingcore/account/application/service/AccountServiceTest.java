@@ -65,12 +65,12 @@ class AccountServiceTest {
     private Account activeAccount(UUID ownerId) {
         return new Account(accountId, ownerId, "테스트계좌",
                 "74420614", "appKey", "appSecret", null,
-                Broker.KIS, null, null);
+                Broker.TOSS, null, null);
     }
 
     private RegisterAccountCommand registerCmd() {
         return new RegisterAccountCommand(
-                "테스트계좌", "74420614", "appKey", "appSecret", Broker.KIS, null
+                "테스트계좌", "74420614", "appKey", "appSecret", Broker.TOSS, null
         );
     }
 
@@ -167,9 +167,9 @@ class AccountServiceTest {
     }
 
     @Test
-    @DisplayName("업비트 계좌(계좌번호 null)를 가진 사용자가 KIS 계좌를 등록해도 NPE가 나지 않는다")
-    void register_kis_whenUserAlreadyHasUpbitAccount_doesNotNpe() {
-        when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
+    @DisplayName("업비트 계좌(계좌번호 null)를 가진 사용자가 Toss 계좌를 등록해도 NPE가 나지 않는다")
+    void register_toss_whenUserAlreadyHasUpbitAccount_doesNotNpe() {
+        when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(true);
         when(connectionTesters.of(any())).thenReturn(connectionTester);
         when(connectionTester.verifyAccount("appKey", "appSecret", "74420614")).thenReturn(new BrokerAccountVerification(null, null));
         when(accountPort.countByUserId(userId)).thenReturn(1);
@@ -193,10 +193,10 @@ class AccountServiceTest {
     }
 
     @Test
-    @DisplayName("연결 테스트: broker 미지정이면 KIS 라우터로 위임")
-    void test_nullBroker_defaultsToKis() {
-        when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
-        when(connectionTesters.of(Broker.KIS)).thenReturn(connectionTester);
+    @DisplayName("연결 테스트: broker 미지정이면 MOCK 라우터로 위임")
+    void test_nullBroker_defaultsToMock() {
+        when(brokerEnabledPort.enabled(Broker.MOCK)).thenReturn(true);
+        when(connectionTesters.of(Broker.MOCK)).thenReturn(connectionTester);
 
         accountService.test(null, "ak", "sk");
 
@@ -206,7 +206,7 @@ class AccountServiceTest {
     @Test
     @DisplayName("계좌 등록 성공")
     void register_success() {
-        when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
+        when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(true);
         when(connectionTesters.of(any())).thenReturn(connectionTester);
         when(connectionTester.verifyAccount("appKey", "appSecret", "74420614")).thenReturn(new BrokerAccountVerification(null, null));
         when(accountPort.countByUserId(userId)).thenReturn(0);
@@ -220,7 +220,7 @@ class AccountServiceTest {
         Account result = accountService.register(userId, registerCmd());
 
         assertThat(result.id()).isNotNull();
-        assertThat(result.broker()).isEqualTo(Broker.KIS);
+        assertThat(result.broker()).isEqualTo(Broker.TOSS);
         verify(accountPort).save(any());
         verify(connectionTester).verifyAccount("appKey", "appSecret", "74420614");
     }
@@ -228,7 +228,7 @@ class AccountServiceTest {
     @Test
     @DisplayName("계좌 10개 초과 시 IllegalStateException 발생")
     void register_exceeds_limit_throws() {
-        when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
+        when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(true);
         when(accountPort.countByUserId(userId)).thenReturn(10);
 
         assertThatThrownBy(() -> accountService.register(userId, registerCmd()))
@@ -239,7 +239,7 @@ class AccountServiceTest {
     @Test
     @DisplayName("다른 사용자가 이미 등록한 계좌번호 재등록 시 DuplicateAccountException 발생 (→ 409)")
     void register_duplicateAccountNo_crossUser_throws() {
-        when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
+        when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(true);
         when(accountPort.countByUserId(userId)).thenReturn(0);
         when(accountPort.existsByDedupeKey("74420614")).thenReturn(true);
 
@@ -355,38 +355,24 @@ class AccountServiceTest {
     }
 
     @Test
-    @DisplayName("broker null이면 KIS 기본값 적용")
-    void register_nullBroker_defaultsToKis() {
-        when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
+    @DisplayName("broker null이면 MOCK 기본값 적용")
+    void register_nullBroker_defaultsToMock() {
+        when(brokerEnabledPort.enabled(Broker.MOCK)).thenReturn(true);
         when(connectionTesters.of(any())).thenReturn(connectionTester);
         when(connectionTester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null, null));
         when(accountPort.countByUserId(userId)).thenReturn(0);
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         RegisterAccountCommand cmd = new RegisterAccountCommand(
-                "테스트계좌", "74420614-01", "appKey", "appSecret", null, null
+                "테스트계좌", null, null, null, null, null
         );
 
         Account result = accountService.register(userId, cmd);
 
-        assertThat(result.broker()).isEqualTo(Broker.KIS);
-        assertThat(result.accountNo()).isEqualTo("74420614-01"); // 전체 형식 그대로 저장
-        assertThat(result.brokerAccountCode()).isNull(); // KIS는 null (accountNo에 통합)
-        // KIS 라우터 경유 verifyAccount 호출 확인
-        verify(connectionTesters).of(Broker.KIS);
-    }
-
-    @Test
-    @DisplayName("비활성 KIS는 신규 계좌 등록을 거부")
-    void register_disabledKis_throwsValidationException() {
-        when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(false);
-
-        assertThatThrownBy(() -> accountService.register(userId, registerCmd()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("한국투자증권 신규 계좌 등록이 비활성화되어 있습니다.");
-
-        verifyNoInteractions(connectionTesters);
-        verify(accountPort, never()).save(any());
+        assertThat(result.broker()).isEqualTo(Broker.MOCK);
+        assertThat(result.brokerAccountCode()).isNull(); // 검증 stub이 보조 식별자를 주지 않음
+        // MOCK 라우터 경유 verifyAccount 호출 확인
+        verify(connectionTesters).of(Broker.MOCK);
     }
 
     @Test
@@ -406,17 +392,6 @@ class AccountServiceTest {
     }
 
     @Test
-    @DisplayName("활성 KIS는 연결 테스트를 실행")
-    void test_enabledKis_verifiesCredentials() {
-        when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
-        when(connectionTesters.of(Broker.KIS)).thenReturn(connectionTester);
-
-        accountService.test(Broker.KIS, "key", "secret");
-
-        verify(connectionTester).verifyCredentials("key", "secret");
-    }
-
-    @Test
     @DisplayName("활성 Toss는 연결 테스트를 실행")
     void test_enabledToss_verifiesCredentials() {
         when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(true);
@@ -425,18 +400,6 @@ class AccountServiceTest {
         accountService.test(Broker.TOSS, "key", "secret");
 
         verify(connectionTester).verifyCredentials("key", "secret");
-    }
-
-    @Test
-    @DisplayName("비활성 KIS는 연결 테스트를 거부")
-    void test_disabledKis_throwsValidationException() {
-        when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(false);
-
-        assertThatThrownBy(() -> accountService.test(Broker.KIS, "key", "secret"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("한국투자증권 신규 계좌 등록이 비활성화되어 있습니다.");
-
-        verifyNoInteractions(connectionTesters);
     }
 
     @Test
@@ -452,11 +415,11 @@ class AccountServiceTest {
     }
 
     @Test
-    @DisplayName("KIS 등록 시 accountNo가 비어있으면 IllegalArgumentException 발생 (→ 400) — @NotBlank 제거로 서비스가 대신 검증")
+    @DisplayName("Toss 등록 시 accountNo가 비어있으면 IllegalArgumentException 발생 (→ 400) — @NotBlank 제거로 서비스가 대신 검증")
     void register_blankAccountNo_nonMockBroker_throws() {
-        when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
+        when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(true);
         RegisterAccountCommand cmd = new RegisterAccountCommand(
-                "테스트계좌", null, "appKey", "appSecret", Broker.KIS, null
+                "테스트계좌", null, "appKey", "appSecret", Broker.TOSS, null
         );
 
         assertThatThrownBy(() -> accountService.register(userId, cmd))
@@ -505,8 +468,8 @@ class AccountServiceTest {
     @Test
     void deleteAllByUserId_deletesTokensBeforeSoftDeletingAccounts() {
         UUID userId = UUID.randomUUID();
-        Account a1 = TradingFixtures.kisAccount(UUID.randomUUID(), userId);
-        Account a2 = TradingFixtures.kisAccount(UUID.randomUUID(), userId);
+        Account a1 = TradingFixtures.stockAccount(UUID.randomUUID(), userId);
+        Account a2 = TradingFixtures.stockAccount(UUID.randomUUID(), userId);
         when(accountPort.findByUserId(userId)).thenReturn(List.of(a1, a2));
 
         accountService.deleteAllByUserId(userId);
@@ -584,7 +547,7 @@ class AccountServiceTest {
     @DisplayName("키 수정: 연결 테스트 실패면 저장하지 않는다")
     void updateCredentials_verificationFails_doesNotSave() {
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(activeAccount(userId));
-        when(connectionTesters.of(Broker.KIS)).thenReturn(connectionTester);
+        when(connectionTesters.of(Broker.TOSS)).thenReturn(connectionTester);
         when(connectionTester.verifyAccount("bad", "bad", "74420614"))
                 .thenThrow(new com.kista.tradingcore.broker.domain.model.BrokerCredentialException());
 
@@ -642,51 +605,51 @@ class AccountServiceTest {
         verify(accountPort, never()).save(any());
     }
 
-    // ---- API 키 만료일 결정 (KIS·토스·메리츠 추정/사용자 입력, 업비트 API 값) ----
+    // ---- API 키 만료일 결정 (토스·메리츠 추정/사용자 입력, 업비트 API 값) ----
 
     private static final String MANUAL_REJECTED = "이 거래소는 API 키 만료일을 직접 바꿀 수 없습니다.";
     private static final String PAST_REJECTED = "API 키 만료일은 오늘 이후여야 합니다.";
 
-    // KIS 등록 공통 stub — 검증은 만료일 없이 통과
-    private void stubKisRegister() {
-        when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
-        when(connectionTesters.of(Broker.KIS)).thenReturn(connectionTester);
+    // Toss 등록 공통 stub — 검증은 만료일 없이 통과
+    private void stubTossRegister() {
+        when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(true);
+        when(connectionTesters.of(Broker.TOSS)).thenReturn(connectionTester);
         when(connectionTester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null, null));
         when(accountPort.countByUserId(userId)).thenReturn(0);
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
-    private RegisterAccountCommand kisRegister(LocalDate expiresOn) {
-        return new RegisterAccountCommand("테스트계좌", "74420614", "appKey", "appSecret", Broker.KIS, expiresOn);
+    private RegisterAccountCommand tossRegister(LocalDate expiresOn) {
+        return new RegisterAccountCommand("테스트계좌", "74420614", "appKey", "appSecret", Broker.TOSS, expiresOn);
     }
 
-    // 만료일이 있는 KIS 계좌 — 키 교체·수정 테스트용
-    private Account kisAccountExpiring(Instant expiresAt) {
+    // 만료일이 있는 Toss 계좌 — 키 교체·수정 테스트용
+    private Account tossAccountExpiring(Instant expiresAt) {
         return new Account(accountId, userId, "테스트계좌", "74420614", "appKey", "appSecret", null,
-                Broker.KIS, null, expiresAt);
+                Broker.TOSS, null, expiresAt);
     }
 
-    private void stubKisRotation(Account account) {
+    private void stubTossRotation(Account account) {
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
-        when(connectionTesters.of(Broker.KIS)).thenReturn(connectionTester);
+        when(connectionTesters.of(Broker.TOSS)).thenReturn(connectionTester);
         when(connectionTester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null, null));
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
     @Test
-    void registerKisEstimatesOneYear() {
-        stubKisRegister();
+    void registerTossEstimatesOneYear() {
+        stubTossRegister();
 
-        Account saved = accountService.register(userId, kisRegister(null));
+        Account saved = accountService.register(userId, tossRegister(null));
 
         assertThat(saved.apiKeyExpiresAt()).isEqualTo(Instant.parse("2027-11-10T15:30:00Z"));
     }
 
     @Test
-    void registerKisWithManualExpiry() {
-        stubKisRegister();
+    void registerTossWithManualExpiry() {
+        stubTossRegister();
 
-        Account saved = accountService.register(userId, kisRegister(LocalDate.of(2027, 3, 1)));
+        Account saved = accountService.register(userId, tossRegister(LocalDate.of(2027, 3, 1)));
 
         assertThat(saved.apiKeyExpiresAt()).isEqualTo(Instant.parse("2027-02-28T15:00:00Z")); // KST 자정
     }
@@ -728,16 +691,16 @@ class AccountServiceTest {
     void estimateFromLeapDay() {
         clock = Clock.fixed(Instant.parse("2028-02-29T03:00:00Z"), TimeZones.KST);
         setUpService();
-        stubKisRegister();
+        stubTossRegister();
 
-        Account saved = accountService.register(userId, kisRegister(null));
+        Account saved = accountService.register(userId, tossRegister(null));
 
         assertThat(saved.apiKeyExpiresAt()).isEqualTo(Instant.parse("2029-02-28T03:00:00Z"));
     }
 
     @Test
     void updateCredentialsNewAppKeyReestimates() {
-        stubKisRotation(kisAccountExpiring(Instant.parse("2026-12-01T00:00:00Z")));
+        stubTossRotation(tossAccountExpiring(Instant.parse("2026-12-01T00:00:00Z")));
 
         Account saved = accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("newKey", "sk", null));
 
@@ -747,7 +710,7 @@ class AccountServiceTest {
     @Test
     void updateCredentialsSameAppKeyKeepsExpiry() {
         Instant existing = Instant.parse("2026-12-01T00:00:00Z");
-        stubKisRotation(kisAccountExpiring(existing));
+        stubTossRotation(tossAccountExpiring(existing));
 
         Account saved = accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("appKey", "sk", null));
 
@@ -756,7 +719,7 @@ class AccountServiceTest {
 
     @Test
     void updateCredentialsSameAppKeyWithManualExpiryReplaces() {
-        stubKisRotation(kisAccountExpiring(Instant.parse("2026-12-01T00:00:00Z")));
+        stubTossRotation(tossAccountExpiring(Instant.parse("2026-12-01T00:00:00Z")));
 
         Account saved = accountService.updateCredentials(accountId, userId,
                 new UpdateCredentialsCommand("appKey", "sk", LocalDate.of(2027, 3, 1)));
@@ -767,7 +730,7 @@ class AccountServiceTest {
     @Test
     void manualExpiryUsesKstToday() {
         // 고정 시각은 UTC 11-10이지만 KST로는 11-11 — 11-10은 어제라 거부, 11-11(오늘)은 허용
-        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(kisAccountExpiring(null));
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(tossAccountExpiring(null));
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         assertThatThrownBy(() -> accountService.update(accountId, userId, new UpdateAccountCommand("닉", LocalDate.of(2026, 11, 10))))
@@ -778,11 +741,11 @@ class AccountServiceTest {
 
     @Test
     void invalidExpiryRejectedBeforeBrokerCall() {
-        when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
-        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(kisAccountExpiring(null));
+        when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(true);
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(tossAccountExpiring(null));
         LocalDate yesterday = LocalDate.of(2026, 11, 10);
 
-        assertThatThrownBy(() -> accountService.register(userId, kisRegister(yesterday)))
+        assertThatThrownBy(() -> accountService.register(userId, tossRegister(yesterday)))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage(PAST_REJECTED);
         assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("k", "s", yesterday)))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage(PAST_REJECTED);
@@ -792,7 +755,7 @@ class AccountServiceTest {
 
     @Test
     void updateSetsManualExpiry() {
-        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(kisAccountExpiring(Instant.parse("2026-12-01T00:00:00Z")));
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(tossAccountExpiring(Instant.parse("2026-12-01T00:00:00Z")));
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Account saved = accountService.update(accountId, userId, new UpdateAccountCommand("닉", LocalDate.of(2027, 3, 1)));
@@ -804,7 +767,7 @@ class AccountServiceTest {
     @Test
     void updateWithNullExpiryKeepsExisting() {
         Instant existing = Instant.parse("2026-12-01T00:00:00Z");
-        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(kisAccountExpiring(existing));
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(tossAccountExpiring(existing));
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Account saved = accountService.update(accountId, userId, new UpdateAccountCommand("닉", null));

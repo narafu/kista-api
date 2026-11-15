@@ -23,7 +23,7 @@ public record AdminAccountItem(
         @Nullable String accountNoMasked,
         @Schema(description = "원본 계좌번호 (ADMIN 전용)", example = "12345678-01")
         @Nullable String accountNo,
-        @Schema(description = "브로커 코드", example = "KIS")
+        @Schema(description = "브로커 코드", example = "TOSS")
         @Nullable String broker
 ) {
     public static AdminAccountItem from(AccountSummaryResponse a, Map<UUID, UserSummary> userMap) {

@@ -71,7 +71,7 @@ class InvestmentPointsQueryServiceTest {
 
     private static Account testAccount(UUID ownerId) {
         return new Account(ACCOUNT_ID, ownerId, "테스트계좌",
-                "74420614", "appKey", "appSecret", null, Broker.KIS, null, null);
+                "74420614", "appKey", "appSecret", null, Broker.TOSS, null, null);
     }
 
     private static StrategyCycle activeCycle(String start, String startDate) {

@@ -47,9 +47,9 @@ class DcaConfigServiceTest {
     @BeforeEach
     void setUp() {
         service = new DcaConfigService(strategyPort, accountPort, strategyVersionPort, dcaDetailPort, FIXED);
-        // 시장 규칙 검증용 계좌 — 기존 테스트는 주식(KIS) 계좌
+        // 시장 규칙 검증용 계좌 — 기존 테스트는 주식(Toss) 계좌
         lenient().when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID))
-                .thenReturn(com.kista.tradingcore.support.TradingFixtures.kisAccount(ACCOUNT_ID, USER_ID));
+                .thenReturn(com.kista.tradingcore.support.TradingFixtures.stockAccount(ACCOUNT_ID, USER_ID));
     }
 
     static final String KEY = "11111111-1111-1111-1111-111111111111";

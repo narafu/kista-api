@@ -124,7 +124,7 @@ class TossOrderApi {
         return result;
     }
 
-    // API 요청 파라미터 빌드 — KST 날짜 그대로 전달 (KIS와 달리 toUtc 변환 없음)
+    // API 요청 파라미터 빌드 — KST 날짜 그대로 전달
     private MultiValueMap<String, String> buildOrderParams(String status, LocalDate queryFrom, LocalDate to,
                                                             StrategyTicker ticker, String cursor) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
@@ -159,7 +159,7 @@ class TossOrderApi {
         return Optional.of(new Execution(tradeDate, ticker, direction, filledQuantity, price, amount, order.orderId()));
     }
 
-    // filledAt → KST 거래일 — 체결 시각의 뉴욕 일자(US 세션일) + 1일 (KIS ord_dt·메리츠와 같은 규칙, DST·프리/애프터마켓 포함)
+    // filledAt → KST 거래일 — 체결 시각의 뉴욕 일자(US 세션일) + 1일 (메리츠와 같은 규칙, DST·프리/애프터마켓 포함)
     // KST 달력일을 그대로 쓰면 D-1 22:00 이후 장중 체결이 D-1로 잡혀 getExecutions(D, D)에서 빠진다
     // null·공백이면 요청 from 날짜 fallback (queryFrom 아님)
     private LocalDate parseTradeDate(String filledAtStr, LocalDate from) {

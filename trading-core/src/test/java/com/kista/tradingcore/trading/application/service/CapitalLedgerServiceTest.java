@@ -96,7 +96,7 @@ class CapitalLedgerServiceTest {
         service = newService(FixedClockTestConfig.FIXED);
         withdrawal = new CapitalWithdrawalService(strategyPort, accountPort,
                 new InfiniteMinSeedGuard(brokerPricePort, minSeedStrategies, strategyInfiniteDetailPort), service);
-        stubAccount(TradingFixtures.kisAccount(accountId, userId)); // 기본: 주식(USD) 계좌
+        stubAccount(TradingFixtures.stockAccount(accountId, userId)); // 기본: 주식(USD) 계좌
     }
 
     // 소유권 검증 default 메서드 자체를 stub — 반환 계좌의 통화·시장이 금액 자릿수·리포트 창 검사를 정한다

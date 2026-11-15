@@ -42,7 +42,7 @@ public enum StrategyTicker {
         return markets.stream().anyMatch(Market::isCrypto);
     }
 
-    // KIS 응답 String → StrategyTicker 변환. 미등록 종목이면 empty 반환 (필터링 용도)
+    // 브로커 응답 String → StrategyTicker 변환. 미등록 종목이면 empty 반환 (필터링 용도)
     public static Optional<StrategyTicker> tryParse(String name) {
         if (name == null) return Optional.empty();
         try {

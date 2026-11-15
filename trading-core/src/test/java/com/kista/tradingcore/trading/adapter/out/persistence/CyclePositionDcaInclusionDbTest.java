@@ -26,7 +26,7 @@ class CyclePositionDcaInclusionDbTest extends DataJpaTestBase {
     @Test
     void user_and_account_queries_include_dca_and_crypto_accounts() {
         UUID userId = UUID.randomUUID();
-        UUID accountId = insertAccount(userId, "KIS");
+        UUID accountId = insertAccount(userId, "TOSS");
         UUID upbitAccountId = insertAccount(userId, "UPBIT");
         UUID infinitePos = insertPosition(accountId, "INFINITE");
         UUID dcaPos = insertPosition(accountId, "DCA");
@@ -45,7 +45,7 @@ class CyclePositionDcaInclusionDbTest extends DataJpaTestBase {
 
     @Test
     void accountCursorQuery_excludesSoftDeletedAccount() {
-        UUID accountId = insertAccount(UUID.randomUUID(), "KIS");
+        UUID accountId = insertAccount(UUID.randomUUID(), "TOSS");
         insertPosition(accountId, "INFINITE");
         jdbc.update("UPDATE accounts SET deleted_at = now() WHERE id = ?", accountId);
 

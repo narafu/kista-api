@@ -23,10 +23,10 @@ class AccountNumberMaskerTest {
         assertThat(AccountNumberMasker.mask("12")).isEqualTo("****");
     }
 
-    // KIS 포맷: "74420614-01" — 하이픈 제거 후 숫자 전체 "7442061401" 마지막 4자리 "1401"
+    // Toss 포맷: "74420614-01" — 하이픈 제거 후 숫자 전체 "7442061401" 마지막 4자리 "1401"
     @Test
-    @DisplayName("KIS 하이픈 포맷: 숫자만 추출한 마지막 4자리 노출")
-    void mask_kisStyleHyphenated_masksExceptLastFourDigits() {
+    @DisplayName("Toss 하이픈 포맷: 숫자만 추출한 마지막 4자리 노출")
+    void mask_hyphenStyleHyphenated_masksExceptLastFourDigits() {
         String result = AccountNumberMasker.mask("74420614-01");
         assertThat(result).isEqualTo("****1401");
         // 숫자 부분이 4자리를 초과하는 어떤 구간도 그대로 노출되지 않아야 함 (앞자리 미노출 검증)

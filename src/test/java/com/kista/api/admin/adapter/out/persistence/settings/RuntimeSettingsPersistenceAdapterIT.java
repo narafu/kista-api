@@ -33,7 +33,7 @@ class RuntimeSettingsPersistenceAdapterIT extends RootDataJpaTestBase {
     void legacyRowWithTradingSectionsStillLoads() {
         RuntimeSettingsPersistenceAdapter adapter = new RuntimeSettingsPersistenceAdapter(repository, new ObjectMapper());
         repository.save(new RuntimeSettingsEntity(RuntimeSettingsPersistenceAdapter.SETTING_KEY,
-                "{\"approvalRequired\":false,\"brokers\":{\"KIS\":{\"enabled\":false}},\"strategies\":{}}"));
+                "{\"approvalRequired\":false,\"brokers\":{\"TOSS\":{\"enabled\":false}},\"strategies\":{}}"));
 
         RuntimeSettings loaded = adapter.load();
 

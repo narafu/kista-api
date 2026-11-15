@@ -43,7 +43,7 @@ class AccountEntity extends BaseAuditEntity {
     private String accountNo;            // 평문 보유 — DB에는 AES-256 암호문 저장(컨버터), 업비트는 null
 
     @Column(name = "broker_account_code", length = 10)
-    private String brokerAccountCode;    // 증권사 API 보조 식별자 — KIS: null, TOSS: accountSeq
+    private String brokerAccountCode;    // 증권사 API 보조 식별자 — TOSS: accountSeq
 
     @Convert(converter = AesStringConverter.class)
     @Column(name = "app_key", nullable = false, length = 512)
@@ -60,7 +60,7 @@ class AccountEntity extends BaseAuditEntity {
     private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨
 
     @Column(name = "api_key_expires_at")
-    private Instant apiKeyExpiresAt; // API 키 만료 시각 — 업비트는 API 조회, KIS·토스·메리츠는 추정(+1년) 또는 사용자 입력, 그 외 NULL (V10 ADD COLUMN이라 물리 순서상 마지막)
+    private Instant apiKeyExpiresAt; // API 키 만료 시각 — 업비트는 API 조회, 토스·메리츠는 추정(+1년) 또는 사용자 입력, 그 외 NULL (V10 ADD COLUMN이라 물리 순서상 마지막)
 
     // Account 도메인 모델 → Entity (accountNoHash는 HMAC 비밀키가 필요해 어댑터가 계산해 넘긴다)
     static AccountEntity fromModel(Account a, String accountNoHash) {

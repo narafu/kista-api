@@ -104,7 +104,7 @@ class AdminSettingsControllerTest {
                         .content("""
                                 {
                                   "auth":{"approvalRequired":false},
-                                  "brokers":{"KIS":{"enabled":true},"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
+                                  "brokers":{"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
                                   "strategies":{
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
@@ -134,7 +134,7 @@ class AdminSettingsControllerTest {
                         .content("""
                                 {
                                   "auth":{"approvalRequired":true},
-                                  "brokers":{"KIS":{"enabled":true},"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
+                                  "brokers":{"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
                                   "strategies":{
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
@@ -158,7 +158,7 @@ class AdminSettingsControllerTest {
                         .content("""
                                 {
                                   "auth":{"approvalRequired":true},
-                                  "brokers":{"KIS":{"enabled":true},"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
+                                  "brokers":{"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
                                   "strategies":{
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
@@ -180,7 +180,7 @@ class AdminSettingsControllerTest {
                         .content("""
                                 {
                                   "auth":{"approvalRequired":true},
-                                  "brokers":{"KIS":{"enabled":true},"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
+                                  "brokers":{"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
                                   "strategies":{
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[0,20,30],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
@@ -202,7 +202,7 @@ class AdminSettingsControllerTest {
                         .content("""
                                 {
                                   "auth":{"approvalRequired":true},
-                                  "brokers":{"KIS":{"enabled":true},"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
+                                  "brokers":{"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
                                   "strategies":{
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
@@ -224,7 +224,7 @@ class AdminSettingsControllerTest {
                         .content("""
                                 {
                                   "auth":{"approvalRequired":true},
-                                  "brokers":{"KIS":{"enabled":true},"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
+                                  "brokers":{"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
                                   "strategies":{
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
@@ -246,7 +246,7 @@ class AdminSettingsControllerTest {
                         .content("""
                                 {
                                   "auth":{"approvalRequired":true},
-                                  "brokers":{"KIS":{"enabled":true},"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
+                                  "brokers":{"TOSS":{"enabled":true},"MOCK":{"enabled":true}},
                                   "strategies":{
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
@@ -286,7 +286,7 @@ class AdminSettingsControllerTest {
                         .content("""
                                 {
                                   "auth":{"approvalRequired":false},
-                                  "brokers":{"KIS":{"enabled":true},"TOSS":{"enabled":false},"MOCK":{"enabled":true}},
+                                  "brokers":{"TOSS":{"enabled":false},"MOCK":{"enabled":true}},
                                   "strategies":{
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},

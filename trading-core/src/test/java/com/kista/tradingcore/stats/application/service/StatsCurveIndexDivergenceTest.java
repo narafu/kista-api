@@ -81,7 +81,7 @@ class StatsCurveIndexDivergenceTest {
                     StrategyTicker.SOXL, StrategyCycleSeedType.NONE));
         }
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(new Account(ACCOUNT_ID, USER_ID, "테스트계좌",
-                "74420614", "appKey", "appSecret", null, Broker.KIS, null, null)));
+                "74420614", "appKey", "appSecret", null, Broker.TOSS, null, null)));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, strategies));
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(cycles);
         when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(positions);

@@ -42,7 +42,7 @@ class TradingUserNotificationAdapterWordingTest {
         for (int days : new int[]{7, 0}) {
             TelegramHttpClient t = mock(TelegramHttpClient.class);
             new TradingUserNotificationAdapter(t, mock(RedisPushNotificationPublisher.class)).notifyApiKeyExpiring(profile,
-                    new ApiKeyExpiringEvent(profile.userId(), UUID.randomUUID(), "한투", Broker.KIS, LocalDate.of(2026, 10, 25), days));
+                    new ApiKeyExpiringEvent(profile.userId(), UUID.randomUUID(), "토스", Broker.TOSS, LocalDate.of(2026, 10, 25), days));
             verify(t).sendMessage(org.mockito.ArgumentMatchers.eq("chat"),
                     org.mockito.ArgumentMatchers.endsWith(" " + hint), org.mockito.ArgumentMatchers.eq("tok"));
         }

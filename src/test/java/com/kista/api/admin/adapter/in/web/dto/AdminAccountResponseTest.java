@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AdminAccountResponseTest {
 
     AccountSummaryResponse upbit = new AccountSummaryResponse(UUID.randomUUID(), UUID.randomUUID(), "업비트 코인", null, Broker.UPBIT, Instant.now());
-    AccountSummaryResponse kis = new AccountSummaryResponse(UUID.randomUUID(), UUID.randomUUID(), "한투 메인", "12345678-01", Broker.KIS, Instant.now());
+    AccountSummaryResponse toss = new AccountSummaryResponse(UUID.randomUUID(), UUID.randomUUID(), "토스 메인", "12345678-01", Broker.TOSS, Instant.now());
 
     @Test
     void upbitAccountNoIsNull() {
@@ -31,8 +31,8 @@ class AdminAccountResponseTest {
     }
 
     @Test
-    void kisAccountNoMasked() {
-        assertThat(AdminAccountResponse.from(kis, null, List.of()).accountNoMasked()).isEqualTo("****7801");
-        assertThat(AdminAccountItem.from(kis, Map.of()).accountNoMasked()).isEqualTo("****7801");
+    void stockAccountNoMasked() {
+        assertThat(AdminAccountResponse.from(toss, null, List.of()).accountNoMasked()).isEqualTo("****7801");
+        assertThat(AdminAccountItem.from(toss, Map.of()).accountNoMasked()).isEqualTo("****7801");
     }
 }

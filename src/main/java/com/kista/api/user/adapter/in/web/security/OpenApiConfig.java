@@ -36,7 +36,7 @@ public class OpenApiConfig {
                         new Tag().name("자산").description("개인 자산·부채 기록 등록·조회·수정·삭제 — 자동매매와 무관한 수동 장부"),
                         new Tag().name("거래 사이클").description("계좌별 매매 사이클 등록·조회·수정·삭제·일시중지·재개"),
                         new Tag().name("대시보드").description("포트폴리오 스냅샷·사이클 이력 조회"),
-                        new Tag().name("통계").description("계좌별 손익·체결·잔고·증거금·현재가 조회 (KIS/Toss 증권사 자동 분기)"),
+                        new Tag().name("통계").description("계좌별 손익·체결·잔고·증거금·현재가 조회 (Toss·Meritz 증권사 자동 분기)"),
                         new Tag().name("메타").description("UI 렌더링용 enum 메타데이터 (라벨, 설명, 유효값 목록)"),
                         new Tag().name("설정").description("텔레그램 봇 알림 설정 관리"),
                         new Tag().name("FCM").description("FCM 디바이스 토큰 관리"),

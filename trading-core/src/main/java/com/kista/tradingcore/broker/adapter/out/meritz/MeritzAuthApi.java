@@ -40,7 +40,7 @@ class MeritzAuthApi implements BrokerConnectionTestPort {
 
     private final RestClient meritzRestClient;          // baseUrl 고정 (MeritzConfig)
     private final ObjectMapper objectMapper;            // 응답 본문 파싱
-    // TokenCoordinator 구현 빈이 여럿이라 구체 타입 주입(KisAuthApi와 동일)
+    // TokenCoordinator 구현 빈이 여럿이라 구체 타입 주입(MeritzAuthApi 단일 구현)
     private final DbTokenCoordinator tokenCoordinator;
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 

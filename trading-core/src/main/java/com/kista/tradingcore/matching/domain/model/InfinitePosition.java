@@ -56,7 +56,7 @@ public record InfinitePosition(
         return roundDecimal().doubleValue();
     }
 
-    // static 헬퍼: DB 저장값(CyclePosition)만으로 회차 계산 — KIS 실시간 조회 없이 StrategyDetail 조립 시 사용
+    // static 헬퍼: DB 저장값(CyclePosition)만으로 회차 계산 — 브로커 실시간 조회 없이 StrategyDetail 조립 시 사용
     public static double calcCurrentRound(BigDecimal avgPrice, int holdings, BigDecimal deposit,
                                           int divisionCount) {
         if (divisionCount == 0 || holdings == 0 || avgPrice == null) return 0.0;

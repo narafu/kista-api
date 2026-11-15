@@ -125,7 +125,7 @@ class TradingPreviewService {
         cyclesByStrategyId.forEach((strategyId, cycle) -> todayOrdersByStrategyId.put(strategyId,
                 ordersByCycleId.getOrDefault(cycle.id(), List.of())));
 
-        // 계좌 내 종목별 전일종가를 1회 일괄 조회(multprice) — 전략마다 개별 KIS 왕복을 생략
+        // 계좌 내 종목별 전일종가를 1회 일괄 조회(multprice) — 전략마다 개별 시세 왕복을 생략
         List<StrategyTicker> tickers = strategies.stream()
                 .filter(s -> cyclesByStrategyId.containsKey(s.id()) && !marketClosed)
                 .map(Strategy::ticker)

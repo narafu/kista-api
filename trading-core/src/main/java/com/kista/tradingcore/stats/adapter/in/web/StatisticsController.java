@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-@Tag(name = "통계", description = "계좌별 손익·체결·잔고·증거금·현재가 조회 (KIS/Toss 증권사 자동 분기)")
+@Tag(name = "통계", description = "계좌별 손익·체결·잔고·증거금·현재가 조회 (Toss·Meritz 증권사 자동 분기)")
 @RestController
 @RequestMapping("/api/accounts/{accountId}")
 @RequiredArgsConstructor
@@ -27,8 +27,8 @@ public class StatisticsController {
 
     private final AccountStatisticsService accountStatistics;
 
-    // 체결기준현재잔고 조회 — 브로커 어댑터 경유(KIS: CTRP6504R+TTTC2101R 보정 / Toss: 보유종목+예수금 직접 산출)
-    @Operation(summary = "현재 잔고 조회", description = "브로커 어댑터 경유(KIS: CTRP6504R+TTTC2101R 보정 / Toss: 보유종목+예수금 직접 산출) — 체결 기준 현재 보유 종목별 잔고 및 평가손익 조회.")
+    // 체결기준현재잔고 조회 — 브로커 어댑터 경유(Toss: 보유종목+예수금 직접 산출)
+    @Operation(summary = "현재 잔고 조회", description = "브로커 어댑터 경유(Toss: 보유종목+예수금 직접 산출) — 체결 기준 현재 보유 종목별 잔고 및 평가손익 조회.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
@@ -43,7 +43,7 @@ public class StatisticsController {
         return PortfolioSummaryResponse.from(accountStatistics.getPresentBalance(accountId, userId));
     }
 
-    // 일별거래내역 조회 — 저장된 체결 주문 기록 기준(외부 브로커 API 미호출, KIS CTOS4001R 아님)
+    // 일별거래내역 조회 — 저장된 체결 주문 기록 기준(외부 브로커 API 미호출)
     @Operation(summary = "일별 거래내역 조회", description = "저장된 체결 주문 기록 기준 지정 기간 동안의 일별 거래내역 조회 (외부 브로커 API 호출 없음).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),

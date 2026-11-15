@@ -30,7 +30,7 @@ class AesCryptoServiceTest {
     }
 
     @Test
-    @DisplayName("KIS App Key 같은 긴 문자열도 암복호화 가능")
+    @DisplayName("Toss App Key 같은 긴 문자열도 암복호화 가능")
     void encrypt_long_string() {
         String appKey = "PSGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
         assertThat(service.decrypt(service.encrypt(appKey))).isEqualTo(appKey);

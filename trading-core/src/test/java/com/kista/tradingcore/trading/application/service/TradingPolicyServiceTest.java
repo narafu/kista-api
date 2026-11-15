@@ -54,10 +54,10 @@ class TradingPolicyServiceTest {
     @Test
     @DisplayName("enabled는 저장된 브로커 설정을 그대로 반환한다 — account BrokerEnabledPort 구현")
     void enabled_delegatesToLoadedSettings() {
-        when(settingsPort.load()).thenReturn(withBroker(Broker.KIS, false));
+        when(settingsPort.load()).thenReturn(withBroker(Broker.TOSS, false));
 
-        assertThat(service.enabled(Broker.KIS)).isFalse();
-        assertThat(service.enabled(Broker.TOSS)).isTrue();
+        assertThat(service.enabled(Broker.TOSS)).isFalse();
+        assertThat(service.enabled(Broker.MOCK)).isTrue();
     }
 
     @Test

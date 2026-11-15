@@ -45,7 +45,7 @@ class TradingPolicyInternalControllerTest {
 
     private static final String FULL_BODY = """
             {
-              "brokers":{"KIS":{"enabled":true},"TOSS":{"enabled":false},"MOCK":{"enabled":true},"UPBIT":{"enabled":false,"allowedIp":"168.107.63.152"},"MERITZ":{"enabled":false},"BINANCE":{"enabled":false,"allowedIp":"168.107.63.152"}},
+              "brokers":{"TOSS":{"enabled":false},"MOCK":{"enabled":true},"UPBIT":{"enabled":false,"allowedIp":"168.107.63.152"},"MERITZ":{"enabled":false},"BINANCE":{"enabled":false,"allowedIp":"168.107.63.152"}},
               "strategies":{
                 "INFINITE":{"enabled":true,"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}},
                 "PRIVACY":{"enabled":false,"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}},
@@ -61,7 +61,7 @@ class TradingPolicyInternalControllerTest {
 
         mockMvc.perform(get("/api/internal/trading/policy-settings").header("X-Internal-Token", VALID_TOKEN))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.brokers.KIS.enabled").value(true))
+                .andExpect(jsonPath("$.brokers.TOSS.enabled").value(true))
                 .andExpect(jsonPath("$.strategies.INFINITE.divisionCount.allowedValues[2]").value(40))
                 .andExpect(jsonPath("$.strategies.VR.recurringMode.defaultValue").value("HOLD"));
     }
@@ -97,7 +97,7 @@ class TradingPolicyInternalControllerTest {
                         .header("X-Internal-Token", VALID_TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"brokers":{"KIS":{"enabled":true}},"strategies":{}}
+                                {"brokers":{"TOSS":{"enabled":true}},"strategies":{}}
                                 """))
                 .andExpect(status().isBadRequest());
 

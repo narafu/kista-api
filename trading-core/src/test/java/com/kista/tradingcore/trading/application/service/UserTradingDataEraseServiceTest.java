@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
-import static com.kista.tradingcore.support.TradingFixtures.kisAccount;
+import static com.kista.tradingcore.support.TradingFixtures.stockAccount;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.inOrder;
@@ -59,7 +59,7 @@ class UserTradingDataEraseServiceTest {
 
     @Test
     void cancelOpenOrders_계좌마다_취소하고_성공이면_알리지_않는다() {
-        Account account = kisAccount(UUID.randomUUID(), userId);
+        Account account = stockAccount(UUID.randomUUID(), userId);
         when(accountService.listByUser(userId)).thenReturn(List.of(account));
 
         eraser.cancelOpenOrders(userId);
@@ -70,8 +70,8 @@ class UserTradingDataEraseServiceTest {
 
     @Test
     void cancelOpenOrders_실패는_계좌별로_알리고_다음_계좌를_계속한다() {
-        Account failing = kisAccount(UUID.randomUUID(), userId);
-        Account throwing = kisAccount(UUID.randomUUID(), userId);
+        Account failing = stockAccount(UUID.randomUUID(), userId);
+        Account throwing = stockAccount(UUID.randomUUID(), userId);
         when(accountService.listByUser(userId)).thenReturn(List.of(throwing, failing));
         when(openOrderCancelPort.cancelOpenOrders(throwing)).thenThrow(new IllegalStateException("broker down"));
         when(openOrderCancelPort.cancelOpenOrders(failing)).thenReturn(1);
