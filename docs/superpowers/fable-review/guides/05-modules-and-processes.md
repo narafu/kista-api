@@ -388,7 +388,7 @@ X → R → G
 | M10 | 신설 대상 전부 0건에서 시작한다(P4가 `kista.role`·`@ConditionalOnWorkerRole`을 먼저 만든다). `RoleRoutes`·`RoleRoutingGuard`는 인터페이스를 두지 않는다(`PENDING_REMOVAL_CEILING` 여유 0) |
 | M11 | worker의 `INTERNAL_API_BASE_URL`은 `http://localhost:8080`이다. `@Scheduled` 잡이 내부 API를 부르는 일은 없지만, worker로 라우팅되는 `/api/admin/scheduler/**`의 수동 트리거가 내부 HTTP를 거쳐 자기 자신을 부른다. web은 `http://kista-worker:8080` |
 | M12 | "R → T 금지" 규칙은 원래 없다. 고칠 것: `ApplicationContextLoadTest`의 "trading-core 빈이 없다" 단언 삭제와 저장소 수 합산, `TradingApplicationContextLoadTest`의 단언을 그쪽으로 합치기, `TradingApplication` 코드 참조 4파일, `RootDataJpaTestBase` 상속 19개, `OpenApiSchemaNameCollisionTest` 두 벌을 한 벌로(두 패키지를 함께 스캔해야 R·T 사이 충돌을 잡는다), `OpenApiNullMarkedRecordContractTest` 두 벌 |
-| M13 | `MarketSessionResponse`는 이미 풀렸다. `Market`·`InvestmentPoint`는 합친 스펙을 한 번 받아 보고 충돌할 때만 `@Schema(name)`을 단다 |
+| M13 | 본문의 충돌 3건은 지금 없는 것으로 본다(`findings/29` 3-1: `MarketSessionResponse`는 이미 이름을 갈랐고, `Market`은 enum 인라인, `InvestmentPoint`는 스펙 밖). 할 일은 `paths-to-exclude` 병합과, 합친 `OpenApiSchemaNameCollisionTest`가 통과하는지 보는 것이다. 테스트가 새 충돌을 잡으면 14-4의 기본값(내부·관리자 쪽에 `@Schema(name)`) |
 | M14 | 가상 스레드가 켜져 있다(`spring.threads.virtual.enabled: true`). `spring.task.scheduling.pool.size`를 넣지 않는다. 확인만 한다: 컨텍스트의 `TaskScheduler` 빈이 `SimpleAsyncTaskScheduler`인지. `ThreadPoolTaskScheduler`면 크기 4를 준다. Hikari는 `maximum-pool-size: ${DB_POOL_MAX:5}`로 두고 compose에서 worker만 10(DB `max_connections` 100, 지금 사용 7). 힙: web `-Xmx1280m`·`mem_limit 2048m`, worker `-Xmx2048m`·`mem_limit 3072m`, 둘 다 `MaxMetaspaceSize=384m`(합친 컨텍스트라 320m에서 올린다) |
 | 배포 파일 | 같은 브랜치에서: `deploy/server/{docker-compose.yml,roles,bluegreen,README.md}`, `caddy/kista-api.caddy`(upstream 이름만. `lb_try_duration`·`handle_errors`는 넣지 않는다 — 14-3 끝), `deploy/hooks/pre-apply.sh`(매핑을 `kista-worker) schema=public`으로, `kista-web`은 건너뜀), `.github/scripts/detect-deploy-scope.sh`(플래그를 `verify`·`config`·`web`·`worker`로. jar가 하나이므로 main 소스가 바뀌면 web·worker 둘 다), `.github/tests/{compose-invariants,deploy-plan,pre-apply}.bats`. compose 이미지 변수 이름은 `KISTA_WORKER_IMAGE`·`KISTA_WEB_IMAGE`여야 한다(kista-infra가 role 이름에서 만든다). `compose-invariants.bats`에 "재발행 플래그는 `kista-worker`만 true, `kista-web`에는 없다"를 넣는다(지금 가드는 trading 한 줄만 본다) |
 
@@ -577,7 +577,7 @@ ssh kista-server 'docker ps -a --format "{{.Names}}\t{{.Status}}" | grep kista-'
 | 순환 빈 참조 | 13절의 대체 경로 | 그래도 안 풀리면 |
 | `ApplicationModules.verify()` 실패 | M은 새 모듈 간 참조를 만들지 않는다. 실패는 대개 ID 개명(`trading-notify`·`trading-web`) 누락이나 삭제한 클래스를 가리키던 `allowedDependencies`다. 그것만 고친다 | R 모듈이 T 모듈 내부를 새로 참조해야만 통과할 때(범위를 넘었다) |
 | yml 값 충돌 | B-1 표 → 표에 없으면 14-2의 M3(R 값) → prod 값이 서로 다르면 worker(옛 trading) 값 | prod 값이 다르고 그 키가 주문·보안·토큰에 닿을 때(`jwt.*`, `crypto.*`, `internal.api.*`, `app.trading.*`) |
-| `Schema-validation` 실패 | 엔티티에 `@Table(schema=)` 추가 | 실제 컬럼이 엔티티와 다를 때(합병과 무관한 기존 드리프트 — 따로 보고) |
+| `Schema-validation` 실패 | 엔티티 42개는 전부 스키마를 명시하고 있다(2026-11-15). 그래도 나면 스캔 범위(M2의 `@EntityScan`)부터 본다 | 실제 컬럼이 엔티티와 다를 때(합병과 무관한 기존 드리프트 — 따로 보고) |
 | Flyway 2벌이 이력 테이블을 새로 만들려 한다 | 빈 정의의 `table`·`defaultSchema`·`locations`를 지금 yml 값과 글자 그대로 맞춘다. baseline 옵션을 켜지 않는다 | 운영과 같은 이력을 가진 로컬 DB에서 `migrate`가 "적용할 것 없음"이 아닐 때 |
 | 가드가 막는다 | 로드맵 9-3. FQCN·패키지 문자열·개수는 고친다. 규칙의 뜻과 부딪히면 그 항목을 하지 않는다 | 가드를 지우지 않으면 합병 자체가 안 될 때 |
 | 구현 하나짜리 인터페이스가 필요해 보인다 | 만들지 않는다(구체 클래스) | — |

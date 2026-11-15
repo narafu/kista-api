@@ -72,7 +72,7 @@ A1~A19·B1~B11 30행 중 그대로 24, 달라짐 5(A9·B1·B9·B11은 S11, A18�
 | B-1 값이 다른 yml 키 | 그대로 11개(전부 표에 있다). 표에 없는 한쪽 키 6개: R base `logging.level.root`·`logging.level.com.kista`, R local 4개(`show-sql` 등) |
 | C `nativeQuery` | R 16 + T 39 = 55개, 전부 스키마 한정 없음. `JdbcTemplate` SQL 4파일 |
 | G-2 같은 메서드+경로 | 0건(컨트롤러 55개, 핸들러 R 106 / T 71) |
-| 락 이름 | R 8 / T 7, 겹침 0. 엔티티 단순명 중복 0 |
+| 락 이름 | R 8 / T 7, 겹침 0. 엔티티 단순명 중복 0. `@Entity` 42개 전부 `@Table(schema=)` 명시(2026-11-15 추가 확인 — 부록 B가 못 본 여러 줄 선언 5개 포함. `BaseAuditEntity`·`BaseCreatedAtEntity`는 `@EntityListeners`라 엔티티가 아니다) |
 | K-1 `deploy/server/readiness`, `schema-reorg` | 없어졌다 |
 
 ## 3. M 커밋 목록 재검증
@@ -90,7 +90,7 @@ A1~A19·B1~B11 30행 중 그대로 24, 달라짐 5(A9·B1·B9·B11은 S11, A18�
 | M12 | "R → T 금지" 규칙 삭제 | 그런 규칙이 없다. 대신 `ApplicationContextLoadTest:60-66`이 "trading-core 빈이 없다"를 단언해 합치면 실패한다. JPA 저장소 수 단언 21 + 20 |
 | M12 | `TradingApplication` 참조 테스트 6개 | 코드 참조 4파일 + 주석 1 + `TradingApplicationContextLoadTest` |
 | M12 | `RootDataJpaTestBase` 상속 20개 | 상속 19개 |
-| M13 | 스키마명 충돌 3건 | `MarketSessionResponse`는 해소. `Market`·`InvestmentPoint`는 web DTO가 아니라 스펙에 실리는지 실행해 봐야 안다. `OpenApiSchemaNameCollisionTest`가 R·T에 한 벌씩이라 서로의 충돌은 못 잡는다 |
+| M13 | 스키마명 충돌 3건 | `MarketSessionResponse`는 해소. **`Market`·`InvestmentPoint`도 충돌하지 않는 것으로 본다(2026-11-15 추가 확인, 정적 근거)**: enum을 컴포넌트로 올리는 설정(`enumAsRef` 등)이 0건이라 enum은 필드에 인라인된다 — finance `Market`은 요청 DTO 2개(`AssetSnapshotRequest`·`BulkFinanceRegisterRequest`)의 필드일 뿐이고 `shared.kernel.Market`을 import하는 `*Request`/`*Response`는 없다. `InvestmentPoint`는 R·T 모두 도메인 타입이고 T 쪽은 스펙에서 제외되는 `/api/internal/trading/stats`에서만, 그것도 contract `InvestmentPointsResponse`로 바뀌어 나간다. 합친 스펙을 받아 확정하는 일은 M13에 남는다. `OpenApiSchemaNameCollisionTest`가 R·T에 한 벌씩이라 서로의 충돌은 못 잡는다 |
 | M14 | `spring.task.scheduling.pool.size` 명시 | 두 앱 모두 `spring.threads.virtual.enabled: true`다. Boot는 이때 풀이 아닌 가상 스레드 스케줄러를 쓴다 — 풀 크기를 정할 대상이 없을 가능성이 높다(14절 기본값 참고) |
 | M14 | Hikari "JVM당 5" | prod 5 맞다. base는 10 |
 | 13절 | `HexagonalArchitectureTest:179-180` | `:210-211`로 밀렸다. 줄 번호 대신 규칙 이름으로 찾는다 |
