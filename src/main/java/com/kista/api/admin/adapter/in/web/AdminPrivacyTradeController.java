@@ -1,8 +1,9 @@
 package com.kista.api.admin.adapter.in.web;
 
+import com.kista.api.admin.domain.model.CreateResult;
 import com.kista.api.admin.adapter.in.web.dto.AdminPrivacyBaseResponse;
-import com.kista.api.admin.application.usecase.AdminPrivacyTradeUseCase;
-import com.kista.api.admin.application.usecase.AdminQueryUseCase;
+import com.kista.api.admin.application.service.AdminPrivacyTradeService;
+import com.kista.api.admin.application.service.AdminQueryService;
 import com.kista.shared.contract.privacy.FidaOrderRequest;
 import com.kista.shared.contract.privacy.PrivacyBaseUpdateRequest;
 import com.kista.shared.contract.privacy.PrivacyOrderAddRequest;
@@ -35,8 +36,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AdminPrivacyTradeController {
 
-    private final AdminQueryUseCase adminQuery;
-    private final AdminPrivacyTradeUseCase adminPrivacyTrade;
+    private final AdminQueryService adminQuery;
+    private final AdminPrivacyTradeService adminPrivacyTrade;
 
     // PRIVACY 기준 매매표(master) + 주문 명세(detail) 목록 — range 미전달 시 전체, 최소 30
     @Operation(summary = "PRIVACY 기준 매매표 목록 조회", description = "기준 매매표(master)와 주문 명세(detail) 목록을 반환합니다. range 미전달 시 전체 조회, 전달 시 최소 30 이상이어야 합니다.")
@@ -60,7 +61,7 @@ public class AdminPrivacyTradeController {
     public ResponseEntity<AdminPrivacyBaseResponse> createBase(
             @AuthenticationPrincipal UUID adminId,
             @RequestBody @Valid FidaOrderRequest command) {
-        AdminPrivacyTradeUseCase.CreateResult result = adminPrivacyTrade.createBase(adminId, command);
+        CreateResult result = adminPrivacyTrade.createBase(adminId, command);
         AdminPrivacyBaseResponse body = AdminPrivacyBaseResponse.from(result.view());
         if (!result.created()) return ResponseEntity.ok(body);
         return ResponseEntity.created(URI.create("/api/admin/privacy-trade-bases/" + result.view().id())).body(body);

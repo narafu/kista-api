@@ -6,8 +6,8 @@ import com.kista.shared.platform.security.JwtAuthFilter;
 import com.kista.shared.platform.security.SecurityConfig;
 import com.kista.api.admin.domain.model.AdminAnomalies;
 import com.kista.api.admin.domain.model.AppErrorLog;
-import com.kista.api.admin.application.usecase.AdminQueryUseCase;
-import com.kista.api.admin.application.usecase.AdminUserUseCase;
+import com.kista.api.admin.application.service.AdminQueryService;
+import com.kista.api.admin.application.service.AdminService;
 import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.api.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
@@ -44,8 +44,8 @@ class AdminObservabilityControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort;
-    @MockitoBean AdminQueryUseCase adminQuery;
-    @MockitoBean AdminUserUseCase adminUser;
+    @MockitoBean AdminQueryService adminQuery;
+    @MockitoBean AdminService adminUser;
     @MockitoBean AppErrorLogPort appErrorLogPort;
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");

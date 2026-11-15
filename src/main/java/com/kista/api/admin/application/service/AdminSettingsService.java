@@ -2,7 +2,6 @@ package com.kista.api.admin.application.service;
 
 import com.kista.api.admin.application.port.output.AuditLogPort;
 import com.kista.api.admin.application.port.output.TradingPolicyPort;
-import com.kista.api.admin.application.usecase.AdminSettingsUseCase;
 import com.kista.api.admin.domain.model.RuntimeSettings;
 import com.kista.api.admin.domain.model.RuntimeSettingsBundle;
 import com.kista.shared.kernel.Broker;
@@ -22,18 +21,19 @@ import java.util.UUID;
 // 후자가 실패하면 정책만 바뀐 부분 반영이 남는다 — PUT은 멱등이라 관리자가 재시도하면 수렴한다.
 @Service
 @RequiredArgsConstructor
-class AdminSettingsService implements AdminSettingsUseCase {
+public class AdminSettingsService {
 
     private final RuntimeSettingsService runtimeSettingsService; // root 소유 설정 트랜잭션 경계
     private final TradingPolicyPort tradingPolicyPort; // trading-core 소유 정책 위임
     private final AuditLogPort auditLogPort; // 관리자 설정 변경 감사 로그 포트
 
-    @Override
+    // 관리자 런타임 설정 조회 — root 설정 + trading-core 정책 묶음
     public RuntimeSettingsBundle getSettings() {
         return new RuntimeSettingsBundle(runtimeSettingsService.load(), tradingPolicyPort.load());
     }
 
-    @Override
+    // benchmarksProvided=false면 요청에서 benchmarks가 생략된 것으로 보고 기존 값을 유지한다.
+    // trading-core 정책 → root 설정 순으로 반영하며 프로세스가 갈려 있어 원자적이지 않다.
     public RuntimeSettingsBundle updateSettings(UUID adminId, RuntimeSettingsBundle settings, boolean benchmarksProvided) {
         // 정책 소유자(trading-core)에 먼저 반영 — 거절(400)되면 root 설정은 손대지 않는다
         TradingPolicySettings previousPolicy = tradingPolicyPort.load();

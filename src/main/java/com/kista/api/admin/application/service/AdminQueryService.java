@@ -9,7 +9,6 @@ import com.kista.shared.contract.trading.OrderResponse;
 import com.kista.shared.contract.trading.StrategySummaryResponse;
 import com.kista.shared.contract.trading.StrategyResponse;
 import com.kista.shared.contract.privacy.PrivacyTradeBaseResponse;
-import com.kista.api.admin.application.usecase.AdminQueryUseCase;
 import com.kista.api.admin.application.port.output.*;
 import com.kista.api.user.application.port.output.UserPort;
 import lombok.RequiredArgsConstructor;
@@ -33,9 +32,10 @@ import com.kista.shared.kernel.UserStatus;
 // (Hikari 커넥션을 쥔 채 같은 풀을 쓰는 자기 자신을 향해 새 HTTP 요청 → 풀 고갈 시 데드락).
 // "@Transactional 내부 외부 시스템 호출 금지" 규칙(constraints.md) 적용 — 순수 DB 조회 메서드에만
 // 개별로 @Transactional(readOnly = true)을 붙인다.
+// 관리자 조회 전용 서비스 — 통계, 계좌·거래·감사·이상 조회 통합
 @Service
 @RequiredArgsConstructor
-class AdminQueryService implements AdminQueryUseCase {
+public class AdminQueryService {
 
     private final UserPort userPort;
     private final AccountQueryPort accountQueryPort; // 계좌 조회(contract)+countAll() — 내부 API 경유
@@ -45,7 +45,6 @@ class AdminQueryService implements AdminQueryUseCase {
     private final AppErrorLogPort appErrorLogPort;
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
-    @Override
     public AdminStats getStats() {
         // accountQueryPort.countAll()이 HTTP 어댑터(내부 API 호출)라 @Transactional 밖 —
         // 상태별 카운트를 단일 GROUP BY 쿼리로 조회 (countAll+countByStatus×3 직렬 호출 대체)
@@ -58,13 +57,13 @@ class AdminQueryService implements AdminQueryUseCase {
         return new AdminStats(totalUsers, pendingCount, activeCount, rejectedCount, totalAccounts);
     }
 
-    @Override
+    // null = 전체
     public List<AccountSummaryResponse> listAccounts(LocalDate from, LocalDate to) {
         // HTTP 어댑터(내부 API 호출)라 @Transactional 밖 — 필터링은 내부 API 쪽(AccountInternalController)이 수행
         return accountQueryPort.findAll(from, to);
     }
 
-    @Override
+    // null = 전체
     public List<OrderResponse> listTrades(LocalDate from, LocalDate to) {
         // from 미지정 시 기본값: 최근 30일 — orders 테이블 전체 로드 방지
         LocalDate f = from != null ? from : LocalDate.now(clock).minusDays(30);
@@ -72,7 +71,7 @@ class AdminQueryService implements AdminQueryUseCase {
         return tradingQueryPort.findAllOrders(f, t);
     }
 
-    @Override
+    // null = 전체
     @Transactional(readOnly = true)
     public List<AuditLog> listAuditLogs(Instant from, Instant to) {
         if (from == null && to == null) return auditLogPort.findAll();
@@ -81,7 +80,7 @@ class AdminQueryService implements AdminQueryUseCase {
         return auditLogPort.findAll(f, t);
     }
 
-    @Override
+    // from/to null = inactiveDays 기준
     public AdminAnomalies getAnomalies(int inactiveDays, LocalDate from, LocalDate to) {
         LocalDate today = LocalDate.now(clock);
         LocalDate rangeFrom = from != null ? from : today.minusDays(inactiveDays);
@@ -112,12 +111,12 @@ class AdminQueryService implements AdminQueryUseCase {
         return new AdminAnomalies(pausedAccounts, inactiveAccounts);
     }
 
-    @Override
+    // strategy_cycle.id → strategyId + strategy.type 배치 조회 (관리자 거래내역 전략 식별용)
     public Map<UUID, StrategySummaryResponse> getStrategySummariesByCycleIds(Set<UUID> cycleIds) {
         return tradingQueryPort.findStrategySummariesByCycleIds(cycleIds);
     }
 
-    @Override
+    // PRIVACY 기준 매매표 목록 — days==null 이면 전체, 그 외 최근 N일
     public List<PrivacyTradeBaseResponse> listPrivacyBases(Integer days) {
         // days==null → 전체(EPOCH부터). 그 외 KST 기준 최근 N일 발행분 (release_date는 KST 발행일 원본)
         LocalDate fromReleaseDate = days == null
@@ -126,28 +125,28 @@ class AdminQueryService implements AdminQueryUseCase {
         return privacyQueryPort.findBasesFromTradeDate(fromReleaseDate);
     }
 
-    @Override
+    // 계좌 선택 이후 전략 선택 UI용 목록
     public List<StrategyResponse> listStrategies(UUID accountId) {
         return tradingQueryPort.findStrategiesByAccountId(accountId);
     }
 
-    @Override
+    // 여러 계좌 ID → 전략 목록 배치 조회 (관리자 계좌 목록 전략 표시용)
     public Map<UUID, List<StrategyResponse>> listStrategiesByAccountIds(Set<UUID> accountIds) {
         return tradingQueryPort.findStrategiesByAccountIds(accountIds);
     }
 
-    @Override
+    // 선택한 전략의 distinct 거래일 목록 조회 (관리자 주문 보정 거래일 드롭다운용)
+    // accountId로 경로 계층 정합성 검증 — 전략이 해당 계좌 소속이 아니면 NoSuchElementException
     public List<LocalDate> listStrategyTradeDates(UUID accountId, UUID strategyId) {
         return tradingQueryPort.findStrategyTradeDates(accountId, strategyId);
     }
 
-    @Override
+    // 앱 에러 로그 조회 / 소프트 삭제 — AdminObservabilityController 전용(from/to 기본값은 컨트롤러가 EPOCH/now로 대입)
     @Transactional(readOnly = true)
     public List<AppErrorLog> listErrorLogs(int limit, Instant from, Instant to) {
         return appErrorLogPort.findRecent(limit, from, to);
     }
 
-    @Override
     @Transactional
     public void deleteErrorLog(UUID id) {
         appErrorLogPort.softDelete(id);

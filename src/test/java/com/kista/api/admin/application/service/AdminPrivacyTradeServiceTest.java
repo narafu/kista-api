@@ -1,12 +1,12 @@
 package com.kista.api.admin.application.service;
 
+import com.kista.api.admin.domain.model.CreateResult;
 import com.kista.api.admin.application.port.output.AuditLogPort;
 import com.kista.api.admin.application.port.output.PrivacyQueryPort;
 import com.kista.shared.contract.privacy.FidaOrderRequest;
 import com.kista.shared.contract.privacy.PrivacyBaseUpdateRequest;
 import com.kista.shared.contract.privacy.PrivacyOrderUpdateRequest;
 import com.kista.shared.contract.privacy.PrivacyTradeBaseResponse;
-import com.kista.api.admin.application.usecase.AdminPrivacyTradeUseCase;
 import com.kista.shared.kernel.StrategyTicker;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,7 +47,7 @@ class AdminPrivacyTradeServiceTest {
                 new BigDecimal("28.50"), BigDecimal.ZERO, null, 0, List.of());
         when(privacyQueryPort.createBase(command)).thenReturn(new PrivacyQueryPort.CreateBaseResult(view, true));
 
-        AdminPrivacyTradeUseCase.CreateResult result = service.createBase(ADMIN_ID, command);
+        CreateResult result = service.createBase(ADMIN_ID, command);
 
         assertThat(result.view()).isEqualTo(view);
         assertThat(result.created()).isTrue();

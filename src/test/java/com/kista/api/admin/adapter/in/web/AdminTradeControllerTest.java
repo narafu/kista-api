@@ -10,9 +10,9 @@ import com.kista.shared.contract.trading.OrderResponse;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderDirection;
-import com.kista.api.admin.application.usecase.AdminQueryUseCase;
-import com.kista.api.admin.application.usecase.AdminTradeCorrectionUseCase;
-import com.kista.api.admin.application.usecase.AdminUserUseCase;
+import com.kista.api.admin.application.service.AdminQueryService;
+import com.kista.api.admin.application.service.AdminTradeCorrectionService;
+import com.kista.api.admin.application.service.AdminService;
 import com.kista.shared.platform.security.TokenBlacklistPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -57,9 +57,9 @@ class AdminTradeControllerTest {
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean AdminQueryUseCase adminQuery;
-    @MockitoBean AdminUserUseCase adminUser;
-    @MockitoBean AdminTradeCorrectionUseCase adminTradeCorrection;
+    @MockitoBean AdminQueryService adminQuery;
+    @MockitoBean AdminService adminUser;
+    @MockitoBean AdminTradeCorrectionService adminTradeCorrection;
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID USER_UUID  = UUID.fromString("00000000-0000-0000-0000-000000000001");

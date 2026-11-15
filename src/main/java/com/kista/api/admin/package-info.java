@@ -1,5 +1,5 @@
 // admin 애그리게이트(관리자 조회·정정·재정렬·감사로그·앱오류로그 + 런타임 설정) 모듈 —
-// domain.model·application.{usecase,port.output}만 공개 계약, application.service·adapter 전체 internal.
+// domain.model·application.port.output만 공개 계약, application.service·adapter 전체 internal.
 // admin은 다른 모듈로부터의 참조가 0건인 순수 downstream sink라 admin 소유 이벤트/포트를 신설하면 즉시 역방향
 // 엣지가 생겨 순환이 된다(user↔admin 빈 순환 해소 시도로 실측 확인됨 — ApprovalRequirementDisabledEvent는
 // user.application.event 소유로 정착, admin은 발행만 한다). notify 직접 호출 0건이라 event NamedInterface 없음.

@@ -1,6 +1,6 @@
 package com.kista.api.admin;
 
-import com.kista.api.admin.application.usecase.AdminTradeCorrectionUseCase;
+import com.kista.api.admin.application.service.AdminTradeCorrectionService;
 import com.kista.shared.contract.trading.TradeCorrectionRequest;
 import com.kista.shared.contract.trading.TradeCorrectionResponse;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
@@ -51,7 +51,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Execution(ExecutionMode.SAME_THREAD) // 실 DB 연결 + 고정 포트 — 병렬 실행 시 트랜잭션/포트 충돌 방지 관례
 class AdminInternalApiIntegrationTest {
 
-    @Autowired private AdminTradeCorrectionUseCase adminTradeCorrectionUseCase;
+    @Autowired private AdminTradeCorrectionService adminTradeCorrectionUseCase;
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private AccountPort accountPort; // account_no/app_key/secret_key는 AES-GCM 암호화 컬럼이라 raw INSERT 불가 — 실 어댑터로 생성
 

@@ -5,7 +5,6 @@ import com.kista.api.admin.domain.model.RuntimeSettings;
 import com.kista.api.admin.domain.model.RuntimeSettingsBundle;
 import com.kista.shared.kernel.TradingPolicySettings;
 import com.kista.api.user.domain.model.User;
-import com.kista.api.admin.application.usecase.AdminSettingsUseCase;
 import com.kista.api.user.application.service.UserService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,7 +36,7 @@ class RuntimeSettingsApprovalConcurrencyIT {
 
     private static final long SIGNUP_GATE = 918_273L; // 테스트 전용 PostgreSQL advisory lock 키
 
-    @Autowired AdminSettingsUseCase adminSettingsUseCase; // 실제 설정 변경 트랜잭션
+    @Autowired AdminSettingsService adminSettingsUseCase; // 실제 설정 변경 트랜잭션
     @Autowired UserService userUseCase; // 실제 가입 트랜잭션
     @Autowired JdbcTemplate jdbcTemplate; // 경합 제어와 최종 상태 검증
     @Autowired PlatformTransactionManager transactionManager; // advisory lock 보유 트랜잭션

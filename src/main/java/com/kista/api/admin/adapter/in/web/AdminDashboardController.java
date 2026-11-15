@@ -1,7 +1,7 @@
 package com.kista.api.admin.adapter.in.web;
 
 import com.kista.api.admin.adapter.in.web.dto.AdminDashboardResponse;
-import com.kista.api.admin.application.usecase.AdminQueryUseCase;
+import com.kista.api.admin.application.service.AdminQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AdminDashboardController {
 
-    private final AdminQueryUseCase adminQuery;
+    private final AdminQueryService adminQuery;
 
     // 사용자 현황 통계 조회 (상태별 카운트 + 총 계좌 수)
     @Operation(summary = "대시보드 통계 조회")

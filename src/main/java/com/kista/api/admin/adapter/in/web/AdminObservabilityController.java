@@ -6,8 +6,8 @@ import com.kista.api.admin.adapter.in.web.dto.AuditLogResponse;
 import com.kista.api.admin.adapter.in.web.dto.ErrorLogResponse;
 import com.kista.api.admin.domain.model.AdminAnomalies;
 import com.kista.api.user.domain.model.UserSummary;
-import com.kista.api.admin.application.usecase.AdminQueryUseCase;
-import com.kista.api.admin.application.usecase.AdminUserUseCase;
+import com.kista.api.admin.application.service.AdminQueryService;
+import com.kista.api.admin.application.service.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -32,8 +32,8 @@ public class AdminObservabilityController {
 
     private static final int MAX_LIMIT = 500;
 
-    private final AdminQueryUseCase adminQuery;
-    private final AdminUserUseCase adminUser;
+    private final AdminQueryService adminQuery;
+    private final AdminService adminUser;
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 감사 로그 — 관리자 액션 기록

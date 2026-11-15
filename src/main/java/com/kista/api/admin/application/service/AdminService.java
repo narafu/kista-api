@@ -3,7 +3,6 @@ package com.kista.api.admin.application.service;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.api.user.domain.model.User;
 import com.kista.api.user.domain.model.UserSummary;
-import com.kista.api.admin.application.usecase.AdminUserUseCase;
 import com.kista.api.user.application.service.UserService;
 import com.kista.api.user.application.port.output.UserSummaryPort;
 import com.kista.api.admin.application.port.output.AuditLogPort;
@@ -21,11 +20,12 @@ import java.util.UUID;
 import com.kista.shared.kernel.UserRole;
 import com.kista.shared.kernel.UserStatus;
 
+// 관리자 사용자 관리 — 조회 + 상태/역할 변경 + 삭제 통합
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
-class AdminService implements AdminUserUseCase {
+public class AdminService {
 
     private final UserPort userPort;
     private final UserSummaryPort userSummaryPort;   // 관리자 화면 전용 read-model
@@ -34,13 +34,12 @@ class AdminService implements AdminUserUseCase {
 
     private static final String TELEGRAM_ACTOR = "TELEGRAM_BOT"; // 텔레그램 인라인 버튼 경로 행위자 표기
 
-    @Override
+    // null = 전체
     @Transactional(readOnly = true)
     public List<UserSummary> listAll(LocalDate from, LocalDate to) {
         return filterByDate(userSummaryPort.findAll(), from, to);
     }
 
-    @Override
     @Transactional(readOnly = true)
     public List<UserSummary> listByStatus(UserStatus status, LocalDate from, LocalDate to) {
         return filterByDate(userSummaryPort.findAllByStatus(status), from, to);
@@ -58,7 +57,6 @@ class AdminService implements AdminUserUseCase {
                 .toList();
     }
 
-    @Override
     public void approveUser(UUID adminId, UUID targetUserId) {
         // UserService 위임 (텔레그램 알림 + SSE 포함)
         userUseCase.approve(targetUserId);
@@ -66,7 +64,6 @@ class AdminService implements AdminUserUseCase {
         auditLogPort.log(adminId, "USER_APPROVE", "USER", targetUserId, null);
     }
 
-    @Override
     public void rejectUser(UUID adminId, UUID targetUserId, String reason) {
         // UserService 위임 (텔레그램 알림 + SSE 포함, reason 정규화는 UserService 책임)
         userUseCase.reject(targetUserId, reason);
@@ -74,14 +71,13 @@ class AdminService implements AdminUserUseCase {
         auditLogPort.log(adminId, "USER_REJECT", "USER", targetUserId, Map.of("reason", reason == null ? "" : reason));
     }
 
-    @Override
+    // 텔레그램 인라인 버튼 승인·거절 — chatId로 관리자를 찾고, 없으면 시스템 행위자(TELEGRAM_BOT)로 감사 기록
     public void approveUserByTelegram(String chatId, UUID targetUserId) {
         userUseCase.approve(targetUserId);
         log.info("텔레그램 관리자 승인: chatId={}, targetUserId={}", chatId, targetUserId);
         auditLogPort.log(resolveTelegramAdmin(chatId), "USER_APPROVE", "USER", targetUserId, telegramPayload(chatId));
     }
 
-    @Override
     public void rejectUserByTelegram(String chatId, UUID targetUserId) {
         userUseCase.reject(targetUserId, null); // 텔레그램 인라인 버튼은 사유 입력 UI 없음
         log.info("텔레그램 관리자 거절: chatId={}, targetUserId={}", chatId, targetUserId);
@@ -104,7 +100,6 @@ class AdminService implements AdminUserUseCase {
         return Map.of("actor", TELEGRAM_ACTOR, "chatId", chatId);
     }
 
-    @Override
     public void changeRole(UUID adminId, UUID targetUserId, UserRole role) {
         if (role == UserRole.USER) {
             // 자기 자신 강등 방지
@@ -123,7 +118,6 @@ class AdminService implements AdminUserUseCase {
                 Map.of("newRole", role.name()));
     }
 
-    @Override
     public void deleteUser(UUID adminId, UUID targetUserId) {
         userPort.findByIdOrThrow(targetUserId); // 존재 확인
         userUseCase.deleteMe(targetUserId);

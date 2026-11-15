@@ -1,12 +1,13 @@
 package com.kista.api.admin.adapter.in.web;
 
+import com.kista.api.admin.domain.model.CreateResult;
 import com.kista.shared.platform.security.InternalTokenAuthFilter;
 import com.kista.shared.platform.security.JwtAuthFilter;
 import com.kista.shared.platform.security.SecurityConfig;
 import com.kista.shared.contract.privacy.PrivacyTradeBaseResponse;
 import com.kista.api.admin.domain.model.AdminPrivacyTradeConflictException;
-import com.kista.api.admin.application.usecase.AdminPrivacyTradeUseCase;
-import com.kista.api.admin.application.usecase.AdminQueryUseCase;
+import com.kista.api.admin.application.service.AdminPrivacyTradeService;
+import com.kista.api.admin.application.service.AdminQueryService;
 import com.kista.shared.platform.security.TokenBlacklistPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -48,8 +49,8 @@ class AdminPrivacyTradeControllerTest {
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean AdminQueryUseCase adminQuery;
-    @MockitoBean AdminPrivacyTradeUseCase adminPrivacyTrade;
+    @MockitoBean AdminQueryService adminQuery;
+    @MockitoBean AdminPrivacyTradeService adminPrivacyTrade;
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID USER_UUID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -107,7 +108,7 @@ class AdminPrivacyTradeControllerTest {
         var view = new PrivacyTradeBaseResponse(id, LocalDate.of(2026, 6, 10), "SOXL",
                 new BigDecimal("28.50"), new BigDecimal("0"), null, 0, List.of());
         when(adminPrivacyTrade.createBase(eq(ADMIN_UUID), any()))
-                .thenReturn(new AdminPrivacyTradeUseCase.CreateResult(view, true));
+                .thenReturn(new CreateResult(view, true));
 
         mockMvc.perform(post("/api/admin/privacy-trade-bases")
                         .with(authentication(adminToken(ADMIN_UUID)))
@@ -127,7 +128,7 @@ class AdminPrivacyTradeControllerTest {
         var view = new PrivacyTradeBaseResponse(id, LocalDate.of(2026, 6, 10), "SOXL",
                 new BigDecimal("28.50"), new BigDecimal("0"), null, 0, List.of());
         when(adminPrivacyTrade.createBase(eq(ADMIN_UUID), any()))
-                .thenReturn(new AdminPrivacyTradeUseCase.CreateResult(view, false));
+                .thenReturn(new CreateResult(view, false));
 
         mockMvc.perform(post("/api/admin/privacy-trade-bases")
                         .with(authentication(adminToken(ADMIN_UUID)))

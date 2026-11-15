@@ -4,7 +4,7 @@ import com.kista.shared.platform.security.InternalTokenAuthFilter;
 import com.kista.shared.platform.security.JwtAuthFilter;
 import com.kista.shared.platform.security.SecurityConfig;
 import com.kista.api.admin.domain.model.AdminStats;
-import com.kista.api.admin.application.usecase.AdminQueryUseCase;
+import com.kista.api.admin.application.service.AdminQueryService;
 import com.kista.shared.platform.security.TokenBlacklistPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -36,7 +36,7 @@ class AdminDashboardControllerTest {
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean AdminQueryUseCase adminQuery;
+    @MockitoBean AdminQueryService adminQuery;
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
 

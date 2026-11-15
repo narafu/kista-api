@@ -2,7 +2,6 @@ package com.kista.api.admin.application.service;
 
 import com.kista.api.admin.application.port.output.AuditLogPort;
 import com.kista.api.admin.application.port.output.TradingCommandPort;
-import com.kista.api.admin.application.usecase.AdminTradeCorrectionUseCase;
 import com.kista.shared.contract.trading.TradeCorrectionRequest;
 import com.kista.shared.contract.trading.TradeCorrectionResponse;
 import lombok.RequiredArgsConstructor;
@@ -13,16 +12,16 @@ import java.util.Map;
 import java.util.UUID;
 
 // 관리자 수동 체결 보정 — 실제 로직은 trading-core 내부 API로 이관됨, 여기는 요청/응답 전달 + 감사 로그만 담당
+// 관리자 수동 체결 보정 — 사용자/계좌/전략 선택 후 다건 체결을 원자적으로 반영
 @Service
 @RequiredArgsConstructor
-class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
+public class AdminTradeCorrectionService {
 
     private static final String AUDIT_ACTION = "TRADE_MANUAL_CORRECTION"; // 감사 로그 액션 코드
 
     private final TradingCommandPort tradingCommandPort;
     private final AuditLogPort auditLogPort;
 
-    @Override
     public TradeCorrectionResponse correctManualFills(UUID adminId, TradeCorrectionRequest command) {
         TradeCorrectionResponse result = tradingCommandPort.correctManualFills(command);
 

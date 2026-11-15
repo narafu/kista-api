@@ -6,9 +6,9 @@ import com.kista.api.admin.adapter.in.web.dto.StrategyStatusRequest;
 import com.kista.shared.contract.account.AccountSummaryResponse;
 import com.kista.api.user.domain.model.UserSummary;
 import com.kista.shared.contract.trading.StrategyResponse;
-import com.kista.api.admin.application.usecase.AdminQueryUseCase;
-import com.kista.api.admin.application.usecase.AdminStrategyUseCase;
-import com.kista.api.admin.application.usecase.AdminUserUseCase;
+import com.kista.api.admin.application.service.AdminQueryService;
+import com.kista.api.admin.application.service.AdminStrategyService;
+import com.kista.api.admin.application.service.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -37,9 +37,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdminAccountController {
 
-    private final AdminQueryUseCase adminQuery;  // 계좌 목록 조회
-    private final AdminUserUseCase adminUser;    // ownerNickname 조회용 사용자 목록
-    private final AdminStrategyUseCase adminStrategy; // 관리자 전략 상태 변경
+    private final AdminQueryService adminQuery;  // 계좌 목록 조회
+    private final AdminService adminUser;    // ownerNickname 조회용 사용자 목록
+    private final AdminStrategyService adminStrategy; // 관리자 전략 상태 변경
 
     @Operation(summary = "계좌 목록 조회", description = "소유자 닉네임과 전략 목록을 포함해 계좌 목록을 반환합니다. from/to로 기간 필터링 가능합니다.")
     @GetMapping

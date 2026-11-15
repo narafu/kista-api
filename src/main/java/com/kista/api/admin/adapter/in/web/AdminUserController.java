@@ -4,7 +4,7 @@ import com.kista.api.admin.adapter.in.web.dto.AdminRoleRequest;
 import com.kista.api.admin.adapter.in.web.dto.AdminStatusRequest;
 import com.kista.api.admin.adapter.in.web.dto.AdminUserResponse;
 import com.kista.api.user.domain.model.UserSummary;
-import com.kista.api.admin.application.usecase.AdminUserUseCase;
+import com.kista.api.admin.application.service.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -25,7 +25,7 @@ import com.kista.shared.kernel.UserStatus;
 @RequiredArgsConstructor
 public class AdminUserController {
 
-    private final AdminUserUseCase adminUser; // 사용자 조회 + 액션 (승인/거절/역할변경/삭제)
+    private final AdminService adminUser; // 사용자 조회 + 액션 (승인/거절/역할변경/삭제)
 
     // 전체 또는 상태별 사용자 목록 조회
     @Operation(summary = "사용자 목록 조회")

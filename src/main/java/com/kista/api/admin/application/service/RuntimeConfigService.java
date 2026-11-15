@@ -1,7 +1,6 @@
 package com.kista.api.admin.application.service;
 
 import com.kista.api.admin.application.port.output.TradingPolicyPort;
-import com.kista.api.admin.application.usecase.RuntimeSettingsUseCase;
 import com.kista.api.admin.domain.model.RuntimeSettingsBundle;
 import com.kista.api.admin.domain.model.TradingPolicyUnavailableException;
 import com.kista.shared.kernel.TradingPolicySettings;
@@ -15,12 +14,12 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-class RuntimeConfigService implements RuntimeSettingsUseCase {
+public class RuntimeConfigService {
 
     private final RuntimeSettingsService runtimeSettingsService; // root 소유 설정 (DB, 항상 가용)
     private final TradingPolicyPort tradingPolicyPort; // trading-core 소유 정책 (내부 HTTP, 장애 시 기본값)
 
-    @Override
+    // 공개 런타임 설정 조회 — root 설정 + trading-core 정책 묶음
     public RuntimeSettingsBundle getSettings() {
         return new RuntimeSettingsBundle(runtimeSettingsService.load(), tradingPolicyOrDefaults());
     }

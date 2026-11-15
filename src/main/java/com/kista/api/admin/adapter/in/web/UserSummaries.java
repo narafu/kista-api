@@ -1,7 +1,7 @@
 package com.kista.api.admin.adapter.in.web;
 
 import com.kista.api.user.domain.model.UserSummary;
-import com.kista.api.admin.application.usecase.AdminUserUseCase;
+import com.kista.api.admin.application.service.AdminService;
 
 import java.util.Map;
 import java.util.UUID;
@@ -14,7 +14,7 @@ final class UserSummaries {
     private UserSummaries() {}
 
     // 전체 사용자를 id 기준 Map으로 변환 (닉네임 등 표시 정보 결합용)
-    static Map<UUID, UserSummary> mapById(AdminUserUseCase adminUser) {
+    static Map<UUID, UserSummary> mapById(AdminService adminUser) {
         return adminUser.listAll(null, null).stream()
                 .collect(Collectors.toMap(UserSummary::id, Function.identity()));
     }

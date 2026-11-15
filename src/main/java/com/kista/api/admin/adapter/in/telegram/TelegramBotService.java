@@ -7,7 +7,7 @@ import com.kista.shared.kernel.Quantities;
 import com.kista.api.admin.application.port.output.PortfolioQueryPort;
 import com.kista.shared.platform.telegram.TelegramHttpClient;
 import com.kista.shared.platform.telegram.TelegramProperties;
-import com.kista.api.admin.application.usecase.AdminUserUseCase;
+import com.kista.api.admin.application.service.AdminService;
 import com.kista.api.user.application.service.UserService;
 import com.kista.api.user.domain.model.User;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +32,7 @@ class TelegramBotService {
     private final TelegramProperties props;            // 관리자 봇 토큰
     private final PortfolioQueryPort portfolioQueryPort;
     private final UserService userUseCase; // /status, /history 조회 전용
-    private final AdminUserUseCase adminUserUseCase; // 인라인 버튼 승인/거절 + 감사 로그
+    private final AdminService adminUserUseCase; // 인라인 버튼 승인/거절 + 감사 로그
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     void handle(TelegramUpdate update) {

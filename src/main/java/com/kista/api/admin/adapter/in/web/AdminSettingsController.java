@@ -2,7 +2,7 @@ package com.kista.api.admin.adapter.in.web;
 
 import com.kista.api.admin.adapter.in.web.dto.AdminSettingsRequest;
 import com.kista.api.admin.adapter.in.web.dto.RuntimeSettingsResponse;
-import com.kista.api.admin.application.usecase.AdminSettingsUseCase;
+import com.kista.api.admin.application.service.AdminSettingsService;
 import com.kista.api.admin.domain.model.RuntimeSettingsBundle;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,7 +25,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AdminSettingsController {
 
-    private final AdminSettingsUseCase adminSettingsUseCase; // 관리자 설정 조회·갱신 유스케이스
+    private final AdminSettingsService adminSettingsUseCase; // 관리자 설정 조회·갱신 유스케이스
 
     @Operation(summary = "런타임 설정 조회", description = "auth/brokers/strategies 전체 런타임 설정을 조회합니다.")
     @GetMapping

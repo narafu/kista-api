@@ -8,7 +8,7 @@ import com.kista.api.admin.domain.model.BenchmarkSettings;
 import com.kista.api.admin.domain.model.RuntimeSettings;
 import com.kista.api.admin.domain.model.RuntimeSettingsBundle;
 import com.kista.shared.kernel.TradingPolicySettings;
-import com.kista.api.admin.application.usecase.AdminSettingsUseCase;
+import com.kista.api.admin.application.service.AdminSettingsService;
 import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.api.admin.application.port.output.AppErrorLogPort;
 import com.kista.shared.kernel.Broker;
@@ -45,7 +45,7 @@ class AdminSettingsControllerTest {
     private static final UUID ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     @Autowired MockMvc mockMvc;
-    @MockitoBean AdminSettingsUseCase adminSettingsUseCase; // 관리자 설정 유스케이스 대역
+    @MockitoBean AdminSettingsService adminSettingsUseCase; // 관리자 설정 유스케이스 대역
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort;
     @MockitoBean AppErrorLogPort appErrorLogPort;

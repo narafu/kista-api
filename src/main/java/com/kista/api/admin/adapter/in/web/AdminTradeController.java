@@ -7,9 +7,9 @@ import com.kista.shared.contract.account.AccountSummaryResponse;
 import com.kista.shared.contract.trading.OrderResponse;
 import com.kista.shared.contract.trading.StrategySummaryResponse;
 import com.kista.api.user.domain.model.UserSummary;
-import com.kista.api.admin.application.usecase.AdminQueryUseCase;
-import com.kista.api.admin.application.usecase.AdminTradeCorrectionUseCase;
-import com.kista.api.admin.application.usecase.AdminUserUseCase;
+import com.kista.api.admin.application.service.AdminQueryService;
+import com.kista.api.admin.application.service.AdminTradeCorrectionService;
+import com.kista.api.admin.application.service.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -39,9 +39,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdminTradeController {
 
-    private final AdminQueryUseCase adminQuery;  // 거래·계좌 조회 (최근 30일 전체, accountId → userId 매핑)
-    private final AdminUserUseCase adminUser;   // userId → nickname 매핑용
-    private final AdminTradeCorrectionUseCase adminTradeCorrection; // 관리자 수동 체결 보정
+    private final AdminQueryService adminQuery;  // 거래·계좌 조회 (최근 30일 전체, accountId → userId 매핑)
+    private final AdminService adminUser;   // userId → nickname 매핑용
+    private final AdminTradeCorrectionService adminTradeCorrection; // 관리자 수동 체결 보정
 
     // 전체 거래 내역 목록 — 일괄 조회로 N+1 방지
     @Operation(summary = "전체 거래 내역 조회", description = "일괄 조회로 N+1을 방지합니다. from/to로 기간 필터링 가능합니다.")

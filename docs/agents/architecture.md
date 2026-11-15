@@ -19,7 +19,7 @@ api.finance     가계부                                  domain/usecase/port
 api.notify      Telegram/FCM 아웃바운드 게이트웨이       port/domain
 api.market      공포탐욕지수                             domain/port/event
 api.benchmark   주택/ETF 벤치마크 비교                   domain/port/event/schedule
-api.admin       관리자 조회·정정·런타임 설정             domain/usecase/port
+api.admin       관리자 조회·정정·런타임 설정             domain/port
 api.user        가입·승인·프로필·JWT 인증                domain/api/port/event
 api.web         크로스모듈 fan-out 앱셸                  (없음)
 shared.kernel   공유 enum·이벤트·순수 포트(OPEN)

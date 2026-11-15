@@ -11,13 +11,6 @@ com.kista.api.admin.application.port.output.TradingCommandPort
 com.kista.api.admin.application.port.output.TradingPolicyPort
 com.kista.api.admin.application.port.output.TradingQueryPort
 com.kista.api.admin.application.port.output.TradingSchedulerCommandPort
-com.kista.api.admin.application.usecase.AdminPrivacyTradeUseCase
-com.kista.api.admin.application.usecase.AdminQueryUseCase
-com.kista.api.admin.application.usecase.AdminSettingsUseCase
-com.kista.api.admin.application.usecase.AdminStrategyUseCase
-com.kista.api.admin.application.usecase.AdminTradeCorrectionUseCase
-com.kista.api.admin.application.usecase.AdminUserUseCase
-com.kista.api.admin.application.usecase.RuntimeSettingsUseCase
 com.kista.api.benchmark.application.port.output.CurrentExchangeRatePort
 com.kista.api.benchmark.application.port.output.HousingBenchmarkFeedPort
 com.kista.api.benchmark.application.port.output.HousingBenchmarkPricePort

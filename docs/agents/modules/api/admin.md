@@ -1,6 +1,6 @@
 ## com.kista.api.admin (`:api`)
 
-Spring Modulith 모듈(CLOSED) — 관리자 조회·정정·재정렬·감사로그·앱오류로그 + 런타임 설정. "domain"·"usecase"·"port" NamedInterface, service·adapter internal.
+Spring Modulith 모듈(CLOSED) — 관리자 조회·정정·재정렬·감사로그·앱오류로그 + 런타임 설정. "domain"·"port" NamedInterface, service·adapter internal.
 
 - 오류 로그(`app_error_logs`) 저장은 두 입구가 같은 `AppErrorLogPort.save`로 수렴한다 — root 발행분 `AppErrorRaisedListener`(동기 `@EventListener`: 발행 지점이 트랜잭션 밖이라 AFTER_COMMIT은 이벤트를 버린다), trading-core 발행분 `AppErrorStreamConsumer`(`stream:app.error`, 그룹 `root`).
 - trading-core 내부 API 요청·응답은 own-type 복제 없이 `com.kista.shared.contract`를 그대로 쓴다. `AccountSummaryResponse`는 id/userId/accountNo/broker/createdAt 5필드로 의도적으로 좁힌 계약이다(appKey/secretKey 등 평문 비밀 제외). 잠금: `InternalApiContractTest`, 게이트·잔존 own-type → `decisions.md`. 표지 예외(`AdminBrokerCredentialException` 등)는 HTTP 상태코드 복원용 own-type이다.

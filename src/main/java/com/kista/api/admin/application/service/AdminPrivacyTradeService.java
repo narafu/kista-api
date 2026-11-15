@@ -1,8 +1,8 @@
 package com.kista.api.admin.application.service;
 
+import com.kista.api.admin.domain.model.CreateResult;
 import com.kista.api.admin.application.port.output.AuditLogPort;
 import com.kista.api.admin.application.port.output.PrivacyQueryPort;
-import com.kista.api.admin.application.usecase.AdminPrivacyTradeUseCase;
 import com.kista.shared.contract.privacy.FidaOrderRequest;
 import com.kista.shared.contract.privacy.PrivacyBaseUpdateRequest;
 import com.kista.shared.contract.privacy.PrivacyOrderAddRequest;
@@ -18,16 +18,16 @@ import java.util.UUID;
 // 안에서 호출하면 커넥션 풀 자기잠금 위험이 있다(AdminQueryService와 동일 사유, constraints.md
 // "@Transactional 내부 외부 시스템 호출 금지" 참고). 예전엔 privacyTradePort가 in-process 호출이라
 // 안전했으나 이번 전환으로 더 이상 그렇지 않다.
+// 관리자 PRIVACY 기준 매매표 수동 보정 — 등록(FIDA 오류 대응)·마스터 필드 수정·개별 주문 가격·수량 수정
 @Service
 @RequiredArgsConstructor
-class AdminPrivacyTradeService implements AdminPrivacyTradeUseCase {
+public class AdminPrivacyTradeService {
 
     // privacy.application.service.PrivacyService/PrivacyTradePort 직접 주입 대신 admin이 정의한
     // 단일 포트로 조회+쓰기를 위임 — 등록(POST /api/internal/fida-orders 재사용)·수정 모두 이 포트 경유
     private final PrivacyQueryPort privacyQueryPort;
     private final AuditLogPort auditLogPort;
 
-    @Override
     public CreateResult createBase(UUID adminId, FidaOrderRequest command) {
         PrivacyQueryPort.CreateBaseResult result = privacyQueryPort.createBase(command);
         auditLogPort.log(adminId, "PRIVACY_BASE_CREATE", "PRIVACY_TRADE_BASE", result.view().id(),
@@ -37,7 +37,6 @@ class AdminPrivacyTradeService implements AdminPrivacyTradeUseCase {
         return new CreateResult(result.view(), result.created());
     }
 
-    @Override
     public PrivacyTradeBaseResponse updateBase(UUID adminId, UUID baseId, PrivacyBaseUpdateRequest command) {
         PrivacyTradeBaseResponse updated = privacyQueryPort.updateBase(baseId, command);
         auditLogPort.log(adminId, "PRIVACY_BASE_UPDATE", "PRIVACY_TRADE_BASE", baseId,
@@ -47,7 +46,6 @@ class AdminPrivacyTradeService implements AdminPrivacyTradeUseCase {
         return updated;
     }
 
-    @Override
     public PrivacyTradeBaseResponse updateOrder(UUID adminId, UUID baseId, UUID orderId, PrivacyOrderUpdateRequest command) {
         PrivacyTradeBaseResponse updated = privacyQueryPort.updateOrder(baseId, orderId, command);
         auditLogPort.log(adminId, "PRIVACY_ORDER_UPDATE", "PRIVACY_TRADE_BASE_ORDER", orderId,
@@ -57,7 +55,6 @@ class AdminPrivacyTradeService implements AdminPrivacyTradeUseCase {
         return updated;
     }
 
-    @Override
     public PrivacyTradeBaseResponse addOrder(UUID adminId, UUID baseId, PrivacyOrderAddRequest command) {
         PrivacyTradeBaseResponse updated = privacyQueryPort.addOrder(baseId, command);
         auditLogPort.log(adminId, "PRIVACY_ORDER_ADD", "PRIVACY_TRADE_BASE_ORDER", baseId,
@@ -69,7 +66,6 @@ class AdminPrivacyTradeService implements AdminPrivacyTradeUseCase {
         return updated;
     }
 
-    @Override
     public PrivacyTradeBaseResponse deleteOrder(UUID adminId, UUID baseId, UUID orderId) {
         PrivacyTradeBaseResponse updated = privacyQueryPort.deleteOrder(baseId, orderId);
         auditLogPort.log(adminId, "PRIVACY_ORDER_DELETE", "PRIVACY_TRADE_BASE_ORDER", orderId,

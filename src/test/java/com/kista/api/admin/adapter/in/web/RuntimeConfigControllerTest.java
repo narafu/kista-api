@@ -5,7 +5,7 @@ import com.kista.shared.platform.security.JwtAuthFilter;
 import com.kista.shared.platform.security.SecurityConfig;
 import com.kista.api.admin.domain.model.RuntimeSettingsBundle;
 import com.kista.shared.platform.security.TokenBlacklistPort;
-import com.kista.api.admin.application.usecase.RuntimeSettingsUseCase;
+import com.kista.api.admin.application.service.RuntimeConfigService;
 import com.kista.api.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class RuntimeConfigControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockitoBean RuntimeSettingsUseCase runtimeSettingsUseCase; // 공개 설정 조회 대역
+    @MockitoBean RuntimeConfigService runtimeSettingsUseCase; // 공개 설정 조회 대역
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort;
     @MockitoBean AppErrorLogPort appErrorLogPort;
