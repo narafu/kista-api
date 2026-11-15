@@ -15,7 +15,7 @@
 ### 1-1. 문헌 규칙 (`docs/reference/laor/infinite-v4.md` — 카페 원문)
 - 1회 매수금 = 잔금 ÷ (분할수 − T). T는 매수 체결 시 누적 가산, 쿼터매도 시 ×0.75. 분할 20·30·40 권장.
 - 별% = 목표수익률 × (1 − 2T/분할수). TQQQ 40분할이면 T마다 0.75%p씩 15% → −15%. 별지점 = 평단 × (1 + 별%), 소수 2자리. 원문은 20·40분할 식만 주고 30분할 식은 없다(KISTA는 같은 일반식으로 확장).
-- 전반전(T < 분할수/2): 1회분 절반은 별지점 LOC, 나머지는 평단 LOC(원문 예시와 맞는 배분: 별지점 쪽 절반 내림 수량을 먼저 잡고 남은 금액을 평단 쪽에 — 절차 자체는 원문에 없고 사이트 코드 §C와 같은 해석). 후반전(T ≥ 분할수/2, 원문 명시): 1회분 전액 별지점 LOC. 둘 다 그 아래로 LOC 1주씩을 계속 건다(가격 = 1회분 ÷ (누적 수량 + k), 내림, 단계 수 제한 없음).
+- 전반전(T < 분할수/2): 1회분 절반은 별지점 LOC, 나머지는 평단 LOC(원문 예시와 맞는 배분: 별지점 쪽 절반 내림 수량을 먼저 잡고 남은 금액을 평단 쪽에 — 절차 자체는 원문에 없고 사이트 코드 §C와 같은 해석. KISTA도 이 순서다). 후반전(T ≥ 분할수/2, 원문 명시): 1회분 전액 별지점 LOC. 둘 다 그 아래로 LOC 1주씩을 계속 건다(가격 = 1회분 ÷ (누적 수량 + k), 내림, 단계 수 제한 없음).
 - LOC 매수점 = 별지점 − 0.01, LOC 매도점 = 별지점(같은 종가에서 매수·매도가 함께 체결되지 않게 하는 장치). 평단 LOC 매수는 −0.01 없음.
 - 매도: 보유 1/4(내림) 별지점 LOC + 나머지 지정가(평단 × (1+목표수익률)), 지정가는 프리장 시작에 접수.
 - 처음 매수(보유 0): 1회분을 종가보다 10~15% 높은 가격(큰수) LOC로 걸고 그 아래로 LOC 1주씩을 계속 건다.
@@ -39,7 +39,7 @@ isFinalRound = unitAmount > deposit  또는  referencePrice > deposit
 - `deposit` = 전략 원장 예수금(최신 `cycle_position.deposit` — `workflow-ledger-price.md` "전략별 원장 상한"). 브로커 잔고가 아니다.
 - **전·후반 분기**: `T < divisionCount/2` → 전반, 그 외(경계 T = divisionCount/2 포함) → 후반.
 - **첫 매수(holdings==0)**: LOC 매수 1건, 가격 = min(locBuyPrice, deposit), 수량 = max(1, floor(unitAmount ÷ 가격)), leg `INFINITE_FIRST_BUY`. 매도 없음. 보유 0이면 averagePrice = 전일종가라 locBuyPrice = 전일종가 × (1+targetProfitRate) − 0.01이 큰수 가격이다.
-- **전반**: LOC 매수①(평단가, 수량 max(1, floor(unitAmount/2 ÷ 평단))) + LOC 매수②(locBuyPrice, 수량 = (unitAmount − 평단×매수①수량) ÷ locBuyPrice — 잔여 ≤ 0이면 없음, 아니면 최소 1주) + LOC 매도(holdings/4, referencePrice) + 지정가 매도(holdings − holdings/4, targetPrice, 개장 접수).
+- **전반**: 수량은 별지점 쪽부터 정한다. LOC 매수②(locBuyPrice, 수량 max(1, floor(unitAmount/2 ÷ locBuyPrice))) + LOC 매수①(평단가, 수량 = (unitAmount − locBuyPrice×매수②수량) ÷ 평단 — 잔여 ≤ 0이면 없음, 아니면 최소 1주) + LOC 매도(holdings/4, referencePrice) + 지정가 매도(holdings − holdings/4, targetPrice, 개장 접수). 주문 목록 순서는 매수①→②.
 - **후반, isFinalRound 아님**: LOC 매수(locBuyPrice, 수량 max(1, floor(unitAmount ÷ locBuyPrice))) + LOC 매도 + 지정가 매도(전반과 같음).
 - **후반, isFinalRound**: MOC 매도 1건(holdings ÷ (divisionCount/2), 최소 1주, 마감 접수, leg `INFINITE_MOC_SELL`)만. 리버스 플래그는 마감 리포트에서만 켜지므로 플래그가 꺼진 채 최종회차가 된 날(보유 有 등록·리버스 종료 직후·리포트 뒤 인출·종가 없는 리포트)에 탄다.
 - isFinalRound(리버스 진입)에 isEarlyStage 가드가 필요 없는 이유: holdings ≥ 1·원장 ≥ 0이면 전반부에서는 성립하지 않는다(전반 ⇒ 원장 > 매입액 ≥ 평단, 기준가 ≤ 평단×(1+targetProfitRate)).
@@ -51,13 +51,13 @@ isFinalRound = unitAmount > deposit  또는  referencePrice > deposit
 | 전·후반 경계 T = n/2 | 원문은 후반("절반 이상"). quantstack 계산기 표만 전반 | 후반 | 원문과 일치(차이 아님 — quantstack 계산기 라벨 오류) |
 | 첫 매수 큰수 | 종가 +10~15%(원문 예시 +12%, 사이트 코드 +13%) | 전일종가 × (1+목표수익률) − 0.01을 접수 전 cap(현재가 × 1.05)이 낮춘다. 가격은 원장 예수금을 넘지 않는다 | 큰수는 증권사 가격 제한을 피하는 실무 장치라 비율은 규칙이 아니다. 원장 상한은 최소 1주 보장 수량이 원장을 넘어 매수 전체가 거절되는 교착을 막는다(1주 가드는 전일종가 기준) |
 | 일반모드 최종회차 | (리버스로 넘어감) | 리버스 첫날 규칙 MOC를 일반모드가 낸다, 최소 1주 | 리버스 플래그가 체결 뒤 리포트에서만 켜지는 구조 때문. 다음 날 첫날 MOC가 한 번 더 나갈 수 있다(`fable-review/questions.md` Q-04) |
-| 전반 절반 배분의 자투리 | **별지점 쪽 먼저로 읽힌다**(원문 예시 1회 539.23·별지점 78.12·평단 69.75 → 별지점 3주·평단 4주) | 평단 쪽 먼저, 최소 1주(같은 입력이면 평단 3주·별지점 4주) | **원문과 불일치 — 이유 없음.** 지침서 08 F5는 "문헌 불명확"을 전제로 유지했으나 원문 예시가 순서를 정한다. 변경 여부 사용자 결정 대기 |
-| 아래 단계 LOC | 첫 매수·전반·후반 모두 1주씩 단계 제한 없이(예시 7~8단계) | 보정 3건(1-5) | 단계 수 3의 근거가 기록돼 있지 않다 |
+| 전반 절반 배분의 자투리 | **별지점 쪽 먼저로 읽힌다**(원문 예시 1회 539.23·별지점 78.12·평단 69.75 → 별지점 3주·평단 4주) | 별지점 쪽 먼저, 최소 1주(같은 입력이면 별지점 3주·평단 4주) | 원문 예시와 일치. 2026-11-15 평단 쪽 먼저에서 바꿨다(지침서 08 F5의 유지 결정을 대체, 상한가 재계산 경로도 같은 순서). 검증: `InfinitePositionTest.earlyAllocation_matchesOriginalExample` |
+| 아래 단계 LOC | 첫 매수·전반·후반 모두 1주씩 단계 제한 없이(예시 7~8단계) | 보정 3건(1-5) | 유지(2026-11-15 소유자 결정). 3단계가 평단 대비 약 −3%~−23%를 덮어 TQQQ 일간 변동 대부분이 들어오고 주문 건수가 적다. 대가: 종가가 사다리 아래로 깊이 빠진 날 1회분을 다 쓰지 못한다(원문 예시에서 종가 40이면 원문 14주·KISTA 10주) |
 | 1/4 수량 | 내림(원문 예시 141주 → 35주) | floor | 원문과 일치 |
-| 지정가 매도 접수 시각 | 프리장 시작(서머타임 17시, 해제 18시 KST) | 장 개시 스케쥴러 22:00 KST 선접수(`scheduler-time-table.md`) | 이유 미기재. 17~22시 프리장 체결 기회만큼 차이 |
+| 지정가 매도 접수 시각 | 프리장 시작(서머타임 17시, 해제 18시 KST) | 장 개시 스케쥴러 22:00 KST 선접수(`scheduler-time-table.md`) | 유지(2026-11-15 소유자 결정). 매수·매도를 장 개시 배치 한 번에 접수해 단순하다. 대가: 17~22시 프리장에서 목표가를 찍고 되돌아온 날 익절을 놓친다 |
 
 ### 1-4. KISTA 고유 요소
-- **최소 1주 보장**: 매수①·매수②(잔여 > 0일 때)·후반 매수·첫 매수·최종회차 MOC.
+- **최소 1주 보장**: 전반 매수②(별지점)·매수①(잔여 > 0일 때)·후반 매수·첫 매수·최종회차 MOC.
 - **리버스 진입 추가 조건** `referencePrice > deposit`: 기준가로 1주도 못 사면 진입. 진입 `unitAmount > deposit`은 문헌 `T > n − 1`과 같다(`(D+C)/n > D ⟺ n·C/(D+C) > n − 1`).
 - **리버스 예산 소진**: 쿼터매수로 1주도 못 사면 같은 수량을 MOC 매도(`REVERSE_INFINITE_QUOTA_MOC_SELL`). 고유 요소가 아니라 원문 규칙이다(`laor/infinite-v4.md` 5절, quantstack에는 누락).
 - **리버스 종료 `≥`**: 종가 ≥ round2(평단 × (1 − targetProfitRate)), holdings > 0, 체결 후 평단 기준(`ReverseModePosition.shouldExit`). 문헌은 "보다 커지면".
@@ -68,7 +68,7 @@ isFinalRound = unitAmount > deposit  또는  referencePrice > deposit
 BUY 가격이 cap(currentPrice × 1.05, PriceCapPolicy)을 넘으면 cap 기준으로 첫 매수(보유 0, 단일 LOC — base 중 가장 비싼 주문 기준)/전반(①②)/후반(단일 LOC)으로 나눠 재산정한 뒤 보정 3건을 붙인다
 보정 i(1~3) = LOC 매수 1주, 가격 = unitAmount ÷ (누적수량 + 1)  (scale=2, FLOOR — (누적수량+1)×가격 ≤ unitAmount), leg INFINITE_CORRECTION_01~03, 누적수량 0이면 생략
 ```
-- 전반 재산정: cappedAvg = 첫 base 가격.min(cap), cappedRef = (매수② 가격, 매수②가 없던 날은 locBuyPrice).min(cap). 동가면 q1+q2 병합(`INFINITE_EARLY_MERGED_BUY`), 분리 시 q2 > 0일 때만 매수② 추가.
+- 전반 재산정: cappedAvg = 첫 base 가격.min(cap), cappedRef = (매수② 가격, 매수②가 없던 날은 locBuyPrice).min(cap). 수량은 별지점 쪽(cappedRef)부터 잡고 나머지를 평단 쪽(cappedAvg)에 준다. 동가면 두 수량 합으로 병합(`INFINITE_EARLY_MERGED_BUY`), 분리 시 매수②는 항상, 매수①은 수량 > 0일 때만.
 - cap과 무관하게 일반모드 BUY마다 `buildOrders`가 보정 3건을 부착한다(isFinalRound·리버스모드 제외, base BUY 바로 뒤·SELL 앞).
 - 보정 합계가 원장 예수금을 넘으면 뒤쪽 보정부터 제거(`trimCorrectionsToBudget`). base는 줄이지 않는다.
 

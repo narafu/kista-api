@@ -13,7 +13,7 @@ kista-api·kista-ui·kista-infra 세 레포 공통 기준이다. 각 레포의 F
 ## 사용자 확정 사항
 
 1. 기존 "유지 확정·재론 금지" 목록(memory, code-quality-backlog 유지 목록 등)은 **전체 항목 1회 재심 허용**. 재심 결과 유지면 이유를 지침서에 남긴다.
-2. 모든 전제가 재검토 대상이다: 2-프로세스 분리, DB 5스키마, Spring Modulith, 헥사고날 포트 구조, 매매 공식까지. 매매 공식은 https://quantstack.app 을 기준 문헌으로 삼는다(KISTA 무한매수법은 4.0). 정리본은 `kista-api/docs/reference/quantstack/`.
+2. 모든 전제가 재검토 대상이다: 2-프로세스 분리, DB 5스키마, Spring Modulith, 헥사고날 포트 구조, 매매 공식까지. 매매 공식의 기준 문헌은 라오어 카페 원문이다(KISTA 무한매수법은 4.0). 무한매수법은 `kista-api/docs/reference/laor/infinite-v4.md`, VR은 `laor/vr-velog.md`. quantstack(`docs/reference/quantstack/`)은 보조 자료이며 출처 위계는 `docs/reference/README.md`.
 3. 테스트 코드 감량도 목표에 포함하되 별도 주제로 다룬다(동작 보존 근거가 줄어드는 위험 때문).
 4. 산출물 위치는 각 레포의 `docs/superpowers/fable-review/`.
 5. 문서 정리도 범위다: CLAUDE.md·docs·README·memory를 과감히 걷어내고 필요하면 구조를 개편한다(자동 로드 토큰 비용 포함).

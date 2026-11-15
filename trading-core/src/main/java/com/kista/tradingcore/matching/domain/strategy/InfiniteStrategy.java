@@ -51,7 +51,7 @@ public class InfiniteStrategy {
         if (baseOrders.isEmpty()) return buyOrders;
 
         // 원래 BUY 주문의 가격 순서: buy①=averagePrice(또는 currentPrice), buy②=locBuyPrice(별지점 − 0.01)
-        // 첫 매수(보유 0)·후반이면 단일 LOC, 전반이면 ①②(매수②는 0주라 없을 수 있다)
+        // 첫 매수(보유 0)·후반이면 단일 LOC, 전반이면 ①②(매수①은 0주라 없을 수 있다)
         // 첫 매수는 base 중 가장 비싼 주문을 기준으로 한다 — 배포 전에 저장된 반반 주문(①②)이 남아 있어도 전액 단일 LOC로 다시 만든다
         List<PlannedOrder> newBuys;
         if (position.holdings() == 0) {
@@ -101,7 +101,7 @@ public class InfiniteStrategy {
         return buys;
     }
 
-    // 전반: buy①(averagePrice 기반), buy②(locBuyPrice 기반, 원본에 없을 수 있음)
+    // 전반: buy①(averagePrice 기반), buy②(locBuyPrice 기반) — 둘 다 원본에 없을 수 있음
     // DB 조회 순서가 보장되지 않으므로 ①②는 순서가 아니라 leg로 식별한다 — ①②로 식별되지 않는 행은 무시하고 없는 자리는 포지션 기준으로 다시 만든다
     private List<PlannedOrder> computeEarlyBuys(LocalDate tradeDate, InfinitePosition position, List<PlannedOrder> baseOrders, BigDecimal cap, BigDecimal unitAmount) {
         PlannedOrder buy1 = baseOrders.stream().filter(o -> AVG_LEGS.contains(o.orderLeg())).findFirst().orElse(null);
@@ -115,17 +115,18 @@ public class InfiniteStrategy {
         BigDecimal cappedAvg = avgPrice.min(cap);
         BigDecimal cappedRef = refPrice.min(cap);
 
-        int quantity1 = InfinitePosition.earlyBuyQuantity1(unitAmount, cappedAvg);
-        int quantity2 = InfinitePosition.earlyBuyQuantity2(unitAmount, cappedAvg, quantity1, cappedRef);
+        // buildEarlyStageOrders와 같은 배분 — 별지점 쪽이 먼저, 평단 쪽이 나머지
+        int refQuantity = InfinitePosition.earlyBuyQuantity1(unitAmount, cappedRef);
+        int avgQuantity = InfinitePosition.earlyBuyQuantity2(unitAmount, cappedRef, refQuantity, cappedAvg);
 
         List<PlannedOrder> buys = new ArrayList<>();
         if (cappedAvg.compareTo(cappedRef) == 0) {
             // cappedAvg == cappedRef이면 병합
             buys.add(PlannedOrder.of(tradeDate, position.ticker(), avgType, BUY,
-                    quantity1 + quantity2, cappedAvg, EARLY_MERGED_LEG));
+                    avgQuantity + refQuantity, cappedAvg, EARLY_MERGED_LEG));
         } else {
-            buys.add(PlannedOrder.of(tradeDate, position.ticker(), avgType, BUY, quantity1, cappedAvg, EARLY_AVG_LEG));
-            if (quantity2 > 0) buys.add(PlannedOrder.of(tradeDate, position.ticker(), refType, BUY, quantity2, cappedRef, EARLY_REF_LEG));
+            if (avgQuantity > 0) buys.add(PlannedOrder.of(tradeDate, position.ticker(), avgType, BUY, avgQuantity, cappedAvg, EARLY_AVG_LEG));
+            buys.add(PlannedOrder.of(tradeDate, position.ticker(), refType, BUY, refQuantity, cappedRef, EARLY_REF_LEG));
         }
         return buys;
     }
@@ -173,14 +174,13 @@ public class InfiniteStrategy {
 
     private List<PlannedOrder> buildEarlyStageOrders(InfinitePosition position, LocalDate tradeDate) {
         List<PlannedOrder> buys = new ArrayList<>();
-        // LOC 매수 ① — 평단가 기준 (최소 1주)
-        int buyQuantity1 = position.calcEarlyBuyQuantityByAvgPrice();
-        buys.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, BUY, buyQuantity1,
+        // 수량은 별지점 − 0.01 쪽이 절반 안에서 먼저 잡고(최소 1주) 남은 금액을 평단가 쪽이 받는다(0주면 미생성)
+        int refQuantity = position.calcEarlyBuyQuantityByRefPrice();
+        int avgQuantity = position.calcEarlyBuyQuantityByAvgPrice(refQuantity);
+        // 주문 목록 순서는 매수①(평단가) → 매수②(별지점)로 유지한다
+        if (avgQuantity > 0) buys.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, BUY, avgQuantity,
                 position.averagePrice(), EARLY_AVG_LEG));
-
-        // LOC 매수 ② — 별지점 − 0.01 (매수①이 unitAmount를 다 쓰면 0주 → 미생성)
-        int buyQuantity2 = position.calcEarlyBuyQuantityByRefPrice(buyQuantity1);
-        if (buyQuantity2 > 0) buys.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, BUY, buyQuantity2,
+        buys.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, BUY, refQuantity,
                 position.locBuyPrice(), EARLY_REF_LEG));
 
         // 보정 주문은 BUY만 담긴 시점에 붙인다 — base BUY가 없으면 보정도 없다

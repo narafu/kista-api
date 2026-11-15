@@ -68,7 +68,7 @@ class InfiniteStrategyTypeTest {
 
         List<PlannedOrder> orders = strategy.buildOrders(position, TODAY);
 
-        // 매수① 평단 50 × floor(250/50)=5주 (평단 매수는 −0.01 없음), 매수② floor((500−250)/57.12)=4주
+        // 매수② 별지점−0.01 57.12 × floor(250/57.12)=4주를 먼저 잡고, 매수① 평단 50 × floor((500−228.48)/50)=5주 (평단 매수는 −0.01 없음)
         assertThat(orders.get(0)).matches(o -> o.quantity() == 5 && o.price().compareTo(new BigDecimal("50")) == 0);
         assertThat(orders.get(1)).matches(o -> "INFINITE_EARLY_REF_BUY".equals(o.orderLeg())
                 && o.quantity() == 4 && o.price().compareTo(new BigDecimal("57.12")) == 0);
@@ -592,7 +592,7 @@ class InfiniteStrategyTypeTest {
     @DisplayName("buildCappedBuyOrders 전반 매수② 0주 + cap 발동: 후반 공식이 아닌 전반 공식으로 재산정")
     void capped_earlyStageWithoutBuy2_staysOnEarlyFormula() {
         // 보유 1주(평단 100)·예수금 1900 → unitAmount=100, T=1(전반), 매수① 1주×100 ≥ 100 → base 1건(매수② 0주)
-        // cap=84(현재가 80): 전반 공식 cappedAvg=cappedRef=84 → q1=1, 잔여 16>0 → q2=1 → 병합 84×2
+        // cap=84(현재가 80): 전반 공식 cappedAvg=cappedRef=84 → 별지점 쪽 max(1, floor(50/84))=1, 잔여 16>0 → 평단 쪽 1 → 병합 84×2
         // (후반 공식이면 floor(100/84)=1주 — 이 단언이 분기 결함을 잡는다)
         InfinitePosition position = new InfinitePosition(new AccountBalance(1, new BigDecimal("100"), new BigDecimal("1900")), StrategyTicker.SOXL, new BigDecimal("100"), 20);
         List<PlannedOrder> base = List.of(PlannedOrder.of(TODAY, StrategyTicker.SOXL, LOC, BUY, 1, new BigDecimal("100"), "INFINITE_EARLY_AVG_BUY"));

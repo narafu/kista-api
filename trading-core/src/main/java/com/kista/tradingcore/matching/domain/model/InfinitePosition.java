@@ -131,14 +131,14 @@ public record InfinitePosition(
 
     // static 헬퍼: 실제 평단가·기준가 대신 임의 가격(예: 캡가격)으로도 재사용 가능
     public static int earlyBuyQuantity1(BigDecimal unitAmount, BigDecimal price) {
-        // 전반 매수①: (unitAmount/2) / price — 최소 1주 보장
+        // 전반 먼저 잡는 쪽(별지점): (unitAmount/2) / price — 최소 1주 보장
         return Math.max(1, unitAmount.divide(BigDecimal.valueOf(2), FLOOR)
                 .divide(price, 0, FLOOR).intValue());
     }
 
     public static int earlyBuyQuantity2(BigDecimal unitAmount, BigDecimal price1, int quantity,
                                         BigDecimal price2) {
-        // 전반 매수②: (unitAmount - price1×quantity) / price2 — 잔여 0 이하면 0주, 아니면 최소 1주
+        // 전반 남은 금액을 받는 쪽(평단): (unitAmount - price1×quantity) / price2 — 잔여 0 이하면 0주, 아니면 최소 1주
         BigDecimal remaining = unitAmount.subtract(price1.multiply(BigDecimal.valueOf(quantity)));
         if (remaining.signum() <= 0) return 0;
         return Math.max(1, remaining.divide(price2, 0, FLOOR).intValue());
@@ -149,13 +149,14 @@ public record InfinitePosition(
         return Math.max(1, unitAmount.divide(price, 0, FLOOR).intValue());
     }
 
-    public int calcEarlyBuyQuantityByAvgPrice() {
-        return earlyBuyQuantity1(unitAmount(), averagePrice());
+    // 전반 배분은 별지점 쪽이 절반 안에서 먼저 수량을 잡고 남은 금액을 평단 쪽이 받는다 — 원문 예시(78.11×3, 69.75×4)와 같은 순서
+    public int calcEarlyBuyQuantityByRefPrice() {
+        return earlyBuyQuantity1(unitAmount(), locBuyPrice());
     }
 
-    public int calcEarlyBuyQuantityByRefPrice(int buyQuantityByAvgPrice) {
-        return earlyBuyQuantity2(unitAmount(), averagePrice(), buyQuantityByAvgPrice,
-                locBuyPrice());
+    public int calcEarlyBuyQuantityByAvgPrice(int buyQuantityByRefPrice) {
+        return earlyBuyQuantity2(unitAmount(), locBuyPrice(), buyQuantityByRefPrice,
+                averagePrice());
     }
 
     public int calcLateBuyQuantity() {

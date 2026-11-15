@@ -647,26 +647,26 @@ class BacktestEngineTest {
                 flat("2024-01-03", 1000),
                 candle("2024-01-04", 1100, 1200, 1080, 1160), // 지정가 매도 1주@1150 체결 → 전량 청산 → 사이클 종료
                 flat("2024-01-05", 1040),
-                candle("2024-01-06", 1045, 1050, 1040, 1045),
+                candle("2024-01-06", 1100, 1110, 1095, 1100), // 종가가 별지점 매수가보다 높아 매수 미체결
                 flat("2024-01-07", 990),                      // 사이클 B 리버스모드 진입(첫날)
                 flat("2024-01-08", 800)                       // 사이클 B 리버스모드 둘째 날 — 별지점 산출
         ), infiniteCommand("2024-01-02", "2000", 4));
 
         assertThat(output.cycleCount()).isEqualTo(2);
-        // 청산 당일이 곧 사이클 B의 0회차 — 0회차 매수①만 체결(매수①이 unitAmount를 다 써 매수② 없음)이라 예수금 1000 + 매도대금 1150 = 2150.00이 그대로 이월된다
+        // 청산 당일이 곧 사이클 B의 0회차 — 예수금 1000 + 매도대금 1150 = 2150.00이 그대로 이월된다
         assertThat(recorder.on("2024-01-04").balance().holdings()).isZero();
         assertThat(recorder.on("2024-01-04").balance().deposit()).isEqualByComparingTo("2150.00");
 
         assertThat(recorder.on("2024-01-07").inputs().isFirstReverseDay()).isTrue();
 
-        // 사이클 B의 별지점 = 사이클 B 종가 4개(1040·1045·990·800) 평균 = 3875 ÷ 4 = 968.75
-        // rotateCycle()이 recentCloses를 비우지 않으면 윈도우가 [1160·1040·1045·990·800]이 되어 1007.00이 나온다
-        // (사이클 A의 청산일 종가 1160이 섞여 별지점이 38.25달러 위로 밀린다)
+        // 사이클 B의 별지점 = 사이클 B 종가 4개(1040·1100·990·800) 평균 = 3930 ÷ 4 = 982.50
+        // rotateCycle()이 recentCloses를 비우지 않으면 윈도우가 [1160·1040·1100·990·800]이 되어 1018.00이 나온다
+        // (사이클 A의 청산일 종가 1160이 섞여 별지점이 35.50달러 위로 밀린다)
         Recorded starDay = recorder.on("2024-01-08");
         assertThat(starDay.inputs().isReverseMode()).isTrue();
         assertThat(starDay.inputs().isFirstReverseDay()).isFalse();
-        assertThat(starDay.inputs().starPointPrice()).isEqualByComparingTo("968.75");
-        assertThat(starDay.inputs().starPointPrice()).isNotEqualByComparingTo("1007.00");
+        assertThat(starDay.inputs().starPointPrice()).isEqualByComparingTo("982.50");
+        assertThat(starDay.inputs().starPointPrice()).isNotEqualByComparingTo("1018.00");
     }
 
     // --- PRIVACY 픽스처 헬퍼 ---

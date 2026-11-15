@@ -4,7 +4,7 @@
 - 1.일반모드 — https://m.cafe.naver.com/ca-fe/web/cafes/30372164/articles/79263 (아래 `N p.쪽`)
 - 2.소진후 리버스모드 — https://m.cafe.naver.com/ca-fe/web/cafes/30372164/articles/79264 (아래 `R p.쪽`)
 
-소유자가 2026-11-14 PDF로 저장해 전달했고(레포에 두지 않는다), 2026-11-15 규칙과 예시 수치만 옮겼다. 원문에 없는 내용은 넣지 않는다. KISTA와의 차이는 `docs/agents/modules/tradingcore/trading-formulas.md` 1절이 SSOT다.
+소유자가 2026-11-14 PDF로 저장해 전달했고, 2026-11-15 규칙과 예시 수치를 옮긴 뒤 PDF는 삭제했다. 쪽 번호는 그 PDF 기준이며 원문 재확인은 위 링크로 한다. 원문에 없는 내용은 넣지 않는다. KISTA와의 차이는 `docs/agents/modules/tradingcore/trading-formulas.md` 1절이 SSOT다.
 
 ## 1. 원금·분할·T
 - 종목: 초심자는 TQQQ, 익숙해지면 SOXL 병행. 그 외 종목은 권하지 않는다. (N p.1)

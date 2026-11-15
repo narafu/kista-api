@@ -253,20 +253,31 @@ class InfinitePositionTest {
     }
 
     @Test
+    @DisplayName("전반 배분: 별지점 쪽이 절반 안에서 먼저 잡고 남은 금액을 평단 쪽이 받는다 — 원문 예시 1회 539.23 → 78.11×3, 69.75×4")
+    void earlyAllocation_matchesOriginalExample() {
+        BigDecimal unit = new BigDecimal("539.23");
+        int byRef = InfinitePosition.earlyBuyQuantity1(unit, new BigDecimal("78.11"));
+
+        assertThat(byRef).isEqualTo(3); // floor(269.615 / 78.11)
+        assertThat(InfinitePosition.earlyBuyQuantity2(unit, new BigDecimal("78.11"), byRef, new BigDecimal("69.75")))
+                .isEqualTo(4); // floor((539.23 − 234.33) / 69.75)
+    }
+
+    @Test
     @DisplayName("30분할 수량: 전반(14회차) 평단 매수 50주·별지점−0.01 매수 50주, 후반(15회차) 101주")
     void quantities_30div() {
         InfinitePosition early = posAtAvg1(1400, 1600, 30); // unit=100, 평단 1, 별지점 1.01, LOC 매수가 1.00
-        int byAvg = early.calcEarlyBuyQuantityByAvgPrice();
+        int byRef = early.calcEarlyBuyQuantityByRefPrice();
 
-        assertThat(byAvg).isEqualTo(50);                                       // floor(50/1)
-        assertThat(early.calcEarlyBuyQuantityByRefPrice(byAvg)).isEqualTo(50); // floor(50/1.00)
+        assertThat(byRef).isEqualTo(50);                                       // floor(50/1.00)
+        assertThat(early.calcEarlyBuyQuantityByAvgPrice(byRef)).isEqualTo(50); // floor((100 − 50)/1)
         assertThat(posAtAvg1(1500, 1500, 30).calcLateBuyQuantity()).isEqualTo(101); // floor(100/0.99) — 별지점 1.00 − 0.01
     }
 
     @Test
-    @DisplayName("40분할 수량: 전반(19회차) 평단 매수 50주, 후반(20회차) 101주")
+    @DisplayName("40분할 수량: 전반(19회차) 별지점 매수 50주, 후반(20회차) 101주")
     void quantities_40div() {
-        assertThat(posAtAvg1(1900, 2100, 40).calcEarlyBuyQuantityByAvgPrice()).isEqualTo(50);
+        assertThat(posAtAvg1(1900, 2100, 40).calcEarlyBuyQuantityByRefPrice()).isEqualTo(50);
         assertThat(posAtAvg1(2000, 2000, 40).calcLateBuyQuantity()).isEqualTo(101); // floor(100/0.99)
     }
 }
