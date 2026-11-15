@@ -14,7 +14,6 @@ import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
-import com.kista.tradingcore.stats.application.usecase.CryptoPortfolioUseCase;
 import com.kista.tradingcore.stats.domain.model.CryptoPortfolio;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,9 +27,10 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 // 코인 계좌 잔고 → KRW 평가 포트폴리오 (거래소 실잔고가 SSOT, DB 포지션 없음)
+// 코인 계좌 포트폴리오 조회 — 주식 계좌는 IllegalArgumentException(400)
 @Service
 @RequiredArgsConstructor
-class CryptoPortfolioService implements CryptoPortfolioUseCase {
+public class CryptoPortfolioService {
 
     private final AccountPort accountPort;       // 소유권 검증
     private final CryptoExchanges exchanges;     // 코인 거래소 라우터
@@ -38,7 +38,6 @@ class CryptoPortfolioService implements CryptoPortfolioUseCase {
     private final StrategyCyclePort strategyCyclePort;   // 전략 최신 사이클
     private final CyclePositionPort cyclePositionPort;   // 사이클 최신 포지션(원장 평단)
 
-    @Override
     public CryptoPortfolio getCryptoPortfolio(UUID accountId, UUID requesterId) {
         Account account = requireCryptoAccount(accountId, requesterId);
         CryptoExchangePort exchange = exchanges.of(account.broker());
@@ -59,7 +58,7 @@ class CryptoPortfolioService implements CryptoPortfolioUseCase {
         return new CryptoPortfolio(currency, balance.quoteAvailable().add(balance.quoteLocked()), holdings);
     }
 
-    @Override
+    // 계좌 거래소의 코인 현재가(KRW) — 잔고와 무관(원장 보유 평가 폴백용). 빈 목록·코인 아닌 종목·주식 계좌는 IllegalArgumentException(400), 시세 없는 종목은 결과에서 빠진다
     public Map<StrategyTicker, BigDecimal> getCurrentPrices(UUID accountId, UUID requesterId, List<StrategyTicker> tickers) {
         // 소유권·코인 계좌 검증 후 종목 검증 — 둘 다 거래소 호출 전 (guard 안에서 매핑 누락 IAE가 나면 5xx로 바뀐다)
         Account account = requireCryptoAccount(accountId, requesterId);

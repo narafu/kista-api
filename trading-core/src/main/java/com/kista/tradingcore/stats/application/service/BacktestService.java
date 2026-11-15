@@ -16,7 +16,6 @@ import com.kista.tradingcore.trading.domain.creation.VrRampValidator;
 import com.kista.tradingcore.trading.domain.creation.StrategyCreationResolver;
 import com.kista.shared.kernel.RecurringMode;
 import com.kista.shared.kernel.StrategyCreationSettings;
-import com.kista.tradingcore.stats.application.usecase.BacktestUseCase;
 import com.kista.tradingcore.stats.application.port.output.HistoricalCandlePort;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
@@ -34,9 +33,10 @@ import java.util.List;
 import java.util.Map;
 import com.kista.shared.kernel.StrategyType;
 
+// 과거 일봉 기반 전략 시뮬레이션 — 계좌·소유권과 무관(로그인만 필요)
 @Service
 @RequiredArgsConstructor
-class BacktestService implements BacktestUseCase {
+public class BacktestService {
 
     private static final String FILL_MODEL_WARNING =
             "체결은 일봉 시가·고가·저가·종가로 판정합니다. 지정가 주문은 장중 가격이 지정가에 닿으면 전량 체결된 것으로 보고"
@@ -56,7 +56,6 @@ class BacktestService implements BacktestUseCase {
     private final CycleOrderStrategies cycleOrderStrategies; // 전략 capability 라우터 (엔진에 그대로 위임)
     private final StrategyCreationPolicyPort strategyCreationPolicyPort; // VR bandWidth/intervalWeeks 허용값 — 운영 등록과 동일 정책
 
-    @Override
     public BacktestResult run(BacktestCommand command) {
         validate(command);
 

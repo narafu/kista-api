@@ -2,7 +2,7 @@ package com.kista.tradingcore.stats.adapter.in.web;
 
 import com.kista.tradingcore.stats.adapter.in.web.dto.*;
 import com.kista.shared.kernel.StrategyTicker;
-import com.kista.tradingcore.stats.application.usecase.AccountStatisticsUseCase;
+import com.kista.tradingcore.stats.application.service.AccountStatisticsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -25,7 +25,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class StatisticsController {
 
-    private final AccountStatisticsUseCase accountStatistics;
+    private final AccountStatisticsService accountStatistics;
 
     // 체결기준현재잔고 조회 — 브로커 어댑터 경유(KIS: CTRP6504R+TTTC2101R 보정 / Toss: 보유종목+예수금 직접 산출)
     @Operation(summary = "현재 잔고 조회", description = "브로커 어댑터 경유(KIS: CTRP6504R+TTTC2101R 보정 / Toss: 보유종목+예수금 직접 산출) — 체결 기준 현재 보유 종목별 잔고 및 평가손익 조회.")

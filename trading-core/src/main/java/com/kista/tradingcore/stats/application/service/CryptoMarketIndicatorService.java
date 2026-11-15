@@ -11,8 +11,6 @@ import com.kista.tradingcore.stats.application.port.output.CryptoMarketMetricsPo
 import com.kista.tradingcore.stats.application.port.output.HashrateHistoryPort;
 import com.kista.tradingcore.stats.application.port.output.HistoricalFxRatePort;
 import com.kista.tradingcore.stats.application.port.output.UpbitMarketDataPort;
-import com.kista.tradingcore.stats.application.usecase.BrokerStatisticsUseCase;
-import com.kista.tradingcore.stats.application.usecase.CryptoMarketIndicatorUseCase;
 import com.kista.tradingcore.stats.domain.model.CryptoHashRibbons;
 import com.kista.tradingcore.stats.domain.model.CryptoMarketIndicators;
 import com.kista.tradingcore.stats.domain.model.CryptoMarketIndicators.*;
@@ -36,8 +34,9 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 // 코인 시장 지표 조립 — 섹션별 실패 격리(null) + 10분 인메모리 캐시(전부 실패 결과는 1분, 장기 일봉·도미넌스/알트 시즌/해시레이트 이력은 다음 UTC 자정까지)
+// 코인 시장 지표 조회 (김프·테더 프리미엄·펀딩비·OI·밸류에이션·롱숏 비율·반감기)
 @Service
-class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
+public class CryptoMarketIndicatorService {
 
     static final int MAX_DAYS = 365; // 조회 가능 최대 기간(일)
     static final Duration TTL = Duration.ofMinutes(10); // 캐시 유효 시간 — 코인 DCA와 Upbit 공개 시세 rate limit(429)을 공유해 캐시가 필수다
@@ -60,14 +59,14 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
     private final HistoricalFxRatePort fxRates; // 과거 공식 환율
     private final BlockHeightPort blockHeight; // BTC 블록 높이 (반감기)
     private final CoinbaseMarketDataPort coinbase; // 코인베이스 (미국 현물 기준가)
-    private final BrokerStatisticsUseCase brokerStatistics; // 현재 공식 환율
+    private final BrokerStatisticsService brokerStatistics; // 현재 공식 환율
     private final CryptoMarketMetricsPort cmc; // CoinMarketCap (BTC 도미넌스·알트 시즌)
     private final HashrateHistoryPort hashrates; // BTC 일별 해시레이트 (Hash Ribbons)
     private final Clock clock; // 조립 시각·오늘 날짜 기준 — 테스트에서 고정
     private final TtlResultCache cache; // 결과 캐시 (single-flight, 정상 10분·전부 실패 1분)
 
     CryptoMarketIndicatorService(UpbitMarketDataPort upbit, BinanceMarketDataPort binance, HistoricalFxRatePort fxRates,
-                                 BlockHeightPort blockHeight, CoinbaseMarketDataPort coinbase, BrokerStatisticsUseCase brokerStatistics,
+                                 BlockHeightPort blockHeight, CoinbaseMarketDataPort coinbase, BrokerStatisticsService brokerStatistics,
                                  CryptoMarketMetricsPort cmc, HashrateHistoryPort hashrates, Clock clock) {
         this.cache = new TtlResultCache(clock);
         this.upbit = upbit;
@@ -81,7 +80,7 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
         this.clock = clock;
     }
 
-    @Override
+    // days: 1~365, 범위 밖이면 IllegalArgumentException
     public CryptoMarketIndicators get(int days) {
         if (days < 1 || days > MAX_DAYS) throw new IllegalArgumentException("조회 기간은 1~" + MAX_DAYS + "일이어야 합니다.");
         // 전부 실패한 결과는 정상 키에 두지 않고(loader가 null) 별도 키에 1분만 둔다 — 그동안은 빈 결과 재사용, 이후 재조회

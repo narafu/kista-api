@@ -1,8 +1,9 @@
 package com.kista.tradingcore.stats.adapter.in.web;
 
+import com.kista.tradingcore.stats.domain.model.Scope;
 import com.kista.shared.contract.stats.InvestmentPointsResponse;
-import com.kista.tradingcore.stats.application.usecase.BrokerStatisticsUseCase;
-import com.kista.tradingcore.stats.application.usecase.InvestmentPointsQuery;
+import com.kista.tradingcore.stats.application.service.BrokerStatisticsService;
+import com.kista.tradingcore.stats.application.service.InvestmentPointsQueryService;
 import com.kista.tradingcore.stats.domain.model.InvestmentPointsResult;
 import com.kista.shared.kernel.Currency;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,14 +22,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TradingStatsInternalController {
 
-    private final InvestmentPointsQuery investmentPointsQuery;
-    private final BrokerStatisticsUseCase brokerStatisticsUseCase; // 환율 조회(증권사 선택은 유스케이스가 결정)
+    private final InvestmentPointsQueryService investmentPointsQuery;
+    private final BrokerStatisticsService brokerStatisticsUseCase; // 환율 조회(증권사 선택은 유스케이스가 결정)
 
     @Operation(summary = "투자 성과 시리즈 조회", description = "벤치마크 비교용 InvestmentPoint 시리즈. X-Internal-Token 헤더 필수.")
     @GetMapping("/investment-points")
     public InvestmentPointsResponse getInvestmentPoints(
             @RequestParam UUID userId,
-            @RequestParam InvestmentPointsQuery.Scope scope,
+            @RequestParam Scope scope,
             @RequestParam(required = false) UUID strategyId,
             @RequestParam(defaultValue = "USD") Currency currency, // STRATEGY scope는 무시(전략 계좌 통화 사용)
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

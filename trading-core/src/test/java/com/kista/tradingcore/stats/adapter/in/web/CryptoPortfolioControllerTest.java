@@ -3,7 +3,7 @@ package com.kista.tradingcore.stats.adapter.in.web;
 import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.platform.PlatformJsonConfig;
-import com.kista.tradingcore.stats.application.usecase.CryptoPortfolioUseCase;
+import com.kista.tradingcore.stats.application.service.CryptoPortfolioService;
 import com.kista.tradingcore.stats.domain.model.CryptoPortfolio;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -33,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CryptoPortfolioControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockitoBean CryptoPortfolioUseCase useCase;
+    @MockitoBean CryptoPortfolioService useCase;
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000aa");

@@ -1,7 +1,7 @@
 package com.kista.tradingcore.stats.adapter.in.web;
 
 import com.kista.tradingcore.stats.adapter.in.web.dto.CryptoMarketIndicatorsResponse;
-import com.kista.tradingcore.stats.application.usecase.CryptoMarketIndicatorUseCase;
+import com.kista.tradingcore.stats.application.service.CryptoMarketIndicatorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -22,7 +22,7 @@ public class CryptoMarketIndicatorController {
 
     private static final CacheControl CACHE = CacheControl.maxAge(10, TimeUnit.MINUTES).cachePublic();
 
-    private final CryptoMarketIndicatorUseCase useCase; // 코인 시장 지표 조회
+    private final CryptoMarketIndicatorService useCase; // 코인 시장 지표 조회
 
     @Operation(summary = "코인 시장 지표 조회", description = "김프(공식 환율·테더 기준)·테더 프리미엄·펀딩비·미결제약정·장기 밸류에이션(200주 이동평균·Mayer Multiple·ATH 대비 하락률)·롱/숏 계좌 비율·BTC 반감기 카운트다운. 실패한 섹션은 null.")
     @ApiResponse(responseCode = "200", description = "조회 성공")

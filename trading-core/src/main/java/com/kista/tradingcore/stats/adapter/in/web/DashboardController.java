@@ -2,7 +2,7 @@ package com.kista.tradingcore.stats.adapter.in.web;
 
 import com.kista.tradingcore.stats.adapter.in.web.dto.CycleHistoryPageResponse;
 import com.kista.tradingcore.stats.adapter.in.web.dto.DailyTransactionResponse;
-import com.kista.tradingcore.stats.application.usecase.AccountStatisticsUseCase;
+import com.kista.tradingcore.stats.application.service.AccountStatisticsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -23,7 +23,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DashboardController {
 
-    private final AccountStatisticsUseCase accountStatistics;
+    private final AccountStatisticsService accountStatistics;
 
     // 사이클 이력 (DB 기반, 커서 페이지네이션)
     @Operation(summary = "사이클 이력 조회", description = "DB의 strategy_cycle 기반 계좌 거래 이력 조회.")

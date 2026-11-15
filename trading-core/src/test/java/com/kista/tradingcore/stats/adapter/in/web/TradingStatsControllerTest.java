@@ -1,7 +1,7 @@
 package com.kista.tradingcore.stats.adapter.in.web;
 
 import com.kista.tradingcore.stats.domain.model.*;
-import com.kista.tradingcore.stats.application.usecase.TradingStatsUseCase;
+import com.kista.tradingcore.stats.application.service.TradingStatsService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -32,7 +32,7 @@ import com.kista.shared.kernel.StrategyTicker;
 class TradingStatsControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockitoBean TradingStatsUseCase tradingStats;
+    @MockitoBean TradingStatsService tradingStats;
 
     private static final UUID USER_ID = UUID.randomUUID();
 

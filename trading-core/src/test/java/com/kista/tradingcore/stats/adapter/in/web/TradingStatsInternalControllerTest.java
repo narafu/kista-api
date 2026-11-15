@@ -1,8 +1,9 @@
 package com.kista.tradingcore.stats.adapter.in.web;
 
+import com.kista.tradingcore.stats.domain.model.Scope;
 import com.kista.tradingcore.broker.domain.model.ExchangeRateQuote;
-import com.kista.tradingcore.stats.application.usecase.BrokerStatisticsUseCase;
-import com.kista.tradingcore.stats.application.usecase.InvestmentPointsQuery;
+import com.kista.tradingcore.stats.application.service.BrokerStatisticsService;
+import com.kista.tradingcore.stats.application.service.InvestmentPointsQueryService;
 import com.kista.tradingcore.stats.domain.model.InvestmentPointsResult;
 import com.kista.shared.platform.security.InternalTokenAuthFilter;
 import com.kista.shared.platform.security.JwtAuthFilter;
@@ -42,8 +43,8 @@ class TradingStatsInternalControllerTest {
 
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean InvestmentPointsQuery investmentPointsQuery;
-    @MockitoBean BrokerStatisticsUseCase brokerStatisticsUseCase; // 환율 조회 라우트 의존성
+    @MockitoBean InvestmentPointsQueryService investmentPointsQuery;
+    @MockitoBean BrokerStatisticsService brokerStatisticsUseCase; // 환율 조회 라우트 의존성
 
     private static final String VALID_TOKEN = "test-internal-token";
     private static final UUID USER_ID = UUID.randomUUID();
@@ -52,7 +53,7 @@ class TradingStatsInternalControllerTest {
     void 투자_성과_시리즈를_조회한다() throws Exception {
         InvestmentPointsResult response = new InvestmentPointsResult(
                 List.of(), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1), null, com.kista.shared.kernel.Currency.USD);
-        given(investmentPointsQuery.fetch(eq(USER_ID), eq(InvestmentPointsQuery.Scope.PORTFOLIO),
+        given(investmentPointsQuery.fetch(eq(USER_ID), eq(Scope.PORTFOLIO),
                 isNull(), eq(com.kista.shared.kernel.Currency.USD), any(), any()))
                 .willReturn(response);
 
@@ -70,7 +71,7 @@ class TradingStatsInternalControllerTest {
 
     @Test
     void currency_파라미터를_유스케이스에_전달하고_응답에_싣는다() throws Exception {
-        given(investmentPointsQuery.fetch(eq(USER_ID), eq(InvestmentPointsQuery.Scope.PORTFOLIO),
+        given(investmentPointsQuery.fetch(eq(USER_ID), eq(Scope.PORTFOLIO),
                 isNull(), eq(com.kista.shared.kernel.Currency.USDT), isNull(), isNull()))
                 .willReturn(new InvestmentPointsResult(
                         List.of(), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1), null, com.kista.shared.kernel.Currency.USDT));
@@ -87,7 +88,7 @@ class TradingStatsInternalControllerTest {
     @Test
     void 구버전_root가_보내는_granularity_파라미터는_무시한다() throws Exception {
         // 배포 스큐(새 kista-trading + 구 kista-api) 구간에도 400 없이 응답해야 한다
-        given(investmentPointsQuery.fetch(eq(USER_ID), eq(InvestmentPointsQuery.Scope.PORTFOLIO),
+        given(investmentPointsQuery.fetch(eq(USER_ID), eq(Scope.PORTFOLIO),
                 isNull(), eq(com.kista.shared.kernel.Currency.USD), isNull(), isNull()))
                 .willReturn(new InvestmentPointsResult(
                         List.of(), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1), null, com.kista.shared.kernel.Currency.USD));

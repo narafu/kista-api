@@ -3,7 +3,7 @@ package com.kista.tradingcore.stats.adapter.in.web;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.stats.adapter.in.web.dto.CryptoPortfolioResponse;
 import com.kista.tradingcore.stats.adapter.in.web.dto.CryptoPricesResponse;
-import com.kista.tradingcore.stats.application.usecase.CryptoPortfolioUseCase;
+import com.kista.tradingcore.stats.application.service.CryptoPortfolioService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -24,7 +24,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CryptoPortfolioController {
 
-    private final CryptoPortfolioUseCase cryptoPortfolio; // 코인 계좌 포트폴리오 조회
+    private final CryptoPortfolioService cryptoPortfolio; // 코인 계좌 포트폴리오 조회
 
     @Operation(summary = "코인 계좌 포트폴리오 조회", description = "업비트 실잔고 기준 원화 예수금과 코인별 보유·평단·현재가·평가액(KRW). 주식 계좌는 400.")
     @ApiResponses({

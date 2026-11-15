@@ -2,7 +2,7 @@ package com.kista.tradingcore.stats.adapter.in.web;
 
 import com.kista.shared.contract.stats.PortfolioCurrentResponse;
 import com.kista.shared.contract.stats.PortfolioOrderResponse;
-import com.kista.tradingcore.stats.application.usecase.PortfolioUseCase;
+import com.kista.tradingcore.stats.application.service.PortfolioService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +20,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PortfolioQueryInternalController {
 
-    private final PortfolioUseCase portfolioUseCase;
+    private final PortfolioService portfolioUseCase;
 
     @Operation(summary = "현재 포트폴리오 현황 조회", description = "전략별 최신 포지션(코인 계좌 포함, 통화 표기). 없으면 빈 목록. X-Internal-Token 헤더 필수.")
     @GetMapping("/current")

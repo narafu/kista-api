@@ -9,7 +9,6 @@ import com.kista.tradingcore.stats.domain.model.*;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
-import com.kista.tradingcore.stats.application.usecase.TradingStatsUseCase;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
@@ -44,7 +43,7 @@ import com.kista.shared.kernel.StrategyType;
 // 사용자 통계 중 trading 소유 부분 — 실현·미실현 손익 요약/누적 자산 곡선/사이클 성과 목록.
 // housing/ETF 벤치마크 비교는 api의 BenchmarkService(com.kista.api.benchmark)가 계속 소유한다.
 @Service
-class TradingStatsService implements TradingStatsUseCase {
+public class TradingStatsService {
 
     // 매매 리포트(체결·포지션 스냅샷 저장) 직후엔 onTradingReportReady가, 투자금·시드·VR 재설정·체결 보정·재개·삭제 직후엔 onStrategyCapitalChanged가 사용자 키를 비우고, 그 외 변경은 TTL 만료에 맡긴다
     private static final Duration CURVE_CACHE_TTL = Duration.ofMinutes(5);
@@ -131,7 +130,6 @@ class TradingStatsService implements TradingStatsUseCase {
                 || key instanceof EquityCurveKey k && k.userId().equals(userId));
     }
 
-    @Override
     public StatsSummary getSummary(UUID userId, Currency currency) {
         return statsResultCache.getOrCompute(
                 new SummaryKey(userId, currency), CURVE_CACHE_TTL, () -> computeSummary(userId, currency));
@@ -167,7 +165,7 @@ class TradingStatsService implements TradingStatsUseCase {
         return new StatsSummary(totalRealized, totalUnrealized, activePrincipal, typeStats, availableCurrencies);
     }
 
-    @Override
+    // from/to null 허용 (null이면 전체/오늘)
     public EquityCurve getEquityCurve(UUID userId, Currency currency, StrategyType type, LocalDate from, LocalDate to) {
         return statsResultCache.getOrCompute(
                 new EquityCurveKey(userId, currency, type, from, to), CURVE_CACHE_TTL,
@@ -195,7 +193,7 @@ class TradingStatsService implements TradingStatsUseCase {
         return new EquityCurve(points);
     }
 
-    @Override
+    // type/accountId/ticker/status 각각 null이면 해당 조건 미적용 (AND 조합). 타 사용자 accountId는 빈 결과. page는 0-based
     public CyclePerformancePage getCyclePerformances(UUID userId, StrategyType type, UUID accountId,
                                                      StrategyTicker ticker, CycleStatusFilter status, int page, int size) {
         // loadCycles가 본인 계좌로 한정하므로 타 사용자 accountId는 자연히 빈 결과

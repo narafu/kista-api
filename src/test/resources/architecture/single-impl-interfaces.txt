@@ -63,14 +63,6 @@ com.kista.tradingcore.stats.application.port.output.HashrateHistoryPort
 com.kista.tradingcore.stats.application.port.output.HistoricalCandlePort
 com.kista.tradingcore.stats.application.port.output.HistoricalFxRatePort
 com.kista.tradingcore.stats.application.port.output.UpbitMarketDataPort
-com.kista.tradingcore.stats.application.usecase.AccountStatisticsUseCase
-com.kista.tradingcore.stats.application.usecase.BacktestUseCase
-com.kista.tradingcore.stats.application.usecase.BrokerStatisticsUseCase
-com.kista.tradingcore.stats.application.usecase.CryptoMarketIndicatorUseCase
-com.kista.tradingcore.stats.application.usecase.CryptoPortfolioUseCase
-com.kista.tradingcore.stats.application.usecase.InvestmentPointsQuery
-com.kista.tradingcore.stats.application.usecase.PortfolioUseCase
-com.kista.tradingcore.stats.application.usecase.TradingStatsUseCase
 com.kista.tradingcore.trading.application.port.output.CryptoFearGreedIndexPort
 com.kista.tradingcore.trading.application.port.output.CycleCapitalEventPort
 com.kista.tradingcore.trading.application.port.output.CyclePositionInfiniteDetailPort

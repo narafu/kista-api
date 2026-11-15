@@ -6,7 +6,7 @@ import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.trading.domain.model.CycleHistoryPage;
-import com.kista.tradingcore.stats.application.usecase.AccountStatisticsUseCase;
+import com.kista.tradingcore.stats.application.service.AccountStatisticsService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -34,7 +34,7 @@ class DashboardControllerTest {
 
     @Autowired MockMvc mockMvc;
 
-    @MockitoBean AccountStatisticsUseCase accountStatistics;
+    @MockitoBean AccountStatisticsService accountStatistics;
 
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000099");
 

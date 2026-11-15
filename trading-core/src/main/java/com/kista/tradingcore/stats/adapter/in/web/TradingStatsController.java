@@ -1,6 +1,6 @@
 package com.kista.tradingcore.stats.adapter.in.web;
 
-import com.kista.tradingcore.stats.application.usecase.TradingStatsUseCase;
+import com.kista.tradingcore.stats.application.service.TradingStatsService;
 import com.kista.tradingcore.stats.adapter.in.web.dto.CyclePerformancePageResponse;
 import com.kista.tradingcore.stats.adapter.in.web.dto.EquityCurveResponse;
 import com.kista.tradingcore.stats.adapter.in.web.dto.StatsSummaryResponse;
@@ -27,7 +27,7 @@ import com.kista.shared.kernel.StrategyType;
 @RequiredArgsConstructor
 class TradingStatsController {
 
-    private final TradingStatsUseCase tradingStats;
+    private final TradingStatsService tradingStats;
 
     @Operation(summary = "수익 통계 요약", description = "실현·미실현 손익과 전략 타입별 사이클 성과 집계.")
     @GetMapping("/summary")

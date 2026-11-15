@@ -9,7 +9,6 @@ import com.kista.tradingcore.stats.application.port.output.CoinbaseMarketDataPor
 import com.kista.tradingcore.stats.application.port.output.CryptoMarketMetricsPort;
 import com.kista.tradingcore.stats.application.port.output.HashrateHistoryPort;
 import com.kista.tradingcore.stats.application.port.output.HistoricalFxRatePort;
-import com.kista.tradingcore.stats.application.usecase.BrokerStatisticsUseCase;
 import com.kista.tradingcore.stats.domain.model.CryptoMarketIndicators;
 import com.kista.tradingcore.stats.domain.model.DatedLongShortRatio;
 import com.kista.tradingcore.stats.domain.model.DatedHashRibbon;
@@ -53,7 +52,7 @@ class CryptoMarketIndicatorServiceTest {
     HistoricalFxRatePort fx = mock(HistoricalFxRatePort.class);
     BlockHeightPort blockHeight = mock(BlockHeightPort.class);
     CoinbaseMarketDataPort coinbase = mock(CoinbaseMarketDataPort.class);
-    BrokerStatisticsUseCase brokerStats = mock(BrokerStatisticsUseCase.class);
+    BrokerStatisticsService brokerStats = mock(BrokerStatisticsService.class);
     CryptoMarketMetricsPort cmc = mock(CryptoMarketMetricsPort.class);
     HashrateHistoryPort hashrates = mock(HashrateHistoryPort.class);
     CryptoMarketIndicatorService service;

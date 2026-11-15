@@ -13,7 +13,6 @@ import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.CycleHistoryPage;
 import com.kista.tradingcore.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.shared.kernel.StrategyTicker;
-import com.kista.tradingcore.stats.application.usecase.AccountStatisticsUseCase;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
@@ -29,9 +28,11 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
+// KIS/Toss 공통 통계 + 계좌 스코프 사이클 이력 조회
+// (전략 스코프 이력·주문·시드 미리보기는 trading StrategyService 소유)
 @Service
 @RequiredArgsConstructor
-class AccountStatisticsService implements AccountStatisticsUseCase {
+public class AccountStatisticsService {
 
     private final AccountPort accountPort;
     private final CyclePositionPort cyclePositionPort;
@@ -41,14 +42,12 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 체결기준현재잔고 — KIS: CTRP6504R+TTTC2101R 보정 포함 / Toss: 보유종목+예수금 직접 산출
-    @Override
     public PresentBalanceResult getPresentBalance(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         return BrokerCallGuard.wrap("잔고 조회", () ->
                 portfolioPort.getPresentBalance(account.toBrokerRef()));
     }
 
-    @Override
     public DailyTransactionResult getDailyTransactions(UUID accountId, UUID requesterId,
                                                         LocalDate from, LocalDate to) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
@@ -56,7 +55,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
                 Map.of(accountId, account.broker().getCurrency()));
     }
 
-    @Override
+    // 유저 스코프 일별 거래내역 조회 (대시보드 위젯용 — 보유 계좌 전체 합산, 1회 조회)
     public DailyTransactionResult getDailyTransactionsForUser(UUID requesterId, LocalDate from, LocalDate to) {
         // accountId → 계좌 통화 (Broker 견적 통화)
         Map<UUID, Currency> currencies = accountPort.findByUserId(requesterId).stream()
@@ -89,14 +88,12 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
 
     // 전략 생성 화면 티커 목록 가격 — 최소 시드 산정 기준(전일종가)과 동일 소스로 통일
     // (currentPrice로 보여주면 등록 시점마다 미묘하게 다른 값이 최소 시드 기준으로 오인될 수 있음)
-    @Override
     public Map<StrategyTicker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<StrategyTicker> tickers) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         return BrokerCallGuard.wrap("전일종가 조회",
                 () -> brokerPricePort.getPrevCloses(tickers, account.toBrokerRef()));
     }
 
-    @Override
     public CycleHistoryPage getByAccount(UUID accountId, UUID requesterId,
                                           LocalDate from, LocalDate to,
                                           Instant cursor, int size) {

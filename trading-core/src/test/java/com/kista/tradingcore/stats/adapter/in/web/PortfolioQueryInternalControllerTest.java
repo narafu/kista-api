@@ -7,7 +7,7 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.tradingcore.trading.domain.model.Order;
-import com.kista.tradingcore.stats.application.usecase.PortfolioUseCase;
+import com.kista.tradingcore.stats.application.service.PortfolioService;
 import com.kista.tradingcore.stats.domain.model.PortfolioOrder;
 import com.kista.tradingcore.stats.domain.model.PortfolioPosition;
 import com.kista.shared.platform.security.InternalTokenAuthFilter;
@@ -46,7 +46,7 @@ class PortfolioQueryInternalControllerTest {
 
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean PortfolioUseCase portfolioUseCase;
+    @MockitoBean PortfolioService portfolioUseCase;
 
     private static final String VALID_TOKEN = "test-internal-token";
     private static final UUID USER_ID = UUID.randomUUID();

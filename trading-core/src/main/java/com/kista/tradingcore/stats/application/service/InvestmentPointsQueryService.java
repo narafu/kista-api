@@ -1,5 +1,6 @@
 package com.kista.tradingcore.stats.application.service;
 
+import com.kista.tradingcore.stats.domain.model.Scope;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
@@ -14,7 +15,6 @@ import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.stats.application.InvestmentIndexCalculator;
-import com.kista.tradingcore.stats.application.usecase.InvestmentPointsQuery;
 import com.kista.tradingcore.stats.domain.model.InvestmentPoint;
 import com.kista.tradingcore.stats.domain.model.InvestmentPointsResult;
 import lombok.RequiredArgsConstructor;
@@ -28,9 +28,10 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+// api의 벤치마크 비교(BenchmarkService)가 HTTP로 소비하는 내부 조회 — TradingStatsInternalController가 의존한다
 @Service
 @RequiredArgsConstructor
-class InvestmentPointsQueryService implements InvestmentPointsQuery {
+public class InvestmentPointsQueryService {
 
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
@@ -42,7 +43,6 @@ class InvestmentPointsQueryService implements InvestmentPointsQuery {
 
     // 원본 BenchmarkService.buildInvestmentContext(private)를 그대로 이식 — 소유권 검증까지
     // 이 메서드가 담당하므로(authorizeIfStrategyScope 대체) api 쪽은 사전검증을 하지 않는다.
-    @Override
     public InvestmentPointsResult fetch(UUID userId, Scope scope, UUID strategyId, Currency currency,
                                         LocalDate from, LocalDate to) {
         LocalDate effectiveTo = to != null ? to : LocalDate.now(clock);

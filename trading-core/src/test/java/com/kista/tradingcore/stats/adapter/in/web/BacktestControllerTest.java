@@ -5,7 +5,7 @@ import com.kista.tradingcore.stats.domain.backtest.BacktestPoint;
 import com.kista.tradingcore.stats.domain.backtest.BacktestResult;
 import com.kista.tradingcore.stats.domain.backtest.BacktestSummary;
 import com.kista.tradingcore.trading.domain.model.Strategy;
-import com.kista.tradingcore.stats.application.usecase.BacktestUseCase;
+import com.kista.tradingcore.stats.application.service.BacktestService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -38,7 +38,7 @@ import com.kista.shared.kernel.StrategyTicker;
 class BacktestControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockitoBean BacktestUseCase backtestUseCase;
+    @MockitoBean BacktestService backtestUseCase;
 
     private static final UUID USER_ID = UUID.randomUUID();
 

@@ -1,7 +1,7 @@
 package com.kista.tradingcore.stats.adapter.in.web;
 
 import com.kista.shared.kernel.StrategyTicker;
-import com.kista.tradingcore.stats.application.usecase.CryptoMarketIndicatorUseCase;
+import com.kista.tradingcore.stats.application.service.CryptoMarketIndicatorService;
 import com.kista.tradingcore.stats.domain.model.CryptoMarketIndicators;
 import com.kista.tradingcore.stats.domain.model.CryptoMarketIndicators.*;
 import com.kista.tradingcore.stats.domain.model.DatedHashRibbon;
@@ -39,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CryptoMarketIndicatorControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockitoBean CryptoMarketIndicatorUseCase useCase;
+    @MockitoBean CryptoMarketIndicatorService useCase;
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
