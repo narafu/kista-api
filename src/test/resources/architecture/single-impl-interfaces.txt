@@ -52,9 +52,6 @@ com.kista.api.market.application.port.output.CnnFearGreedPort
 com.kista.api.market.application.port.output.CryptoFearGreedPort
 com.kista.api.market.application.port.output.FearGreedSnapshotPort
 com.kista.api.market.application.port.output.MarketCalendarQueryPort
-com.kista.api.market.application.usecase.FetchFearGreedUseCase
-com.kista.api.market.application.usecase.GetFearGreedUseCase
-com.kista.api.market.application.usecase.MarketUseCase
 com.kista.api.notify.application.port.output.FcmDeviceTokenPort
 com.kista.api.notify.application.port.output.NotifyPort
 com.kista.api.notify.application.port.output.PushNotificationPort

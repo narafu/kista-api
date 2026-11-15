@@ -2,7 +2,7 @@ package com.kista.api.market.adapter.in.schedule;
 
 import com.kista.shared.platform.scheduling.SchedulerJobRunner;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
-import com.kista.api.market.application.usecase.FetchFearGreedUseCase;
+import com.kista.api.market.application.service.FearGreedService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -19,7 +19,7 @@ import java.time.Instant;
 @ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true) // local에서 끄면 운영 DB·텔레그램과 중복 알림 발생 방지
 public class FearGreedScheduler {
 
-    private final FetchFearGreedUseCase fetchFearGreedUseCase;
+    private final FearGreedService fetchFearGreedUseCase;
     private final SchedulerJobRunner jobRunner;
     private final SchedulerLockService schedulerLockService;
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입

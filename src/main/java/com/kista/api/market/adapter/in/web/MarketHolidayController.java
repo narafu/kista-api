@@ -3,7 +3,7 @@ package com.kista.api.market.adapter.in.web;
 import com.kista.api.market.adapter.in.web.dto.MarketSessionResponse;
 import com.kista.api.market.adapter.in.web.dto.TossCandleResponse;
 import com.kista.api.market.application.port.output.MarketCalendarQueryPort;
-import com.kista.api.market.application.usecase.MarketUseCase;
+import com.kista.api.market.application.service.MarketHolidayService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -28,7 +28,7 @@ public class MarketHolidayController {
 
     private static final CacheControl HOLIDAYS_CACHE = CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic();
 
-    private final MarketUseCase marketUseCase;
+    private final MarketHolidayService marketUseCase;
     private final MarketCalendarQueryPort marketCalendarQueryPort;
 
     @Operation(summary = "월별 미국 시장 휴장일 조회")

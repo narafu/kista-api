@@ -2,7 +2,6 @@ package com.kista.api.market.application.service;
 
 import com.kista.api.market.domain.model.FearGreedSnapshot;
 import com.kista.api.market.application.event.FearGreedFetchFailedEvent;
-import com.kista.api.market.application.usecase.FetchFearGreedUseCase;
 import com.kista.api.market.application.port.output.CnnFearGreedPort;
 import com.kista.api.market.application.port.output.FearGreedSnapshotPort;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +15,7 @@ import java.time.Instant;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-class FearGreedService implements FetchFearGreedUseCase {
+public class FearGreedService {
 
     private final CnnFearGreedPort cnnFearGreedPort;
     private final FearGreedSnapshotPort fearGreedSnapshotPort;
@@ -24,7 +23,7 @@ class FearGreedService implements FetchFearGreedUseCase {
 
     private static final String SOURCE_CNN = "CNN";
 
-    @Override
+    // 지정 시각의 CNN 공포탐욕지수를 조회해 저장
     public void fetchAndSave(Instant snapshotDate) {
         try {
             var data = cnnFearGreedPort.fetch();

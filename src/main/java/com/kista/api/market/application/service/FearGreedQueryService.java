@@ -4,7 +4,6 @@ import com.kista.shared.kernel.TimeZones;
 import com.kista.shared.platform.cache.TtlResultCache;
 import com.kista.api.market.domain.model.CryptoFearGreedHistory;
 import com.kista.api.market.domain.model.FearGreedSnapshot;
-import com.kista.api.market.application.usecase.GetFearGreedUseCase;
 import com.kista.api.market.application.port.output.CryptoFearGreedPort;
 import com.kista.api.market.application.port.output.FearGreedSnapshotPort;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +21,7 @@ import java.util.stream.Collectors;
 // 클래스 레벨 @Transactional 없음 — CRYPTO 외부 HTTP 동안 DB 커넥션을 잡지 않도록(CNN 조회는 리포지토리 기본 트랜잭션)
 @Slf4j
 @Service
-class FearGreedQueryService implements GetFearGreedUseCase {
+public class FearGreedQueryService {
 
     static final int MAX_DAYS = 365; // 조회 기간 상한 — kista-ui 최대 옵션, CRYPTO 외부 limit 상한
     static final Duration CRYPTO_TTL = Duration.ofHours(1); // 정상 이력 캐시 fallback — time_until_update가 없을 때
@@ -46,7 +45,7 @@ class FearGreedQueryService implements GetFearGreedUseCase {
         this.cache = new TtlResultCache(clock);
     }
 
-    @Override
+    // 지정 source의 최근 days일(1~365) 일별 값을 날짜 오름차순으로 조회 — CRYPTO 외부 조회 실패는 빈 목록
     public List<FearGreedSnapshot> getRecent(String source, int days) {
         if (days < 1 || days > MAX_DAYS) throw new IllegalArgumentException("조회 기간은 1~" + MAX_DAYS + "일이어야 합니다.");
         // days일 전 KST 00:00부터 현재까지 시각 범위로 조회

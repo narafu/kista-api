@@ -6,7 +6,7 @@ import com.kista.shared.platform.security.SecurityConfig;
 import com.kista.api.market.domain.model.FearGreedRating;
 import com.kista.api.market.domain.model.FearGreedSnapshot;
 import com.kista.shared.platform.security.TokenBlacklistPort;
-import com.kista.api.market.application.usecase.GetFearGreedUseCase;
+import com.kista.api.market.application.service.FearGreedQueryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -40,7 +40,7 @@ class FearGreedControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean GetFearGreedUseCase getFearGreedUseCase;
+    @MockitoBean FearGreedQueryService getFearGreedUseCase;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
 

@@ -1,7 +1,7 @@
 package com.kista.api.market.adapter.in.web;
 
 import com.kista.api.market.adapter.in.web.dto.FearGreedResponse;
-import com.kista.api.market.application.usecase.GetFearGreedUseCase;
+import com.kista.api.market.application.service.FearGreedQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -26,7 +26,7 @@ public class FearGreedController {
     private static final String SOURCE_CRYPTO = "CRYPTO";
     private static final CacheControl FEAR_GREED_CACHE = CacheControl.maxAge(10, TimeUnit.MINUTES).cachePublic();
 
-    private final GetFearGreedUseCase getFearGreedUseCase;
+    private final FearGreedQueryService getFearGreedUseCase;
 
     @Operation(summary = "CNN·크립토 공포탐욕지수 조회 (현재값 + 추이)")
     @ApiResponse(responseCode = "200", description = "조회 성공")

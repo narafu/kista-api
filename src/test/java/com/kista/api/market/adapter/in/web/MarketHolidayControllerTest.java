@@ -5,7 +5,7 @@ import com.kista.shared.platform.security.JwtAuthFilter;
 import com.kista.shared.platform.security.SecurityConfig;
 import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.api.market.application.port.output.MarketCalendarQueryPort;
-import com.kista.api.market.application.usecase.MarketUseCase;
+import com.kista.api.market.application.service.MarketHolidayService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -39,7 +39,7 @@ class MarketHolidayControllerTest {
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean MarketUseCase marketUseCase;
+    @MockitoBean MarketHolidayService marketUseCase;
     @MockitoBean MarketCalendarQueryPort marketCalendarQueryPort;
 
     private static final UUID USER_UUID = UUID.fromString("00000000-0000-0000-0000-000000000001");
