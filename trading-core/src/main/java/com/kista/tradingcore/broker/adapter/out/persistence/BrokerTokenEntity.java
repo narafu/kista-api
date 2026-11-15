@@ -12,11 +12,12 @@ import lombok.NoArgsConstructor;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+// broker 토큰 캐시(현재 메리츠 사용) — 계좌별 액세스 토큰과 만료 시각
 @Entity
 @Table(name = "broker_tokens", schema = "trading")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-class KisTokenEntity extends BaseAuditEntity {
+class BrokerTokenEntity extends BaseAuditEntity {
 
     @Id
     @Column(name = "account_id")
@@ -28,7 +29,7 @@ class KisTokenEntity extends BaseAuditEntity {
     @Column(name = "expires_at", nullable = false)
     private OffsetDateTime expiresAt;
 
-    KisTokenEntity(UUID accountId, String accessToken, OffsetDateTime expiresAt) {
+    BrokerTokenEntity(UUID accountId, String accessToken, OffsetDateTime expiresAt) {
         this.accountId = accountId;
         this.accessToken = accessToken;
         this.expiresAt = expiresAt;

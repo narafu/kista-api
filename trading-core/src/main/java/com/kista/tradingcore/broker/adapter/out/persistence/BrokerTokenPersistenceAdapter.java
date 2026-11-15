@@ -13,22 +13,22 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Component
-@RequiredArgsConstructor(access = AccessLevel.PACKAGE) // KisTokenJpaRepository가 package-private
-public class KisTokenPersistenceAdapter implements BrokerTokenCachePort {
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE) // BrokerTokenJpaRepository가 package-private
+public class BrokerTokenPersistenceAdapter implements BrokerTokenCachePort {
 
-    private final KisTokenJpaRepository repository;
+    private final BrokerTokenJpaRepository repository;
 
     @Override
     public Optional<String> findValidToken(UUID accountId, OffsetDateTime now) {
         // account_id + 만료 시각 기준으로 유효 토큰 조회
-        return repository.findValidToken(accountId, now).map(KisTokenEntity::getAccessToken);
+        return repository.findValidToken(accountId, now).map(BrokerTokenEntity::getAccessToken);
     }
 
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void saveToken(UUID accountId, String accessToken, OffsetDateTime expiresAt) {
         // accountId를 PK로 upsert (Spring Data: 기존 행이면 UPDATE, 없으면 INSERT)
-        repository.save(new KisTokenEntity(accountId, accessToken, expiresAt));
+        repository.save(new BrokerTokenEntity(accountId, accessToken, expiresAt));
     }
 
     @Override

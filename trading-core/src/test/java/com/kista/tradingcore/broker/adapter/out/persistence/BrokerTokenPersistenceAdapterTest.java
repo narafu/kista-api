@@ -18,12 +18,12 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import(KisTokenPersistenceAdapter.class)
+@Import(BrokerTokenPersistenceAdapter.class)
 @Execution(ExecutionMode.SAME_THREAD) // @DataJpaTest + parallel execution — 트랜잭션 경합 방지
-class KisTokenPersistenceAdapterTest extends DataJpaTestBase {
+class BrokerTokenPersistenceAdapterTest extends DataJpaTestBase {
 
     @Autowired JdbcTemplate jdbcTemplate;
-    @Autowired KisTokenPersistenceAdapter tokenAdapter;
+    @Autowired BrokerTokenPersistenceAdapter tokenAdapter;
 
     private UUID userId;
     private UUID accountId;

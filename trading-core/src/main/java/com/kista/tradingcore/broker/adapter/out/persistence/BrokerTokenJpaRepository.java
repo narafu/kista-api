@@ -9,13 +9,13 @@ import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
-interface KisTokenJpaRepository extends JpaRepository<KisTokenEntity, UUID> {
+interface BrokerTokenJpaRepository extends JpaRepository<BrokerTokenEntity, UUID> {
 
-    @Query("SELECT e FROM KisTokenEntity e WHERE e.accountId = :accountId AND e.expiresAt > :now")
-    Optional<KisTokenEntity> findValidToken(@Param("accountId") UUID accountId, @Param("now") OffsetDateTime now);
+    @Query("SELECT e FROM BrokerTokenEntity e WHERE e.accountId = :accountId AND e.expiresAt > :now")
+    Optional<BrokerTokenEntity> findValidToken(@Param("accountId") UUID accountId, @Param("now") OffsetDateTime now);
 
     @Modifying(clearAutomatically = true)
-    @Query("UPDATE KisTokenEntity e SET e.accessToken = :invalidatedToken, e.expiresAt = :invalidatedAt " +
+    @Query("UPDATE BrokerTokenEntity e SET e.accessToken = :invalidatedToken, e.expiresAt = :invalidatedAt " +
             "WHERE e.accountId = :accountId AND e.accessToken = :rejectedAccessToken")
     int invalidateToken(@Param("accountId") UUID accountId,
                         @Param("rejectedAccessToken") String rejectedAccessToken,
