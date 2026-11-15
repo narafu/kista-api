@@ -20,12 +20,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PortfolioQueryInternalController {
 
-    private final PortfolioService portfolioUseCase;
+    private final PortfolioService portfolioService;
 
     @Operation(summary = "현재 포트폴리오 현황 조회", description = "전략별 최신 포지션(코인 계좌 포함, 통화 표기). 없으면 빈 목록. X-Internal-Token 헤더 필수.")
     @GetMapping("/current")
     public List<PortfolioCurrentResponse> getCurrent(@RequestParam UUID userId) {
-        return portfolioUseCase.getCurrent(userId).stream()
+        return portfolioService.getCurrent(userId).stream()
                 .map(StatsContractMapper::toResponse)
                 .toList();
     }
@@ -36,7 +36,7 @@ public class PortfolioQueryInternalController {
             @RequestParam UUID userId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return portfolioUseCase.getHistory(userId, from, to).stream()
+        return portfolioService.getHistory(userId, from, to).stream()
                 .map(StatsContractMapper::toResponse)
                 .toList();
     }

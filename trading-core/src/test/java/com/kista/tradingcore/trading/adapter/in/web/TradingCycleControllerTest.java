@@ -86,7 +86,7 @@ class TradingCycleControllerTest {
     @MockitoBean CapitalLedgerService injectCapital;
     @MockitoBean CapitalWithdrawalService withdrawCapital;
     @MockitoBean DcaConfigService dcaConfig;
-    @MockitoBean DcaExecutionQueryService dcaExecutionQuery;
+    @MockitoBean DcaExecutionQueryService dcaExecutionQueryService;
 
     private static final UUID CYCLE_ID   = UUID.fromString("00000000-0000-0000-0000-000000000010");
     private static final UUID USER_ID    = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -799,7 +799,7 @@ class TradingCycleControllerTest {
 
     @Test
     void lists_dca_executions() throws Exception {
-        when(dcaExecutionQuery.list(eq(CYCLE_ID), any(), eq(DcaExecutionFilter.NONE), eq(0), eq(20))).thenReturn(new DcaExecutionPage(List.of(
+        when(dcaExecutionQueryService.list(eq(CYCLE_ID), any(), eq(DcaExecutionFilter.NONE), eq(0), eq(20))).thenReturn(new DcaExecutionPage(List.of(
                 new DcaExecutionPage.Row(
                         DcaExecution.skipped(CYCLE_ID, KEY, com.kista.shared.kernel.OrderDirection.SELL, LocalDate.of(2026, 8, 31),
                                 DcaSkipReason.CONDITION_NOT_MET, "RSI(14) 48.20 > 35", null),
@@ -819,7 +819,7 @@ class TradingCycleControllerTest {
     @Test
     void lists_dca_executions_passes_filters() throws Exception {
         var expected = new DcaExecutionFilter(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), com.kista.shared.kernel.OrderDirection.SELL, KEY);
-        when(dcaExecutionQuery.list(eq(CYCLE_ID), any(), eq(expected), eq(0), eq(50))).thenReturn(new DcaExecutionPage(List.of(), 0, 50, 0));
+        when(dcaExecutionQueryService.list(eq(CYCLE_ID), any(), eq(expected), eq(0), eq(50))).thenReturn(new DcaExecutionPage(List.of(), 0, 50, 0));
         mockMvc.perform(get("/api/trading-cycles/{id}/dca-executions", CYCLE_ID)
                         .param("from", "2026-08-01").param("to", "2026-08-31").param("direction", "SELL").param("ruleKey", KEY).param("size", "50")
                         .with(authentication(userToken(USER_ID))))
@@ -829,7 +829,7 @@ class TradingCycleControllerTest {
 
     @Test
     void lists_dca_executions_notOwner_returns403() throws Exception {
-        when(dcaExecutionQuery.list(eq(CYCLE_ID), any(), any(), anyInt(), anyInt())).thenThrow(new SecurityException("소유권 불일치"));
+        when(dcaExecutionQueryService.list(eq(CYCLE_ID), any(), any(), anyInt(), anyInt())).thenThrow(new SecurityException("소유권 불일치"));
         mockMvc.perform(get("/api/trading-cycles/{id}/dca-executions", CYCLE_ID).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isForbidden());
     }

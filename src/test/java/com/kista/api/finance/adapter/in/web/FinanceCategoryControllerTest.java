@@ -35,7 +35,7 @@ class FinanceCategoryControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean FinanceCategoryService categoryUseCase;
+    @MockitoBean FinanceCategoryService financeCategoryService;
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
@@ -47,7 +47,7 @@ class FinanceCategoryControllerTest {
                 FinanceCategory.Type.EXPENSE, "식비", 0, Instant.now());
         FinanceCategory l2 = new FinanceCategory(l2Id, null, l1Id, null,
                 FinanceCategory.Type.EXPENSE, "외식", 0, Instant.now());
-        when(categoryUseCase.list(any(), any())).thenReturn(List.of(l1, l2));
+        when(financeCategoryService.list(any(), any())).thenReturn(List.of(l1, l2));
 
         mockMvc.perform(get("/api/finance/categories")
                         .with(authentication(userToken(USER_ID))))
@@ -68,7 +68,7 @@ class FinanceCategoryControllerTest {
                 FinanceCategory.Type.EXPENSE, "외식", 0, Instant.now());
         FinanceCategory l3 = new FinanceCategory(l3Id, null, l2Id, null,
                 FinanceCategory.Type.EXPENSE, "배달", 0, Instant.now());
-        when(categoryUseCase.list(any(), any())).thenReturn(List.of(l1, l2, l3));
+        when(financeCategoryService.list(any(), any())).thenReturn(List.of(l1, l2, l3));
 
         mockMvc.perform(get("/api/finance/categories")
                         .with(authentication(userToken(USER_ID))))
@@ -84,7 +84,7 @@ class FinanceCategoryControllerTest {
         UUID savedId = UUID.randomUUID();
         FinanceCategory saved = new FinanceCategory(savedId, null, null, USER_ID,
                 FinanceCategory.Type.EXPENSE, "식비", 0, Instant.now());
-        when(categoryUseCase.create(any(), anyBoolean(), any(FinanceCategoryCommand.class))).thenReturn(saved);
+        when(financeCategoryService.create(any(), anyBoolean(), any(FinanceCategoryCommand.class))).thenReturn(saved);
 
         mockMvc.perform(post("/api/finance/categories")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -94,7 +94,7 @@ class FinanceCategoryControllerTest {
                 .andExpect(header().string("Location", "/api/finance/categories/" + savedId));
 
         // shareToGroup 미지정이면 기본값 false로 서비스에 전달
-        verify(categoryUseCase).create(eq(USER_ID), eq(false), any(FinanceCategoryCommand.class));
+        verify(financeCategoryService).create(eq(USER_ID), eq(false), any(FinanceCategoryCommand.class));
     }
 
     @Test
@@ -103,7 +103,7 @@ class FinanceCategoryControllerTest {
         UUID groupId = UUID.randomUUID();
         FinanceCategory saved = new FinanceCategory(savedId, groupId, null, USER_ID,
                 FinanceCategory.Type.EXPENSE, "식비", 0, Instant.now());
-        when(categoryUseCase.create(any(), anyBoolean(), any(FinanceCategoryCommand.class))).thenReturn(saved);
+        when(financeCategoryService.create(any(), anyBoolean(), any(FinanceCategoryCommand.class))).thenReturn(saved);
 
         mockMvc.perform(post("/api/finance/categories")
                         .param("shareToGroup", "true")
@@ -113,7 +113,7 @@ class FinanceCategoryControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.groupId").value(groupId.toString()));
 
-        verify(categoryUseCase).create(eq(USER_ID), eq(true), any(FinanceCategoryCommand.class));
+        verify(financeCategoryService).create(eq(USER_ID), eq(true), any(FinanceCategoryCommand.class));
     }
 
     @Test
@@ -133,7 +133,7 @@ class FinanceCategoryControllerTest {
                         .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isBadRequest());
 
-        verifyNoInteractions(categoryUseCase);
+        verifyNoInteractions(financeCategoryService);
     }
 
     @Test
@@ -141,7 +141,7 @@ class FinanceCategoryControllerTest {
         UUID id = UUID.randomUUID();
         FinanceCategory updated = new FinanceCategory(id, null, null, USER_ID,
                 FinanceCategory.Type.EXPENSE, "식비(수정)", 1, Instant.now());
-        when(categoryUseCase.update(any(), any(), any(FinanceCategoryCommand.class))).thenReturn(updated);
+        when(financeCategoryService.update(any(), any(), any(FinanceCategoryCommand.class))).thenReturn(updated);
 
         mockMvc.perform(put("/api/finance/categories/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -159,7 +159,7 @@ class FinanceCategoryControllerTest {
                         .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isNoContent());
 
-        verify(categoryUseCase).delete(id, USER_ID);
+        verify(financeCategoryService).delete(id, USER_ID);
     }
 
     @Test
@@ -168,7 +168,7 @@ class FinanceCategoryControllerTest {
         UUID groupId = UUID.randomUUID();
         FinanceCategory shared = new FinanceCategory(id, groupId, null, USER_ID,
                 FinanceCategory.Type.EXPENSE, "식비", 0, Instant.now());
-        when(categoryUseCase.shareToGroup(id, USER_ID)).thenReturn(shared);
+        when(financeCategoryService.shareToGroup(id, USER_ID)).thenReturn(shared);
 
         mockMvc.perform(patch("/api/finance/categories/{id}/share", id)
                         .with(csrf()).with(authentication(userToken(USER_ID))))
@@ -181,7 +181,7 @@ class FinanceCategoryControllerTest {
         UUID id = UUID.randomUUID();
         FinanceCategory personal = new FinanceCategory(id, null, null, USER_ID,
                 FinanceCategory.Type.EXPENSE, "식비", 0, Instant.now());
-        when(categoryUseCase.unshare(id, USER_ID)).thenReturn(personal);
+        when(financeCategoryService.unshare(id, USER_ID)).thenReturn(personal);
 
         mockMvc.perform(patch("/api/finance/categories/{id}/unshare", id)
                         .with(csrf()).with(authentication(userToken(USER_ID))))

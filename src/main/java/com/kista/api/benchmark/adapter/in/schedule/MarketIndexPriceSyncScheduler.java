@@ -16,7 +16,7 @@ import java.time.Duration;
 @ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true)
 public class MarketIndexPriceSyncScheduler {
 
-    private final MarketIndexPriceSyncService syncMarketIndexPricesUseCase;
+    private final MarketIndexPriceSyncService marketIndexPriceSyncService;
     private final SchedulerJobRunner jobRunner;
     private final SchedulerLockService schedulerLockService;
 
@@ -31,10 +31,10 @@ public class MarketIndexPriceSyncScheduler {
     // 수동 트리거 — 크론 대기 없이 즉시 실행. run()과 락 이름을 공유해 크론과 동시 실행되지 않음
     public void runNow() throws InterruptedException {
         schedulerLockService.tryRun("market-index-price-sync", Duration.ofMinutes(30),
-                () -> jobRunner.run("벤치마크 ETF 지수 종가 동기화 스케쥴러 수동", syncMarketIndexPricesUseCase::syncAndSave));
+                () -> jobRunner.run("벤치마크 ETF 지수 종가 동기화 스케쥴러 수동", marketIndexPriceSyncService::syncAndSave));
     }
 
     private void runLocked() {
-        jobRunner.run("벤치마크 ETF 지수 종가 동기화 스케쥴러", syncMarketIndexPricesUseCase::syncAndSave);
+        jobRunner.run("벤치마크 ETF 지수 종가 동기화 스케쥴러", marketIndexPriceSyncService::syncAndSave);
     }
 }

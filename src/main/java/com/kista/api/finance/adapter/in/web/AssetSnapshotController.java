@@ -32,7 +32,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AssetSnapshotController {
 
-    private final AssetSnapshotService assetSnapshotUseCase;
+    private final AssetSnapshotService assetSnapshotService;
     // 응답 보강(카테고리명·계좌명·최상위 카테고리 ID) 전용 읽기 조회 — 서비스 외 out-port 직접 의존은
     // 이 컨트롤러에 한해 의도적 예외다 (plan §5.5 참고)
     private final FinanceCategoryPort financeCategoryPort;
@@ -46,7 +46,7 @@ public class AssetSnapshotController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(name = "userId", required = false) UUID filterUserId) {
-        return assetSnapshotUseCase.list(userId, from, to, filterUserId).stream()
+        return assetSnapshotService.list(userId, from, to, filterUserId).stream()
                 .map(this::enrich)
                 .toList();
     }
@@ -61,7 +61,7 @@ public class AssetSnapshotController {
             @AuthenticationPrincipal UUID userId,
             @RequestParam(required = false, defaultValue = "false") boolean shareToGroup,
             @Valid @RequestBody AssetSnapshotRequest request) {
-        AssetSnapshot saved = assetSnapshotUseCase.create(userId, shareToGroup, request.toCommand());
+        AssetSnapshot saved = assetSnapshotService.create(userId, shareToGroup, request.toCommand());
         return ResponseEntity.created(URI.create("/api/finance/asset-snapshots/" + saved.id()))
                 .body(enrich(saved));
     }
@@ -77,7 +77,7 @@ public class AssetSnapshotController {
             @Parameter(description = "자산 기록 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId,
             @Valid @RequestBody AssetSnapshotRequest request) {
-        return enrich(assetSnapshotUseCase.update(id, userId, request.toCommand()));
+        return enrich(assetSnapshotService.update(id, userId, request.toCommand()));
     }
 
     @Operation(summary = "자산 기록 그룹 공유 전환", description = "개인 소유 자산 기록을 소유자의 현재 그룹으로 공유 전환합니다.")
@@ -90,7 +90,7 @@ public class AssetSnapshotController {
     public AssetSnapshotResponse share(
             @Parameter(description = "자산 기록 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        return enrich(assetSnapshotUseCase.shareToGroup(id, userId));
+        return enrich(assetSnapshotService.shareToGroup(id, userId));
     }
 
     @Operation(summary = "자산 기록 그룹 공유 해제", description = "그룹 공유 자산 기록을 개인 소유로 되돌립니다. 같은 그룹 멤버면 누구든 가능합니다.")
@@ -103,7 +103,7 @@ public class AssetSnapshotController {
     public AssetSnapshotResponse unshare(
             @Parameter(description = "자산 기록 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        return enrich(assetSnapshotUseCase.unshare(id, userId));
+        return enrich(assetSnapshotService.unshare(id, userId));
     }
 
     @Operation(summary = "자산 기록 삭제")
@@ -117,7 +117,7 @@ public class AssetSnapshotController {
     public void delete(
             @Parameter(description = "자산 기록 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        assetSnapshotUseCase.delete(id, userId);
+        assetSnapshotService.delete(id, userId);
     }
 
     // 카테고리·계좌 이름을 매 행마다 조회한다(N+1) — 개인 재무 규모(수십~수백 건)에서는 무시할 수 있는 비용이라

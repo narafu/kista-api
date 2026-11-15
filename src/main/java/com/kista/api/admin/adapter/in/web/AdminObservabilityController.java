@@ -32,7 +32,7 @@ public class AdminObservabilityController {
 
     private static final int MAX_LIMIT = 500;
 
-    private final AdminQueryService adminQuery;
+    private final AdminQueryService adminQueryService;
     private final AdminService adminUser;
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
@@ -44,7 +44,7 @@ public class AdminObservabilityController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         Instant fromInstant = toInstantOrDefault(from, 0, null);
         Instant toInstant   = toInstantOrDefault(to, 1, null);
-        return adminQuery.listAuditLogs(fromInstant, toInstant).stream()
+        return adminQueryService.listAuditLogs(fromInstant, toInstant).stream()
                 .map(AuditLogResponse::from)
                 .toList();
     }
@@ -59,7 +59,7 @@ public class AdminObservabilityController {
         int safeLimit = Math.min(limit, MAX_LIMIT);
         Instant fromInstant = toInstantOrDefault(from, 0, Instant.EPOCH);
         Instant toInstant   = toInstantOrDefault(to, 1, Instant.now(clock));
-        return adminQuery.listErrorLogs(safeLimit, fromInstant, toInstant).stream()
+        return adminQueryService.listErrorLogs(safeLimit, fromInstant, toInstant).stream()
                 .map(ErrorLogResponse::from)
                 .toList();
     }
@@ -75,7 +75,7 @@ public class AdminObservabilityController {
     @DeleteMapping("/errors/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void softDeleteErrorLog(@PathVariable UUID id) {
-        adminQuery.deleteErrorLog(id);
+        adminQueryService.deleteErrorLog(id);
     }
 
     // 이상 징후 — 일시중지·비활성 계좌
@@ -85,7 +85,7 @@ public class AdminObservabilityController {
             @RequestParam(defaultValue = "7") int inactiveDays,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        AdminAnomalies anomalies = adminQuery.getAnomalies(inactiveDays, from, to);
+        AdminAnomalies anomalies = adminQueryService.getAnomalies(inactiveDays, from, to);
         Map<UUID, UserSummary> userMap = UserSummaries.mapById(adminUser);
 
         List<AdminAccountItem> paused = anomalies.pausedAccounts().stream()

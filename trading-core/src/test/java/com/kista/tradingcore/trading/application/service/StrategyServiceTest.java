@@ -162,7 +162,7 @@ class StrategyServiceTest {
         var historyStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(null, null),
                 new PrivacyCycleOrderStrategy(null)));
-        StrategyHistoryQueryService historyQueryService = new StrategyHistoryQueryService(
+        StrategyHistoryQueryService strategyHistoryQueryService = new StrategyHistoryQueryService(
                 accountPort, strategyPort, cyclePositionPort, orderPort, historyStrategies,
                 privacyTradePort, brokerPricePort,
                 new UnassignedCashCalculator(strategyPort, cyclePositionPort, marginPort, null), FIXED);
@@ -174,7 +174,7 @@ class StrategyServiceTest {
                 accountPort,
                 creationService,
                 detailAssembler,
-                historyQueryService,
+                strategyHistoryQueryService,
                 new CycleSnapshotCreator(
                         strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, cycleCapitalEventPort, FIXED),
                 orderCancelService,

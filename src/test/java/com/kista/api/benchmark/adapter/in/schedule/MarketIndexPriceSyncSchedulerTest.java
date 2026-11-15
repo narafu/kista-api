@@ -17,10 +17,10 @@ class MarketIndexPriceSyncSchedulerTest {
 
     @Test
     void run_acquiresLockAndRunsMarketIndexPriceSyncJob() throws Exception {
-        MarketIndexPriceSyncService useCase = mock(MarketIndexPriceSyncService.class);
+        MarketIndexPriceSyncService marketIndexPriceSyncService = mock(MarketIndexPriceSyncService.class);
         SchedulerJobRunner jobRunner = mock(SchedulerJobRunner.class);
         SchedulerLockService lockService = mock(SchedulerLockService.class);
-        MarketIndexPriceSyncScheduler scheduler = new MarketIndexPriceSyncScheduler(useCase, jobRunner, lockService);
+        MarketIndexPriceSyncScheduler scheduler = new MarketIndexPriceSyncScheduler(marketIndexPriceSyncService, jobRunner, lockService);
 
         scheduler.run();
 
@@ -33,16 +33,16 @@ class MarketIndexPriceSyncSchedulerTest {
         verify(jobRunner).run(eq("벤치마크 ETF 지수 종가 동기화 스케쥴러"), runnableCaptor.capture());
         runnableCaptor.getValue().run();
 
-        verify(useCase).syncAndSave();
+        verify(marketIndexPriceSyncService).syncAndSave();
         assertThat(taskCaptor.getValue()).isNotNull();
     }
 
     @Test
     void runNow_sharesCronLockAndRunsManualJob() throws Exception {
-        MarketIndexPriceSyncService useCase = mock(MarketIndexPriceSyncService.class);
+        MarketIndexPriceSyncService marketIndexPriceSyncService = mock(MarketIndexPriceSyncService.class);
         SchedulerJobRunner jobRunner = mock(SchedulerJobRunner.class);
         SchedulerLockService lockService = mock(SchedulerLockService.class);
-        MarketIndexPriceSyncScheduler scheduler = new MarketIndexPriceSyncScheduler(useCase, jobRunner, lockService);
+        MarketIndexPriceSyncScheduler scheduler = new MarketIndexPriceSyncScheduler(marketIndexPriceSyncService, jobRunner, lockService);
 
         scheduler.runNow();
 
@@ -55,6 +55,6 @@ class MarketIndexPriceSyncSchedulerTest {
         verify(jobRunner).run(eq("벤치마크 ETF 지수 종가 동기화 스케쥴러 수동"), runnableCaptor.capture());
         runnableCaptor.getValue().run();
 
-        verify(useCase).syncAndSave();
+        verify(marketIndexPriceSyncService).syncAndSave();
     }
 }

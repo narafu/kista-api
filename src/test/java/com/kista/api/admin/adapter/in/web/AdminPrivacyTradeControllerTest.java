@@ -49,7 +49,7 @@ class AdminPrivacyTradeControllerTest {
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean AdminQueryService adminQuery;
+    @MockitoBean AdminQueryService adminQueryService;
     @MockitoBean AdminPrivacyTradeService adminPrivacyTrade;
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
@@ -73,7 +73,7 @@ class AdminPrivacyTradeControllerTest {
         var view = new PrivacyTradeBaseResponse(UUID.randomUUID(), LocalDate.of(2026, 6, 10), "SOXL",
                 new BigDecimal("28.50"), new BigDecimal("45.20"), new BigDecimal("27.80"), 120,
                 List.of(new PrivacyTradeBaseResponse.OrderLine(UUID.randomUUID(), "BUY", "LOC", new BigDecimal("14.25"), 60)));
-        when(adminQuery.listPrivacyBases(30)).thenReturn(List.of(view));
+        when(adminQueryService.listPrivacyBases(30)).thenReturn(List.of(view));
 
         mockMvc.perform(get("/api/admin/privacy-trade-bases?range=30")
                         .with(authentication(adminToken(ADMIN_UUID))))
@@ -82,17 +82,17 @@ class AdminPrivacyTradeControllerTest {
                 .andExpect(jsonPath("$[0].tradeDate").doesNotExist())
                 .andExpect(jsonPath("$[0].ticker").value("SOXL"))
                 .andExpect(jsonPath("$[0].orders[0].direction").value("BUY"));
-        verify(adminQuery).listPrivacyBases(30);
+        verify(adminQueryService).listPrivacyBases(30);
     }
 
     @Test
     void listBases_defaultRange_passesNull() throws Exception {
-        when(adminQuery.listPrivacyBases(isNull())).thenReturn(List.of());
+        when(adminQueryService.listPrivacyBases(isNull())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/admin/privacy-trade-bases")
                         .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isOk());
-        verify(adminQuery).listPrivacyBases(isNull());
+        verify(adminQueryService).listPrivacyBases(isNull());
     }
 
     @Test

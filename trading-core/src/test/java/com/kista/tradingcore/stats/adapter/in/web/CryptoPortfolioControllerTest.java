@@ -33,14 +33,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CryptoPortfolioControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockitoBean CryptoPortfolioService useCase;
+    @MockitoBean CryptoPortfolioService cryptoPortfolioService;
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
 
     @Test
     void returnsKrwPortfolio() throws Exception {
-        when(useCase.getCryptoPortfolio(ACCOUNT_ID, USER_ID)).thenReturn(new CryptoPortfolio(Currency.KRW, new BigDecimal("1000"),
+        when(cryptoPortfolioService.getCryptoPortfolio(ACCOUNT_ID, USER_ID)).thenReturn(new CryptoPortfolio(Currency.KRW, new BigDecimal("1000"),
                 List.of(new CryptoPortfolio.Holding(StrategyTicker.BTC, new BigDecimal("0.0015"), new BigDecimal("140000000"),
                         new BigDecimal("150000000"), new BigDecimal("225000")))));
 
@@ -60,7 +60,7 @@ class CryptoPortfolioControllerTest {
     @Test
     void jsonNumbersArePlainDecimalsWithoutExponent() throws Exception {
         // stripTrailingZeros 정규화 값(5E-7, 1.505E+8)이 지수 표기로 나가면 안 된다
-        when(useCase.getCryptoPortfolio(ACCOUNT_ID, USER_ID)).thenReturn(new CryptoPortfolio(Currency.KRW, new BigDecimal("1E+3"),
+        when(cryptoPortfolioService.getCryptoPortfolio(ACCOUNT_ID, USER_ID)).thenReturn(new CryptoPortfolio(Currency.KRW, new BigDecimal("1E+3"),
                 List.of(new CryptoPortfolio.Holding(StrategyTicker.BTC, new BigDecimal("5E-7"), new BigDecimal("1.505E+8"),
                         new BigDecimal("1.505E+8"), new BigDecimal("75")))));
 
@@ -73,7 +73,7 @@ class CryptoPortfolioControllerTest {
 
     @Test
     void stockAccountReturns400() throws Exception {
-        when(useCase.getCryptoPortfolio(ACCOUNT_ID, USER_ID)).thenThrow(new IllegalArgumentException("코인 계좌가 아닙니다."));
+        when(cryptoPortfolioService.getCryptoPortfolio(ACCOUNT_ID, USER_ID)).thenThrow(new IllegalArgumentException("코인 계좌가 아닙니다."));
 
         mockMvc.perform(get("/api/accounts/{id}/crypto-portfolio", ACCOUNT_ID).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isBadRequest());
@@ -81,7 +81,7 @@ class CryptoPortfolioControllerTest {
 
     @Test
     void returnsKrwCryptoPricesWithoutExponent() throws Exception {
-        when(useCase.getCurrentPrices(ACCOUNT_ID, USER_ID, List.of(StrategyTicker.ETH, StrategyTicker.BTC)))
+        when(cryptoPortfolioService.getCurrentPrices(ACCOUNT_ID, USER_ID, List.of(StrategyTicker.ETH, StrategyTicker.BTC)))
                 .thenReturn(Map.of(StrategyTicker.BTC, new BigDecimal("1.5E+8"), StrategyTicker.ETH, new BigDecimal("5000000")));
 
         String body = mockMvc.perform(get("/api/accounts/{id}/crypto-prices", ACCOUNT_ID).param("tickers", "ETH,BTC,ETH")

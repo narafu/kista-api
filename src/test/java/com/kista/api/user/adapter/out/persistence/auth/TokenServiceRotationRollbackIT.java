@@ -39,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("TokenService RT 재사용 공격 감지 — 실제 트랜잭션 커밋 검증 통합 테스트")
 class TokenServiceRotationRollbackIT extends RootDataJpaTestBase {
 
-    @Autowired TokenService tokenUseCase;
+    @Autowired TokenService tokenService;
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired Clock clock; // 서비스와 같은 고정 Clock — 시드 시각을 서비스 기준에 맞춘다
     @MockitoBean BlacklistPort blacklistPort;
@@ -75,7 +75,7 @@ class TokenServiceRotationRollbackIT extends RootDataJpaTestBase {
         TestTransaction.flagForCommit();
         TestTransaction.end();
 
-        assertThatThrownBy(() -> tokenUseCase.refresh(rawToken, "ua"))
+        assertThatThrownBy(() -> tokenService.refresh(rawToken, "ua"))
                 .isInstanceOf(InvalidRefreshTokenException.class);
 
         // refresh() 내부 트랜잭션 밖에서 순수 조회 — 세션 폐기(delete)가 실제로 커밋됐는지 확인

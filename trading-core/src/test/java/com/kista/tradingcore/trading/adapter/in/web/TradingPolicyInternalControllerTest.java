@@ -39,7 +39,7 @@ class TradingPolicyInternalControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean TradingPolicyService tradingPolicyUseCase;
+    @MockitoBean TradingPolicyService tradingPolicyService;
 
     private static final String VALID_TOKEN = "test-internal-token";
 
@@ -57,7 +57,7 @@ class TradingPolicyInternalControllerTest {
 
     @Test
     void getPolicy_validToken_returnsCurrentPolicy() throws Exception {
-        given(tradingPolicyUseCase.getPolicy()).willReturn(TradingPolicySettings.defaults());
+        given(tradingPolicyService.getPolicy()).willReturn(TradingPolicySettings.defaults());
 
         mockMvc.perform(get("/api/internal/trading/policy-settings").header("X-Internal-Token", VALID_TOKEN))
                 .andExpect(status().isOk())
@@ -74,7 +74,7 @@ class TradingPolicyInternalControllerTest {
 
     @Test
     void replacePolicy_validBody_delegatesWholeSettings() throws Exception {
-        given(tradingPolicyUseCase.replacePolicy(any())).willAnswer(inv -> inv.getArgument(0));
+        given(tradingPolicyService.replacePolicy(any())).willAnswer(inv -> inv.getArgument(0));
 
         mockMvc.perform(put("/api/internal/trading/policy-settings")
                         .header("X-Internal-Token", VALID_TOKEN)
@@ -85,7 +85,7 @@ class TradingPolicyInternalControllerTest {
                 .andExpect(jsonPath("$.strategies.PRIVACY.enabled").value(false));
 
         ArgumentCaptor<TradingPolicySettings> captor = ArgumentCaptor.forClass(TradingPolicySettings.class);
-        verify(tradingPolicyUseCase).replacePolicy(captor.capture());
+        verify(tradingPolicyService).replacePolicy(captor.capture());
         assertThat(captor.getValue().brokerEnabled(com.kista.shared.kernel.Broker.TOSS)).isFalse();
         assertThat(captor.getValue().strategy(com.kista.shared.kernel.StrategyType.PRIVACY).enabled()).isFalse();
     }
@@ -101,6 +101,6 @@ class TradingPolicyInternalControllerTest {
                                 """))
                 .andExpect(status().isBadRequest());
 
-        verify(tradingPolicyUseCase, never()).replacePolicy(any());
+        verify(tradingPolicyService, never()).replacePolicy(any());
     }
 }

@@ -40,7 +40,7 @@ class FearGreedControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean FearGreedQueryService getFearGreedUseCase;
+    @MockitoBean FearGreedQueryService fearGreedQueryService;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
 
@@ -48,10 +48,10 @@ class FearGreedControllerTest {
 
     @Test
     void getFearGreed_returns_cnn_and_crypto_bundle() throws Exception {
-        when(getFearGreedUseCase.getRecent(eq("CNN"), anyInt())).thenReturn(List.of(
+        when(fearGreedQueryService.getRecent(eq("CNN"), anyInt())).thenReturn(List.of(
                 new FearGreedSnapshot(null, "CNN", Instant.parse("2026-06-21T00:00:00Z"), 60, FearGreedRating.GREED, null),
                 new FearGreedSnapshot(null, "CNN", Instant.parse("2026-06-22T00:00:00Z"), 72, FearGreedRating.GREED, null)));
-        when(getFearGreedUseCase.getRecent(eq("CRYPTO"), anyInt())).thenReturn(List.of(
+        when(fearGreedQueryService.getRecent(eq("CRYPTO"), anyInt())).thenReturn(List.of(
                 new FearGreedSnapshot(null, "CRYPTO", Instant.parse("2026-06-22T00:00:00Z"), 30, FearGreedRating.FEAR, null)));
 
         mockMvc.perform(get("/api/market/fear-greed")
@@ -69,9 +69,9 @@ class FearGreedControllerTest {
     @Test
     void getFearGreed_empty_crypto_keeps_cnn_and_nulls_crypto_current() throws Exception {
         // CRYPTO 외부 조회 실패 시 서비스가 빈 이력을 돌려준다 — CNN은 정상, crypto.current=null
-        when(getFearGreedUseCase.getRecent(eq("CNN"), anyInt())).thenReturn(List.of(
+        when(fearGreedQueryService.getRecent(eq("CNN"), anyInt())).thenReturn(List.of(
                 new FearGreedSnapshot(null, "CNN", Instant.parse("2026-06-22T00:00:00Z"), 72, FearGreedRating.GREED, null)));
-        when(getFearGreedUseCase.getRecent(eq("CRYPTO"), anyInt())).thenReturn(List.of());
+        when(fearGreedQueryService.getRecent(eq("CRYPTO"), anyInt())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/market/fear-greed").param("days", "90"))
                 .andExpect(status().isOk())

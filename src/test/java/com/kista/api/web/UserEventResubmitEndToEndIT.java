@@ -44,7 +44,7 @@ class UserEventResubmitEndToEndIT {
     @Autowired UserEventResubmitScheduler scheduler;
     @MockitoSpyBean StringRedisTemplate redisTemplate; // XADD 실패 주입용
     @MockitoBean NotifyPort notifyPort;                // 관리자 텔레그램 대신 호출 검증
-    @Autowired UserSettingsService userSettingsUseCase;
+    @Autowired UserSettingsService userSettingsService;
 
     private final UUID userId = UUID.randomUUID();
 
@@ -85,9 +85,9 @@ class UserEventResubmitEndToEndIT {
                 userId, "kakao_" + userId);
         doThrow(new RedisConnectionFailureException("redis down")).doCallRealMethod().when(redisTemplate).opsForStream();
 
-        userSettingsUseCase.updateNotificationPref(userId, NotificationType.TRADING_ALERT, false);
+        userSettingsService.updateNotificationPref(userId, NotificationType.TRADING_ALERT, false);
 
-        assertThat(userSettingsUseCase.getByUserId(userId).isNotificationEnabled(NotificationType.TRADING_ALERT)).isFalse();
+        assertThat(userSettingsService.getByUserId(userId).isNotificationEnabled(NotificationType.TRADING_ALERT)).isFalse();
         assertThat(jdbcTemplate.queryForObject("SELECT status FROM public.event_publication WHERE serialized_event LIKE ? AND listener_id LIKE ?",
                 String.class, "%" + userId + "%", "%UserEventStreamPublisher%")).isEqualTo("FAILED");
     }

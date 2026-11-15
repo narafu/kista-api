@@ -51,7 +51,7 @@ class UserServiceTest {
     @Mock BlacklistPort blacklistPort;
     @Mock RefreshTokenPort refreshTokenPort;
     @Mock ApprovalPolicyPort approvalPolicyPort;
-    @Mock ObjectProvider<UserService> userUseCaseProvider;
+    @Mock ObjectProvider<UserService> userServiceProvider;
     @Mock UserNotifyProfilePublisher userNotifyProfilePublisher;
     @Mock AdminSeedPromoter adminSeedPromoter;
     @Mock FinanceGroupPort financeGroupPort; // 가입 시 개인 그룹 부트스트랩
@@ -61,10 +61,10 @@ class UserServiceTest {
     @BeforeEach
     void setUpRuntimeSettings() {
         userService = new UserService(userPort, userCascadeDeleter, eventPublisher, bootstrapProps,
-                kakaoOAuthPort, blacklistPort, refreshTokenPort, approvalPolicyPort, userUseCaseProvider,
+                kakaoOAuthPort, blacklistPort, refreshTokenPort, approvalPolicyPort, userServiceProvider,
                 userNotifyProfilePublisher, adminSeedPromoter, FixedClockTestConfig.FIXED);
         lenient().when(approvalPolicyPort.approvalRequiredForUpdate()).thenReturn(true);
-        lenient().when(userUseCaseProvider.getObject()).thenReturn(userService);
+        lenient().when(userServiceProvider.getObject()).thenReturn(userService);
     }
 
     private User pendingUser(UUID id) {
@@ -460,7 +460,7 @@ class UserServiceTest {
         assertThat(result.status()).isEqualTo(UserStatus.PENDING);
         assertThat(result.role()).isEqualTo(UserRole.USER);
         verify(userPort).save(any()); // 신규 저장 1회
-        verify(userUseCaseProvider).getObject(); // 트랜잭션 프록시를 통해 register 호출
+        verify(userServiceProvider).getObject(); // 트랜잭션 프록시를 통해 register 호출
         verify(eventPublisher).publishEvent(any(NewUserRegisteredEvent.class));
     }
 

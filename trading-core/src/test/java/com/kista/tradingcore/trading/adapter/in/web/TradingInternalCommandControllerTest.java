@@ -40,7 +40,7 @@ class TradingInternalCommandControllerTest {
 
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean ManualTradeCorrectionService manualTradeCorrectionUseCase;
+    @MockitoBean ManualTradeCorrectionService manualTradeCorrectionService;
 
     private static final String VALID_TOKEN = "test-internal-token";
 

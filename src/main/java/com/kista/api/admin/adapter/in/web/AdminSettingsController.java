@@ -25,12 +25,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AdminSettingsController {
 
-    private final AdminSettingsService adminSettingsUseCase; // 관리자 설정 조회·갱신 유스케이스
+    private final AdminSettingsService adminSettingsService; // 관리자 설정 조회·갱신 유스케이스
 
     @Operation(summary = "런타임 설정 조회", description = "auth/brokers/strategies 전체 런타임 설정을 조회합니다.")
     @GetMapping
     public ResponseEntity<RuntimeSettingsResponse> getSettings() {
-        return noStore(RuntimeSettingsResponse.from(adminSettingsUseCase.getSettings()));
+        return noStore(RuntimeSettingsResponse.from(adminSettingsService.getSettings()));
     }
 
     @Operation(summary = "런타임 설정 갱신", description = "요청 전체(auth/brokers/strategies)를 검증한 뒤 한 번에 교체합니다. 부분 갱신은 지원하지 않습니다.")
@@ -41,9 +41,9 @@ public class AdminSettingsController {
         // 요청에 빠진 증권사 키는 현재 정책 값을 유지한다 — 신규 증권사(UPBIT)를 모르는 구 관리자 화면 호환
         // 요청 전체를 도메인 설정으로 검증한 뒤 단일 갱신 유스케이스를 호출한다.
         // benchmarks 생략 여부는 DTO 단계에서만 판별 가능 — toDomain() 변환 시 null이 기본값으로 치환되기 전에 확인한다.
-        RuntimeSettingsBundle requested = request.toDomain(adminSettingsUseCase.getSettings().tradingPolicy().brokers());
+        RuntimeSettingsBundle requested = request.toDomain(adminSettingsService.getSettings().tradingPolicy().brokers());
         return noStore(RuntimeSettingsResponse.from(
-                adminSettingsUseCase.updateSettings(adminId, requested, request.benchmarks() != null)));
+                adminSettingsService.updateSettings(adminId, requested, request.benchmarks() != null)));
     }
 
     private ResponseEntity<RuntimeSettingsResponse> noStore(RuntimeSettingsResponse response) {

@@ -47,7 +47,7 @@ public class UserService {
     private final BlacklistPort blacklistPort;              // 거절 즉시 AT 차단
     private final RefreshTokenPort refreshTokenPort;        // RT 삭제 (탈퇴/거절 시 전체 세션 종료)
     private final ApprovalPolicyPort approvalPolicyPort; // 승인설정 조회 (admin RuntimeSettingsService가 구현, 포트 역전)
-    private final ObjectProvider<UserService> userUseCaseProvider; // OAuth 이후 트랜잭션 프록시 재진입
+    private final ObjectProvider<UserService> userServiceProvider; // OAuth 이후 트랜잭션 프록시 재진입
     private final UserNotifyProfilePublisher userNotifyProfilePublisher; // trading-core user_notify_profile 캐시 동기화
     private final AdminSeedPromoter adminSeedPromoter; // ADMIN seed promote 트랜잭션 경계 (login()이 NOT_SUPPORTED라 분리)
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
@@ -74,7 +74,7 @@ public class UserService {
         try {
             // 신규 사용자 등록 시도 (기존 사용자면 그대로 반환)
             // 외부 OAuth 호출이 끝난 뒤 프록시를 통해 가입 트랜잭션만 시작한다.
-            user = userUseCaseProvider.getObject()
+            user = userServiceProvider.getObject()
                     .register(kakaoUser.kakaoId(), kakaoUser.nickname(), UuidV7.next(), kakaoUser.email());
         } catch (DataIntegrityViolationException _) {
             // 동시 가입 경쟁 조건 → 기존 사용자 직접 조회 (self-invocation 방지)

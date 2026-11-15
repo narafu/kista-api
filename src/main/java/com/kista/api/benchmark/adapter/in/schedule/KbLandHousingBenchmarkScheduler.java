@@ -17,7 +17,7 @@ import java.time.Duration;
 @ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true)
 public class KbLandHousingBenchmarkScheduler {
 
-    private final HousingBenchmarkService fetchHousingBenchmarkUseCase;
+    private final HousingBenchmarkService housingBenchmarkService;
     private final SchedulerJobRunner jobRunner;
     private final SchedulerLockService schedulerLockService;
 
@@ -29,10 +29,10 @@ public class KbLandHousingBenchmarkScheduler {
     // 수동 트리거 — 크론 대기 없이 즉시 실행. run()과 락 이름을 공유해 크론과 동시 실행되지 않음
     public void runNow() throws InterruptedException {
         schedulerLockService.tryRun("kbland-housing-benchmark", Duration.ofMinutes(30),
-                () -> jobRunner.run("KB Land 주택 벤치마크 수집 스케쥴러 수동", fetchHousingBenchmarkUseCase::fetchAndSave));
+                () -> jobRunner.run("KB Land 주택 벤치마크 수집 스케쥴러 수동", housingBenchmarkService::fetchAndSave));
     }
 
     private void runLocked() {
-        jobRunner.run("KB Land 주택 벤치마크 수집 스케쥴러", fetchHousingBenchmarkUseCase::fetchAndSave);
+        jobRunner.run("KB Land 주택 벤치마크 수집 스케쥴러", housingBenchmarkService::fetchAndSave);
     }
 }

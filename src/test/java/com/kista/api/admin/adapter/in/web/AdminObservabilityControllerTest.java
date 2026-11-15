@@ -44,7 +44,7 @@ class AdminObservabilityControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort;
-    @MockitoBean AdminQueryService adminQuery;
+    @MockitoBean AdminQueryService adminQueryService;
     @MockitoBean AdminService adminUser;
     @MockitoBean AppErrorLogPort appErrorLogPort;
 
@@ -67,7 +67,7 @@ class AdminObservabilityControllerTest {
 
     @Test
     void listAuditLogs_adminRole_returns200() throws Exception {
-        when(adminQuery.listAuditLogs(null, null)).thenReturn(List.of());
+        when(adminQueryService.listAuditLogs(null, null)).thenReturn(List.of());
 
         mockMvc.perform(get("/api/admin/logs/audit")
                         .with(authentication(adminToken(ADMIN_UUID))))
@@ -95,7 +95,7 @@ class AdminObservabilityControllerTest {
                 UUID.randomUUID(), "KisApiException", "KIS 오류", "stack...",
                 Map.of("caller", "TradingService"), Instant.now()
         );
-        when(adminQuery.listErrorLogs(eq(100), eq(Instant.EPOCH), any(Instant.class))).thenReturn(List.of(log));
+        when(adminQueryService.listErrorLogs(eq(100), eq(Instant.EPOCH), any(Instant.class))).thenReturn(List.of(log));
 
         mockMvc.perform(get("/api/admin/logs/errors")
                         .with(authentication(adminToken(ADMIN_UUID))))
@@ -105,7 +105,7 @@ class AdminObservabilityControllerTest {
 
     @Test
     void listErrorLogs_customLimit_passedToPort() throws Exception {
-        when(adminQuery.listErrorLogs(eq(50), eq(Instant.EPOCH), any(Instant.class))).thenReturn(List.of());
+        when(adminQueryService.listErrorLogs(eq(50), eq(Instant.EPOCH), any(Instant.class))).thenReturn(List.of());
 
         mockMvc.perform(get("/api/admin/logs/errors?limit=50")
                         .with(authentication(adminToken(ADMIN_UUID))))
@@ -128,7 +128,7 @@ class AdminObservabilityControllerTest {
 
     @Test
     void getAnomalies_adminRole_returns200() throws Exception {
-        when(adminQuery.getAnomalies(7, null, null))
+        when(adminQueryService.getAnomalies(7, null, null))
                 .thenReturn(new AdminAnomalies(List.of(), List.of()));
         when(adminUser.listAll(null, null)).thenReturn(List.of());
 
@@ -141,7 +141,7 @@ class AdminObservabilityControllerTest {
 
     @Test
     void getAnomalies_withDateRange_passesRangeToService() throws Exception {
-        when(adminQuery.getAnomalies(7, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 1)))
+        when(adminQueryService.getAnomalies(7, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 1)))
                 .thenReturn(new AdminAnomalies(List.of(), List.of()));
         when(adminUser.listAll(null, null)).thenReturn(List.of());
 

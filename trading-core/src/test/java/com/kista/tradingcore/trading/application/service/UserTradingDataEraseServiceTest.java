@@ -37,7 +37,7 @@ class UserTradingDataEraseServiceTest {
     @Mock CyclePositionPort cyclePositionPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock StrategyPort strategyPort;
-    @Mock AccountService accountUseCase;
+    @Mock AccountService accountService;
     @Mock TradingUserProfilePort tradingUserProfilePort;
 
     @InjectMocks UserTradingDataEraseService eraser;
@@ -49,18 +49,18 @@ class UserTradingDataEraseServiceTest {
         eraser.erase(userId);
 
         // 소프트 삭제 쿼리가 accounts를 조인하므로 계좌는 하위 데이터 뒤에, 복제본 tombstone은 마지막
-        InOrder inOrder = inOrder(cyclePositionPort, strategyCyclePort, strategyPort, accountUseCase, tradingUserProfilePort);
+        InOrder inOrder = inOrder(cyclePositionPort, strategyCyclePort, strategyPort, accountService, tradingUserProfilePort);
         inOrder.verify(cyclePositionPort).deleteByUserId(userId);
         inOrder.verify(strategyCyclePort).deleteByUserId(userId);
         inOrder.verify(strategyPort).deleteByUserId(userId);
-        inOrder.verify(accountUseCase).deleteAllByUserId(userId);
+        inOrder.verify(accountService).deleteAllByUserId(userId);
         inOrder.verify(tradingUserProfilePort).markDeleted(userId);
     }
 
     @Test
     void cancelOpenOrders_계좌마다_취소하고_성공이면_알리지_않는다() {
         Account account = kisAccount(UUID.randomUUID(), userId);
-        when(accountUseCase.listByUser(userId)).thenReturn(List.of(account));
+        when(accountService.listByUser(userId)).thenReturn(List.of(account));
 
         eraser.cancelOpenOrders(userId);
 
@@ -72,7 +72,7 @@ class UserTradingDataEraseServiceTest {
     void cancelOpenOrders_실패는_계좌별로_알리고_다음_계좌를_계속한다() {
         Account failing = kisAccount(UUID.randomUUID(), userId);
         Account throwing = kisAccount(UUID.randomUUID(), userId);
-        when(accountUseCase.listByUser(userId)).thenReturn(List.of(throwing, failing));
+        when(accountService.listByUser(userId)).thenReturn(List.of(throwing, failing));
         when(openOrderCancelPort.cancelOpenOrders(throwing)).thenThrow(new IllegalStateException("broker down"));
         when(openOrderCancelPort.cancelOpenOrders(failing)).thenReturn(1);
 

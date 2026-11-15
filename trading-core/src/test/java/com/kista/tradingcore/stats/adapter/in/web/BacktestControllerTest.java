@@ -38,7 +38,7 @@ import com.kista.shared.kernel.StrategyTicker;
 class BacktestControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockitoBean BacktestService backtestUseCase;
+    @MockitoBean BacktestService backtestService;
 
     private static final UUID USER_ID = UUID.randomUUID();
 
@@ -59,7 +59,7 @@ class BacktestControllerTest {
 
     @Test
     void 백테스트_결과를_반환한다() throws Exception {
-        when(backtestUseCase.run(any())).thenReturn(result());
+        when(backtestService.run(any())).thenReturn(result());
 
         mockMvc.perform(get("/api/backtest")
                         .param("type", "VR").param("ticker", "TQQQ")
@@ -80,7 +80,7 @@ class BacktestControllerTest {
                 .andExpect(jsonPath("$.warnings.length()").value(1));
 
         ArgumentCaptor<BacktestCommand> captor = ArgumentCaptor.forClass(BacktestCommand.class);
-        verify(backtestUseCase).run(captor.capture());
+        verify(backtestService).run(captor.capture());
         BacktestCommand command = captor.getValue();
         assertThat(command.type()).isEqualTo(StrategyType.VR);
         assertThat(command.ticker()).isEqualTo(StrategyTicker.TQQQ);
@@ -94,7 +94,7 @@ class BacktestControllerTest {
 
     @Test
     void vrRecurringAmount는_생략하면_0으로_기본값을_쓴다() throws Exception {
-        when(backtestUseCase.run(any())).thenReturn(result());
+        when(backtestService.run(any())).thenReturn(result());
 
         mockMvc.perform(get("/api/backtest")
                         .param("type", "INFINITE").param("ticker", "TQQQ")
@@ -104,7 +104,7 @@ class BacktestControllerTest {
                 .andExpect(status().isOk());
 
         ArgumentCaptor<BacktestCommand> captor = ArgumentCaptor.forClass(BacktestCommand.class);
-        verify(backtestUseCase).run(captor.capture());
+        verify(backtestService).run(captor.capture());
         assertThat(captor.getValue().vrRecurringAmount()).isZero();
     }
 
@@ -117,12 +117,12 @@ class BacktestControllerTest {
                         .with(authentication(auth())))
                 .andExpect(status().isBadRequest());
 
-        verifyNoInteractions(backtestUseCase);
+        verifyNoInteractions(backtestService);
     }
 
     @Test
     void 서비스가_던진_IllegalArgumentException은_400으로_매핑된다() throws Exception {
-        when(backtestUseCase.run(any())).thenThrow(new IllegalArgumentException("시드(seed)는 0보다 커야 합니다"));
+        when(backtestService.run(any())).thenThrow(new IllegalArgumentException("시드(seed)는 0보다 커야 합니다"));
 
         mockMvc.perform(get("/api/backtest")
                         .param("type", "INFINITE").param("ticker", "TQQQ")
@@ -140,6 +140,6 @@ class BacktestControllerTest {
                         .param("seed", "1000"))
                 .andExpect(status().isUnauthorized());
 
-        verifyNoInteractions(backtestUseCase);
+        verifyNoInteractions(backtestService);
     }
 }

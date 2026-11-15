@@ -37,13 +37,13 @@ class AccountControllerTest {
 
     @Autowired MockMvc mockMvc;
 
-    @MockitoBean AccountService accountUseCase;
+    @MockitoBean AccountService accountService;
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
 
     @Test
     void list_accounts_returns_200() throws Exception {
-        when(accountUseCase.listByUser(any())).thenReturn(List.of());
+        when(accountService.listByUser(any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/accounts")
                         .with(authentication(userToken(UUID.fromString(USER_ID)))))
@@ -69,7 +69,7 @@ class AccountControllerTest {
 
     @Test
     void testConnection_failure_returns422() throws Exception {
-        doThrow(new BrokerCredentialException()).when(accountUseCase).test(any(), anyString(), anyString());
+        doThrow(new BrokerCredentialException()).when(accountService).test(any(), anyString(), anyString());
 
         mockMvc.perform(post("/api/accounts/connection-tests")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -82,7 +82,7 @@ class AccountControllerTest {
     void testConnection_disabledBroker_returns400() throws Exception {
         // 서비스의 증권사 비활성 검증 예외는 사용자 입력 오류로 노출한다.
         doThrow(new IllegalArgumentException("한국투자증권 신규 계좌 등록이 비활성화되어 있습니다."))
-                .when(accountUseCase).test(any(), anyString(), anyString());
+                .when(accountService).test(any(), anyString(), anyString());
 
         mockMvc.perform(post("/api/accounts/connection-tests")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -103,7 +103,7 @@ class AccountControllerTest {
     @Test
     void register_tossAccount_returns201() throws Exception {
         // Toss 계좌 등록: AccountService.register()가 accountSeq 조회까지 통합 처리
-        when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
+        when(accountService.register(any(UUID.class), any(RegisterAccountCommand.class)))
                 .thenReturn(new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID),
                         "토스계좌", "131-01-001931", "cid", "csecret", "42", Broker.TOSS, null, null));
 
@@ -119,7 +119,7 @@ class AccountControllerTest {
     @Test
     void register_kisAccount_returns201() throws Exception {
         // KIS 계좌 등록: AccountService.register()가 verifyAccount 통합 처리
-        when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
+        when(accountService.register(any(UUID.class), any(RegisterAccountCommand.class)))
                 .thenReturn(new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID),
                         "KIS계좌", "74420614", "appKey", "appSecret", null, Broker.KIS, null, null));
 
@@ -136,7 +136,7 @@ class AccountControllerTest {
     @Test
     void register_upbit_responseHasNullAccountNoAndKrwCurrency() throws Exception {
         java.time.Instant expiresAt = java.time.Instant.parse("2027-10-17T00:00:00Z");
-        when(accountUseCase.register(any(), any())).thenReturn(new Account(UUID.randomUUID(), UUID.fromString(USER_ID),
+        when(accountService.register(any(), any())).thenReturn(new Account(UUID.randomUUID(), UUID.fromString(USER_ID),
                 "업비트", null, "ak", "sk", null, Broker.UPBIT, null, expiresAt));
 
         mockMvc.perform(post("/api/accounts")
@@ -158,12 +158,12 @@ class AccountControllerTest {
                         .content("{\"broker\":\"UPBIT\",\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isNoContent());
-        verify(accountUseCase).test(eq(Broker.UPBIT), eq("testkey1234"), eq("testsecret1234"));
+        verify(accountService).test(eq(Broker.UPBIT), eq("testkey1234"), eq("testsecret1234"));
     }
 
     @Test
     void register_duplicate_returns409WithCodeInBody() throws Exception {
-        when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
+        when(accountService.register(any(UUID.class), any(RegisterAccountCommand.class)))
                 .thenThrow(new Account.DuplicateAccountException("74420614-01"));
 
         mockMvc.perform(post("/api/accounts")
@@ -179,7 +179,7 @@ class AccountControllerTest {
     @Test
     void register_disabledBroker_returns400() throws Exception {
         // 신규 계좌 등록도 연결 테스트와 동일한 사용자 입력 오류 응답을 사용한다.
-        when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
+        when(accountService.register(any(UUID.class), any(RegisterAccountCommand.class)))
                 .thenThrow(new IllegalArgumentException("토스증권 신규 계좌 등록이 비활성화되어 있습니다."));
 
         mockMvc.perform(post("/api/accounts")
@@ -198,7 +198,7 @@ class AccountControllerTest {
         // 내부의 두 매핑 경로(전용 6종 vs 범용 GENERIC)를 모두 실측한다.
         UUID accountId = UUID.randomUUID();
         doThrow(new SecurityException("계좌에 대한 접근 권한이 없습니다"))
-                .when(accountUseCase).delete(eq(accountId), any());
+                .when(accountService).delete(eq(accountId), any());
 
         mockMvc.perform(delete("/api/accounts/" + accountId)
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
@@ -219,7 +219,7 @@ class AccountControllerTest {
     @Test
     void updateCredentials_returns200() throws Exception {
         UUID id = UUID.randomUUID();
-        when(accountUseCase.updateCredentials(eq(id), eq(UUID.fromString(USER_ID)), any()))
+        when(accountService.updateCredentials(eq(id), eq(UUID.fromString(USER_ID)), any()))
                 .thenReturn(new Account(id, UUID.fromString(USER_ID), "업비트", null, "new-ak", "new-sk", null, Broker.UPBIT, null,
                         java.time.Instant.parse("2027-10-17T00:00:00Z")));
 
@@ -230,7 +230,7 @@ class AccountControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.apiKeyExpiresAt").value("2027-10-17T00:00:00Z"))
                 .andExpect(jsonPath("$.appKey").doesNotExist());
-        verify(accountUseCase).updateCredentials(id, UUID.fromString(USER_ID),
+        verify(accountService).updateCredentials(id, UUID.fromString(USER_ID),
                 new com.kista.tradingcore.account.domain.model.UpdateCredentialsCommand("new-ak", "new-sk", null));
     }
 
@@ -245,7 +245,7 @@ class AccountControllerTest {
 
     @Test
     void registerPassesApiKeyExpiresOn() throws Exception {
-        when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
+        when(accountService.register(any(UUID.class), any(RegisterAccountCommand.class)))
                 .thenReturn(new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID),
                         "KIS계좌", "74420614", "appKey", "appSecret", null, Broker.KIS, null, null));
 
@@ -255,14 +255,14 @@ class AccountControllerTest {
                                 "\"appKey\":\"appKey\",\"secretKey\":\"appSecret\",\"apiKeyExpiresOn\":\"2027-03-01\"}")
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isCreated());
-        verify(accountUseCase).register(eq(UUID.fromString(USER_ID)), eq(new RegisterAccountCommand(
+        verify(accountService).register(eq(UUID.fromString(USER_ID)), eq(new RegisterAccountCommand(
                 "KIS계좌", "74420614-01", "appKey", "appSecret", null, java.time.LocalDate.of(2027, 3, 1))));
     }
 
     @Test
     void updateCredentialsPassesApiKeyExpiresOn() throws Exception {
         UUID id = UUID.randomUUID();
-        when(accountUseCase.updateCredentials(eq(id), eq(UUID.fromString(USER_ID)), any()))
+        when(accountService.updateCredentials(eq(id), eq(UUID.fromString(USER_ID)), any()))
                 .thenReturn(new Account(id, UUID.fromString(USER_ID), "KIS", null, "ak", "sk", null, Broker.KIS, null, null));
 
         mockMvc.perform(put("/api/accounts/{id}/credentials", id)
@@ -270,14 +270,14 @@ class AccountControllerTest {
                         .content("{\"appKey\":\"ak\",\"secretKey\":\"sk\",\"apiKeyExpiresOn\":\"2027-03-01\"}")
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isOk());
-        verify(accountUseCase).updateCredentials(id, UUID.fromString(USER_ID),
+        verify(accountService).updateCredentials(id, UUID.fromString(USER_ID),
                 new com.kista.tradingcore.account.domain.model.UpdateCredentialsCommand("ak", "sk", java.time.LocalDate.of(2027, 3, 1)));
     }
 
     @Test
     void updateWithoutExpiryKeepsExisting() throws Exception {
         UUID id = UUID.randomUUID();
-        when(accountUseCase.update(eq(id), eq(UUID.fromString(USER_ID)), any()))
+        when(accountService.update(eq(id), eq(UUID.fromString(USER_ID)), any()))
                 .thenReturn(new Account(id, UUID.fromString(USER_ID), "새이름", null, "ak", "sk", null, Broker.KIS, null, null));
 
         mockMvc.perform(put("/api/accounts/{id}", id)
@@ -285,7 +285,7 @@ class AccountControllerTest {
                         .content("{\"nickname\":\"새이름\"}")
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isOk());
-        verify(accountUseCase).update(id, UUID.fromString(USER_ID),
+        verify(accountService).update(id, UUID.fromString(USER_ID),
                 new com.kista.tradingcore.account.domain.model.UpdateAccountCommand("새이름", null));
     }
 }

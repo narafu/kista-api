@@ -17,10 +17,10 @@ class KbLandHousingBenchmarkSchedulerTest {
 
     @Test
     void run_acquiresLockAndRunsHousingBenchmarkFetchJob() throws Exception {
-        HousingBenchmarkService useCase = mock(HousingBenchmarkService.class);
+        HousingBenchmarkService housingBenchmarkService = mock(HousingBenchmarkService.class);
         SchedulerJobRunner jobRunner = mock(SchedulerJobRunner.class);
         SchedulerLockService lockService = mock(SchedulerLockService.class);
-        KbLandHousingBenchmarkScheduler scheduler = new KbLandHousingBenchmarkScheduler(useCase, jobRunner, lockService);
+        KbLandHousingBenchmarkScheduler scheduler = new KbLandHousingBenchmarkScheduler(housingBenchmarkService, jobRunner, lockService);
 
         scheduler.run();
 
@@ -33,7 +33,7 @@ class KbLandHousingBenchmarkSchedulerTest {
         verify(jobRunner).run(eq("KB Land 주택 벤치마크 수집 스케쥴러"), runnableCaptor.capture());
         runnableCaptor.getValue().run();
 
-        verify(useCase).fetchAndSave();
+        verify(housingBenchmarkService).fetchAndSave();
         assertThat(taskCaptor.getValue()).isNotNull();
     }
 }

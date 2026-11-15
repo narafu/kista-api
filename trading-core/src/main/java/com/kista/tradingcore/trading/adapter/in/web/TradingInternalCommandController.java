@@ -16,12 +16,12 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class TradingInternalCommandController {
 
-    private final ManualTradeCorrectionService manualTradeCorrectionUseCase;
+    private final ManualTradeCorrectionService manualTradeCorrectionService;
 
     @Operation(summary = "관리자 수동 체결 보정")
     @PostMapping("/trade-corrections")
     public TradeCorrectionResponse correctManualFills(@RequestBody @Valid TradeCorrectionRequest request) {
         return TradingContractMapper.toResponse(
-                manualTradeCorrectionUseCase.correctManualFills(TradingContractMapper.toCommand(request)));
+                manualTradeCorrectionService.correctManualFills(TradingContractMapper.toCommand(request)));
     }
 }

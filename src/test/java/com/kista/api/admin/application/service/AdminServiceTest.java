@@ -35,7 +35,7 @@ class AdminServiceTest {
 
     @Mock UserPort userPort;
     @Mock UserSummaryPort userSummaryPort;
-    @Mock UserService userUseCase;
+    @Mock UserService userService;
     @Mock AuditLogPort auditLogPort;
 
     @InjectMocks AdminService adminService;
@@ -46,7 +46,7 @@ class AdminServiceTest {
 
         adminService.approveUser(adminId, targetId);
 
-        verify(userUseCase).approve(targetId);
+        verify(userService).approve(targetId);
         verify(auditLogPort).log(eq(adminId), eq("USER_APPROVE"), eq("USER"), eq(targetId), any());
     }
 
@@ -56,7 +56,7 @@ class AdminServiceTest {
 
         adminService.rejectUser(adminId, targetId, null);
 
-        verify(userUseCase).reject(targetId, null);
+        verify(userService).reject(targetId, null);
         verify(auditLogPort).log(eq(adminId), eq("USER_REJECT"), eq("USER"), eq(targetId), any());
     }
 
@@ -67,7 +67,7 @@ class AdminServiceTest {
 
         adminService.rejectUser(adminId, targetId, reason);
 
-        verify(userUseCase).reject(targetId, reason);
+        verify(userService).reject(targetId, reason);
         ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
         verify(auditLogPort).log(eq(adminId), eq("USER_REJECT"), eq("USER"), eq(targetId), payloadCaptor.capture());
         assertThat(payloadCaptor.getValue()).containsEntry("reason", reason);
@@ -76,13 +76,13 @@ class AdminServiceTest {
     @Test
     void approveUserByTelegram_mappedAdmin_logsAdminIdWithTelegramActor() {
         UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
-        when(userUseCase.findUserIdByTelegramChatId("777")).thenReturn(Optional.of(adminId));
+        when(userService.findUserIdByTelegramChatId("777")).thenReturn(Optional.of(adminId));
         when(userPort.findById(adminId)).thenReturn(Optional.of(new User(adminId, "k", "n", null,
                 UserStatus.ACTIVE, UserRole.ADMIN, null, null, null, null, null, User.DEFAULT_CHANNEL)));
 
         adminService.approveUserByTelegram("777", targetId);
 
-        verify(userUseCase).approve(targetId);
+        verify(userService).approve(targetId);
         verify(auditLogPort).log(eq(adminId), eq("USER_APPROVE"), eq("USER"), eq(targetId),
                 eq(Map.of("actor", "TELEGRAM_BOT", "chatId", "777")));
     }
@@ -90,11 +90,11 @@ class AdminServiceTest {
     @Test
     void rejectUserByTelegram_unmappedChat_logsNullAdminId() {
         UUID targetId = UUID.randomUUID();
-        when(userUseCase.findUserIdByTelegramChatId("777")).thenReturn(Optional.empty());
+        when(userService.findUserIdByTelegramChatId("777")).thenReturn(Optional.empty());
 
         adminService.rejectUserByTelegram("777", targetId);
 
-        verify(userUseCase).reject(targetId, null);
+        verify(userService).reject(targetId, null);
         ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
         verify(auditLogPort).log(eq(null), eq("USER_REJECT"), eq("USER"), eq(targetId), payloadCaptor.capture());
         assertThat(payloadCaptor.getValue()).containsEntry("actor", "TELEGRAM_BOT").containsEntry("chatId", "777");
@@ -103,7 +103,7 @@ class AdminServiceTest {
     @Test
     void approveUserByTelegram_nonAdminChatOwner_logsNullAdminId() {
         UUID userId = UUID.randomUUID(), targetId = UUID.randomUUID();
-        when(userUseCase.findUserIdByTelegramChatId("777")).thenReturn(Optional.of(userId));
+        when(userService.findUserIdByTelegramChatId("777")).thenReturn(Optional.of(userId));
         when(userPort.findById(userId)).thenReturn(Optional.of(new User(userId, "k", "n", null,
                 UserStatus.ACTIVE, UserRole.USER, null, null, null, null, null, User.DEFAULT_CHANNEL)));
 
@@ -119,7 +119,7 @@ class AdminServiceTest {
         adminService.changeRole(adminId, targetId, UserRole.ADMIN);
 
         // 역할 저장 + AT 무효화는 user 모듈(UserService.changeRole)이 담당 — admin은 검증과 감사 로그만
-        verify(userUseCase).changeRole(targetId, UserRole.ADMIN);
+        verify(userService).changeRole(targetId, UserRole.ADMIN);
         verify(auditLogPort).log(eq(adminId), eq("USER_ROLE_CHANGE"), eq("USER"), eq(targetId), any());
     }
 
@@ -130,7 +130,7 @@ class AdminServiceTest {
         assertThatThrownBy(() -> adminService.changeRole(adminId, adminId, UserRole.USER))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("자기 자신");
-        verify(userUseCase, never()).changeRole(any(), any());
+        verify(userService, never()).changeRole(any(), any());
     }
 
     @Test
@@ -142,7 +142,7 @@ class AdminServiceTest {
         assertThatThrownBy(() -> adminService.changeRole(adminId, targetId, UserRole.USER))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("최소 1명");
-        verify(userUseCase, never()).changeRole(any(), any());
+        verify(userService, never()).changeRole(any(), any());
     }
 
     @Test
@@ -153,7 +153,7 @@ class AdminServiceTest {
 
         adminService.changeRole(adminId, targetId, UserRole.USER);
 
-        verify(userUseCase).changeRole(targetId, UserRole.USER);
+        verify(userService).changeRole(targetId, UserRole.USER);
     }
 
     @Test
@@ -165,7 +165,7 @@ class AdminServiceTest {
         adminService.changeRole(adminId, targetId, UserRole.USER);
 
         verify(userPort, never()).countByRole(any());
-        verify(userUseCase).changeRole(targetId, UserRole.USER);
+        verify(userService).changeRole(targetId, UserRole.USER);
     }
 
     @Test
@@ -176,7 +176,7 @@ class AdminServiceTest {
         adminService.deleteUser(adminId, targetId);
 
         // cascade 삭제는 UserService.deleteMe로 위임
-        verify(userUseCase).deleteMe(targetId);
+        verify(userService).deleteMe(targetId);
         verify(auditLogPort).log(eq(adminId), eq("USER_DELETE"), eq("USER"), eq(targetId), any());
     }
 }

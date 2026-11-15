@@ -27,7 +27,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FinanceTransactionController {
 
-    private final FinanceTransactionService transactionUseCase;
+    private final FinanceTransactionService financeTransactionService;
 
     @Operation(summary = "거래내역 목록 조회", description = "userId=본인UUID로 필터링하면 개인 탭(내가 입력한 내역만)입니다.")
     @ApiResponse(responseCode = "200", description = "조회 성공")
@@ -38,7 +38,7 @@ public class FinanceTransactionController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) UUID categoryId,
             @RequestParam(name = "userId", required = false) UUID filterUserId) {
-        return transactionUseCase.list(userId, from, to, categoryId, filterUserId).stream()
+        return financeTransactionService.list(userId, from, to, categoryId, filterUserId).stream()
                 .map(FinanceTransactionResponse::from)
                 .toList();
     }
@@ -53,7 +53,7 @@ public class FinanceTransactionController {
             @AuthenticationPrincipal UUID userId,
             @RequestParam(required = false, defaultValue = "false") boolean shareToGroup,
             @Valid @RequestBody FinanceTransactionRequest request) {
-        var saved = transactionUseCase.create(userId, shareToGroup, request.toCommand());
+        var saved = financeTransactionService.create(userId, shareToGroup, request.toCommand());
         return ResponseEntity.created(URI.create("/api/finance/transactions/" + saved.id()))
                 .body(FinanceTransactionResponse.from(saved));
     }
@@ -69,7 +69,7 @@ public class FinanceTransactionController {
             @Parameter(description = "거래내역 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId,
             @Valid @RequestBody FinanceTransactionRequest request) {
-        return FinanceTransactionResponse.from(transactionUseCase.update(id, userId, request.toCommand()));
+        return FinanceTransactionResponse.from(financeTransactionService.update(id, userId, request.toCommand()));
     }
 
     @Operation(summary = "거래내역 그룹 공유 전환", description = "개인 소유 거래내역을 소유자의 현재 그룹으로 공유 전환합니다.")
@@ -82,7 +82,7 @@ public class FinanceTransactionController {
     public FinanceTransactionResponse share(
             @Parameter(description = "거래내역 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        return FinanceTransactionResponse.from(transactionUseCase.shareToGroup(id, userId));
+        return FinanceTransactionResponse.from(financeTransactionService.shareToGroup(id, userId));
     }
 
     @Operation(summary = "거래내역 그룹 공유 해제", description = "그룹 공유 거래내역을 개인 소유로 되돌립니다. 같은 그룹 멤버면 누구든 가능합니다.")
@@ -95,7 +95,7 @@ public class FinanceTransactionController {
     public FinanceTransactionResponse unshare(
             @Parameter(description = "거래내역 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        return FinanceTransactionResponse.from(transactionUseCase.unshare(id, userId));
+        return FinanceTransactionResponse.from(financeTransactionService.unshare(id, userId));
     }
 
     @Operation(summary = "거래내역 삭제")
@@ -109,6 +109,6 @@ public class FinanceTransactionController {
     public void delete(
             @Parameter(description = "거래내역 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        transactionUseCase.delete(id, userId);
+        financeTransactionService.delete(id, userId);
     }
 }

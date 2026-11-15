@@ -43,7 +43,7 @@ public class TradingCycleController {
     private final CapitalLedgerService injectCapital;           // PRIVACY·INFINITE·DCA 진행 중 사이클 투자금 추가
     private final CapitalWithdrawalService withdrawCapital;       // PRIVACY·INFINITE·DCA 진행 중 사이클 투자금 인출
     private final DcaConfigService dcaConfig;                    // DCA 설정 수정
-    private final DcaExecutionQueryService dcaExecutionQuery;           // DCA 회차 이력 조회
+    private final DcaExecutionQueryService dcaExecutionQueryService;           // DCA 회차 이력 조회
     private final Clock clock;                                   // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 로그인 사용자의 전 계좌 전략 목록 — 모바일 전략 탭용
@@ -280,6 +280,6 @@ public class TradingCycleController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         DcaExecutionFilter filter = new DcaExecutionFilter(from, to, direction, ruleKey);
-        return DcaExecutionPageResponse.from(dcaExecutionQuery.list(id, userId, filter, page, size));
+        return DcaExecutionPageResponse.from(dcaExecutionQueryService.list(id, userId, filter, page, size));
     }
 }

@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdminTradeController {
 
-    private final AdminQueryService adminQuery;  // 거래·계좌 조회 (최근 30일 전체, accountId → userId 매핑)
+    private final AdminQueryService adminQueryService;  // 거래·계좌 조회 (최근 30일 전체, accountId → userId 매핑)
     private final AdminService adminUser;   // userId → nickname 매핑용
     private final AdminTradeCorrectionService adminTradeCorrection; // 관리자 수동 체결 보정
 
@@ -49,7 +49,7 @@ public class AdminTradeController {
     public List<AdminTradeResponse> listTrades(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return toResponses(adminQuery.listTrades(from, to));
+        return toResponses(adminQueryService.listTrades(from, to));
     }
 
     @Operation(summary = "전략별 거래일 목록 조회")
@@ -57,7 +57,7 @@ public class AdminTradeController {
     public List<LocalDate> listStrategyTradeDates(
             @PathVariable UUID accountId,
             @PathVariable UUID strategyId) {
-        return adminQuery.listStrategyTradeDates(accountId, strategyId);
+        return adminQueryService.listStrategyTradeDates(accountId, strategyId);
     }
 
     // 관리자 수동 체결 보정 — fills 배열 순서대로 여러 건을 원자적으로 반영
@@ -72,7 +72,7 @@ public class AdminTradeController {
 
     // accountId → AccountSummaryResponse 전체 매핑 (N+1 방지용 일괄 조회)
     private Map<UUID, AccountSummaryResponse> buildAccountMap() {
-        return adminQuery.listAccounts(null, null).stream()
+        return adminQueryService.listAccounts(null, null).stream()
                 .collect(Collectors.toMap(AccountSummaryResponse::id, Function.identity()));
     }
 
@@ -84,7 +84,7 @@ public class AdminTradeController {
                 .map(OrderResponse::strategyCycleId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        Map<UUID, StrategySummaryResponse> strategySummaryMap = adminQuery.getStrategySummariesByCycleIds(cycleIds);
+        Map<UUID, StrategySummaryResponse> strategySummaryMap = adminQueryService.getStrategySummariesByCycleIds(cycleIds);
         return orders.stream()
                 .map(o -> AdminTradeResponse.from(o, accountMap, userMap, strategySummaryMap))
                 .toList();

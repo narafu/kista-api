@@ -31,7 +31,7 @@ public class UserTradingDataEraseService {
     private final CyclePositionPort cyclePositionPort;
     private final StrategyCyclePort strategyCyclePort;
     private final StrategyPort strategyPort;
-    private final AccountService accountUseCase;                   // 계좌 목록 + 소프트 삭제·증권사 토큰 삭제 (account 모듈 소유)
+    private final AccountService accountService;                   // 계좌 목록 + 소프트 삭제·증권사 토큰 삭제 (account 모듈 소유)
     private final TradingUserProfilePort tradingUserProfilePort;   // user_notify_profile 복제본 tombstone
 
     // 1단계: 계좌마다 전략 PAUSED + 증권사 미체결 취소(HTTP — 트랜잭션 밖). PAUSED가 먼저 기록돼 이후 정리가 실패해도 배치가 새 주문을 내지 않는다.
@@ -39,7 +39,7 @@ public class UserTradingDataEraseService {
     // 계좌별 격리 — 한 계좌의 취소 예외가 다른 계좌 정리를 막지 않는다
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void cancelOpenOrders(UUID userId) {
-        for (Account account : accountUseCase.listByUser(userId)) {
+        for (Account account : accountService.listByUser(userId)) {
             int failed;
             try {
                 failed = openOrderCancelPort.cancelOpenOrders(account);
@@ -61,7 +61,7 @@ public class UserTradingDataEraseService {
         cyclePositionPort.deleteByUserId(userId);
         strategyCyclePort.deleteByUserId(userId);
         strategyPort.deleteByUserId(userId);
-        accountUseCase.deleteAllByUserId(userId);
+        accountService.deleteAllByUserId(userId);
         tradingUserProfilePort.markDeleted(userId);
     }
 }

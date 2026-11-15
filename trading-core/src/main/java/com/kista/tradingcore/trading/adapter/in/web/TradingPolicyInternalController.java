@@ -20,17 +20,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class TradingPolicyInternalController {
 
-    private final TradingPolicyService tradingPolicyUseCase;
+    private final TradingPolicyService tradingPolicyService;
 
     @Operation(summary = "매매 런타임 정책 조회", description = "증권사별 신규 등록 허용·전략 타입별 생성 정책. X-Internal-Token 필수.")
     @GetMapping
     public TradingPolicySettings getPolicy() {
-        return tradingPolicyUseCase.getPolicy();
+        return tradingPolicyService.getPolicy();
     }
 
     @Operation(summary = "매매 런타임 정책 전체 교체", description = "root admin PUT /api/admin/settings의 brokers/strategies 섹션 위임. X-Internal-Token 필수.")
     @PutMapping
     public TradingPolicySettings replacePolicy(@RequestBody TradingPolicySettings settings) {
-        return tradingPolicyUseCase.replacePolicy(settings);
+        return tradingPolicyService.replacePolicy(settings);
     }
 }

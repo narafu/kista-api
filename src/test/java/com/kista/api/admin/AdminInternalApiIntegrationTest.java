@@ -51,7 +51,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Execution(ExecutionMode.SAME_THREAD) // 실 DB 연결 + 고정 포트 — 병렬 실행 시 트랜잭션/포트 충돌 방지 관례
 class AdminInternalApiIntegrationTest {
 
-    @Autowired private AdminTradeCorrectionService adminTradeCorrectionUseCase;
+    @Autowired private AdminTradeCorrectionService adminTradeCorrectionService;
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private AccountPort accountPort; // account_no/app_key/secret_key는 AES-GCM 암호화 컬럼이라 raw INSERT 불가 — 실 어댑터로 생성
 
@@ -105,7 +105,7 @@ class AdminInternalApiIntegrationTest {
                 List.of(new TradeCorrectionRequest.Fill(
                         today, OrderDirection.BUY, BigDecimal.ONE, new BigDecimal("120.00"), "MANUAL-1", "통합테스트")));
 
-        TradeCorrectionResponse result = adminTradeCorrectionUseCase.correctManualFills(userId, command);
+        TradeCorrectionResponse result = adminTradeCorrectionService.correctManualFills(userId, command);
 
         // BUY 1주@120 반영 후: holdings=3, avgPrice=(100*2+120)/3=106.6667, deposit=1000-120=880.00
         assertThat(result.processedCount()).isEqualTo(1);

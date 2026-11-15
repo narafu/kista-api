@@ -17,7 +17,7 @@ import java.time.Duration;
 @ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true) // local에서 끄면 운영 DB·텔레그램과 중복 알림 발생 방지
 public class RefreshTokenCleanupScheduler {
 
-    private final TokenService tokenUseCase;
+    private final TokenService tokenService;
     private final SchedulerJobRunner jobRunner; // 스케쥴러 시작/종료 알림 (레거시 공통 골격 재사용)
     private final SchedulerLockService schedulerLockService;
 
@@ -26,7 +26,7 @@ public class RefreshTokenCleanupScheduler {
     public void cleanupExpiredTokens() throws InterruptedException {
         schedulerLockService.tryRun("refresh-token-expired-cleanup", Duration.ofMinutes(30),
                 () -> jobRunner.run("만료 RT 정리 스케쥴러", () -> {
-                    int deleted = tokenUseCase.cleanupExpiredTokens();
+                    int deleted = tokenService.cleanupExpiredTokens();
                     log.info("만료 refresh_token {} 건 정리 완료", deleted);
                 }));
     }
@@ -36,7 +36,7 @@ public class RefreshTokenCleanupScheduler {
     public void cleanupRotatedTokens() throws InterruptedException {
         schedulerLockService.tryRun("refresh-token-rotated-cleanup", Duration.ofMinutes(30),
                 () -> jobRunner.run("회전 RT 정리 스케쥴러", () -> {
-                    int deleted = tokenUseCase.cleanupRotatedTokens();
+                    int deleted = tokenService.cleanupRotatedTokens();
                     log.info("grace 초과 회전 refresh_token {} 건 정리 완료", deleted);
                 }));
     }

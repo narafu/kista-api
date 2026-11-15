@@ -35,12 +35,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final UserService userUseCase;
-    private final TokenService tokenUseCase;
+    private final UserService userService;
+    private final TokenService tokenService;
     private final JwtIssuerService jwtIssuerService;
     private final JwtDecoder jwtDecoder; // AT 파싱용 — logout 시 jti 추출
     private final RefreshTokenCookieHelper cookieHelper;
-    private final UserSettingsService getUserSettingsQuery; // UserResponse 알림 설정·추천 목록 조회용
+    private final UserSettingsService userSettingsService; // UserResponse 알림 설정·추천 목록 조회용
 
 
     // 카카오 OAuth 인가 코드로 로그인 — AT(body) + RT(HttpOnly 쿠키) 발급
@@ -51,11 +51,11 @@ public class AuthController {
     public KakaoLoginResponse kakaoCallback(@RequestBody KakaoCallbackRequest request,
                                              HttpServletRequest httpRequest,
                                              HttpServletResponse httpResponse) {
-        User user = userUseCase.login(request.code(), request.redirectUri());
-        String rawRt = tokenUseCase.issueRefreshToken(user.id(), httpRequest.getHeader("User-Agent"));
+        User user = userService.login(request.code(), request.redirectUri());
+        String rawRt = tokenService.issueRefreshToken(user.id(), httpRequest.getHeader("User-Agent"));
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.issue(rawRt).toString());
         String at = jwtIssuerService.issue(user.id(), user.role());
-        UserSettings settings = getUserSettingsQuery.getByUserId(user.id());
+        UserSettings settings = userSettingsService.getByUserId(user.id());
         return new KakaoLoginResponse(at, "bearer", jwtIssuerService.expiresInSeconds(), UserResponse.from(user, settings));
     }
 
@@ -73,7 +73,7 @@ public class AuthController {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             return null;
         }
-        var result = tokenUseCase.refresh(rawRt, request.getHeader("User-Agent"));
+        var result = tokenService.refresh(rawRt, request.getHeader("User-Agent"));
         response.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.issue(result.newRawRefreshToken()).toString());
         String newAt = jwtIssuerService.issue(result.userId(), result.userRole());
         return new RefreshResponse(newAt, "bearer", jwtIssuerService.expiresInSeconds());
@@ -101,7 +101,7 @@ public class AuthController {
             }
         }
         // RT 쿠키가 없어도 호출한다 — 제시된 AT의 jti는 차단해야 한다
-        tokenUseCase.logout(rawRt, jti, atExpiresAt);
+        tokenService.logout(rawRt, jti, atExpiresAt);
         response.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.clear().toString());
     }
 
@@ -110,8 +110,8 @@ public class AuthController {
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping("/me")
     public UserResponse me(@AuthenticationPrincipal UUID userId) {
-        User user = userUseCase.getById(userId);
-        UserSettings settings = getUserSettingsQuery.getByUserId(userId);
+        User user = userService.getById(userId);
+        UserSettings settings = userSettingsService.getByUserId(userId);
         return UserResponse.from(user, settings);
     }
 
@@ -125,7 +125,7 @@ public class AuthController {
     @PostMapping("/approval-requests")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void requestApproval(@AuthenticationPrincipal UUID userId) {
-        userUseCase.reapply(userId);
+        userService.reapply(userId);
     }
 
     // 회원 탈퇴 — cascade로 계좌/거래내역/토큰 자동 삭제 (FK CASCADE + 블랙리스트 등재)
@@ -134,7 +134,7 @@ public class AuthController {
     @DeleteMapping("/me")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteMe(@AuthenticationPrincipal UUID userId, HttpServletResponse response) {
-        userUseCase.deleteMe(userId);
+        userService.deleteMe(userId);
         response.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.clear().toString());
     }
 }

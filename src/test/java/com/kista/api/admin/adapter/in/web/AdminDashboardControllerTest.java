@@ -36,13 +36,13 @@ class AdminDashboardControllerTest {
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean AdminQueryService adminQuery;
+    @MockitoBean AdminQueryService adminQueryService;
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     @Test
     void getStats_withAdminToken_returns200() throws Exception {
-        when(adminQuery.getStats()).thenReturn(new AdminStats(10, 3, 5, 2, 7));
+        when(adminQueryService.getStats()).thenReturn(new AdminStats(10, 3, 5, 2, 7));
 
         mockMvc.perform(get("/api/admin/dashboard/stats").with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isOk())

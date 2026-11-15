@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Bean;
 public class TokenUseCaseTestConfig {
 
     @Bean
-    public TokenService tokenUseCase(RefreshTokenPort refreshTokenPort, BlacklistPort blacklistPort, UserPort userPort, Clock clock) {
+    public TokenService tokenService(RefreshTokenPort refreshTokenPort, BlacklistPort blacklistPort, UserPort userPort, Clock clock) {
         return new TokenService(refreshTokenPort, blacklistPort, userPort, clock);
     }
 }

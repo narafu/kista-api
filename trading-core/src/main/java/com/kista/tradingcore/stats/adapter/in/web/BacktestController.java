@@ -27,7 +27,7 @@ import com.kista.shared.kernel.StrategyTicker;
 @RequiredArgsConstructor
 public class BacktestController {
 
-    private final BacktestService backtestUseCase;
+    private final BacktestService backtestService;
 
     @Operation(summary = "전략 백테스트", description = "과거 일봉으로 전략을 시뮬레이션해 자산 곡선·성과 요약·해석 주의사항을 반환. "
             + "initialHoldings/initialAvgPrice로 기존 보유 포지션부터 시작하는 백테스트도 가능(seed=0 허용, 단 예수금과 보유 중 하나는 있어야 함). "
@@ -66,6 +66,6 @@ public class BacktestController {
         BacktestCommand command = new BacktestCommand(type, ticker, from, to, seed,
                 divisionCount, vrBandWidth, vrIntervalWeeks, vrRecurringAmount, vrInitialValue,
                 initialHoldings, initialAvgPrice, rampInput, cycleSeedType);
-        return BacktestResponse.from(backtestUseCase.run(command));
+        return BacktestResponse.from(backtestService.run(command));
     }
 }

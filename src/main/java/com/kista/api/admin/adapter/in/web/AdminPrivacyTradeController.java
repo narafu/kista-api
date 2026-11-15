@@ -36,7 +36,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AdminPrivacyTradeController {
 
-    private final AdminQueryService adminQuery;
+    private final AdminQueryService adminQueryService;
     private final AdminPrivacyTradeService adminPrivacyTrade;
 
     // PRIVACY 기준 매매표(master) + 주문 명세(detail) 목록 — range 미전달 시 전체, 최소 30
@@ -45,7 +45,7 @@ public class AdminPrivacyTradeController {
     public List<AdminPrivacyBaseResponse> listBases(@RequestParam(required = false) Integer range) {
         if (range != null && range < 30)
             throw new IllegalArgumentException("range는 30 이상이어야 합니다");
-        return adminQuery.listPrivacyBases(range).stream()
+        return adminQueryService.listPrivacyBases(range).stream()
                 .map(AdminPrivacyBaseResponse::from)
                 .toList();
     }

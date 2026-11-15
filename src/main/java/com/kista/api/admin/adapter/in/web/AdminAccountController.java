@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdminAccountController {
 
-    private final AdminQueryService adminQuery;  // 계좌 목록 조회
+    private final AdminQueryService adminQueryService;  // 계좌 목록 조회
     private final AdminService adminUser;    // ownerNickname 조회용 사용자 목록
     private final AdminStrategyService adminStrategy; // 관리자 전략 상태 변경
 
@@ -47,9 +47,9 @@ public class AdminAccountController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         Map<UUID, UserSummary> userMap = UserSummaries.mapById(adminUser);
-        List<AccountSummaryResponse> accounts = adminQuery.listAccounts(from, to);
+        List<AccountSummaryResponse> accounts = adminQueryService.listAccounts(from, to);
         Set<UUID> accountIds = accounts.stream().map(AccountSummaryResponse::id).collect(Collectors.toSet());
-        Map<UUID, List<StrategyResponse>> strategyMap = adminQuery.listStrategiesByAccountIds(accountIds);
+        Map<UUID, List<StrategyResponse>> strategyMap = adminQueryService.listStrategiesByAccountIds(accountIds);
         return accounts.stream()
                 .map(a -> AdminAccountResponse.from(a, userMap.get(a.userId()), strategyMap.getOrDefault(a.id(), List.of())))
                 .toList();
@@ -59,7 +59,7 @@ public class AdminAccountController {
     @Operation(summary = "계좌 전략 목록 조회", description = "계좌 선택 이후 전략 선택 드롭다운용 목록을 반환합니다.")
     @GetMapping("/{accountId}/strategies")
     public List<AdminStrategyResponse> listStrategies(@PathVariable UUID accountId) {
-        return adminQuery.listStrategies(accountId).stream()
+        return adminQueryService.listStrategies(accountId).stream()
                 .map(AdminStrategyResponse::from)
                 .toList();
     }

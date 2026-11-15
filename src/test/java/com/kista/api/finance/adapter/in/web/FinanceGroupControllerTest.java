@@ -38,7 +38,7 @@ class FinanceGroupControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean FinanceGroupService groupUseCase;
+    @MockitoBean FinanceGroupService financeGroupService;
     @MockitoBean FinanceMemberPort financeMemberPort;
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -46,7 +46,7 @@ class FinanceGroupControllerTest {
     @Test
     void listMyGroups_returns200() throws Exception {
         FinanceGroup group = new FinanceGroup(UUID.randomUUID(), USER_ID, Instant.now());
-        when(groupUseCase.listMyGroups(USER_ID)).thenReturn(List.of(group));
+        when(financeGroupService.listMyGroups(USER_ID)).thenReturn(List.of(group));
 
         mockMvc.perform(get("/api/finance/groups")
                         .with(authentication(userToken(USER_ID))))
@@ -59,7 +59,7 @@ class FinanceGroupControllerTest {
         UUID groupId = UUID.randomUUID();
         FinanceGroupMember member = new FinanceGroupMember(UUID.randomUUID(), groupId, USER_ID,
                 FinanceGroup.MemberRole.OWNER, Instant.now(), Instant.now());
-        when(groupUseCase.listMembers(groupId, USER_ID)).thenReturn(List.of(member));
+        when(financeGroupService.listMembers(groupId, USER_ID)).thenReturn(List.of(member));
         when(financeMemberPort.nicknameOf(USER_ID)).thenReturn(Optional.of("홍길동"));
 
         mockMvc.perform(get("/api/finance/groups/{id}/members", groupId)
@@ -78,7 +78,7 @@ class FinanceGroupControllerTest {
                 FinanceGroup.MemberRole.OWNER, Instant.now(), Instant.now());
         FinanceGroupMember other = new FinanceGroupMember(UUID.randomUUID(), groupId, otherUserId,
                 FinanceGroup.MemberRole.MEMBER, Instant.now(), Instant.now());
-        when(groupUseCase.listMembers(groupId, USER_ID)).thenReturn(List.of(owner, other));
+        when(financeGroupService.listMembers(groupId, USER_ID)).thenReturn(List.of(owner, other));
         when(financeMemberPort.nicknameOf(USER_ID)).thenReturn(Optional.of("홍길동"));
         when(financeMemberPort.nicknameOf(otherUserId)).thenReturn(Optional.of("김철수"));
 
@@ -96,7 +96,7 @@ class FinanceGroupControllerTest {
         UUID groupId = UUID.randomUUID();
         FinanceGroupMember member = new FinanceGroupMember(UUID.randomUUID(), groupId, USER_ID,
                 FinanceGroup.MemberRole.OWNER, Instant.now(), Instant.now());
-        when(groupUseCase.listMembers(groupId, USER_ID)).thenReturn(List.of(member));
+        when(financeGroupService.listMembers(groupId, USER_ID)).thenReturn(List.of(member));
         when(financeMemberPort.nicknameOf(USER_ID)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/finance/groups/{id}/members", groupId)
@@ -111,7 +111,7 @@ class FinanceGroupControllerTest {
     @Test
     void listMembers_nonMember_returns403() throws Exception {
         UUID groupId = UUID.randomUUID();
-        when(groupUseCase.listMembers(groupId, USER_ID))
+        when(financeGroupService.listMembers(groupId, USER_ID))
                 .thenThrow(new SecurityException("그룹 멤버가 아닙니다"));
 
         mockMvc.perform(get("/api/finance/groups/{id}/members", groupId)
@@ -125,7 +125,7 @@ class FinanceGroupControllerTest {
         String code = "abc123code";
         FinanceGroupInvitation invitation = new FinanceGroupInvitation(UUID.randomUUID(), groupId, USER_ID,
                 null, code, FinanceGroupInvitation.Status.PENDING, Instant.now().plusSeconds(3600), Instant.now());
-        when(groupUseCase.invite(eq(groupId), eq(USER_ID), eq(72L))).thenReturn(invitation);
+        when(financeGroupService.invite(eq(groupId), eq(USER_ID), eq(72L))).thenReturn(invitation);
 
         mockMvc.perform(post("/api/finance/groups/{id}/invitations", groupId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -152,10 +152,10 @@ class FinanceGroupControllerTest {
         UUID groupId = UUID.randomUUID();
         FinanceGroupInvitation accepted = new FinanceGroupInvitation(UUID.randomUUID(), groupId, UUID.randomUUID(),
                 USER_ID, code, FinanceGroupInvitation.Status.ACCEPTED, Instant.now().plusSeconds(3600), Instant.now());
-        when(groupUseCase.respondToInvitation(eq(code), eq(USER_ID), eq(FinanceGroupInvitation.Status.ACCEPTED)))
+        when(financeGroupService.respondToInvitation(eq(code), eq(USER_ID), eq(FinanceGroupInvitation.Status.ACCEPTED)))
                 .thenReturn(accepted);
         FinanceGroup group = new FinanceGroup(groupId, UUID.randomUUID(), Instant.now());
-        when(groupUseCase.listMyGroups(USER_ID)).thenReturn(List.of(group));
+        when(financeGroupService.listMyGroups(USER_ID)).thenReturn(List.of(group));
 
         mockMvc.perform(patch("/api/finance/invitations/{code}", code)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -175,6 +175,6 @@ class FinanceGroupControllerTest {
                         .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isNoContent());
 
-        verify(groupUseCase).leaveGroup(groupId, USER_ID, targetUserId);
+        verify(financeGroupService).leaveGroup(groupId, USER_ID, targetUserId);
     }
 }

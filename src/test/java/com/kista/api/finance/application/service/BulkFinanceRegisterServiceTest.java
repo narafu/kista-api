@@ -30,8 +30,8 @@ import static org.mockito.Mockito.when;
 
 class BulkFinanceRegisterServiceTest {
 
-    private AssetSnapshotService assetSnapshotUseCase;
-    private FinanceTransactionService transactionUseCase;
+    private AssetSnapshotService assetSnapshotService;
+    private FinanceTransactionService financeTransactionService;
     private FinanceGroupPort financeGroupPort;
     private BulkFinanceRegisterService service;
 
@@ -40,10 +40,10 @@ class BulkFinanceRegisterServiceTest {
 
     @BeforeEach
     void setUp() {
-        assetSnapshotUseCase = mock(AssetSnapshotService.class);
-        transactionUseCase = mock(FinanceTransactionService.class);
+        assetSnapshotService = mock(AssetSnapshotService.class);
+        financeTransactionService = mock(FinanceTransactionService.class);
         financeGroupPort = mock(FinanceGroupPort.class);
-        service = new BulkFinanceRegisterService(assetSnapshotUseCase, transactionUseCase, financeGroupPort);
+        service = new BulkFinanceRegisterService(assetSnapshotService, financeTransactionService, financeGroupPort);
     }
 
     private AssetSnapshotCommand asset(String memo) {
@@ -61,14 +61,14 @@ class BulkFinanceRegisterServiceTest {
         AssetSnapshotCommand asset2 = asset("메모2");
 
         doThrow(new IllegalArgumentException("카테고리 없음"))
-                .when(assetSnapshotUseCase).create(eq(userId), eq(false), argThat(c -> c.memo().equals("메모1")));
+                .when(assetSnapshotService).create(eq(userId), eq(false), argThat(c -> c.memo().equals("메모1")));
 
         BulkFinanceRegisterResult result = service.register(userId, false, List.of(asset1, asset2), List.of());
 
         assertThat(result.assetSuccessCount()).isEqualTo(1);
         assertThat(result.failures()).hasSize(1);
         assertThat(result.failures().getFirst()).contains("메모1", "카테고리 없음");
-        verify(assetSnapshotUseCase, times(1)).create(eq(userId), eq(false), argThat(c -> c.memo().equals("메모2")));
+        verify(assetSnapshotService, times(1)).create(eq(userId), eq(false), argThat(c -> c.memo().equals("메모2")));
     }
 
     @Test
@@ -77,14 +77,14 @@ class BulkFinanceRegisterServiceTest {
         AssetSnapshotCommand open = asset("정상월자산");
 
         doThrow(new MonthlyClosing.MonthClosedException("2026-08"))
-                .when(assetSnapshotUseCase).create(eq(userId), eq(false), argThat(c -> c.memo().equals("마감월자산")));
+                .when(assetSnapshotService).create(eq(userId), eq(false), argThat(c -> c.memo().equals("마감월자산")));
 
         BulkFinanceRegisterResult result = service.register(userId, false, List.of(closed, open), List.of());
 
         assertThat(result.assetSuccessCount()).isEqualTo(1);
         assertThat(result.failures()).hasSize(1);
         assertThat(result.failures().getFirst()).contains("마감월자산", "기록 점검이 완료된 달");
-        verify(assetSnapshotUseCase, times(1)).create(eq(userId), eq(false), argThat(c -> c.memo().equals("정상월자산")));
+        verify(assetSnapshotService, times(1)).create(eq(userId), eq(false), argThat(c -> c.memo().equals("정상월자산")));
     }
 
     @Test
@@ -97,8 +97,8 @@ class BulkFinanceRegisterServiceTest {
         assertThat(result.assetSuccessCount()).isEqualTo(1);
         assertThat(result.transactionSuccessCount()).isEqualTo(1);
         assertThat(result.failures()).isEmpty();
-        verify(assetSnapshotUseCase, times(1)).create(eq(userId), eq(true), any());
-        verify(transactionUseCase, times(1)).create(eq(userId), eq(true), any());
+        verify(assetSnapshotService, times(1)).create(eq(userId), eq(true), any());
+        verify(financeTransactionService, times(1)).create(eq(userId), eq(true), any());
     }
 
     @Test
@@ -109,8 +109,8 @@ class BulkFinanceRegisterServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("소속된 그룹이 없습니다.");
 
-        verify(assetSnapshotUseCase, never()).create(any(), anyBoolean(), any());
-        verify(transactionUseCase, never()).create(any(), anyBoolean(), any());
+        verify(assetSnapshotService, never()).create(any(), anyBoolean(), any());
+        verify(financeTransactionService, never()).create(any(), anyBoolean(), any());
     }
 
     @Test
@@ -118,7 +118,7 @@ class BulkFinanceRegisterServiceTest {
         BulkFinanceRegisterResult result = service.register(userId, false, List.of(asset("자산1")), List.of());
 
         assertThat(result.assetSuccessCount()).isEqualTo(1);
-        verify(assetSnapshotUseCase, times(1)).create(eq(userId), eq(false), any());
+        verify(assetSnapshotService, times(1)).create(eq(userId), eq(false), any());
         verify(financeGroupPort, never()).findCurrentGroupId(any());
     }
 
@@ -126,7 +126,7 @@ class BulkFinanceRegisterServiceTest {
     void 한_항목의_create가_실패해도_나머지_거래는_등록되고_failures로_수집된다() {
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
         doThrow(new IllegalStateException("이미 다른 그룹에 공유된 항목입니다"))
-                .when(transactionUseCase).create(eq(userId), eq(true), argThat(c -> c.memo().equals("거래1")));
+                .when(financeTransactionService).create(eq(userId), eq(true), argThat(c -> c.memo().equals("거래1")));
 
         BulkFinanceRegisterResult result = service.register(
                 userId, true, List.of(), List.of(tx("거래1"), tx("거래2")));

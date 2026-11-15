@@ -31,8 +31,8 @@ class TelegramBotService {
     private final TelegramHttpClient telegramHttpClient;
     private final TelegramProperties props;            // 관리자 봇 토큰
     private final PortfolioQueryPort portfolioQueryPort;
-    private final UserService userUseCase; // /status, /history 조회 전용
-    private final AdminService adminUserUseCase; // 인라인 버튼 승인/거절 + 감사 로그
+    private final UserService userService; // /status, /history 조회 전용
+    private final AdminService adminService; // 인라인 버튼 승인/거절 + 감사 로그
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     void handle(TelegramUpdate update) {
@@ -86,11 +86,11 @@ class TelegramBotService {
         try {
             reply = switch (action) {
                 case "approve" -> {
-                    adminUserUseCase.approveUserByTelegram(String.valueOf(chatId), targetUserId);
+                    adminService.approveUserByTelegram(String.valueOf(chatId), targetUserId);
                     yield "✅ 승인 완료: " + targetUserId;
                 }
                 case "reject" -> {
-                    adminUserUseCase.rejectUserByTelegram(String.valueOf(chatId), targetUserId);
+                    adminService.rejectUserByTelegram(String.valueOf(chatId), targetUserId);
                     yield "❌ 거절 완료: " + targetUserId;
                 }
                 default -> {
@@ -125,7 +125,7 @@ class TelegramBotService {
 
     private String buildStatusMessage() {
         // adminChatId로 사용자 UUID 조회 — 미설정이면 데이터 없음 메시지
-        return userUseCase.findUserIdByTelegramChatId(adminChatId())
+        return userService.findUserIdByTelegramChatId(adminChatId())
                 .map(userId -> {
                     List<PortfolioCurrentResponse> list = portfolioQueryPort.getCurrent(userId);
                     if (list.isEmpty()) return "포트폴리오 데이터가 없습니다.";
@@ -151,7 +151,7 @@ class TelegramBotService {
         LocalDate to = LocalDate.now(clock);
         LocalDate from = to.minusDays(days);
         // adminChatId로 사용자 UUID 조회 — 미설정이면 데이터 없음 메시지
-        return userUseCase.findUserIdByTelegramChatId(adminChatId())
+        return userService.findUserIdByTelegramChatId(adminChatId())
                 .map(userId -> {
                     List<PortfolioOrderResponse> list = portfolioQueryPort.getHistory(userId, from, to);
                     if (list.isEmpty()) return "최근 " + days + "일 거래 내역이 없습니다.";

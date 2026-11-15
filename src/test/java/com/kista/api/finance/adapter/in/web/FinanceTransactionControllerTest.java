@@ -36,13 +36,13 @@ class FinanceTransactionControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean FinanceTransactionService transactionUseCase;
+    @MockitoBean FinanceTransactionService financeTransactionService;
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     @Test
     void list_withNoQueryParams_returns200() throws Exception {
-        when(transactionUseCase.list(any(), any(), any(), any(), any())).thenReturn(List.of());
+        when(financeTransactionService.list(any(), any(), any(), any(), any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/finance/transactions")
                         .with(authentication(userToken(USER_ID))))
@@ -52,7 +52,7 @@ class FinanceTransactionControllerTest {
 
     @Test
     void list_withAllQueryParams_returns200() throws Exception {
-        when(transactionUseCase.list(any(), any(), any(), any(), any())).thenReturn(List.of());
+        when(financeTransactionService.list(any(), any(), any(), any(), any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/finance/transactions")
                         .param("from", "2026-08-01")
@@ -70,7 +70,7 @@ class FinanceTransactionControllerTest {
         UUID savedId = UUID.randomUUID();
         FinanceTransaction saved = new FinanceTransaction(savedId, null, UUID.randomUUID(), USER_ID,
                 LocalDate.of(2026, 8, 1), 344000L, null, Instant.now());
-        when(transactionUseCase.create(any(), anyBoolean(), any(FinanceTransactionCommand.class))).thenReturn(saved);
+        when(financeTransactionService.create(any(), anyBoolean(), any(FinanceTransactionCommand.class))).thenReturn(saved);
 
         mockMvc.perform(post("/api/finance/transactions")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -80,7 +80,7 @@ class FinanceTransactionControllerTest {
                 .andExpect(header().string("Location", "/api/finance/transactions/" + savedId));
 
         // shareToGroup 미지정 시 기본 false로 서비스 호출
-        verify(transactionUseCase).create(eq(USER_ID), eq(false), any(FinanceTransactionCommand.class));
+        verify(financeTransactionService).create(eq(USER_ID), eq(false), any(FinanceTransactionCommand.class));
     }
 
     @Test
@@ -89,7 +89,7 @@ class FinanceTransactionControllerTest {
         UUID groupId = UUID.randomUUID();
         FinanceTransaction saved = new FinanceTransaction(savedId, groupId, UUID.randomUUID(), USER_ID,
                 LocalDate.of(2026, 8, 1), 344000L, null, Instant.now());
-        when(transactionUseCase.create(any(), anyBoolean(), any(FinanceTransactionCommand.class))).thenReturn(saved);
+        when(financeTransactionService.create(any(), anyBoolean(), any(FinanceTransactionCommand.class))).thenReturn(saved);
 
         mockMvc.perform(post("/api/finance/transactions")
                         .param("shareToGroup", "true")
@@ -99,7 +99,7 @@ class FinanceTransactionControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.groupId").value(groupId.toString()));
 
-        verify(transactionUseCase).create(eq(USER_ID), eq(true), any(FinanceTransactionCommand.class));
+        verify(financeTransactionService).create(eq(USER_ID), eq(true), any(FinanceTransactionCommand.class));
     }
 
     @Test
@@ -117,7 +117,7 @@ class FinanceTransactionControllerTest {
         UUID categoryId = UUID.randomUUID();
         FinanceTransaction updated = new FinanceTransaction(id, null, categoryId, USER_ID,
                 LocalDate.of(2026, 8, 2), 500000L, "메모", Instant.now());
-        when(transactionUseCase.update(any(), any(), any(FinanceTransactionCommand.class))).thenReturn(updated);
+        when(financeTransactionService.update(any(), any(), any(FinanceTransactionCommand.class))).thenReturn(updated);
 
         mockMvc.perform(put("/api/finance/transactions/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -135,7 +135,7 @@ class FinanceTransactionControllerTest {
                         .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isNoContent());
 
-        verify(transactionUseCase).delete(id, USER_ID);
+        verify(financeTransactionService).delete(id, USER_ID);
     }
 
     @Test
@@ -144,7 +144,7 @@ class FinanceTransactionControllerTest {
         UUID groupId = UUID.randomUUID();
         FinanceTransaction shared = new FinanceTransaction(id, groupId, UUID.randomUUID(), USER_ID,
                 LocalDate.of(2026, 8, 1), 344000L, null, Instant.now());
-        when(transactionUseCase.shareToGroup(id, USER_ID)).thenReturn(shared);
+        when(financeTransactionService.shareToGroup(id, USER_ID)).thenReturn(shared);
 
         mockMvc.perform(patch("/api/finance/transactions/{id}/share", id)
                         .with(csrf()).with(authentication(userToken(USER_ID))))
@@ -157,7 +157,7 @@ class FinanceTransactionControllerTest {
         UUID id = UUID.randomUUID();
         FinanceTransaction personal = new FinanceTransaction(id, null, UUID.randomUUID(), USER_ID,
                 LocalDate.of(2026, 8, 1), 344000L, null, Instant.now());
-        when(transactionUseCase.unshare(id, USER_ID)).thenReturn(personal);
+        when(financeTransactionService.unshare(id, USER_ID)).thenReturn(personal);
 
         mockMvc.perform(patch("/api/finance/transactions/{id}/unshare", id)
                         .with(csrf()).with(authentication(userToken(USER_ID))))

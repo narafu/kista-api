@@ -46,7 +46,7 @@ class PortfolioQueryInternalControllerTest {
 
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean PortfolioService portfolioUseCase;
+    @MockitoBean PortfolioService portfolioService;
 
     private static final String VALID_TOKEN = "test-internal-token";
     private static final UUID USER_ID = UUID.randomUUID();
@@ -57,7 +57,7 @@ class PortfolioQueryInternalControllerTest {
                 UUID.randomUUID(), UUID.randomUUID(), StrategyTicker.ETH, StrategyType.DCA,
                 new BigDecimal("500.00"), new BigDecimal("3000.00"), new BigDecimal("2900.50"),
                 new BigDecimal("0.5"), Instant.now());
-        given(portfolioUseCase.getCurrent(USER_ID)).willReturn(List.of(new PortfolioPosition(entry, Currency.USDT)));
+        given(portfolioService.getCurrent(USER_ID)).willReturn(List.of(new PortfolioPosition(entry, Currency.USDT)));
 
         mockMvc.perform(get("/api/internal/trading/stats/portfolio/current")
                         .header("X-Internal-Token", VALID_TOKEN)
@@ -72,7 +72,7 @@ class PortfolioQueryInternalControllerTest {
 
     @Test
     void 포트폴리오가_없으면_빈_목록_200을_반환한다() throws Exception {
-        given(portfolioUseCase.getCurrent(USER_ID)).willReturn(List.of());
+        given(portfolioService.getCurrent(USER_ID)).willReturn(List.of());
 
         mockMvc.perform(get("/api/internal/trading/stats/portfolio/current")
                         .header("X-Internal-Token", VALID_TOKEN)
@@ -86,7 +86,7 @@ class PortfolioQueryInternalControllerTest {
         Order order = new Order(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 LocalDate.of(2026, 1, 5), StrategyTicker.TQQQ, OrderType.LOC, null, OrderDirection.BUY,
                 "leg", BigDecimal.valueOf(3), new BigDecimal("100.00"), null, null, null, null);
-        given(portfolioUseCase.getHistory(USER_ID, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31)))
+        given(portfolioService.getHistory(USER_ID, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31)))
                 .willReturn(List.of(new PortfolioOrder(order, Currency.USD)));
 
         mockMvc.perform(get("/api/internal/trading/stats/portfolio/history")

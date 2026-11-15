@@ -45,12 +45,12 @@ class AuthControllerTokenTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean UserService userUseCase;
-    @MockitoBean TokenService tokenUseCase;
+    @MockitoBean UserService userService;
+    @MockitoBean TokenService tokenService;
     @MockitoBean JwtIssuerService jwtIssuerService;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort;
-    @MockitoBean UserSettingsService getUserSettingsQuery;
+    @MockitoBean UserSettingsService userSettingsService;
 
     private static final UUID USER_ID = UUID.randomUUID();
 
@@ -58,8 +58,8 @@ class AuthControllerTokenTest {
     void refresh_validCookie_returns200AndSetsNewCookie() throws Exception {
         var result = new TokenRefreshResult(USER_ID, UserRole.USER, "newRawRt");
         User user = stubUser(USER_ID);
-        given(tokenUseCase.refresh(anyString(), any())).willReturn(result);
-        given(userUseCase.getById(any())).willReturn(user);
+        given(tokenService.refresh(anyString(), any())).willReturn(result);
+        given(userService.getById(any())).willReturn(user);
         given(jwtIssuerService.issue(any(), any())).willReturn("newAt");
         given(jwtIssuerService.expiresInSeconds()).willReturn(900L);
 
@@ -79,7 +79,7 @@ class AuthControllerTokenTest {
 
     @Test
     void refresh_invalidToken_returns401() throws Exception {
-        given(tokenUseCase.refresh(anyString(), any()))
+        given(tokenService.refresh(anyString(), any()))
                 .willThrow(new InvalidRefreshTokenException("유효하지 않은 refresh token"));
 
         mockMvc.perform(post("/api/auth/refresh")
@@ -110,7 +110,7 @@ class AuthControllerTokenTest {
         mockMvc.perform(post("/api/auth/logout").header(HttpHeaders.AUTHORIZATION, "Bearer validAt"))
                 .andExpect(status().isNoContent());
 
-        org.mockito.Mockito.verify(tokenUseCase).logout(null, "jti-logout", expiresAt);
+        org.mockito.Mockito.verify(tokenService).logout(null, "jti-logout", expiresAt);
     }
 
     @Test

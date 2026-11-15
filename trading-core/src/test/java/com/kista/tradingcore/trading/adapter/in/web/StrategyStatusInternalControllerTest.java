@@ -47,7 +47,7 @@ class StrategyStatusInternalControllerTest {
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean AccountPort accountPort;
     @MockitoBean StrategyPort strategyPort;
-    @MockitoBean StrategyService strategyUseCase;
+    @MockitoBean StrategyService strategyService;
 
     private static final String VALID_TOKEN = "test-internal-token";
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
@@ -78,7 +78,7 @@ class StrategyStatusInternalControllerTest {
                         .param("status", "PAUSED"))
                 .andExpect(status().isOk());
 
-        verify(strategyUseCase).pause(STRATEGY_ID, account.userId());
+        verify(strategyService).pause(STRATEGY_ID, account.userId());
     }
 
     @Test
@@ -94,7 +94,7 @@ class StrategyStatusInternalControllerTest {
                         .param("status", "ACTIVE"))
                 .andExpect(status().isOk());
 
-        verify(strategyUseCase).resume(STRATEGY_ID, account.userId());
+        verify(strategyService).resume(STRATEGY_ID, account.userId());
     }
 
     @Test
@@ -108,7 +108,7 @@ class StrategyStatusInternalControllerTest {
                         .param("status", "ARCHIVED"))
                 .andExpect(status().isBadRequest());
 
-        org.mockito.Mockito.verifyNoInteractions(strategyUseCase);
+        org.mockito.Mockito.verifyNoInteractions(strategyService);
     }
 
     @Test
@@ -118,7 +118,7 @@ class StrategyStatusInternalControllerTest {
         given(strategyPort.findByIdOrThrow(STRATEGY_ID))
                 .willReturn(strategy(STRATEGY_ID, ACCOUNT_ID, StrategyStatus.ARCHIVED));
         org.mockito.Mockito.doThrow(new IllegalStateException("보관된 전략은 변경할 수 없습니다."))
-                .when(strategyUseCase).resume(STRATEGY_ID, account.userId());
+                .when(strategyService).resume(STRATEGY_ID, account.userId());
 
         mockMvc.perform(patch("/api/internal/trading/accounts/{accountId}/strategies/{strategyId}/status",
                         ACCOUNT_ID, STRATEGY_ID)
@@ -138,8 +138,8 @@ class StrategyStatusInternalControllerTest {
                         .param("status", "ACTIVE"))
                 .andExpect(status().isOk());
 
-        verify(strategyUseCase, never()).resume(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
-        verify(strategyUseCase, never()).pause(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        verify(strategyService, never()).resume(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        verify(strategyService, never()).pause(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test

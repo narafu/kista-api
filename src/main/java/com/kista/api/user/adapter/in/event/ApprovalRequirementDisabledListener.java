@@ -19,13 +19,13 @@ import org.springframework.transaction.event.TransactionalEventListener;
 class ApprovalRequirementDisabledListener {
 
     private final UserPort userPort;
-    private final UserService userUseCase;
+    private final UserService userService;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onApprovalRequirementDisabled(ApprovalRequirementDisabledEvent event) {
         userPort.findAllByStatus(UserStatus.PENDING).stream()
                 .map(User::id)
-                .forEach(userUseCase::approve);
+                .forEach(userService::approve);
     }
 }

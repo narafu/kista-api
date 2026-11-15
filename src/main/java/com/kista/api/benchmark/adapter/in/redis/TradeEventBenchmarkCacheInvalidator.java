@@ -21,7 +21,7 @@ import tools.jackson.databind.ObjectMapper;
 class TradeEventBenchmarkCacheInvalidator implements MessageListener {
 
     private final RedisMessageListenerContainer listenerContainer;
-    private final BenchmarkService benchmarkUseCase;
+    private final BenchmarkService benchmarkService;
     private final ObjectMapper objectMapper;
 
     @PostConstruct
@@ -33,7 +33,7 @@ class TradeEventBenchmarkCacheInvalidator implements MessageListener {
     public void onMessage(Message message, byte[] pattern) {
         try {
             TradeEventEnvelope payload = objectMapper.readValue(message.getBody(), TradeEventEnvelope.class);
-            benchmarkUseCase.invalidateUserCache(payload.userId());
+            benchmarkService.invalidateUserCache(payload.userId());
         } catch (Exception e) {
             log.error("trade.event 벤치마크 캐시 무효화 실패", e);
         }

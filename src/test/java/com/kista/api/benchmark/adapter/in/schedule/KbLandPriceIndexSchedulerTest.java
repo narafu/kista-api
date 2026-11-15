@@ -17,10 +17,10 @@ class KbLandPriceIndexSchedulerTest {
 
     @Test
     void run_acquiresLockAndRunsRecentYearsFetchJob() throws Exception {
-        HousingBenchmarkService useCase = mock(HousingBenchmarkService.class);
+        HousingBenchmarkService housingBenchmarkService = mock(HousingBenchmarkService.class);
         SchedulerJobRunner jobRunner = mock(SchedulerJobRunner.class);
         SchedulerLockService lockService = mock(SchedulerLockService.class);
-        KbLandPriceIndexScheduler scheduler = new KbLandPriceIndexScheduler(useCase, jobRunner, lockService);
+        KbLandPriceIndexScheduler scheduler = new KbLandPriceIndexScheduler(housingBenchmarkService, jobRunner, lockService);
 
         scheduler.run();
 
@@ -35,16 +35,16 @@ class KbLandPriceIndexSchedulerTest {
         runnableCaptor.getValue().run();
 
         // 매주 배치는 최근 2년치만 가볍게 갱신한다.
-        verify(useCase).fetchAndSave(2);
+        verify(housingBenchmarkService).fetchAndSave(2);
         assertThat(taskCaptor.getValue()).isNotNull();
     }
 
     @Test
     void runFullRefresh_acquiresSeparateLockAndRunsTwentyYearFetchJob() throws Exception {
-        HousingBenchmarkService useCase = mock(HousingBenchmarkService.class);
+        HousingBenchmarkService housingBenchmarkService = mock(HousingBenchmarkService.class);
         SchedulerJobRunner jobRunner = mock(SchedulerJobRunner.class);
         SchedulerLockService lockService = mock(SchedulerLockService.class);
-        KbLandPriceIndexScheduler scheduler = new KbLandPriceIndexScheduler(useCase, jobRunner, lockService);
+        KbLandPriceIndexScheduler scheduler = new KbLandPriceIndexScheduler(housingBenchmarkService, jobRunner, lockService);
 
         scheduler.runFullRefresh();
 
@@ -59,6 +59,6 @@ class KbLandPriceIndexSchedulerTest {
         runnableCaptor.getValue().run();
 
         // 월간 풀 리프레시는 20년 전체를 다시 받아 과거 구간의 KB Land 보정을 반영한다.
-        verify(useCase).fetchAndSave(20);
+        verify(housingBenchmarkService).fetchAndSave(20);
     }
 }

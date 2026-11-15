@@ -45,7 +45,7 @@ class AdminAccountControllerTest {
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean AdminQueryService adminQuery;
+    @MockitoBean AdminQueryService adminQueryService;
     @MockitoBean AdminService adminUser;
     @MockitoBean AdminStrategyService adminStrategy;
 
@@ -67,7 +67,7 @@ class AdminAccountControllerTest {
 
     @Test
     void listAccounts_adminRole_returns200() throws Exception {
-        when(adminQuery.listAccounts(null, null)).thenReturn(List.of());
+        when(adminQueryService.listAccounts(null, null)).thenReturn(List.of());
         when(adminUser.listAll(null, null)).thenReturn(List.of());
 
         mockMvc.perform(get("/api/admin/accounts")
@@ -79,7 +79,7 @@ class AdminAccountControllerTest {
     @Test
     void listStrategiesByAccount_adminRole_returns200() throws Exception {
         UUID accountId = UUID.randomUUID();
-        when(adminQuery.listStrategies(accountId)).thenReturn(List.of(
+        when(adminQueryService.listStrategies(accountId)).thenReturn(List.of(
                 new StrategyResponse(UUID.randomUUID(), accountId, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
                         StrategyTicker.SOXL, StrategyCycleSeedType.MAX)));
 

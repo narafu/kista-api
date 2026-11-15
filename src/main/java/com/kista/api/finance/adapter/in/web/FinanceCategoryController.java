@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FinanceCategoryController {
 
-    private final FinanceCategoryService categoryUseCase;
+    private final FinanceCategoryService financeCategoryService;
 
     @Operation(summary = "카테고리 목록 조회", description = "카테고리를 중첩된 트리로 반환합니다.")
     @ApiResponse(responseCode = "200", description = "조회 성공")
@@ -35,7 +35,7 @@ public class FinanceCategoryController {
     public List<FinanceCategoryResponse> list(
             @AuthenticationPrincipal UUID userId,
             @RequestParam(required = false) FinanceCategory.Type type) {
-        List<FinanceCategory> flat = categoryUseCase.list(userId, type);
+        List<FinanceCategory> flat = financeCategoryService.list(userId, type);
         Map<UUID, List<FinanceCategory>> byParent = flat.stream()
                 .filter(c -> c.parentId() != null)
                 .collect(Collectors.groupingBy(FinanceCategory::parentId));
@@ -70,7 +70,7 @@ public class FinanceCategoryController {
             // 오분류되는 걸 막기 위해 여기서 먼저 400을 낸다 — @NotNull은 update()가 공유하는 DTO라 걸 수 없다.
             throw new IllegalArgumentException("type은 필수입니다");
         }
-        FinanceCategory saved = categoryUseCase.create(userId, shareToGroup, request.toCommand());
+        FinanceCategory saved = financeCategoryService.create(userId, shareToGroup, request.toCommand());
         return ResponseEntity.created(URI.create("/api/finance/categories/" + saved.id()))
                 .body(FinanceCategoryResponse.from(saved, List.of()));
     }
@@ -87,7 +87,7 @@ public class FinanceCategoryController {
             @Parameter(description = "카테고리 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId,
             @Valid @RequestBody FinanceCategoryRequest request) {
-        return FinanceCategoryResponse.from(categoryUseCase.update(id, userId, request.toCommand()), List.of());
+        return FinanceCategoryResponse.from(financeCategoryService.update(id, userId, request.toCommand()), List.of());
     }
 
     @Operation(summary = "카테고리 그룹 공유 전환", description = "개인 소유 카테고리를 소유자의 현재 그룹으로 공유 전환합니다. 하위 카테고리도 함께 전환됩니다.")
@@ -100,7 +100,7 @@ public class FinanceCategoryController {
     public FinanceCategoryResponse share(
             @Parameter(description = "카테고리 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        return FinanceCategoryResponse.from(categoryUseCase.shareToGroup(id, userId), List.of());
+        return FinanceCategoryResponse.from(financeCategoryService.shareToGroup(id, userId), List.of());
     }
 
     @Operation(summary = "카테고리 그룹 공유 해제", description = "그룹 공유 카테고리를 개인 소유로 되돌립니다. 하위 카테고리도 함께 전환됩니다. 같은 그룹 멤버면 누구든 가능합니다.")
@@ -113,7 +113,7 @@ public class FinanceCategoryController {
     public FinanceCategoryResponse unshare(
             @Parameter(description = "카테고리 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        return FinanceCategoryResponse.from(categoryUseCase.unshare(id, userId), List.of());
+        return FinanceCategoryResponse.from(financeCategoryService.unshare(id, userId), List.of());
     }
 
     @Operation(summary = "카테고리 삭제", description = "소프트 삭제 — 하위 카테고리도 함께 삭제됩니다.")
@@ -127,6 +127,6 @@ public class FinanceCategoryController {
     public void delete(
             @Parameter(description = "카테고리 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        categoryUseCase.delete(id, userId);
+        financeCategoryService.delete(id, userId);
     }
 }

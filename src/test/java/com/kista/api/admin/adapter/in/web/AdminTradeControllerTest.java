@@ -57,7 +57,7 @@ class AdminTradeControllerTest {
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean AdminQueryService adminQuery;
+    @MockitoBean AdminQueryService adminQueryService;
     @MockitoBean AdminService adminUser;
     @MockitoBean AdminTradeCorrectionService adminTradeCorrection;
 
@@ -81,8 +81,8 @@ class AdminTradeControllerTest {
 
     @Test
     void listTrades_adminRole_returns200() throws Exception {
-        when(adminQuery.listTrades(null, null)).thenReturn(List.of());
-        when(adminQuery.listAccounts(null, null)).thenReturn(List.of());
+        when(adminQueryService.listTrades(null, null)).thenReturn(List.of());
+        when(adminQueryService.listAccounts(null, null)).thenReturn(List.of());
         when(adminUser.listAll(null, null)).thenReturn(List.of());
 
         mockMvc.perform(get("/api/admin/trades")
@@ -96,13 +96,13 @@ class AdminTradeControllerTest {
         UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
         UUID cycleId = UUID.fromString("00000000-0000-0000-0000-000000000040");
         // 계좌 목록이 비어 accountMap에 없음 → 통화를 알 수 없어 null
-        when(adminQuery.listAccounts(null, null)).thenReturn(List.of());
+        when(adminQueryService.listAccounts(null, null)).thenReturn(List.of());
         when(adminUser.listAll(null, null)).thenReturn(List.of());
-        when(adminQuery.listTrades(null, null)).thenReturn(List.of(
+        when(adminQueryService.listTrades(null, null)).thenReturn(List.of(
                 new OrderResponse(UUID.fromString("00000000-0000-0000-0000-000000000050"), accountId, cycleId,
                         LocalDate.of(2026, 7, 1), StrategyTicker.SOXL, OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL,
                         "SELL_01", BigDecimal.valueOf(2), new BigDecimal("267.37"), OrderStatus.PLACED, "BROKER-1", null, null)));
-        when(adminQuery.getStrategySummariesByCycleIds(java.util.Set.of(cycleId))).thenReturn(java.util.Map.of());
+        when(adminQueryService.getStrategySummariesByCycleIds(java.util.Set.of(cycleId))).thenReturn(java.util.Map.of());
 
         mockMvc.perform(get("/api/admin/trades").with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isOk())
@@ -115,7 +115,7 @@ class AdminTradeControllerTest {
     void listStrategyTradeDates_adminRole_returns200() throws Exception {
         UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
         UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
-        when(adminQuery.listStrategyTradeDates(accountId, strategyId))
+        when(adminQueryService.listStrategyTradeDates(accountId, strategyId))
                 .thenReturn(List.of(LocalDate.of(2026, 7, 1)));
 
         mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies/{strategyId}/trade-dates",
@@ -130,7 +130,7 @@ class AdminTradeControllerTest {
         UUID wrongAccountId = UUID.randomUUID();
         UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
         // 서비스가 accountId 불일치 시 NoSuchElementException을 던지도록 stub — ProblemDetailExceptionHandler가 404로 매핑
-        when(adminQuery.listStrategyTradeDates(wrongAccountId, strategyId))
+        when(adminQueryService.listStrategyTradeDates(wrongAccountId, strategyId))
                 .thenThrow(new java.util.NoSuchElementException("전략이 해당 계좌에 속하지 않습니다"));
 
         mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies/{strategyId}/trade-dates",

@@ -27,7 +27,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FinanceBudgetController {
 
-    private final FinanceBudgetService budgetUseCase;
+    private final FinanceBudgetService financeBudgetService;
 
     @Operation(summary = "예산 목록 조회", description = "date를 지정하면 그 날짜에 유효한 예산만 반환합니다.")
     @ApiResponse(responseCode = "200", description = "조회 성공")
@@ -36,7 +36,7 @@ public class FinanceBudgetController {
             @AuthenticationPrincipal UUID userId,
             @RequestParam(required = false) UUID categoryId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return budgetUseCase.list(userId, categoryId, date).stream()
+        return financeBudgetService.list(userId, categoryId, date).stream()
                 .map(FinanceBudgetResponse::from)
                 .toList();
     }
@@ -53,7 +53,7 @@ public class FinanceBudgetController {
             @Parameter(description = "true면 현재 그룹 소유로 생성")
             @RequestParam(required = false, defaultValue = "false") boolean shareToGroup,
             @Valid @RequestBody FinanceBudgetRequest request) {
-        var saved = budgetUseCase.create(userId, shareToGroup, request.toCommand());
+        var saved = financeBudgetService.create(userId, shareToGroup, request.toCommand());
         return ResponseEntity.created(URI.create("/api/finance/budgets/" + saved.id()))
                 .body(FinanceBudgetResponse.from(saved));
     }
@@ -70,7 +70,7 @@ public class FinanceBudgetController {
             @Parameter(description = "예산 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId,
             @Valid @RequestBody FinanceBudgetRequest request) {
-        return FinanceBudgetResponse.from(budgetUseCase.update(id, userId, request.toCommand()));
+        return FinanceBudgetResponse.from(financeBudgetService.update(id, userId, request.toCommand()));
     }
 
     @Operation(summary = "예산 그룹 공유 전환", description = "개인 소유 예산을 소유자의 현재 그룹으로 공유 전환합니다.")
@@ -83,7 +83,7 @@ public class FinanceBudgetController {
     public FinanceBudgetResponse share(
             @Parameter(description = "예산 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        return FinanceBudgetResponse.from(budgetUseCase.shareToGroup(id, userId));
+        return FinanceBudgetResponse.from(financeBudgetService.shareToGroup(id, userId));
     }
 
     @Operation(summary = "예산 그룹 공유 해제", description = "그룹 공유 예산을 개인 소유로 되돌립니다. 같은 그룹 멤버면 누구든 가능합니다.")
@@ -97,7 +97,7 @@ public class FinanceBudgetController {
     public FinanceBudgetResponse unshare(
             @Parameter(description = "예산 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        return FinanceBudgetResponse.from(budgetUseCase.unshare(id, userId));
+        return FinanceBudgetResponse.from(financeBudgetService.unshare(id, userId));
     }
 
     @Operation(summary = "예산 삭제", description = "파생 설정이라 하드 삭제됩니다.")
@@ -111,6 +111,6 @@ public class FinanceBudgetController {
     public void delete(
             @Parameter(description = "예산 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        budgetUseCase.delete(id, userId);
+        financeBudgetService.delete(id, userId);
     }
 }

@@ -25,14 +25,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AccountController {
 
-    private final AccountService accountUseCase;
+    private final AccountService accountService;
 
     // 내 계좌 목록 조회 (민감정보 마스킹)
     @Operation(summary = "내 계좌 목록 조회", description = "로그인한 사용자의 전체 계좌 목록 반환. 계좌번호는 마지막 4자리만 노출.")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping
     public List<AccountResponse> list(@AuthenticationPrincipal UUID userId) {
-        return accountUseCase.listByUser(userId).stream()
+        return accountService.listByUser(userId).stream()
                 .map(AccountResponse::from)
                 .toList();
     }
@@ -49,7 +49,7 @@ public class AccountController {
     public AccountResponse register(@AuthenticationPrincipal UUID userId,
                                     @Valid @RequestBody AccountRequest request) {
         // 자격증명+계좌 검증은 AccountService.register()가 증권사별로 통합 처리
-        return AccountResponse.from(accountUseCase.register(userId, request.toRegisterCommand()));
+        return AccountResponse.from(accountService.register(userId, request.toRegisterCommand()));
     }
 
     // 계좌 수정 (소유권 검증)
@@ -66,7 +66,7 @@ public class AccountController {
             @AuthenticationPrincipal UUID userId,
             @RequestBody AccountRequest request) {
         return AccountResponse.from(
-                accountUseCase.update(id, userId, request.toUpdateCommand())
+                accountService.update(id, userId, request.toUpdateCommand())
         );
     }
 
@@ -86,7 +86,7 @@ public class AccountController {
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId,
             @Valid @RequestBody CredentialsRequest request) {
-        return AccountResponse.from(accountUseCase.updateCredentials(id, userId, request.toCommand()));
+        return AccountResponse.from(accountService.updateCredentials(id, userId, request.toCommand()));
     }
 
     // 계좌 삭제 (소유권 검증)
@@ -103,7 +103,7 @@ public class AccountController {
             @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        accountUseCase.delete(id, userId);
+        accountService.delete(id, userId);
     }
 
     // 자격증명 연결 테스트 — 실패 시 BrokerCredentialException → ProblemDetailExceptionHandler → 422
@@ -117,6 +117,6 @@ public class AccountController {
     public void testConnection(
             @RequestBody TestConnectionRequest request) {
         // broker 기본값은 서비스가 결정 — 실패 시 BrokerCredentialException → ProblemDetailExceptionHandler → 422
-        accountUseCase.test(request.broker(), request.appKey(), request.appSecret());
+        accountService.test(request.broker(), request.appKey(), request.appSecret());
     }
 }

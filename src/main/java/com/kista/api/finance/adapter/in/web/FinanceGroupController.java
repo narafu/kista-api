@@ -30,14 +30,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FinanceGroupController {
 
-    private final FinanceGroupService groupUseCase;
+    private final FinanceGroupService financeGroupService;
     private final FinanceMemberPort financeMemberPort; // 멤버 닉네임 조회(user 모듈 의존은 포트 어댑터가 격리)
 
     @Operation(summary = "내 그룹 목록 조회", description = "내가 속한 그룹 목록(한 사용자는 최대 1개 그룹).")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping("/groups")
     public List<FinanceGroupResponse> listMyGroups(@AuthenticationPrincipal UUID userId) {
-        return groupUseCase.listMyGroups(userId).stream()
+        return financeGroupService.listMyGroups(userId).stream()
                 .map(FinanceGroupResponse::from)
                 .toList();
     }
@@ -51,7 +51,7 @@ public class FinanceGroupController {
     public List<FinanceGroupMemberResponse> listMembers(
             @Parameter(description = "그룹 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        return groupUseCase.listMembers(id, userId).stream()
+        return financeGroupService.listMembers(id, userId).stream()
                 // 조회와 탈퇴 사이 경합으로 방금 탈퇴한 멤버는 닉네임 없이(null) 보여준다 — 목록 전체를 404로 죽이지 않는다
                 .map(m -> FinanceGroupMemberResponse.from(m, financeMemberPort.nicknameOf(m.userId()).orElse(null)))
                 .toList();
@@ -67,7 +67,7 @@ public class FinanceGroupController {
             @Parameter(description = "그룹 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId,
             @Valid @RequestBody FinanceGroupInvitationRequest request) {
-        var invitation = groupUseCase.invite(id, userId, request.expiresInHours());
+        var invitation = financeGroupService.invite(id, userId, request.expiresInHours());
         return ResponseEntity.created(URI.create("/api/finance/invitations/" + invitation.code()))
                 .body(FinanceGroupInvitationResponse.from(invitation));
     }
@@ -83,8 +83,8 @@ public class FinanceGroupController {
             @Parameter(description = "초대 코드") @PathVariable String code,
             @AuthenticationPrincipal UUID userId,
             @Valid @RequestBody FinanceGroupInvitationStatusRequest request) {
-        FinanceGroupInvitation invitation = groupUseCase.respondToInvitation(code, userId, request.status());
-        return groupUseCase.listMyGroups(userId).stream()
+        FinanceGroupInvitation invitation = financeGroupService.respondToInvitation(code, userId, request.status());
+        return financeGroupService.listMyGroups(userId).stream()
                 .filter(g -> g.id().equals(invitation.groupId()))
                 .findFirst()
                 .map(FinanceGroupResponse::from)
@@ -102,6 +102,6 @@ public class FinanceGroupController {
             @Parameter(description = "그룹 ID") @PathVariable UUID id,
             @Parameter(description = "탈퇴 대상 사용자 ID") @PathVariable UUID userId,
             @AuthenticationPrincipal UUID requesterId) {
-        groupUseCase.leaveGroup(id, requesterId, userId);
+        financeGroupService.leaveGroup(id, requesterId, userId);
     }
 }

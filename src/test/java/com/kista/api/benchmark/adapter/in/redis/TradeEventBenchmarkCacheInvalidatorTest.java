@@ -20,10 +20,10 @@ import static org.mockito.Mockito.verify;
 class TradeEventBenchmarkCacheInvalidatorTest {
 
     @Mock RedisMessageListenerContainer listenerContainer;
-    @Mock BenchmarkService benchmarkUseCase;
+    @Mock BenchmarkService benchmarkService;
 
     private TradeEventBenchmarkCacheInvalidator invalidator() {
-        return new TradeEventBenchmarkCacheInvalidator(listenerContainer, benchmarkUseCase, new ObjectMapper());
+        return new TradeEventBenchmarkCacheInvalidator(listenerContainer, benchmarkService, new ObjectMapper());
     }
 
     @Test
@@ -34,13 +34,13 @@ class TradeEventBenchmarkCacheInvalidatorTest {
 
         invalidator().onMessage(new DefaultMessage("trade.event".getBytes(), payload.getBytes(StandardCharsets.UTF_8)), null);
 
-        verify(benchmarkUseCase).invalidateUserCache(userId);
+        verify(benchmarkService).invalidateUserCache(userId);
     }
 
     @Test
     void 역직렬화_실패는_삼키고_무효화하지_않는다() {
         invalidator().onMessage(new DefaultMessage("trade.event".getBytes(), "not-json".getBytes()), null);
 
-        verify(benchmarkUseCase, never()).invalidateUserCache(any());
+        verify(benchmarkService, never()).invalidateUserCache(any());
     }
 }

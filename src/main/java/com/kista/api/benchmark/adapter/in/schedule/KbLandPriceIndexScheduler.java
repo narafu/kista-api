@@ -22,7 +22,7 @@ public class KbLandPriceIndexScheduler {
     private static final int RECENT_YEARS = 2;
     private static final int FULL_REFRESH_YEARS = 20;
 
-    private final HousingBenchmarkService fetchHousingPriceIndexUseCase;
+    private final HousingBenchmarkService housingBenchmarkService;
     private final SchedulerJobRunner jobRunner;
     private final SchedulerLockService schedulerLockService;
 
@@ -50,6 +50,6 @@ public class KbLandPriceIndexScheduler {
     // 락 획득 + 지정 연도 범위 수집 실행 — 락 이름·연도·로그 라벨만 다른 4개 진입점의 공통 골격
     private void trigger(String lockName, int years, String label) throws InterruptedException {
         schedulerLockService.tryRun(lockName, Duration.ofMinutes(30),
-                () -> jobRunner.run(label, () -> fetchHousingPriceIndexUseCase.fetchAndSave(years)));
+                () -> jobRunner.run(label, () -> housingBenchmarkService.fetchAndSave(years)));
     }
 }

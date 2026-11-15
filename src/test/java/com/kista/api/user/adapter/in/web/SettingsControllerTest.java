@@ -32,8 +32,8 @@ class SettingsControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean UserProfileService userProfileUseCase;
-    @MockitoBean UserSettingsService userSettingsUseCase;
+    @MockitoBean UserProfileService userProfileService;
+    @MockitoBean UserSettingsService userSettingsService;
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -47,7 +47,7 @@ class SettingsControllerTest {
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isNoContent());
 
-        verify(userProfileUseCase).updateTelegram(
+        verify(userProfileService).updateTelegram(
                 eq(UUID.fromString(USER_ID)), eq("test-token"), eq("chat-123"));
     }
 
@@ -57,7 +57,7 @@ class SettingsControllerTest {
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isNoContent());
 
-        verify(userProfileUseCase).removeTelegram(eq(UUID.fromString(USER_ID)));
+        verify(userProfileService).removeTelegram(eq(UUID.fromString(USER_ID)));
     }
 
     @Test
@@ -79,7 +79,7 @@ class SettingsControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"channel\":\"FCM\"}"))
                 .andExpect(status().isNoContent());
-        verify(userProfileUseCase).updateNotificationChannel(any(), eq(NotificationChannel.FCM));
+        verify(userProfileService).updateNotificationChannel(any(), eq(NotificationChannel.FCM));
     }
 
     @Test
@@ -99,7 +99,7 @@ class SettingsControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nickname\":\"새닉네임\"}"))
                 .andExpect(status().isNoContent());
-        verify(userProfileUseCase).updateNickname(eq(UUID.fromString(USER_ID)), eq("새닉네임"));
+        verify(userProfileService).updateNickname(eq(UUID.fromString(USER_ID)), eq("새닉네임"));
     }
 
     @Test
@@ -119,7 +119,7 @@ class SettingsControllerTest {
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isNoContent());
 
-        verify(userSettingsUseCase).updateNotificationPref(
+        verify(userSettingsService).updateNotificationPref(
                 any(), argThat(type -> type.name().equals("TRADING_ALERT")), eq(false));
     }
 
@@ -140,7 +140,7 @@ class SettingsControllerTest {
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isNoContent());
 
-        verify(userSettingsUseCase).updateStrategySuggestions(
+        verify(userSettingsService).updateStrategySuggestions(
                 any(), eq(java.util.List.of("VR", "커스텀전략")));
     }
 }

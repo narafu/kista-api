@@ -28,8 +28,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SettingsController {
 
-    private final UserProfileService userProfileUseCase;
-    private final UserSettingsService userSettingsUseCase; // 잔고검증/알림타입/운영전략 추천 목록 — user_settings·user_notification_prefs 테이블
+    private final UserProfileService userProfileService;
+    private final UserSettingsService userSettingsService; // 잔고검증/알림타입/운영전략 추천 목록 — user_settings·user_notification_prefs 테이블
 
     // 텔레그램 봇 설정 (botToken, chatId 저장 + getMe로 username 검증) — IllegalArgumentException→400 ProblemDetailExceptionHandler 처리
     @Operation(summary = "텔레그램 설정 저장", description = "텔레그램 봇 토큰과 채팅 ID를 AES-256 암호화하여 저장. body: {\"botToken\": \"...\", \"chatId\": \"...\"}")
@@ -39,7 +39,7 @@ public class SettingsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateTelegram(@AuthenticationPrincipal UUID userId,
                                @Valid @RequestBody TelegramUpdateRequest body) {
-        userProfileUseCase.updateTelegram(userId, body.botToken(), body.chatId());
+        userProfileService.updateTelegram(userId, body.botToken(), body.chatId());
     }
 
     // 텔레그램 봇 설정 해제
@@ -48,7 +48,7 @@ public class SettingsController {
     @DeleteMapping("/telegram")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeTelegram(@AuthenticationPrincipal UUID userId) {
-        userProfileUseCase.removeTelegram(userId);
+        userProfileService.removeTelegram(userId);
     }
 
     // 알림 채널 변경 (TELEGRAM / FCM / ALL 중 선택) — IllegalArgumentException→400 ProblemDetailExceptionHandler 처리
@@ -61,7 +61,7 @@ public class SettingsController {
         NotificationChannel channel = NotificationChannel.tryParse(body.channel())
                 .orElseThrow(() -> new IllegalArgumentException(
                         "알 수 없는 알림 채널: " + body.channel() + ". 허용값: NONE, TELEGRAM, FCM, ALL"));
-        userProfileUseCase.updateNotificationChannel(userId, channel);
+        userProfileService.updateNotificationChannel(userId, channel);
     }
 
     // 알림 타입 on/off (TRADING_ALERT 등)
@@ -80,7 +80,7 @@ public class SettingsController {
         } catch (IllegalArgumentException _) {
             throw new IllegalArgumentException("알 수 없는 알림 타입: " + type + ". 허용값: " + Arrays.stream(NotificationType.values()).map(Enum::name).collect(Collectors.joining(", ")));
         }
-        userSettingsUseCase.updateNotificationPref(userId, notificationType, body.enabled());
+        userSettingsService.updateNotificationPref(userId, notificationType, body.enabled());
     }
 
     // 운영전략 추천 목록 변경 (자산 등록 폼 자유입력을 돕는 추천값 — 값 자체를 제한하지 않음)
@@ -90,7 +90,7 @@ public class SettingsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateStrategySuggestions(@AuthenticationPrincipal UUID userId,
                                           @Valid @RequestBody StrategySuggestionsRequest body) {
-        userSettingsUseCase.updateStrategySuggestions(userId, body.suggestions());
+        userSettingsService.updateStrategySuggestions(userId, body.suggestions());
     }
 
     // 닉네임 변경 (1~10자, 한글·영문·숫자·공백)
@@ -101,6 +101,6 @@ public class SettingsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateNickname(@AuthenticationPrincipal UUID userId,
                                @Valid @RequestBody NicknameRequest body) {
-        userProfileUseCase.updateNickname(userId, body.nickname());
+        userProfileService.updateNickname(userId, body.nickname());
     }
 }

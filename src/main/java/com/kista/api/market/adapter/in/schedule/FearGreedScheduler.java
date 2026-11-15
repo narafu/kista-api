@@ -19,7 +19,7 @@ import java.time.Instant;
 @ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true) // local에서 끄면 운영 DB·텔레그램과 중복 알림 발생 방지
 public class FearGreedScheduler {
 
-    private final FearGreedService fetchFearGreedUseCase;
+    private final FearGreedService fearGreedService;
     private final SchedulerJobRunner jobRunner;
     private final SchedulerLockService schedulerLockService;
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
@@ -30,6 +30,6 @@ public class FearGreedScheduler {
     }
 
     private void runLocked() {
-        jobRunner.run("공포탐욕지수 수집 스케쥴러", () -> fetchFearGreedUseCase.fetchAndSave(Instant.now(clock)));
+        jobRunner.run("공포탐욕지수 수집 스케쥴러", () -> fearGreedService.fetchAndSave(Instant.now(clock)));
     }
 }

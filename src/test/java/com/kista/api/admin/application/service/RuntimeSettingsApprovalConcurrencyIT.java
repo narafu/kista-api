@@ -36,8 +36,8 @@ class RuntimeSettingsApprovalConcurrencyIT {
 
     private static final long SIGNUP_GATE = 918_273L; // 테스트 전용 PostgreSQL advisory lock 키
 
-    @Autowired AdminSettingsService adminSettingsUseCase; // 실제 설정 변경 트랜잭션
-    @Autowired UserService userUseCase; // 실제 가입 트랜잭션
+    @Autowired AdminSettingsService adminSettingsService; // 실제 설정 변경 트랜잭션
+    @Autowired UserService userService; // 실제 가입 트랜잭션
     @Autowired JdbcTemplate jdbcTemplate; // 경합 제어와 최종 상태 검증
     @Autowired PlatformTransactionManager transactionManager; // advisory lock 보유 트랜잭션
     @MockitoBean TradingPolicyPort tradingPolicyPort; // trading-core 정책은 별도 프로세스라 대역 — 이 테스트는 root 승인 잠금만 본다
@@ -55,7 +55,7 @@ class RuntimeSettingsApprovalConcurrencyIT {
         jdbcTemplate.update("INSERT INTO users (id, kakao_id, nickname, status, role, notification_channel, created_at, updated_at) " +
                         "VALUES (?, ?, ?, 'ACTIVE', 'ADMIN', 'TELEGRAM', now(), now())",
                 adminId, "admin-" + adminId, "admin");
-        adminSettingsUseCase.updateSettings(adminId, RuntimeSettingsBundle.defaults(), true);
+        adminSettingsService.updateSettings(adminId, RuntimeSettingsBundle.defaults(), true);
 
         // 가입 INSERT를 승인 설정 판정 뒤에 일시 정지시키는 테스트 전용 트리거다.
         jdbcTemplate.execute("CREATE OR REPLACE FUNCTION block_runtime_settings_signup() RETURNS trigger AS $$ " +
@@ -68,7 +68,7 @@ class RuntimeSettingsApprovalConcurrencyIT {
     void tearDown() {
         jdbcTemplate.execute("DROP TRIGGER IF EXISTS block_runtime_settings_signup_trigger ON users");
         jdbcTemplate.execute("DROP FUNCTION IF EXISTS block_runtime_settings_signup()");
-        adminSettingsUseCase.updateSettings(adminId, RuntimeSettingsBundle.defaults(), true);
+        adminSettingsService.updateSettings(adminId, RuntimeSettingsBundle.defaults(), true);
         // UserService.register()가 가입 시 개인 그룹(finance_groups + OWNER 멤버십)을 자동 생성하므로,
         // users를 하드 삭제하기 전에 그 그룹 자체와 멤버십부터 지워야 FK 위반이 나지 않는다
         // (finance_group_members_user_id_fkey, finance_groups_owner_user_id_fkey).
@@ -92,13 +92,13 @@ class RuntimeSettingsApprovalConcurrencyIT {
         assertThat(gateHeld.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
 
         Future<User> signup = executor.submit(() ->
-                userUseCase.register("signup-" + signupId, "signup", signupId, null));
+                userService.register("signup-" + signupId, "signup", signupId, null));
         awaitWaitingAdvisoryLock();
 
         RuntimeSettingsBundle approvalDisabled = new RuntimeSettingsBundle(
                 new RuntimeSettings(false, RuntimeSettings.defaults().benchmarks()), TradingPolicySettings.defaults());
         Future<RuntimeSettingsBundle> disable = executor.submit(() ->
-                adminSettingsUseCase.updateSettings(adminId, approvalDisabled, true));
+                adminSettingsService.updateSettings(adminId, approvalDisabled, true));
 
         releaseGate.countDown();
         gate.get();

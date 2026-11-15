@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class RuntimeConfigController {
 
-    private final RuntimeConfigService runtimeSettingsUseCase; // 공개 설정 조회 유스케이스
+    private final RuntimeConfigService runtimeConfigService; // 공개 설정 조회 유스케이스
 
     @Operation(summary = "공개 런타임 설정 조회", description = "가입 승인 필요 여부·증권사별 활성화·전략 생성 정책을 반환합니다. 로그인 없이 호출 가능하며 동적 설정이므로 캐시하지 않습니다.")
     @SecurityRequirements
@@ -24,6 +24,6 @@ public class RuntimeConfigController {
     public ResponseEntity<RuntimeSettingsResponse> getRuntimeConfig() {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(RuntimeSettingsResponse.from(runtimeSettingsUseCase.getSettings()));
+                .body(RuntimeSettingsResponse.from(runtimeConfigService.getSettings()));
     }
 }

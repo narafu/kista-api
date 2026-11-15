@@ -25,14 +25,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FinanceAccountController {
 
-    private final FinanceAccountService accountUseCase;
+    private final FinanceAccountService financeAccountService;
 
     @Operation(summary = "계좌 목록 조회")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping
     public List<FinanceAccountResponse> list(
             @AuthenticationPrincipal UUID userId) {
-        return accountUseCase.list(userId).stream()
+        return financeAccountService.list(userId).stream()
                 .map(FinanceAccountResponse::from)
                 .toList();
     }
@@ -47,7 +47,7 @@ public class FinanceAccountController {
             @AuthenticationPrincipal UUID userId,
             @RequestParam(required = false, defaultValue = "false") boolean shareToGroup,
             @Valid @RequestBody FinanceAccountRequest request) {
-        var saved = accountUseCase.create(userId, shareToGroup, request.toCommand());
+        var saved = financeAccountService.create(userId, shareToGroup, request.toCommand());
         return ResponseEntity.created(URI.create("/api/finance/accounts/" + saved.id()))
                 .body(FinanceAccountResponse.from(saved));
     }
@@ -63,7 +63,7 @@ public class FinanceAccountController {
             @Parameter(description = "계좌 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId,
             @Valid @RequestBody FinanceAccountRequest request) {
-        return FinanceAccountResponse.from(accountUseCase.update(id, userId, request.toCommand()));
+        return FinanceAccountResponse.from(financeAccountService.update(id, userId, request.toCommand()));
     }
 
     @Operation(summary = "계좌 삭제")
@@ -77,7 +77,7 @@ public class FinanceAccountController {
     public void delete(
             @Parameter(description = "계좌 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        accountUseCase.delete(id, userId);
+        financeAccountService.delete(id, userId);
     }
 
     @Operation(summary = "계좌 그룹 공유 전환", description = "개인 소유 계좌를 소유자의 현재 그룹으로 공유 전환합니다.")
@@ -90,7 +90,7 @@ public class FinanceAccountController {
     public FinanceAccountResponse share(
             @Parameter(description = "계좌 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        return FinanceAccountResponse.from(accountUseCase.shareToGroup(id, userId));
+        return FinanceAccountResponse.from(financeAccountService.shareToGroup(id, userId));
     }
 
     @Operation(summary = "계좌 그룹 공유 해제", description = "그룹 공유 계좌를 개인 소유로 되돌립니다. 같은 그룹 멤버면 누구든 가능합니다.")
@@ -103,6 +103,6 @@ public class FinanceAccountController {
     public FinanceAccountResponse unshare(
             @Parameter(description = "계좌 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        return FinanceAccountResponse.from(accountUseCase.unshare(id, userId));
+        return FinanceAccountResponse.from(financeAccountService.unshare(id, userId));
     }
 }

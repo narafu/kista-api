@@ -20,8 +20,8 @@ import java.util.function.Function;
 @RequiredArgsConstructor
 public class BulkFinanceRegisterService {
 
-    private final AssetSnapshotService assetSnapshotUseCase;
-    private final FinanceTransactionService financeTransactionUseCase;
+    private final AssetSnapshotService assetSnapshotService;
+    private final FinanceTransactionService financeTransactionService;
     private final FinanceGroupPort financeGroupPort;
 
     // shareToGroup=true면 각 항목을 등록자의 현재 그룹 소유로 원자적 생성한다.
@@ -37,9 +37,9 @@ public class BulkFinanceRegisterService {
         }
 
         List<String> failures = new ArrayList<>();
-        int assetSuccess = processAll(assets, c -> assetSnapshotUseCase.create(userId, shareToGroup, c),
+        int assetSuccess = processAll(assets, c -> assetSnapshotService.create(userId, shareToGroup, c),
                 AssetSnapshotCommand::memo, "자산", failures);
-        int txSuccess = processAll(transactions, c -> financeTransactionUseCase.create(userId, shareToGroup, c),
+        int txSuccess = processAll(transactions, c -> financeTransactionService.create(userId, shareToGroup, c),
                 FinanceTransactionCommand::memo, "거래", failures);
 
         return new BulkFinanceRegisterResult(assetSuccess, txSuccess, failures);

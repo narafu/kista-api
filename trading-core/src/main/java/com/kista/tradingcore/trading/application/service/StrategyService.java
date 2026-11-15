@@ -46,7 +46,7 @@ public class StrategyService {
     private final AccountPort accountPort;
     private final StrategyCreationService creationService;         // 신규 전략 등록 전용
     private final StrategyDetailAssembler detailAssembler;         // 응답 StrategyDetail 조립(조회·등록 공용)
-    private final StrategyHistoryQueryService historyQueryService; // 시드 미리보기 + 조회 2종
+    private final StrategyHistoryQueryService strategyHistoryQueryService; // 시드 미리보기 + 조회 2종
     private final CycleSnapshotCreator cycleSnapshotCreator;       // 재개 시 종료된 사이클 재오픈 전용
     private final OrderCancelService orderCancelService;           // 일시중지·삭제 전 미체결 주문 정리
     private final ApplicationEventPublisher eventPublisher;       // stats 캐시 무효화 이벤트 발행
@@ -241,7 +241,7 @@ public class StrategyService {
     public StrategySeedPreview strategySeedPreview(
             UUID accountId, UUID requesterId,
             StrategyType type, StrategyTicker ticker, int divisionCount) {
-        return historyQueryService.strategySeedPreview(accountId, requesterId, type, ticker, divisionCount);
+        return strategyHistoryQueryService.strategySeedPreview(accountId, requesterId, type, ticker, divisionCount);
     }
 
     // 전략(사이클) 기준 거래 이력 조회 — 커서 기반 페이지네이션
@@ -249,13 +249,13 @@ public class StrategyService {
     public CycleHistoryPage getByStrategy(UUID strategyId, UUID requesterId,
                                           LocalDate from, LocalDate to,
                                           Instant cursor, int size) {
-        return historyQueryService.getByStrategy(strategyId, requesterId, from, to, cursor, size);
+        return strategyHistoryQueryService.getByStrategy(strategyId, requesterId, from, to, cursor, size);
     }
 
     // 전략(사이클) 기준 기간 내 주문 내역 조회 — 사용자 전략 상세 화면용
     @Transactional(readOnly = true)
     public List<Order> getOrdersByStrategy(UUID strategyId, UUID requesterId, LocalDate from, LocalDate to) {
-        return historyQueryService.getOrdersByStrategy(strategyId, requesterId, from, to);
+        return strategyHistoryQueryService.getOrdersByStrategy(strategyId, requesterId, from, to);
     }
 
 }

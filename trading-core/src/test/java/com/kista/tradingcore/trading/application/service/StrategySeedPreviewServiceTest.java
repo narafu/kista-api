@@ -73,12 +73,12 @@ class StrategySeedPreviewServiceTest {
                 new DcaCycleOrderStrategy()
         ));
         // 시드 미리보기가 쓰는 협력자만 실제 주입, 나머지는 미사용이라 null
-        StrategyHistoryQueryService historyQueryService = new StrategyHistoryQueryService(
+        StrategyHistoryQueryService strategyHistoryQueryService = new StrategyHistoryQueryService(
                 accountPort, strategyPort, cyclePositionPort, null, cycleStrategies, privacyTradePort, pricePort,
                 new UnassignedCashCalculator(strategyPort, cyclePositionPort, marginPort, cryptoExchanges), FIXED);
         service = new StrategyService(
                 null, null, null, null,
-                accountPort, null, null, historyQueryService, null, null, null, null, null, null, null, null, null);
+                accountPort, null, null, strategyHistoryQueryService, null, null, null, null, null, null, null, null, null);
         // 실제 Account record — account.toBrokerRef()가 인스턴스 메서드라 mock(Account.class)로는 null 반환됨
         account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Broker.KIS, null, null);
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);

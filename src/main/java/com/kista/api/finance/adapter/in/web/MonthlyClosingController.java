@@ -21,14 +21,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class MonthlyClosingController {
 
-    private final MonthlyClosingService monthlyClosingUseCase;
+    private final MonthlyClosingService monthlyClosingService;
 
     @Operation(summary = "월별 마감 상태 목록 조회")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping
     public List<MonthlyClosingResponse> list(
             @AuthenticationPrincipal UUID userId) {
-        return monthlyClosingUseCase.list(userId).stream()
+        return monthlyClosingService.list(userId).stream()
                 .map(MonthlyClosingResponse::from)
                 .toList();
     }
@@ -44,6 +44,6 @@ public class MonthlyClosingController {
             @AuthenticationPrincipal UUID userId,
             @RequestBody MonthlyClosingRequest request) {
         return MonthlyClosingResponse.from(
-                monthlyClosingUseCase.setCompleted(userId, month, request.completed()));
+                monthlyClosingService.setCompleted(userId, month, request.completed()));
     }
 }

@@ -29,7 +29,7 @@ public class AdminService {
 
     private final UserPort userPort;
     private final UserSummaryPort userSummaryPort;   // 관리자 화면 전용 read-model
-    private final UserService userUseCase; // 승인/거절/탈퇴 위임 (텔레그램 알림 + SSE 포함)
+    private final UserService userService; // 승인/거절/탈퇴 위임 (텔레그램 알림 + SSE 포함)
     private final AuditLogPort auditLogPort;             // 감사 로그 기록
 
     private static final String TELEGRAM_ACTOR = "TELEGRAM_BOT"; // 텔레그램 인라인 버튼 경로 행위자 표기
@@ -59,27 +59,27 @@ public class AdminService {
 
     public void approveUser(UUID adminId, UUID targetUserId) {
         // UserService 위임 (텔레그램 알림 + SSE 포함)
-        userUseCase.approve(targetUserId);
+        userService.approve(targetUserId);
         log.info("관리자 사용자 승인: adminId={}, targetUserId={}", adminId, targetUserId);
         auditLogPort.log(adminId, "USER_APPROVE", "USER", targetUserId, null);
     }
 
     public void rejectUser(UUID adminId, UUID targetUserId, String reason) {
         // UserService 위임 (텔레그램 알림 + SSE 포함, reason 정규화는 UserService 책임)
-        userUseCase.reject(targetUserId, reason);
+        userService.reject(targetUserId, reason);
         log.info("관리자 사용자 거절: adminId={}, targetUserId={}", adminId, targetUserId);
         auditLogPort.log(adminId, "USER_REJECT", "USER", targetUserId, Map.of("reason", reason == null ? "" : reason));
     }
 
     // 텔레그램 인라인 버튼 승인·거절 — chatId로 관리자를 찾고, 없으면 시스템 행위자(TELEGRAM_BOT)로 감사 기록
     public void approveUserByTelegram(String chatId, UUID targetUserId) {
-        userUseCase.approve(targetUserId);
+        userService.approve(targetUserId);
         log.info("텔레그램 관리자 승인: chatId={}, targetUserId={}", chatId, targetUserId);
         auditLogPort.log(resolveTelegramAdmin(chatId), "USER_APPROVE", "USER", targetUserId, telegramPayload(chatId));
     }
 
     public void rejectUserByTelegram(String chatId, UUID targetUserId) {
-        userUseCase.reject(targetUserId, null); // 텔레그램 인라인 버튼은 사유 입력 UI 없음
+        userService.reject(targetUserId, null); // 텔레그램 인라인 버튼은 사유 입력 UI 없음
         log.info("텔레그램 관리자 거절: chatId={}, targetUserId={}", chatId, targetUserId);
         Map<String, Object> payload = new HashMap<>(telegramPayload(chatId));
         payload.put("reason", "");
@@ -88,7 +88,7 @@ public class AdminService {
 
     // chatId에 연결된 ADMIN 사용자 — 없거나 ADMIN이 아니면 null(admin_id nullable, 행위자는 payload.actor로 식별)
     private UUID resolveTelegramAdmin(String chatId) {
-        return userUseCase.findUserIdByTelegramChatId(chatId)
+        return userService.findUserIdByTelegramChatId(chatId)
                 .flatMap(userPort::findById)
                 .filter(u -> u.role() == UserRole.ADMIN)
                 .map(User::id)
@@ -112,7 +112,7 @@ public class AdminService {
             }
         }
         // 역할 저장 + 기존 AT 무효화는 user 모듈이 캡슐화한다
-        userUseCase.changeRole(targetUserId, role);
+        userService.changeRole(targetUserId, role);
         log.info("관리자 역할 변경: adminId={}, targetUserId={}, role={}", adminId, targetUserId, role);
         auditLogPort.log(adminId, "USER_ROLE_CHANGE", "USER", targetUserId,
                 Map.of("newRole", role.name()));
@@ -120,7 +120,7 @@ public class AdminService {
 
     public void deleteUser(UUID adminId, UUID targetUserId) {
         userPort.findByIdOrThrow(targetUserId); // 존재 확인
-        userUseCase.deleteMe(targetUserId);
+        userService.deleteMe(targetUserId);
         log.info("관리자 사용자 삭제: adminId={}, targetUserId={}", adminId, targetUserId);
         auditLogPort.log(adminId, "USER_DELETE", "USER", targetUserId, null);
     }

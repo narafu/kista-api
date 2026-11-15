@@ -28,7 +28,7 @@ public class MarketHolidayController {
 
     private static final CacheControl HOLIDAYS_CACHE = CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic();
 
-    private final MarketHolidayService marketUseCase;
+    private final MarketHolidayService marketHolidayService;
     private final MarketCalendarQueryPort marketCalendarQueryPort;
 
     @Operation(summary = "월별 미국 시장 휴장일 조회")
@@ -38,7 +38,7 @@ public class MarketHolidayController {
             @Parameter(description = "연도", example = "2026") @RequestParam int year,
             @Parameter(description = "월 (1-12)", example = "6") @RequestParam int month) {
         // LocalDate → ISO 문자열 변환으로 직렬화 방식 명시
-        List<String> holidays = marketUseCase.getMonthlyHolidays(year, month)
+        List<String> holidays = marketHolidayService.getMonthlyHolidays(year, month)
                 .stream().map(Object::toString).toList();
         return ResponseEntity.ok().cacheControl(HOLIDAYS_CACHE).body(holidays);
     }
@@ -70,8 +70,8 @@ public class MarketHolidayController {
             @Parameter(description = "종료일 (from과 함께 지정)", example = "2026-10-14") @RequestParam(required = false) LocalDate to) {
         if ((from == null) != (to == null)) throw new IllegalArgumentException("from과 to는 함께 지정해야 합니다.");
         return TossCandleResponse.fromList(from != null
-                ? marketUseCase.getDailyCandles(ticker, from, to)
-                : marketUseCase.getDailyCandles(ticker, count));
+                ? marketHolidayService.getDailyCandles(ticker, from, to)
+                : marketHolidayService.getDailyCandles(ticker, count));
     }
 
 }

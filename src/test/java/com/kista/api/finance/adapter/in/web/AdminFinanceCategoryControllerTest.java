@@ -45,7 +45,7 @@ class AdminFinanceCategoryControllerTest {
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort;
-    @MockitoBean FinanceCategoryService categoryUseCase;
+    @MockitoBean FinanceCategoryService financeCategoryService;
 
     @Test
     void list_anonymous_returns401() throws Exception {
@@ -68,7 +68,7 @@ class AdminFinanceCategoryControllerTest {
                 FinanceCategory.Type.INCOME, "근로소득", 10, Instant.now());
         FinanceCategory l2 = new FinanceCategory(l2Id, null, l1Id, null,
                 FinanceCategory.Type.INCOME, "급여", 10, Instant.now());
-        when(categoryUseCase.listSystem(any())).thenReturn(List.of(l1, l2));
+        when(financeCategoryService.listSystem(any())).thenReturn(List.of(l1, l2));
 
         mockMvc.perform(get("/api/admin/finance/categories")
                         .with(authentication(adminToken(DEV_ADMIN_UUID))))
@@ -82,7 +82,7 @@ class AdminFinanceCategoryControllerTest {
         UUID savedId = UUID.randomUUID();
         FinanceCategory saved = new FinanceCategory(savedId, null, null, null,
                 FinanceCategory.Type.EXPENSE, "새시스템카테고리", 0, Instant.now());
-        when(categoryUseCase.createSystem(any(FinanceCategoryCommand.class))).thenReturn(saved);
+        when(financeCategoryService.createSystem(any(FinanceCategoryCommand.class))).thenReturn(saved);
 
         mockMvc.perform(post("/api/admin/finance/categories")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -115,7 +115,7 @@ class AdminFinanceCategoryControllerTest {
         UUID id = UUID.randomUUID();
         FinanceCategory updated = new FinanceCategory(id, null, null, null,
                 FinanceCategory.Type.EXPENSE, "수정된시스템카테고리", 1, Instant.now());
-        when(categoryUseCase.updateSystem(any(), any(FinanceCategoryCommand.class))).thenReturn(updated);
+        when(financeCategoryService.updateSystem(any(), any(FinanceCategoryCommand.class))).thenReturn(updated);
 
         mockMvc.perform(put("/api/admin/finance/categories/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -128,7 +128,7 @@ class AdminFinanceCategoryControllerTest {
     @Test
     void update_targetNotSystem_returns400() throws Exception {
         UUID id = UUID.randomUUID();
-        when(categoryUseCase.updateSystem(any(), any(FinanceCategoryCommand.class)))
+        when(financeCategoryService.updateSystem(any(), any(FinanceCategoryCommand.class)))
                 .thenThrow(new IllegalArgumentException("시스템 카테고리가 아닙니다: " + id));
 
         mockMvc.perform(put("/api/admin/finance/categories/{id}", id)

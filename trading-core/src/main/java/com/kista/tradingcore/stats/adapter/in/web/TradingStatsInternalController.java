@@ -22,8 +22,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TradingStatsInternalController {
 
-    private final InvestmentPointsQueryService investmentPointsQuery;
-    private final BrokerStatisticsService brokerStatisticsUseCase; // 환율 조회(증권사 선택은 유스케이스가 결정)
+    private final InvestmentPointsQueryService investmentPointsQueryService;
+    private final BrokerStatisticsService brokerStatisticsService; // 환율 조회(증권사 선택은 유스케이스가 결정)
 
     @Operation(summary = "투자 성과 시리즈 조회", description = "벤치마크 비교용 InvestmentPoint 시리즈. X-Internal-Token 헤더 필수.")
     @GetMapping("/investment-points")
@@ -34,13 +34,13 @@ public class TradingStatsInternalController {
             @RequestParam(defaultValue = "USD") Currency currency, // STRATEGY scope는 무시(전략 계좌 통화 사용)
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        InvestmentPointsResult result = investmentPointsQuery.fetch(userId, scope, strategyId, currency, from, to);
+        InvestmentPointsResult result = investmentPointsQueryService.fetch(userId, scope, strategyId, currency, from, to);
         return StatsContractMapper.toResponse(result);
     }
 
     @Operation(summary = "현재 USD/KRW 매매기준율 조회", description = "TOSS_INVEST 매매기준율(midRate) 단일 값. X-Internal-Token 헤더 필수.")
     @GetMapping("/exchange-rate")
     public BigDecimal exchangeRate() {
-        return brokerStatisticsUseCase.currentExchangeRate().midRate();
+        return brokerStatisticsService.currentExchangeRate().midRate();
     }
 }

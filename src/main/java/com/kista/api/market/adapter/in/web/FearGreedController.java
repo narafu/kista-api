@@ -26,7 +26,7 @@ public class FearGreedController {
     private static final String SOURCE_CRYPTO = "CRYPTO";
     private static final CacheControl FEAR_GREED_CACHE = CacheControl.maxAge(10, TimeUnit.MINUTES).cachePublic();
 
-    private final FearGreedQueryService getFearGreedUseCase;
+    private final FearGreedQueryService fearGreedQueryService;
 
     @Operation(summary = "CNN·크립토 공포탐욕지수 조회 (현재값 + 추이)")
     @ApiResponse(responseCode = "200", description = "조회 성공")
@@ -35,8 +35,8 @@ public class FearGreedController {
             @Parameter(description = "조회 기간(일)", example = "200") @RequestParam(defaultValue = "200") int days) {
         // 두 소스를 각각 조회해 번들 응답으로 조립
         FearGreedResponse response = FearGreedResponse.from(
-                getFearGreedUseCase.getRecent(SOURCE_CNN, days),
-                getFearGreedUseCase.getRecent(SOURCE_CRYPTO, days));
+                fearGreedQueryService.getRecent(SOURCE_CNN, days),
+                fearGreedQueryService.getRecent(SOURCE_CRYPTO, days));
         return ResponseEntity.ok().cacheControl(FEAR_GREED_CACHE).body(response);
     }
 }

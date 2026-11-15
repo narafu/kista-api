@@ -42,12 +42,12 @@ public class DevAuthController {
     private static final UUID   DEV_E2E_USER_ID  = UUID.fromString("00000000-0000-0000-0000-000000000003");
     private static final String DEV_E2E_KAKAO_ID = "dev-e2e-user";
 
-    private final UserService              userUseCase;
+    private final UserService              userService;
     private final JwtIssuerService         jwtIssuerService; // 자체 발급 ES256 JWT
     private final UserPort                 userPort;          // ADMIN 테스트 유저 직접 저장용
-    private final TokenService             tokenUseCase;      // RT 발급
+    private final TokenService             tokenService;      // RT 발급
     private final RefreshTokenCookieHelper cookieHelper;      // RT 쿠키 설정
-    private final UserSettingsService      userSettingsUseCase; // trading-core 복제본 재동기화
+    private final UserSettingsService      userSettingsService; // trading-core 복제본 재동기화
 
     @Operation(summary = "[DEV] UID로 사용자 승인 — 로컬 프로파일 전용", description = "지정한 userId를 APPROVED 상태로 변경. Telegram 없이 로컬 승인 처리 시 사용.")
     @ApiResponse(responseCode = "200", description = "승인 성공")
@@ -56,7 +56,7 @@ public class DevAuthController {
     public void devApprove(
             @Parameter(description = "승인할 사용자 ID", example = "00000000-0000-0000-0000-000000000001")
             @PathVariable UUID userId) {
-        userUseCase.approve(userId);
+        userService.approve(userId);
     }
 
     @Operation(summary = "[DEV] 개발용 JWT 토큰 발급 — 로컬 프로파일 전용", description = "고정 UUID(00000000-…-0001) 테스트 유저를 자동 생성·승인 후 JWT 반환. 매번 호출해도 idempotent.")
@@ -95,7 +95,7 @@ public class DevAuthController {
     private TokenResponse issueUserToken(String kakaoId, String nickname, UUID userId,
                                          HttpServletRequest request, HttpServletResponse response) {
         // 테스트 유저 생성 or 기존 유저 반환 (idempotent)
-        User user = userUseCase.register(kakaoId, nickname, userId, null);
+        User user = userService.register(kakaoId, nickname, userId, null);
         activateOrResync(user);
         return issueTokens(user.id(), user.role(), request, response);
     }
@@ -103,7 +103,7 @@ public class DevAuthController {
     // RT 발급 후 HttpOnly 쿠키 설정 + role 클레임 포함 ES256 AT 반환 (TTL은 expiresInSeconds()로 통일)
     private TokenResponse issueTokens(UUID userId, UserRole role,
                                       HttpServletRequest request, HttpServletResponse response) {
-        String rawRt = tokenUseCase.issueRefreshToken(userId, request.getHeader("User-Agent"));
+        String rawRt = tokenService.issueRefreshToken(userId, request.getHeader("User-Agent"));
         response.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.issue(rawRt).toString());
         String at = jwtIssuerService.issue(userId, role);
         return new TokenResponse(at, "bearer", jwtIssuerService.expiresInSeconds());
@@ -112,7 +112,7 @@ public class DevAuthController {
     // ACTIVE 전환(approve가 복제본 동기화 이벤트 발행) — 이미 ACTIVE면 approve()가 409라 대신 재동기화만 한다.
     // 로컬은 Redis 초기화·trading 스키마 재생성으로 trading.user_notify_profile이 유실될 수 있는데, 그대로 두면 전략 등록이 404
     private void activateOrResync(User user) {
-        if (user.status() != UserStatus.ACTIVE) userUseCase.approve(user.id());
-        else userSettingsUseCase.resyncNotifyProfile(user.id());
+        if (user.status() != UserStatus.ACTIVE) userService.approve(user.id());
+        else userSettingsService.resyncNotifyProfile(user.id());
     }
 }

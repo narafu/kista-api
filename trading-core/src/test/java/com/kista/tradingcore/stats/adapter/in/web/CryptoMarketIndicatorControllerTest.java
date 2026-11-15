@@ -39,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CryptoMarketIndicatorControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockitoBean CryptoMarketIndicatorService useCase;
+    @MockitoBean CryptoMarketIndicatorService cryptoMarketIndicatorService;
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
@@ -51,7 +51,7 @@ class CryptoMarketIndicatorControllerTest {
 
     @Test
     void 지표를_조회하면_200과_캐시헤더() throws Exception {
-        when(useCase.get(200)).thenReturn(sample(null));
+        when(cryptoMarketIndicatorService.get(200)).thenReturn(sample(null));
 
         mockMvc.perform(get("/api/crypto-market-indicators").with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
@@ -62,17 +62,17 @@ class CryptoMarketIndicatorControllerTest {
 
     @Test
     void days_기본값은_200() throws Exception {
-        when(useCase.get(200)).thenReturn(sample(null));
+        when(cryptoMarketIndicatorService.get(200)).thenReturn(sample(null));
 
         mockMvc.perform(get("/api/crypto-market-indicators").with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk());
 
-        verify(useCase).get(200);
+        verify(cryptoMarketIndicatorService).get(200);
     }
 
     @Test
     void 테더프리미엄과_펀딩비_섹션이_null이면_null로_직렬화() throws Exception {
-        when(useCase.get(30)).thenReturn(sample(null));
+        when(cryptoMarketIndicatorService.get(30)).thenReturn(sample(null));
 
         mockMvc.perform(get("/api/crypto-market-indicators").param("days", "30").with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
@@ -90,7 +90,7 @@ class CryptoMarketIndicatorControllerTest {
     @Test
     void hashRibbons의_SMA와_state가_null이면_null로_직렬화() throws Exception {
         var d = LocalDate.of(2026, 10, 18);
-        when(useCase.get(200)).thenReturn(new CryptoMarketIndicators(Instant.parse("2026-10-19T00:00:00Z"), null, List.of(),
+        when(cryptoMarketIndicatorService.get(200)).thenReturn(new CryptoMarketIndicators(Instant.parse("2026-10-19T00:00:00Z"), null, List.of(),
                 null, null, null,
                 HashRibbons.of(List.of(new DatedHashRibbon(d, new BigDecimal("1050.12"), null, null, null, false)))));
 
@@ -114,7 +114,7 @@ class CryptoMarketIndicatorControllerTest {
         var valuation = Valuation.of(List.of(new DatedValuation(d, new BigDecimal("100000"), null, null,
                 new BigDecimal("1.25"), new BigDecimal("-10.5"))));
         var longShort = LongShortRatio.of(List.of(new DatedLongShortRatio(d, new BigDecimal("0.6331"), new BigDecimal("1.7255"))));
-        when(useCase.get(200)).thenReturn(new CryptoMarketIndicators(Instant.parse("2026-10-19T00:00:00Z"), premium,
+        when(cryptoMarketIndicatorService.get(200)).thenReturn(new CryptoMarketIndicators(Instant.parse("2026-10-19T00:00:00Z"), premium,
                 List.of(new TickerIndicators(StrategyTicker.BTC, kimchi, funding, oi, valuation, longShort,
                         new Premium(new BigDecimal("0.0342"), List.of(new DatedValue(d, new BigDecimal("-0.0125")))))),
                 new Halving(972_175L, 1_050_000L, 77_825L, Instant.parse("2028-04-01T00:00:00Z")),

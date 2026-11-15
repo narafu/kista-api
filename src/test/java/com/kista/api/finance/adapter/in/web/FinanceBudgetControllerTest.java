@@ -38,13 +38,13 @@ class FinanceBudgetControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean FinanceBudgetService budgetUseCase;
+    @MockitoBean FinanceBudgetService financeBudgetService;
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     @Test
     void list_withNoQueryParams_returns200() throws Exception {
-        when(budgetUseCase.list(any(), any(), any())).thenReturn(List.of());
+        when(financeBudgetService.list(any(), any(), any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/finance/budgets")
                         .with(authentication(userToken(USER_ID))))
@@ -54,7 +54,7 @@ class FinanceBudgetControllerTest {
 
     @Test
     void list_withAllQueryParams_returns200() throws Exception {
-        when(budgetUseCase.list(any(), any(), any())).thenReturn(List.of());
+        when(financeBudgetService.list(any(), any(), any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/finance/budgets")
                         .param("categoryId", UUID.randomUUID().toString())
@@ -70,7 +70,7 @@ class FinanceBudgetControllerTest {
         UUID savedId = UUID.randomUUID();
         FinanceBudget saved = new FinanceBudget(savedId, null, UUID.randomUUID(), USER_ID,
                 LocalDate.of(2026, 1, 1), null, 350000L, Instant.now());
-        when(budgetUseCase.create(any(), anyBoolean(), any(FinanceBudgetCommand.class))).thenReturn(saved);
+        when(financeBudgetService.create(any(), anyBoolean(), any(FinanceBudgetCommand.class))).thenReturn(saved);
 
         mockMvc.perform(post("/api/finance/budgets")
                         .param("shareToGroup", "true")
@@ -80,7 +80,7 @@ class FinanceBudgetControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/api/finance/budgets/" + savedId));
 
-        verify(budgetUseCase).create(eq(USER_ID), eq(true), any(FinanceBudgetCommand.class));
+        verify(financeBudgetService).create(eq(USER_ID), eq(true), any(FinanceBudgetCommand.class));
     }
 
     @Test
@@ -88,7 +88,7 @@ class FinanceBudgetControllerTest {
         UUID savedId = UUID.randomUUID();
         FinanceBudget saved = new FinanceBudget(savedId, null, UUID.randomUUID(), USER_ID,
                 LocalDate.of(2026, 1, 1), null, 350000L, Instant.now());
-        when(budgetUseCase.create(any(), anyBoolean(), any(FinanceBudgetCommand.class))).thenReturn(saved);
+        when(financeBudgetService.create(any(), anyBoolean(), any(FinanceBudgetCommand.class))).thenReturn(saved);
 
         mockMvc.perform(post("/api/finance/budgets")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -96,7 +96,7 @@ class FinanceBudgetControllerTest {
                         .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isCreated());
 
-        verify(budgetUseCase).create(eq(USER_ID), eq(false), any(FinanceBudgetCommand.class));
+        verify(financeBudgetService).create(eq(USER_ID), eq(false), any(FinanceBudgetCommand.class));
     }
 
     @Test
@@ -114,7 +114,7 @@ class FinanceBudgetControllerTest {
         UUID categoryId = UUID.randomUUID();
         FinanceBudget updated = new FinanceBudget(id, null, categoryId, USER_ID,
                 LocalDate.of(2026, 1, 1), null, 400000L, Instant.now());
-        when(budgetUseCase.update(any(), any(), any(FinanceBudgetCommand.class))).thenReturn(updated);
+        when(financeBudgetService.update(any(), any(), any(FinanceBudgetCommand.class))).thenReturn(updated);
 
         mockMvc.perform(put("/api/finance/budgets/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -132,7 +132,7 @@ class FinanceBudgetControllerTest {
                         .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isNoContent());
 
-        verify(budgetUseCase).delete(id, USER_ID);
+        verify(financeBudgetService).delete(id, USER_ID);
     }
 
     @Test
@@ -141,7 +141,7 @@ class FinanceBudgetControllerTest {
         UUID groupId = UUID.randomUUID();
         FinanceBudget shared = new FinanceBudget(id, groupId, UUID.randomUUID(), USER_ID,
                 LocalDate.of(2026, 1, 1), null, 350000L, Instant.now());
-        when(budgetUseCase.shareToGroup(id, USER_ID)).thenReturn(shared);
+        when(financeBudgetService.shareToGroup(id, USER_ID)).thenReturn(shared);
 
         mockMvc.perform(patch("/api/finance/budgets/{id}/share", id)
                         .with(csrf()).with(authentication(userToken(USER_ID))))
@@ -154,7 +154,7 @@ class FinanceBudgetControllerTest {
         UUID id = UUID.randomUUID();
         FinanceBudget personal = new FinanceBudget(id, null, UUID.randomUUID(), USER_ID,
                 LocalDate.of(2026, 1, 1), null, 350000L, Instant.now());
-        when(budgetUseCase.unshare(id, USER_ID)).thenReturn(personal);
+        when(financeBudgetService.unshare(id, USER_ID)).thenReturn(personal);
 
         mockMvc.perform(patch("/api/finance/budgets/{id}/unshare", id)
                         .with(csrf()).with(authentication(userToken(USER_ID))))

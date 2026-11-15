@@ -16,11 +16,11 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class FinanceUserCascadeListener {
 
-    private final FinanceUserDataEraseService financeUserDataEraseUseCase; // 재무 기록·그룹 멤버십 정리
+    private final FinanceUserDataEraseService financeUserDataEraseService; // 재무 기록·그룹 멤버십 정리
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onUserDeleted(UserDeletedEvent event) {
-        financeUserDataEraseUseCase.eraseUserData(event.userId());
+        financeUserDataEraseService.eraseUserData(event.userId());
     }
 }

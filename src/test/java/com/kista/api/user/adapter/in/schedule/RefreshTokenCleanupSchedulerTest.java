@@ -18,7 +18,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class RefreshTokenCleanupSchedulerTest {
 
-    @Mock TokenService tokenUseCase;
+    @Mock TokenService tokenService;
     @Mock SchedulerJobRunner jobRunner;
     @Mock SchedulerLockService schedulerLockService;
 
@@ -26,7 +26,7 @@ class RefreshTokenCleanupSchedulerTest {
 
     @BeforeEach
     void setUp() throws InterruptedException {
-        scheduler = new RefreshTokenCleanupScheduler(tokenUseCase, jobRunner, schedulerLockService);
+        scheduler = new RefreshTokenCleanupScheduler(tokenService, jobRunner, schedulerLockService);
 
         lenient().doAnswer((Answer<Boolean>) invocation -> {
             SchedulerLockService.LockedTask task = invocation.getArgument(2);
@@ -42,9 +42,9 @@ class RefreshTokenCleanupSchedulerTest {
         ArgumentCaptor<Runnable> jobCaptor = ArgumentCaptor.forClass(Runnable.class);
         verify(jobRunner).run(eq("만료 RT 정리 스케쥴러"), jobCaptor.capture());
 
-        when(tokenUseCase.cleanupExpiredTokens()).thenReturn(3);
+        when(tokenService.cleanupExpiredTokens()).thenReturn(3);
         jobCaptor.getValue().run();
-        verify(tokenUseCase).cleanupExpiredTokens();
+        verify(tokenService).cleanupExpiredTokens();
     }
 
     @Test
@@ -54,8 +54,8 @@ class RefreshTokenCleanupSchedulerTest {
         ArgumentCaptor<Runnable> jobCaptor = ArgumentCaptor.forClass(Runnable.class);
         verify(jobRunner).run(eq("회전 RT 정리 스케쥴러"), jobCaptor.capture());
 
-        when(tokenUseCase.cleanupRotatedTokens()).thenReturn(5);
+        when(tokenService.cleanupRotatedTokens()).thenReturn(5);
         jobCaptor.getValue().run();
-        verify(tokenUseCase).cleanupRotatedTokens();
+        verify(tokenService).cleanupRotatedTokens();
     }
 }

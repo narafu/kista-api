@@ -45,7 +45,7 @@ class AdminSettingsControllerTest {
     private static final UUID ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     @Autowired MockMvc mockMvc;
-    @MockitoBean AdminSettingsService adminSettingsUseCase; // 관리자 설정 유스케이스 대역
+    @MockitoBean AdminSettingsService adminSettingsService; // 관리자 설정 유스케이스 대역
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort;
     @MockitoBean AppErrorLogPort appErrorLogPort;
@@ -53,7 +53,7 @@ class AdminSettingsControllerTest {
     @BeforeEach
     void stubCurrentSettings() {
         // PUT은 누락 증권사 키 보존을 위해 현재 정책을 먼저 읽는다
-        when(adminSettingsUseCase.getSettings()).thenReturn(RuntimeSettingsBundle.defaults());
+        when(adminSettingsService.getSettings()).thenReturn(RuntimeSettingsBundle.defaults());
     }
 
     @Test
@@ -64,7 +64,7 @@ class AdminSettingsControllerTest {
 
     @Test
     void getSettings_returnsTypedSettingsForAdmin() throws Exception {
-        when(adminSettingsUseCase.getSettings()).thenReturn(RuntimeSettingsBundle.defaults());
+        when(adminSettingsService.getSettings()).thenReturn(RuntimeSettingsBundle.defaults());
 
         mockMvc.perform(get("/api/admin/settings").with(authentication(adminToken(ADMIN_ID))))
                 .andExpect(status().isOk())
@@ -89,14 +89,14 @@ class AdminSettingsControllerTest {
                                 """))
                 .andExpect(status().isBadRequest());
 
-        verify(adminSettingsUseCase, never()).updateSettings(any(), any(), anyBoolean());
+        verify(adminSettingsService, never()).updateSettings(any(), any(), anyBoolean());
     }
 
     @Test
     void putSettings_savesCompletePayload() throws Exception {
         RuntimeSettingsBundle updated = new RuntimeSettingsBundle(
                 new RuntimeSettings(false, null), TradingPolicySettings.defaults());
-        when(adminSettingsUseCase.updateSettings(eq(ADMIN_ID), any(), eq(false))).thenReturn(updated);
+        when(adminSettingsService.updateSettings(eq(ADMIN_ID), any(), eq(false))).thenReturn(updated);
 
         mockMvc.perform(put("/api/admin/settings")
                         .with(authentication(adminToken(ADMIN_ID)))
@@ -117,7 +117,7 @@ class AdminSettingsControllerTest {
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.auth.approvalRequired").value(false));
 
-        verify(adminSettingsUseCase).updateSettings(ADMIN_ID, updated, false);
+        verify(adminSettingsService).updateSettings(ADMIN_ID, updated, false);
     }
 
     @Test
@@ -126,7 +126,7 @@ class AdminSettingsControllerTest {
                 new BenchmarkFieldSettings<>(List.of("SPY", "QQQ"), "QQQ"));
         RuntimeSettingsBundle updated = new RuntimeSettingsBundle(
                 new RuntimeSettings(true, customBenchmarks), TradingPolicySettings.defaults());
-        when(adminSettingsUseCase.updateSettings(eq(ADMIN_ID), any(), eq(true))).thenReturn(updated);
+        when(adminSettingsService.updateSettings(eq(ADMIN_ID), any(), eq(true))).thenReturn(updated);
 
         mockMvc.perform(put("/api/admin/settings")
                         .with(authentication(adminToken(ADMIN_ID)))
@@ -147,7 +147,7 @@ class AdminSettingsControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"));
 
-        verify(adminSettingsUseCase).updateSettings(ADMIN_ID, updated, true);
+        verify(adminSettingsService).updateSettings(ADMIN_ID, updated, true);
     }
 
     @Test
@@ -169,7 +169,7 @@ class AdminSettingsControllerTest {
                                 """))
                 .andExpect(status().isBadRequest());
 
-        verify(adminSettingsUseCase, never()).updateSettings(any(), any(), anyBoolean());
+        verify(adminSettingsService, never()).updateSettings(any(), any(), anyBoolean());
     }
 
     @Test
@@ -191,7 +191,7 @@ class AdminSettingsControllerTest {
                                 """))
                 .andExpect(status().isBadRequest());
 
-        verify(adminSettingsUseCase, never()).updateSettings(any(), any(), anyBoolean());
+        verify(adminSettingsService, never()).updateSettings(any(), any(), anyBoolean());
     }
 
     @Test
@@ -213,7 +213,7 @@ class AdminSettingsControllerTest {
                                 """))
                 .andExpect(status().isBadRequest());
 
-        verify(adminSettingsUseCase, never()).updateSettings(any(), any(), anyBoolean());
+        verify(adminSettingsService, never()).updateSettings(any(), any(), anyBoolean());
     }
 
     @Test
@@ -235,7 +235,7 @@ class AdminSettingsControllerTest {
                                 """))
                 .andExpect(status().isBadRequest());
 
-        verify(adminSettingsUseCase, never()).updateSettings(any(), any(), anyBoolean());
+        verify(adminSettingsService, never()).updateSettings(any(), any(), anyBoolean());
     }
 
     @Test
@@ -258,7 +258,7 @@ class AdminSettingsControllerTest {
                                 """))
                 .andExpect(status().isBadRequest());
 
-        verify(adminSettingsUseCase, never()).updateSettings(any(), any(), anyBoolean());
+        verify(adminSettingsService, never()).updateSettings(any(), any(), anyBoolean());
     }
 
     @Test
@@ -276,8 +276,8 @@ class AdminSettingsControllerTest {
         java.util.Map<Broker, BrokerSettings> currentBrokers = new java.util.EnumMap<>(TradingPolicySettings.defaults().brokers());
         currentBrokers.put(Broker.UPBIT, new BrokerSettings(true, "10.0.0.1"));
         TradingPolicySettings current = new TradingPolicySettings(currentBrokers, TradingPolicySettings.defaults().strategies());
-        when(adminSettingsUseCase.getSettings()).thenReturn(new RuntimeSettingsBundle(RuntimeSettings.defaults(), current));
-        when(adminSettingsUseCase.updateSettings(eq(ADMIN_ID), any(), eq(false)))
+        when(adminSettingsService.getSettings()).thenReturn(new RuntimeSettingsBundle(RuntimeSettings.defaults(), current));
+        when(adminSettingsService.updateSettings(eq(ADMIN_ID), any(), eq(false)))
                 .thenAnswer(inv -> inv.getArgument(1));
 
         mockMvc.perform(put("/api/admin/settings")

@@ -28,14 +28,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class RuntimeConfigControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockitoBean RuntimeConfigService runtimeSettingsUseCase; // 공개 설정 조회 대역
+    @MockitoBean RuntimeConfigService runtimeConfigService; // 공개 설정 조회 대역
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort;
     @MockitoBean AppErrorLogPort appErrorLogPort;
 
     @Test
     void getRuntimeConfig_isPublicAndDisablesCaching() throws Exception {
-        when(runtimeSettingsUseCase.getSettings()).thenReturn(RuntimeSettingsBundle.defaults());
+        when(runtimeConfigService.getSettings()).thenReturn(RuntimeSettingsBundle.defaults());
 
         mockMvc.perform(get("/api/runtime-config"))
                 .andExpect(status().isOk())

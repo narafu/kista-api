@@ -32,13 +32,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdminFinanceCategoryController {
 
-    private final FinanceCategoryService categoryUseCase;
+    private final FinanceCategoryService financeCategoryService;
 
     @Operation(summary = "시스템 카테고리 목록 조회", description = "그룹 공용 시스템 카테고리를 중첩된 트리로 반환합니다.")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping
     public List<FinanceCategoryResponse> list(@RequestParam(required = false) FinanceCategory.Type type) {
-        List<FinanceCategory> flat = categoryUseCase.listSystem(type);
+        List<FinanceCategory> flat = financeCategoryService.listSystem(type);
         // FinanceCategoryController.list()와 같은 재귀 트리 조립 패턴 — 그룹 사용자용 컨트롤러는 건드리지 않는다.
         Map<UUID, List<FinanceCategory>> byParent = flat.stream()
                 .filter(c -> c.parentId() != null)
@@ -70,7 +70,7 @@ public class AdminFinanceCategoryController {
         if (request.type() == null) {
             throw new IllegalArgumentException("type은 필수입니다");
         }
-        FinanceCategory saved = categoryUseCase.createSystem(request.toCommand());
+        FinanceCategory saved = financeCategoryService.createSystem(request.toCommand());
         log.info("시스템 카테고리 등록: adminId={}, categoryId={}", adminId, saved.id());
         return ResponseEntity.created(URI.create("/api/admin/finance/categories/" + saved.id()))
                 .body(FinanceCategoryResponse.from(saved, List.of()));
@@ -88,7 +88,7 @@ public class AdminFinanceCategoryController {
             @AuthenticationPrincipal UUID adminId,
             @Valid @RequestBody FinanceCategoryRequest request) {
         FinanceCategoryResponse response = FinanceCategoryResponse.from(
-                categoryUseCase.updateSystem(id, request.toCommand()), List.of());
+                financeCategoryService.updateSystem(id, request.toCommand()), List.of());
         log.info("시스템 카테고리 수정: adminId={}, categoryId={}", adminId, id);
         return response;
     }
@@ -104,7 +104,7 @@ public class AdminFinanceCategoryController {
     public void delete(
             @Parameter(description = "카테고리 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID adminId) {
-        categoryUseCase.deleteSystem(id);
+        financeCategoryService.deleteSystem(id);
         log.info("시스템 카테고리 삭제: adminId={}, categoryId={}", adminId, id);
     }
 }

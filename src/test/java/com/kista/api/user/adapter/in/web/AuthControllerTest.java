@@ -45,12 +45,12 @@ class AuthControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean UserService userUseCase;
-    @MockitoBean TokenService tokenUseCase; // AuthController RT 발급 의존성
+    @MockitoBean UserService userService;
+    @MockitoBean TokenService tokenService; // AuthController RT 발급 의존성
     @MockitoBean RefreshTokenCookieHelper cookieHelper; // RT 쿠키 헬퍼 의존성
     @MockitoBean JwtDecoder jwtDecoder; // JwtDecoderConfig bean — WebMvcTest에서 명시 필요
     @MockitoBean JwtIssuerService jwtIssuerService;   // JWT 발급 서비스
-    @MockitoBean UserSettingsService getUserSettingsQuery; // AuthController.me() / kakaoCallback() 의존성
+    @MockitoBean UserSettingsService userSettingsService; // AuthController.me() / kakaoCallback() 의존성
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
@@ -65,7 +65,7 @@ class AuthControllerTest {
     @DisplayName("쿨다운 중 재신청 시 429 Too Many Requests 반환")
     void reapply_cooldown_returns_429() throws Exception {
         Instant retryAfter = Instant.now().plus(1, ChronoUnit.HOURS);
-        doThrow(new User.CooldownException(retryAfter)).when(userUseCase).reapply(USER_ID);
+        doThrow(new User.CooldownException(retryAfter)).when(userService).reapply(USER_ID);
 
         mockMvc.perform(post("/api/auth/approval-requests")
                         .with(csrf())
@@ -81,13 +81,13 @@ class AuthControllerTest {
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isNoContent());
 
-        verify(userUseCase).deleteMe(USER_ID); // 서비스 실제 호출 검증
+        verify(userService).deleteMe(USER_ID); // 서비스 실제 호출 검증
     }
 
     @Test
     @DisplayName("존재하지 않는 사용자 탈퇴 시 404 반환")
     void deleteMe_userNotFound_returns404() throws Exception {
-        doThrow(new NoSuchElementException()).when(userUseCase).deleteMe(any());
+        doThrow(new NoSuchElementException()).when(userService).deleteMe(any());
 
         mockMvc.perform(delete("/api/auth/me")
                         .with(csrf())
@@ -131,7 +131,7 @@ class AuthControllerTest {
         // jti와 expiresAt이 올바르게 전달됐는지 검증
         ArgumentCaptor<String> jtiCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Instant> expiresAtCaptor = ArgumentCaptor.forClass(Instant.class);
-        verify(tokenUseCase).logout(anyString(), jtiCaptor.capture(), expiresAtCaptor.capture());
+        verify(tokenService).logout(anyString(), jtiCaptor.capture(), expiresAtCaptor.capture());
         assertThat(jtiCaptor.getValue()).isEqualTo(jti);
         assertThat(expiresAtCaptor.getValue()).isEqualTo(expiresAt);
     }
@@ -151,6 +151,6 @@ class AuthControllerTest {
                 .andExpect(status().isNoContent());
 
         // jti=null, expiresAt=null로 호출됐는지 검증
-        verify(tokenUseCase).logout(anyString(), isNull(), isNull());
+        verify(tokenService).logout(anyString(), isNull(), isNull());
     }
 }

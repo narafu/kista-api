@@ -53,12 +53,12 @@ class DevAuthControllerTest {
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort;         // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean UserService userUseCase;
+    @MockitoBean UserService userService;
     @MockitoBean JwtIssuerService jwtIssuerService;
     @MockitoBean UserPort userPort;
-    @MockitoBean TokenService tokenUseCase;                // RT 발급
+    @MockitoBean TokenService tokenService;                // RT 발급
     @MockitoBean RefreshTokenCookieHelper cookieHelper;    // RT 쿠키 설정
-    @MockitoBean UserSettingsService userSettingsUseCase;  // 복제본 재동기화
+    @MockitoBean UserSettingsService userSettingsService;  // 복제본 재동기화
 
     private static final UUID DEV_USER_ID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID DEV_ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
@@ -73,14 +73,14 @@ class DevAuthControllerTest {
     @BeforeEach
     void setUp() {
         // devToken/devAdminToken 공통 stub — RT 발급 + 쿠키 설정 + AT 만료시간 (issue() 반환값만 테스트별 상이)
-        when(tokenUseCase.issueRefreshToken(any(), any())).thenReturn("raw-rt");
+        when(tokenService.issueRefreshToken(any(), any())).thenReturn("raw-rt");
         when(cookieHelper.issue(any())).thenReturn(ResponseCookie.from("rt", "raw-rt").build());
         when(jwtIssuerService.expiresInSeconds()).thenReturn(604800L);
     }
 
     @Test
     void devApprove_returns_200() throws Exception {
-        doNothing().when(userUseCase).approve(DEV_USER_ID);
+        doNothing().when(userService).approve(DEV_USER_ID);
 
         mockMvc.perform(post("/api/auth/dev-approve/00000000-0000-0000-0000-000000000001")
                         .with(csrf()))
@@ -89,8 +89,8 @@ class DevAuthControllerTest {
 
     @Test
     void devToken_returns_token() throws Exception {
-        when(userUseCase.register(any(), any(), any(), any())).thenReturn(MOCK_USER);
-        doNothing().when(userUseCase).approve(any());
+        when(userService.register(any(), any(), any(), any())).thenReturn(MOCK_USER);
+        doNothing().when(userService).approve(any());
         when(jwtIssuerService.issue(any(), any())).thenReturn("tok");
 
         mockMvc.perform(post("/api/auth/dev-token")
@@ -98,26 +98,26 @@ class DevAuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("tok"));
         // 이미 ACTIVE — approve 대신 복제본 재동기화
-        verify(userUseCase, never()).approve(any());
-        verify(userSettingsUseCase).resyncNotifyProfile(DEV_USER_ID);
+        verify(userService, never()).approve(any());
+        verify(userSettingsService).resyncNotifyProfile(DEV_USER_ID);
     }
 
     @Test
     void devToken_신규_유저는_approve로_활성화하고_재동기화하지_않는다() throws Exception {
-        when(userUseCase.register(any(), any(), any(), any()))
+        when(userService.register(any(), any(), any(), any()))
                 .thenReturn(DomainFixtures.userWithStatus(DEV_USER_ID, UserStatus.PENDING, UserRole.USER));
         when(jwtIssuerService.issue(any(), any())).thenReturn("tok");
 
         mockMvc.perform(post("/api/auth/dev-token")
                         .with(csrf()))
                 .andExpect(status().isOk());
-        verify(userUseCase).approve(DEV_USER_ID);
-        verify(userSettingsUseCase, never()).resyncNotifyProfile(any());
+        verify(userService).approve(DEV_USER_ID);
+        verify(userSettingsService, never()).resyncNotifyProfile(any());
     }
 
     @Test
     void devE2eToken은_dev_유저와_다른_고정_E2E_유저로_토큰을_발급한다() throws Exception {
-        when(userUseCase.register(any(), any(), any(), any()))
+        when(userService.register(any(), any(), any(), any()))
                 .thenReturn(DomainFixtures.userWithStatus(DEV_E2E_ID, UserStatus.PENDING, UserRole.USER));
         when(jwtIssuerService.issue(any(), any())).thenReturn("e2e-tok");
 
@@ -125,10 +125,10 @@ class DevAuthControllerTest {
                         .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("e2e-tok"));
-        verify(userUseCase).register("dev-e2e-user", "E2E 테스트 유저", DEV_E2E_ID, null);
-        verify(userUseCase).approve(DEV_E2E_ID);
+        verify(userService).register("dev-e2e-user", "E2E 테스트 유저", DEV_E2E_ID, null);
+        verify(userService).approve(DEV_E2E_ID);
         // dev 유저(...0001)가 아니라 E2E 유저로 RT·AT를 발급해야 한다
-        verify(tokenUseCase).issueRefreshToken(eq(DEV_E2E_ID), any());
+        verify(tokenService).issueRefreshToken(eq(DEV_E2E_ID), any());
         verify(jwtIssuerService).issue(DEV_E2E_ID, UserRole.USER);
     }
 
@@ -141,6 +141,6 @@ class DevAuthControllerTest {
                         .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("admin-tok"));
-        verify(userSettingsUseCase).resyncNotifyProfile(DEV_ADMIN_ID);
+        verify(userSettingsService).resyncNotifyProfile(DEV_ADMIN_ID);
     }
 }

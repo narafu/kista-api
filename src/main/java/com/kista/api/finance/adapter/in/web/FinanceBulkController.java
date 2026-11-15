@@ -28,7 +28,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FinanceBulkController {
 
-    private final BulkFinanceRegisterService bulkFinanceRegisterUseCase;
+    private final BulkFinanceRegisterService bulkFinanceRegisterService;
 
     @Operation(summary = "가계부 일괄 등록", description = "자산/수입/소비/저축 기록 여러 건을 한 번에 등록합니다 (항목별 날짜는 요청 값 그대로 사용).")
     @ApiResponse(responseCode = "200", description = "등록 처리 완료 (항목별 성공/실패는 응답 본문 참고)")
@@ -42,7 +42,7 @@ public class FinanceBulkController {
                 .map(BulkFinanceRegisterRequest.AssetItem::toCommand).toList();
         List<FinanceTransactionCommand> transactions = request.transactions() == null ? List.of() : request.transactions().stream()
                 .map(BulkFinanceRegisterRequest.TransactionItem::toCommand).toList();
-        BulkFinanceRegisterResult result = bulkFinanceRegisterUseCase.register(userId, shareToGroup, assets, transactions);
+        BulkFinanceRegisterResult result = bulkFinanceRegisterService.register(userId, shareToGroup, assets, transactions);
         return BulkFinanceRegisterResponse.from(result);
     }
 }
