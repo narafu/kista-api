@@ -204,6 +204,14 @@
 - 멈춘 범위: 없음.
 - 답: 자체 결정(2026-11-15) ①. ui의 계좌 등록 첫 스텝이 증권사 선택을 필수로 받아 실제로는 생략 요청이 없다(`CreateAccountStepper.tsx:79`). ②는 ui가 생략 요청을 보내지 않는 것을 확인한 뒤 따로 한다.
 
+### Q-15 C5에 없던 코인 전용 계약 상수(`ErrorCode`·`DcaSkipReason`)를 T4에서 지울지
+- 상태: 사용자 결정 필요
+- 묶음·태스크: S16 T1(전수표에서 발견) / 15 T4에서 적용
+- 걸린 곳: `constraints.md`는 `ErrorCode` 상수 삭제를 금지한다(kista-ui 계약). C5는 `BROKER_IP_NOT_ALLOWED`만 예외로 허락했다. 전수표(`findings/31` 10절)에서 같은 성격의 상수가 더 나왔다: `ErrorCode.BROKER_WITHDRAWAL_ENABLED`와 `BrokerWithdrawalEnabledException`(바이낸스 전용), `DcaSkipReason`의 `BELOW_MIN_ORDER_AMOUNT`·`EXCHANGE_API_ERROR`·`API_KEY_EXPIRED`(코인 전용, 상수명이 `dca_execution` 값이자 UI 계약). `ApiKeyExpirySource.BROKER_API`는 15의 2-2절이 이미 삭제로 정했다.
+- 선택지: ① C5처럼 T4에서 함께 지운다. C2가 코인 `dca_execution` 행을 완전 삭제하므로 DB에 남는 값이 없고, ui는 G1에서 처리 코드를 걷는다(ui 12에 항목 추가 필요) ② 상수만 남기고 발행 코드만 지운다. 계약은 그대로지만 죽은 상수가 남는다.
+- 권고: ①. 단 T4 배포 직전 `SELECT DISTINCT skip_reason FROM trading.dca_execution`으로 주식 행에 세 값이 없는지 확인한다.
+- 멈춘 범위: 없음(T4 착수 전까지 답이 필요하다. 답이 없으면 ②로 진행해 계약을 깨지 않는다).
+
 ## Fable 대기 작업 (2026-11-15 추가)
 
 Fable 한도가 돌아오면 한 세션에서 몰아서 한다. 위에서부터 순서대로 하고, 끝난 항목에는 결과 문서와 커밋 해시를 적는다. 검수만 하고 고치지 않는다. 고칠 결함은 로드맵에 후속 묶음으로 추가한다. 산출물은 `findings/30-post-hoc-review.md` 하나에 절로 나눈다.

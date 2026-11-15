@@ -164,8 +164,8 @@ root 스키마는 바꿀 것이 없다. `kista_ref.fear_greed_snapshots`에는 C
 | # | 내용 | 모델 | 선행 |
 |---|---|---|---|
 | T0 | DCA 종목 BITO·EETH 추가(2-4절). 메리츠 거래소 코드 실측 → 코드·테스트·문서 → 배포 → 사용자가 관리자 설정에서 허용. 관찰: Mock 계좌로 두 종목 DCA 전략을 만들어 개장 배치 1회 | Sonnet | 없음 |
-| T1 | 전수표: `findings/20`의 목록을 지금 코드와 대조해 파일별 "삭제 / 분기 제거 / 유지"로 확정한다. 추가로 `Upbit|UPBIT|Binance|BINANCE|Crypto|crypto|USDT|BTC|ETH|코인|업비트|바이낸스`를 main·test·resources·docs·`flows.yml`·`.github`·`deploy`·`scripts`에서 grep해 빠진 것을 찾는다. `findings/20`의 "미확인" 3건 중 남은 것(사용자 삭제 cascade가 코인 계좌에서도 같은 경로인지)을 닫는다 | Sonnet | 없음 |
-| T2 | 6절 1번: 주식 DCA 테스트 분리·보강 | Opus | 없음 |
+| T1 | 전수표: **완료(2026-11-15, `findings/31`)** `findings/20`의 목록을 지금 코드와 대조해 파일별 "삭제 / 분기 제거 / 유지"로 확정한다. 추가로 `Upbit|UPBIT|Binance|BINANCE|Crypto|crypto|USDT|BTC|ETH|코인|업비트|바이낸스`를 main·test·resources·docs·`flows.yml`·`.github`·`deploy`·`scripts`에서 grep해 빠진 것을 찾는다. `findings/20`의 "미확인" 3건 중 남은 것(사용자 삭제 cascade가 코인 계좌에서도 같은 경로인지)을 닫는다 | Sonnet | 없음 |
+| T2 | 6절 1번: 주식 DCA 테스트 분리·보강 **완료(2026-11-15, `12c00e08b`·`05602bbef`)** | Opus | 없음 |
 | T3 | 단계 P ③의 운영 확인 조회(읽기 전용)와 결과 기록. 덤프와 삭제 SQL 초안을 사용자에게 제시(4절) | Opus | 사용자의 단계 P ①② |
 | T4 | 단계 A: 통째 삭제 → 분기 제거 → Flyway(가드·완전 삭제·정책 JSON) → 테스트 기대값. 커밋은 "통째 삭제", "분기 제거", "마이그레이션"으로 나누되 배포는 하나 | Sonnet(통째 삭제·기계적 분기), Opus(DCA 커널·거래일·원장 서비스의 분기, 마이그레이션 검토) | T1~T3, 단계 U 배포 |
 | T5 | `flows.yml`(흐름 `crypto-market-indicators`·`crypto-dca` 삭제와 문구 약 20곳), `README.md`, `docs/architecture-map.md`, `CLAUDE.md`, `docs/agents/vendors/binance.md`·`vendors/upbit.md` 삭제, 모듈 문서(`dca.md`·`broker.md`·`stats.md`·`trading.md`·`account.md`·`notify.md`·`modules/api/market.md`·`admin.md`), `scheduler-time-table.md`, `code-quality-backlog.md`의 코인 항목, `scripts/dev-seed/dev-seed.sql`의 코인 시드, `.env.example`·`deploy/server/README.md` | Sonnet | T4와 같은 배포 |
