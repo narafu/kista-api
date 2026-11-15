@@ -88,6 +88,23 @@ class DcaRuleTest {
     }
 
     @Test
+    void 주식_MOO_MOC는_주식_시장_규칙을_통과한다() {
+        for (OrderType type : List.of(OrderType.MOO, OrderType.MOC)) {
+            DcaRule r = rule("a", OrderDirection.BUY, type, null, amount("100.25"));
+            assertThatCode(() -> r.requireCompatible(Market.US_STOCK)).as(type.name()).doesNotThrowAnyException();
+        }
+    }
+
+    @Test
+    void 주식_매주_규칙은_주말_요일을_거부한다() {
+        for (java.time.DayOfWeek weekend : List.of(java.time.DayOfWeek.SATURDAY, java.time.DayOfWeek.SUNDAY)) {
+            assertThatIllegalArgumentException().as(weekend.name()).isThrownBy(() -> new DcaRule("a", OrderDirection.BUY, DcaFrequency.WEEKLY,
+                            weekend, null, OrderType.MOC, null, amount("100"), DcaShortfallPolicy.PARTIAL, List.of()))
+                    .withMessage("주말 요일은 지정할 수 없습니다.");
+        }
+    }
+
+    @Test
     void leg_접두사_왕복과_비DCA_leg_판별() {
         DcaRule r = rule("weekly-1", OrderDirection.BUY, OrderType.MOC, null, amount("100"));
         assertThat(DcaRule.isDcaLeg(r.orderLeg())).isTrue();

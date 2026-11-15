@@ -112,6 +112,42 @@ class DcaPlanInputCollectorTest {
     }
 
     @Test
+    void stock_account_collects_us_stock_inputs_without_crypto_rules() {
+        dca(OrderDirection.BUY, OrderType.MOC);
+        collected = collector.collect(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger);
+        assertThat(collected.inputs().dueRules()).singleElement().satisfies(in -> {
+            assertThat(in.market()).isEqualTo(com.kista.shared.kernel.Market.US_STOCK);
+            assertThat(in.tradingRules()).isNull();
+        });
+    }
+
+    @Test
+    void stock_moo_buy_in_open_batch_plans_moo_whole_shares() {
+        dca(OrderDirection.BUY, OrderType.MOO); // 300 / 87.12 → 3주, 캡가 91.48
+        List<PlannedOrder> plan = plan(EnumSet.of(OrderTiming.AT_OPEN), List.of(), null, ledger);
+        assertThat(plan).singleElement().satisfies(o -> {
+            assertThat(o.orderType()).isEqualTo(OrderType.MOO);
+            assertThat(o.timing()).isEqualTo(OrderTiming.AT_OPEN);
+            assertThat(o.quantity()).isEqualTo(3);
+            assertThat(o.price()).isEqualByComparingTo("91.48");
+        });
+    }
+
+    @Test
+    void stock_moc_sell_in_close_batch_plans_moc_whole_shares() {
+        dca(OrderDirection.SELL, OrderType.MOC); // 300 / 87.12 → 3주, 전일 종가 기준
+        ledger = new AccountBalance(10, new BigDecimal("80.00"), BigDecimal.ZERO);
+        List<PlannedOrder> plan = plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger);
+        assertThat(plan).singleElement().satisfies(o -> {
+            assertThat(o.orderType()).isEqualTo(OrderType.MOC);
+            assertThat(o.timing()).isEqualTo(OrderTiming.AT_CLOSE);
+            assertThat(o.direction()).isEqualTo(OrderDirection.SELL);
+            assertThat(o.quantity()).isEqualTo(3);
+            assertThat(o.price()).isEqualByComparingTo("87.12");
+        });
+    }
+
+    @Test
     void current_price_above_prev_close_becomes_reference_price() {
         dca(OrderDirection.BUY, OrderType.MOC);
         List<PlannedOrder> plan = plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), new BigDecimal("95.00"), ledger);
