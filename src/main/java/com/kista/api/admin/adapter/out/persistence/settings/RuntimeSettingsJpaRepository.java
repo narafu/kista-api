@@ -11,7 +11,7 @@ import java.util.Optional;
 interface RuntimeSettingsJpaRepository extends JpaRepository<RuntimeSettingsEntity, String> {
 
     @Modifying
-    @Query(value = "INSERT INTO admin_runtime_settings (setting_key, setting_value) " +
+    @Query(value = "INSERT INTO public.admin_runtime_settings (setting_key, setting_value) " +
             "VALUES (:settingKey, CAST(:settingValue AS jsonb)) ON CONFLICT (setting_key) DO NOTHING",
             nativeQuery = true)
     void insertIfMissing(String settingKey, String settingValue); // 삭제된 singleton 행의 원자적 기본값 복구

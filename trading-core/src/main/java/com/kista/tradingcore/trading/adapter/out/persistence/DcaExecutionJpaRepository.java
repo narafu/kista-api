@@ -19,7 +19,7 @@ interface DcaExecutionJpaRepository extends JpaRepository<DcaExecutionEntity, UU
 
     // 전략×규칙별 최신 1건
     @Query(value = """
-            SELECT DISTINCT ON (strategy_id, rule_key) * FROM dca_execution
+            SELECT DISTINCT ON (strategy_id, rule_key) * FROM trading.dca_execution
             WHERE strategy_id IN (:strategyIds)
             ORDER BY strategy_id, rule_key, trade_date DESC
             """, nativeQuery = true)
@@ -28,7 +28,7 @@ interface DcaExecutionJpaRepository extends JpaRepository<DcaExecutionEntity, UU
     // ORDERED → SKIPPED 조건부 전이 — 반환값 1이면 전이
     @Modifying
     @Query(value = """
-            UPDATE dca_execution SET status = 'SKIPPED', skip_reason = :skipReason, detail = :detail
+            UPDATE trading.dca_execution SET status = 'SKIPPED', skip_reason = :skipReason, detail = :detail
             WHERE strategy_id = :strategyId AND rule_key = :ruleKey AND trade_date = :tradeDate
               AND status = 'ORDERED' AND order_id = :orderId
             """, nativeQuery = true)
@@ -38,7 +38,7 @@ interface DcaExecutionJpaRepository extends JpaRepository<DcaExecutionEntity, UU
     // UNIQUE(strategy_id, rule_key, trade_date) 충돌 시 무시 — 반환값 1이면 삽입
     @Modifying
     @Query(value = """
-            INSERT INTO dca_execution (id, strategy_id, rule_key, direction, trade_date, status, skip_reason, order_id, quantity, reference_price, detail)
+            INSERT INTO trading.dca_execution (id, strategy_id, rule_key, direction, trade_date, status, skip_reason, order_id, quantity, reference_price, detail)
             VALUES (:id, :strategyId, :ruleKey, :direction, :tradeDate, :status, :skipReason, :orderId, :quantity, :referencePrice, :detail)
             ON CONFLICT (strategy_id, rule_key, trade_date) DO NOTHING
             """, nativeQuery = true)

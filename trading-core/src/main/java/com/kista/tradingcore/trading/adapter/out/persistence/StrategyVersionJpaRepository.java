@@ -18,14 +18,14 @@ interface StrategyVersionJpaRepository extends JpaRepository<StrategyVersionEnti
     // 여러 전략의 활성 버전 배치 조회 (목록 조회 N+1 방지) — strategy_id별 version_no 최대 1건 (id DESC tie-break)
     @Query(value = """
             SELECT DISTINCT ON (strategy_id) *
-            FROM strategy_version
+            FROM trading.strategy_version
             WHERE strategy_id IN (:strategyIds) AND deleted_at IS NULL
             ORDER BY strategy_id, version_no DESC, created_at DESC, id DESC
             """, nativeQuery = true)
     List<StrategyVersionEntity> findActiveByStrategyIdIn(@Param("strategyIds") Collection<UUID> strategyIds);
 
     // native — @SQLRestriction을 우회해 삭제 버전 포함 MAX (uq_strategy_version_strategy_version_no는 삭제 행도 포함)
-    @Query(value = "SELECT COALESCE(MAX(version_no), 0) FROM strategy_version WHERE strategy_id = :strategyId", nativeQuery = true)
+    @Query(value = "SELECT COALESCE(MAX(version_no), 0) FROM trading.strategy_version WHERE strategy_id = :strategyId", nativeQuery = true)
     int findMaxVersionNoByStrategyId(@Param("strategyId") UUID strategyId);
 
     @Modifying

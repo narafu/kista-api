@@ -19,7 +19,7 @@ interface FinanceCategoryJpaRepository extends JpaRepository<FinanceCategoryEnti
     // HQL의 "(:type IS NULL OR ...)" 형태는 다른 finance 리포지토리들의 동일 패턴(:from/:to/:date)과 같은 이유로
     // PostgreSQL이 IS NULL 자리 바인드 파라미터 타입을 추론하지 못해 실패한다 — 네이티브 쿼리로 우회하고,
     // enum 바인딩 모호성을 피하기 위해 파라미터 타입을 String으로 받아 어댑터에서 type.name()을 넘긴다.
-    @Query(nativeQuery = true, value = "SELECT * FROM finance_categories WHERE deleted_at IS NULL AND (" +
+    @Query(nativeQuery = true, value = "SELECT * FROM finance.finance_categories WHERE deleted_at IS NULL AND (" +
             "(user_id IS NULL AND group_id IS NULL) " +
             "OR (user_id = :userId AND group_id IS NULL) " +
             "OR (group_id = :currentGroupId)" +
@@ -32,10 +32,10 @@ interface FinanceCategoryJpaRepository extends JpaRepository<FinanceCategoryEnti
     // 소프트 삭제 시 모든 하위 세대(임의 depth) 동반 — recursive CTE로 전체 서브트리 조회 후 일괄 UPDATE
     @Modifying
     @Query(nativeQuery = true, value = "WITH RECURSIVE descendants AS (" +
-            "SELECT id FROM finance_categories WHERE id = :id " +
+            "SELECT id FROM finance.finance_categories WHERE id = :id " +
             "UNION ALL " +
-            "SELECT c.id FROM finance_categories c INNER JOIN descendants d ON c.parent_id = d.id" +
-            ") UPDATE finance_categories SET deleted_at = :now WHERE id IN (SELECT id FROM descendants)")
+            "SELECT c.id FROM finance.finance_categories c INNER JOIN descendants d ON c.parent_id = d.id" +
+            ") UPDATE finance.finance_categories SET deleted_at = :now WHERE id IN (SELECT id FROM descendants)")
     void softDeleteWithChildren(@Param("id") UUID id, @Param("now") Instant now);
 
     // 회원 탈퇴 시 내가 만든 그룹 카테고리만 (시스템은 userId NULL이라 자동 제외)
@@ -46,18 +46,18 @@ interface FinanceCategoryJpaRepository extends JpaRepository<FinanceCategoryEnti
     // 그룹 공유 전환 시 모든 하위 세대(임의 depth) 동반 — softDeleteWithChildren과 동일한 recursive CTE 패턴
     @Modifying
     @Query(nativeQuery = true, value = "WITH RECURSIVE descendants AS (" +
-            "SELECT id FROM finance_categories WHERE id = :id " +
+            "SELECT id FROM finance.finance_categories WHERE id = :id " +
             "UNION ALL " +
-            "SELECT c.id FROM finance_categories c INNER JOIN descendants d ON c.parent_id = d.id" +
-            ") UPDATE finance_categories SET group_id = :groupId WHERE id IN (SELECT id FROM descendants)")
+            "SELECT c.id FROM finance.finance_categories c INNER JOIN descendants d ON c.parent_id = d.id" +
+            ") UPDATE finance.finance_categories SET group_id = :groupId WHERE id IN (SELECT id FROM descendants)")
     void shareToGroupWithChildren(@Param("id") UUID id, @Param("groupId") UUID groupId);
 
     // 그룹 공유 해제 시 모든 하위 세대(임의 depth) 동반
     @Modifying
     @Query(nativeQuery = true, value = "WITH RECURSIVE descendants AS (" +
-            "SELECT id FROM finance_categories WHERE id = :id " +
+            "SELECT id FROM finance.finance_categories WHERE id = :id " +
             "UNION ALL " +
-            "SELECT c.id FROM finance_categories c INNER JOIN descendants d ON c.parent_id = d.id" +
-            ") UPDATE finance_categories SET group_id = NULL WHERE id IN (SELECT id FROM descendants)")
+            "SELECT c.id FROM finance.finance_categories c INNER JOIN descendants d ON c.parent_id = d.id" +
+            ") UPDATE finance.finance_categories SET group_id = NULL WHERE id IN (SELECT id FROM descendants)")
     void unshareWithChildren(@Param("id") UUID id);
 }

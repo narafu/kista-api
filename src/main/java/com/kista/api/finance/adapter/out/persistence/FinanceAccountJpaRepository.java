@@ -14,7 +14,7 @@ interface FinanceAccountJpaRepository extends JpaRepository<FinanceAccountEntity
 
     // 폼 선택지·목록용, 활성 행만. 이중축: 내 개인 계좌(group_id IS NULL) ∪ 내 현재 그룹 계좌(group_id = :currentGroupId).
     // HQL의 "(:param IS NULL OR ...)" IS NULL 타입 추론 실패 패턴(다른 finance 리포지토리 참고)을 피하려 네이티브 쿼리 사용.
-    @Query(nativeQuery = true, value = "SELECT * FROM finance_accounts WHERE deleted_at IS NULL " +
+    @Query(nativeQuery = true, value = "SELECT * FROM finance.finance_accounts WHERE deleted_at IS NULL " +
             "AND ((user_id = :userId AND group_id IS NULL) OR group_id = :currentGroupId)")
     List<FinanceAccountEntity> findMyScope(@Param("userId") UUID userId, @Param("currentGroupId") UUID currentGroupId);
 

@@ -312,6 +312,8 @@ market  benchmark  finance  notification  ops  platform  app(모듈 아님: 앱 
 
 공통 규칙은 `00-roadmap.md` 9절. 측정 원본은 `findings/23`. 남은 것: P3·P4·P6, 단계 M·X·R·G.
 
+**P3 실행 결과(2026-11-15)**: 대상 전부 한정, 스키마 판단이 애매한 테이블 0. 별칭을 새로 쓴 곳은 `SchedulerLockService`(`INSERT INTO %s AS l`)뿐. 루트 테스트 classpath에는 두 `application.yml`이 있지만 루트 resources가 앞이라 `public.scheduler_locks`를 받는다(기존 search_path가 갈리던 방식과 같다). M6은 이 프로퍼티를 role별로 두지 않고 `trading.scheduler_locks` 하나로 정하면 된다.
+
 전제 정정:
 
 - P3의 nativeQuery 수는 지금 R 16곳, T 39곳이다(본문 11·약 45). 대상은 수가 아니라 "전부"이고 신설 가드가 빠진 것을 잡는다.

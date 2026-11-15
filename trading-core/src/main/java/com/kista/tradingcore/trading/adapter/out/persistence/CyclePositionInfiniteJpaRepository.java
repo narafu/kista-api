@@ -12,8 +12,8 @@ import java.util.UUID;
 interface CyclePositionInfiniteJpaRepository extends JpaRepository<CyclePositionInfiniteEntity, UUID> {
 
     @Query(value = """
-            SELECT cpi.* FROM cycle_position_infinite cpi
-            JOIN cycle_position cp ON cpi.cycle_position_id = cp.id
+            SELECT cpi.* FROM trading.cycle_position_infinite cpi
+            JOIN trading.cycle_position cp ON cpi.cycle_position_id = cp.id
             WHERE cp.strategy_cycle_id = :cycleId
               AND cp.deleted_at IS NULL
               AND cpi.deleted_at IS NULL
@@ -27,8 +27,8 @@ interface CyclePositionInfiniteJpaRepository extends JpaRepository<CyclePosition
     @Query(value = """
             SELECT DISTINCT ON (cp.strategy_cycle_id)
                    cp.strategy_cycle_id AS cycleId, cpi.cycle_position_id AS cyclePositionId, cpi.is_reverse_mode AS reverseMode
-            FROM cycle_position_infinite cpi
-            JOIN cycle_position cp ON cpi.cycle_position_id = cp.id
+            FROM trading.cycle_position_infinite cpi
+            JOIN trading.cycle_position cp ON cpi.cycle_position_id = cp.id
             WHERE cp.strategy_cycle_id IN (:cycleIds)
               AND cp.deleted_at IS NULL
               AND cpi.deleted_at IS NULL

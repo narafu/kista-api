@@ -20,8 +20,8 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
 
     // INFINITE 상세(cycle_position_infinite)가 있는 최신 N건 — 수동 보정 행은 상세가 없어 제외 (native라 deleted_at 수동 명시, 건수는 Pageable)
     @Query(value = """
-            SELECT cp.* FROM cycle_position cp
-            JOIN cycle_position_infinite cpi ON cpi.cycle_position_id = cp.id
+            SELECT cp.* FROM trading.cycle_position cp
+            JOIN trading.cycle_position_infinite cpi ON cpi.cycle_position_id = cp.id
             WHERE cp.strategy_cycle_id = :cycleId AND cp.deleted_at IS NULL AND cpi.deleted_at IS NULL
             ORDER BY cp.created_at DESC, cp.id DESC
             """, nativeQuery = true)
@@ -33,7 +33,7 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
     // 여러 사이클의 개장 포지션 배치 조회 (목록 조회 N+1 방지) — cycle별 createdAt 가장 오래된 1건 (id ASC tie-break)
     @Query(value = """
             SELECT DISTINCT ON (strategy_cycle_id) *
-            FROM cycle_position
+            FROM trading.cycle_position
             WHERE strategy_cycle_id IN (:cycleIds) AND deleted_at IS NULL
             ORDER BY strategy_cycle_id, created_at ASC, id ASC
             """, nativeQuery = true)
@@ -42,7 +42,7 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
     // 여러 사이클의 최신 포지션 배치 조회 (목록 조회 N+1 방지) — cycle별 createdAt 최신 1건 (id DESC tie-break)
     @Query(value = """
             SELECT DISTINCT ON (strategy_cycle_id) *
-            FROM cycle_position
+            FROM trading.cycle_position
             WHERE strategy_cycle_id IN (:cycleIds) AND deleted_at IS NULL
             ORDER BY strategy_cycle_id, created_at DESC, id DESC
             """, nativeQuery = true)
@@ -50,8 +50,8 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
 
     // 전략 ID 기준 날짜 범위 조회 (strategy_cycle 경유 JOIN — native)
     @Query(value = """
-            SELECT cp.* FROM cycle_position cp
-            JOIN strategy_cycle sc ON cp.strategy_cycle_id = sc.id
+            SELECT cp.* FROM trading.cycle_position cp
+            JOIN trading.strategy_cycle sc ON cp.strategy_cycle_id = sc.id
             WHERE sc.strategy_id = :strategyId
               AND cp.created_at >= :from AND cp.created_at < :to
               AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL
@@ -64,10 +64,10 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
 
     // 사용자 스코프 전략별 최신 포지션 1건 (관리자 /status — 본인 데이터만, native, 코인 계좌 포함: 통화 표기는 서비스가 계좌에서 해석)
     @Query(value = """
-            SELECT DISTINCT ON (s.id) cp.* FROM cycle_position cp
-            JOIN strategy_cycle sc ON cp.strategy_cycle_id = sc.id
-            JOIN strategy s ON sc.strategy_id = s.id
-            JOIN accounts a ON s.account_id = a.id
+            SELECT DISTINCT ON (s.id) cp.* FROM trading.cycle_position cp
+            JOIN trading.strategy_cycle sc ON cp.strategy_cycle_id = sc.id
+            JOIN trading.strategy s ON sc.strategy_id = s.id
+            JOIN trading.accounts a ON s.account_id = a.id
             WHERE a.user_id = :userId
               AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL AND s.deleted_at IS NULL AND a.deleted_at IS NULL
             ORDER BY s.id, cp.created_at DESC, cp.id DESC
@@ -76,10 +76,10 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
 
     // 사용자 스코프 범위 조회 (통계 — created_at 오름차순, native, DCA 포함: DCA도 자기 원장 스냅샷을 가진다)
     @Query(value = """
-            SELECT cp.* FROM cycle_position cp
-            JOIN strategy_cycle sc ON cp.strategy_cycle_id = sc.id
-            JOIN strategy s ON sc.strategy_id = s.id
-            JOIN accounts a ON s.account_id = a.id
+            SELECT cp.* FROM trading.cycle_position cp
+            JOIN trading.strategy_cycle sc ON cp.strategy_cycle_id = sc.id
+            JOIN trading.strategy s ON sc.strategy_id = s.id
+            JOIN trading.accounts a ON s.account_id = a.id
             WHERE a.user_id = :userId
               AND cp.created_at >= :from AND cp.created_at < :to
               AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL AND s.deleted_at IS NULL AND a.deleted_at IS NULL
@@ -90,8 +90,8 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
 
     // 사이클 ID 목록 스코프 범위 조회 (equity curve type 필터 — 메모리 필터 대신 IN 절로 DB에서 좁힘, native)
     @Query(value = """
-            SELECT cp.* FROM cycle_position cp
-            JOIN strategy_cycle sc ON cp.strategy_cycle_id = sc.id
+            SELECT cp.* FROM trading.cycle_position cp
+            JOIN trading.strategy_cycle sc ON cp.strategy_cycle_id = sc.id
             WHERE cp.strategy_cycle_id IN (:cycleIds)
               AND cp.created_at >= :from AND cp.created_at < :to
               AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL
@@ -102,10 +102,10 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
 
     // 계좌 기준 커서 페이지네이션 (native — strategy_cycle → strategy → accounts JOIN, 코인 계좌 포함)
     @Query(value = """
-            SELECT cp.* FROM cycle_position cp
-            JOIN strategy_cycle sc ON cp.strategy_cycle_id = sc.id
-            JOIN strategy s ON sc.strategy_id = s.id
-            JOIN accounts a ON s.account_id = a.id
+            SELECT cp.* FROM trading.cycle_position cp
+            JOIN trading.strategy_cycle sc ON cp.strategy_cycle_id = sc.id
+            JOIN trading.strategy s ON sc.strategy_id = s.id
+            JOIN trading.accounts a ON s.account_id = a.id
             WHERE s.account_id = :accountId
               AND cp.created_at >= :from AND cp.created_at < :cursor
               AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL AND s.deleted_at IS NULL AND a.deleted_at IS NULL
@@ -119,8 +119,8 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
 
     // 전략 기준 커서 페이지네이션 (native)
     @Query(value = """
-            SELECT cp.* FROM cycle_position cp
-            JOIN strategy_cycle sc ON cp.strategy_cycle_id = sc.id
+            SELECT cp.* FROM trading.cycle_position cp
+            JOIN trading.strategy_cycle sc ON cp.strategy_cycle_id = sc.id
             WHERE sc.strategy_id = :strategyId
               AND cp.created_at >= :from AND cp.created_at < :cursor
               AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL
@@ -134,16 +134,16 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
 
     @Modifying
     @Query(value = """
-            UPDATE cycle_position cp SET deleted_at = :now
-            FROM strategy_cycle sc WHERE cp.strategy_cycle_id = sc.id
+            UPDATE trading.cycle_position cp SET deleted_at = :now
+            FROM trading.strategy_cycle sc WHERE cp.strategy_cycle_id = sc.id
             AND sc.strategy_id = :strategyId AND cp.deleted_at IS NULL
             """, nativeQuery = true)
     void softDeleteByStrategyId(@Param("strategyId") UUID strategyId, @Param("now") Instant now);
 
     @Modifying
     @Query(value = """
-            UPDATE cycle_position cp SET deleted_at = :now
-            FROM strategy_cycle sc JOIN strategy s ON sc.strategy_id = s.id
+            UPDATE trading.cycle_position cp SET deleted_at = :now
+            FROM trading.strategy_cycle sc JOIN trading.strategy s ON sc.strategy_id = s.id
             WHERE cp.strategy_cycle_id = sc.id
             AND s.account_id = :accountId AND cp.deleted_at IS NULL
             """, nativeQuery = true)
@@ -151,9 +151,9 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
 
     @Modifying
     @Query(value = """
-            UPDATE cycle_position cp SET deleted_at = :now
-            FROM strategy_cycle sc JOIN strategy s ON sc.strategy_id = s.id
-            JOIN accounts a ON s.account_id = a.id
+            UPDATE trading.cycle_position cp SET deleted_at = :now
+            FROM trading.strategy_cycle sc JOIN trading.strategy s ON sc.strategy_id = s.id
+            JOIN trading.accounts a ON s.account_id = a.id
             WHERE cp.strategy_cycle_id = sc.id
             AND a.user_id = :userId AND cp.deleted_at IS NULL
             """, nativeQuery = true)

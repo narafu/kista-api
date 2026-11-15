@@ -42,7 +42,7 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
 
     // 관리자 거래내역 — 최신순 (동일 trade_date 내 created_at DESC 2차 정렬)
     @Query(value = """
-            SELECT * FROM orders
+            SELECT * FROM trading.orders
             WHERE trade_date BETWEEN :from AND :to
             ORDER BY trade_date DESC, created_at DESC
             """, nativeQuery = true)
@@ -52,7 +52,7 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
 
     // 기간 내 distinct accountId 목록 조회 (이상징후 감지용 N+1 방지)
     @Query(value = """
-            SELECT DISTINCT account_id FROM orders
+            SELECT DISTINCT account_id FROM trading.orders
             WHERE trade_date BETWEEN :from AND :to
             """, nativeQuery = true)
     List<UUID> findDistinctAccountIdsByTradeDateBetween(
@@ -63,7 +63,7 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     // 주의: 'PLANNED'/'BUY'는 OrderStatus/OrderDirection enum name() 값 — enum 이름 변경 시 이 쿼리도 수정 필요
     @Query(value = """
             SELECT COALESCE(SUM(price * quantity), 0)
-            FROM orders
+            FROM trading.orders
             WHERE account_id = :accountId
               AND trade_date = :tradeDate
               AND status IN ('PLANNED', 'SUBMITTING')
@@ -77,7 +77,7 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     // PostgreSQL SUM(numeric)은 numeric을 반환하므로 BigDecimal로 수신한다
     @Query(value = """
             SELECT COALESCE(SUM(quantity), 0)
-            FROM orders
+            FROM trading.orders
             WHERE account_id = :accountId
               AND trade_date = :tradeDate
               AND ticker = :ticker
@@ -91,8 +91,8 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
 
     // 사용자 기준 기간 조회 — 전 종목 (account 경유 JOIN — native)
     @Query(value = """
-            SELECT o.* FROM orders o
-            JOIN accounts a ON o.account_id = a.id
+            SELECT o.* FROM trading.orders o
+            JOIN trading.accounts a ON o.account_id = a.id
             WHERE a.user_id = :userId
               AND o.trade_date BETWEEN :from AND :to
               AND a.deleted_at IS NULL
@@ -105,8 +105,8 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
 
     // 유저 기준 기간 체결 주문 조회 — 체결 판정은 filled_quantity > 0 (취소 전 부분 체결된 CANCELLED 포함) (account 경유 JOIN — 대시보드 배치 조회용, 계좌 구분 없이 전체 합산)
     @Query(value = """
-            SELECT o.* FROM orders o
-            JOIN accounts a ON o.account_id = a.id
+            SELECT o.* FROM trading.orders o
+            JOIN trading.accounts a ON o.account_id = a.id
             WHERE a.user_id = :userId
               AND o.trade_date BETWEEN :from AND :to
               AND o.filled_quantity > 0
@@ -120,7 +120,7 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
 
     // 계좌·날짜범위 체결 주문 조회 (daily-trades) — 최신순, 체결 판정은 filled_quantity > 0 (취소 전 부분 체결된 CANCELLED 포함)
     @Query(value = """
-            SELECT * FROM orders
+            SELECT * FROM trading.orders
             WHERE account_id = :accountId
               AND trade_date BETWEEN :from AND :to
               AND filled_quantity > 0
@@ -133,8 +133,8 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
 
     // 전략 기준 기간 내 주문 전체 조회 — strategy_cycle 경유 JOIN
     @Query(value = """
-            SELECT o.* FROM orders o
-            JOIN strategy_cycle sc ON o.strategy_cycle_id = sc.id
+            SELECT o.* FROM trading.orders o
+            JOIN trading.strategy_cycle sc ON o.strategy_cycle_id = sc.id
             WHERE sc.strategy_id = :strategyId
               AND o.trade_date BETWEEN :from AND :to
               AND sc.deleted_at IS NULL
@@ -151,8 +151,8 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
 
     // 전략 기준 distinct 거래일 목록 조회 — 관리자 주문 보정 거래일 드롭다운용
     @Query(value = """
-            SELECT DISTINCT o.trade_date FROM orders o
-            JOIN strategy_cycle sc ON o.strategy_cycle_id = sc.id
+            SELECT DISTINCT o.trade_date FROM trading.orders o
+            JOIN trading.strategy_cycle sc ON o.strategy_cycle_id = sc.id
             WHERE sc.strategy_id = :strategyId
               AND sc.deleted_at IS NULL
             ORDER BY o.trade_date DESC
@@ -163,7 +163,7 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     // orders 테이블은 soft-delete 없음 — deleted_at 조건 불필요
     @Query(value = """
             SELECT COALESCE(SUM(filled_quantity * filled_price), 0)
-            FROM orders
+            FROM trading.orders
             WHERE strategy_cycle_id = :strategyCycleId
               AND direction = 'BUY'
               AND filled_quantity > 0

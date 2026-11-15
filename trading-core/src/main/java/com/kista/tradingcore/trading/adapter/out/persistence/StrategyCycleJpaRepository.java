@@ -33,7 +33,7 @@ interface StrategyCycleJpaRepository extends JpaRepository<StrategyCycleEntity, 
     // 여러 전략의 현재 사이클 배치 조회 (목록 조회 N+1 방지) — strategy_id별 createdAt 최신 1건 (id DESC tie-break)
     @Query(value = """
             SELECT DISTINCT ON (strategy_id) *
-            FROM strategy_cycle
+            FROM trading.strategy_cycle
             WHERE strategy_id IN (:strategyIds) AND deleted_at IS NULL
             ORDER BY strategy_id, created_at DESC, id DESC
             """, nativeQuery = true)
@@ -46,8 +46,8 @@ interface StrategyCycleJpaRepository extends JpaRepository<StrategyCycleEntity, 
     // 계좌에 속한 모든 전략의 사이클 소프트 삭제
     @Modifying
     @Query(value = """
-            UPDATE strategy_cycle sc SET deleted_at = :now
-            FROM strategy s WHERE sc.strategy_id = s.id
+            UPDATE trading.strategy_cycle sc SET deleted_at = :now
+            FROM trading.strategy s WHERE sc.strategy_id = s.id
             AND s.account_id = :accountId AND sc.deleted_at IS NULL
             """, nativeQuery = true)
     void softDeleteByAccountId(@Param("accountId") UUID accountId, @Param("now") Instant now);
@@ -55,8 +55,8 @@ interface StrategyCycleJpaRepository extends JpaRepository<StrategyCycleEntity, 
     // 사용자 소유 모든 사이클 소프트 삭제
     @Modifying
     @Query(value = """
-            UPDATE strategy_cycle sc SET deleted_at = :now
-            FROM strategy s JOIN accounts a ON s.account_id = a.id
+            UPDATE trading.strategy_cycle sc SET deleted_at = :now
+            FROM trading.strategy s JOIN trading.accounts a ON s.account_id = a.id
             WHERE sc.strategy_id = s.id
             AND a.user_id = :userId AND sc.deleted_at IS NULL
             """, nativeQuery = true)

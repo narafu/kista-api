@@ -25,7 +25,7 @@ class TradingBatchRunPersistenceAdapter implements TradingBatchRunPort {
     @Override
     public Optional<TradingBatchPhase> findPhase(TradingBatchJob job, LocalDate tradeDate) {
         return jdbcTemplate.queryForList(
-                        "SELECT phase FROM trading_batch_run WHERE job_name = ? AND trade_date = ?",
+                        "SELECT phase FROM trading.trading_batch_run WHERE job_name = ? AND trade_date = ?",
                         String.class, job.lockName(), tradeDate)
                 .stream().findFirst().map(TradingBatchPhase::valueOf);
     }
@@ -33,7 +33,7 @@ class TradingBatchRunPersistenceAdapter implements TradingBatchRunPort {
     @Override
     public void recordPhase(TradingBatchJob job, LocalDate tradeDate, TradingBatchPhase phase) {
         jdbcTemplate.update("""
-                INSERT INTO trading_batch_run (job_name, trade_date, phase, updated_at)
+                INSERT INTO trading.trading_batch_run (job_name, trade_date, phase, updated_at)
                 VALUES (?, ?, ?, ?)
                 ON CONFLICT (job_name, trade_date) DO UPDATE
                    SET phase = EXCLUDED.phase,
@@ -44,14 +44,14 @@ class TradingBatchRunPersistenceAdapter implements TradingBatchRunPort {
     @Override
     public boolean isReported(LocalDate tradeDate, UUID strategyId) {
         return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
-                "SELECT EXISTS (SELECT 1 FROM trading_batch_report WHERE trade_date = ? AND strategy_id = ?)",
+                "SELECT EXISTS (SELECT 1 FROM trading.trading_batch_report WHERE trade_date = ? AND strategy_id = ?)",
                 Boolean.class, tradeDate, strategyId));
     }
 
     @Override
     public void markReported(LocalDate tradeDate, UUID strategyId) {
         jdbcTemplate.update("""
-                INSERT INTO trading_batch_report (trade_date, strategy_id)
+                INSERT INTO trading.trading_batch_report (trade_date, strategy_id)
                 VALUES (?, ?)
                 ON CONFLICT (trade_date, strategy_id) DO NOTHING
                 """, tradeDate, strategyId);

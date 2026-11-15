@@ -17,7 +17,7 @@ interface FinanceBudgetJpaRepository extends JpaRepository<FinanceBudgetEntity, 
     // "could not determine data type of parameter"로 실패하고, HQL CAST(:date AS date)로 우회를 시도하면
     // 이번엔 Hibernate가 그 파라미터를 bytea로 바인딩해 "cannot cast type bytea to date"로 실패한다.
     // 네이티브 쿼리 + PostgreSQL ::date 캐스트로 우회한다 — JDBC가 LocalDate를 곧바로 바인딩하므로 문제없다.
-    @Query(nativeQuery = true, value = "SELECT * FROM finance_budgets WHERE " +
+    @Query(nativeQuery = true, value = "SELECT * FROM finance.finance_budgets WHERE " +
             "((user_id = :userId AND group_id IS NULL) OR group_id = :currentGroupId) " +
             "AND (:categoryId IS NULL OR category_id = :categoryId) " +
             "AND (CAST(:date AS date) IS NULL OR (apply_start_date <= CAST(:date AS date) " +
@@ -28,7 +28,7 @@ interface FinanceBudgetJpaRepository extends JpaRepository<FinanceBudgetEntity, 
     // 개인 스코프(user_id 일치, group_id IS NULL) + 동일 category에서 [startDate, endDate]와 겹치는 예산.
     // endDate가 NULL(무기한)이면 시작일 이후 전부가 겹침 대상 — findMyScope와 동일한 CAST(:x AS date) IS NULL
     // 우회 패턴 사용(PostgreSQL이 NULL 파라미터 타입을 추론 못 하는 문제 회피).
-    @Query(nativeQuery = true, value = "SELECT * FROM finance_budgets WHERE " +
+    @Query(nativeQuery = true, value = "SELECT * FROM finance.finance_budgets WHERE " +
             "user_id = :userId AND group_id IS NULL AND category_id = :categoryId " +
             "AND (CAST(:endDate AS date) IS NULL OR apply_start_date <= CAST(:endDate AS date)) " +
             "AND (apply_end_date IS NULL OR apply_end_date >= :startDate)")

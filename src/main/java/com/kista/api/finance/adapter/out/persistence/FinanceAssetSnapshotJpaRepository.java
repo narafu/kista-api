@@ -18,7 +18,7 @@ interface FinanceAssetSnapshotJpaRepository extends JpaRepository<FinanceAssetSn
     // "could not determine data type of parameter"로 실패하고, HQL CAST(:from AS date)로 우회를 시도하면
     // 이번엔 Hibernate가 그 파라미터를 bytea로 바인딩해 "cannot cast type bytea to date"로 실패한다.
     // 네이티브 쿼리 + PostgreSQL ::date 캐스트로 우회한다 — JDBC가 LocalDate를 곧바로 바인딩하므로 문제없다.
-    @Query(nativeQuery = true, value = "SELECT * FROM finance_asset_snapshots WHERE deleted_at IS NULL " +
+    @Query(nativeQuery = true, value = "SELECT * FROM finance.finance_asset_snapshots WHERE deleted_at IS NULL " +
             "AND ((user_id = :userId AND group_id IS NULL) OR group_id = :currentGroupId) " +
             "AND (CAST(:from AS date) IS NULL OR entry_date >= CAST(:from AS date)) " +
             "AND (CAST(:to AS date) IS NULL OR entry_date <= CAST(:to AS date)) " +

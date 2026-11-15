@@ -12,7 +12,7 @@ import java.util.UUID;
 interface FinanceMonthlyClosingJpaRepository extends JpaRepository<FinanceMonthlyClosingEntity, UUID> {
 
     // 이중축: 내 개인 마감(group_id IS NULL) ∪ 내 현재 그룹 마감(group_id = :currentGroupId).
-    @Query(nativeQuery = true, value = "SELECT * FROM finance_monthly_closings WHERE " +
+    @Query(nativeQuery = true, value = "SELECT * FROM finance.finance_monthly_closings WHERE " +
             "((user_id = :userId AND group_id IS NULL) OR group_id = :currentGroupId)")
     List<FinanceMonthlyClosingEntity> findMyScope(@Param("userId") UUID userId, @Param("currentGroupId") UUID currentGroupId);
 
@@ -30,7 +30,7 @@ interface FinanceMonthlyClosingJpaRepository extends JpaRepository<FinanceMonthl
     // closed_at은 completed=true일 때 값을 갖고 false로 전환되면 NULL로 되돌린다.
     @Modifying
     @Query(value = """
-            INSERT INTO finance_monthly_closings (id, group_id, user_id, month, completed, closed_at)
+            INSERT INTO finance.finance_monthly_closings (id, group_id, user_id, month, completed, closed_at)
             VALUES (:id, :groupId, :userId, :month, :completed, CASE WHEN :completed THEN now() END)
             ON CONFLICT (group_id, month) WHERE group_id IS NOT NULL
             DO UPDATE SET completed = excluded.completed,
@@ -44,7 +44,7 @@ interface FinanceMonthlyClosingJpaRepository extends JpaRepository<FinanceMonthl
     // 개인 마감(group_id IS NULL) 전용 — uq_finance_monthly_closings_personal_month(user_id, month) partial index 대상.
     @Modifying
     @Query(value = """
-            INSERT INTO finance_monthly_closings (id, group_id, user_id, month, completed, closed_at)
+            INSERT INTO finance.finance_monthly_closings (id, group_id, user_id, month, completed, closed_at)
             VALUES (:id, NULL, :userId, :month, :completed, CASE WHEN :completed THEN now() END)
             ON CONFLICT (user_id, month) WHERE group_id IS NULL AND user_id IS NOT NULL
             DO UPDATE SET completed = excluded.completed,

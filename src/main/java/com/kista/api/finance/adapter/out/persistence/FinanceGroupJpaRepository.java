@@ -19,8 +19,8 @@ interface FinanceGroupJpaRepository extends JpaRepository<FinanceGroupEntity, UU
 
     // 1인1그룹 불변식이므로 결과는 최대 1개. 무그룹 유저는 empty.
     @Query(nativeQuery = true, value = """
-            SELECT m.group_id FROM finance_group_members m
-            JOIN finance_groups g ON g.id = m.group_id
+            SELECT m.group_id FROM finance.finance_group_members m
+            JOIN finance.finance_groups g ON g.id = m.group_id
             WHERE m.user_id = :userId AND m.deleted_at IS NULL AND g.deleted_at IS NULL
             LIMIT 1
             """)

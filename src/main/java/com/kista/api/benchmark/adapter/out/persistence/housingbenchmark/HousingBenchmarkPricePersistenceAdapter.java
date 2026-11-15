@@ -24,7 +24,7 @@ public class HousingBenchmarkPricePersistenceAdapter implements HousingBenchmark
         // KB Land는 과거 기준 월 값이 보정될 수 있어 자연키 충돌 시 최신 응답으로 갱신한다.
         // batchUpdate로 1회 왕복으로 처리 (행마다 개별 update 제거)
         String sql = """
-                INSERT INTO housing_benchmark_prices (
+                INSERT INTO kista_ref.housing_benchmark_prices (
                     id,
                     source,
                     metric_code,

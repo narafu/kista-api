@@ -25,7 +25,7 @@ public class HousingPriceIndexPersistenceAdapter implements HousingPriceIndexPor
     public void upsertAll(List<HousingPriceIndex> indices) {
         // KB Land는 과거 기준일 값이 보정될 수 있어 자연키 충돌 시 최신 응답으로 갱신한다.
         String sql = """
-                INSERT INTO housing_price_indices (
+                INSERT INTO kista_ref.housing_price_indices (
                     id,
                     source,
                     metric_code,

@@ -24,8 +24,8 @@ interface StrategyJpaRepository extends JpaRepository<StrategyEntity, UUID> {
 
     @Query(value = """
             SELECT sc.id AS cycleId, s.id AS strategyId, s.type AS strategyType
-            FROM strategy_cycle sc
-            JOIN strategy s ON sc.strategy_id = s.id
+            FROM trading.strategy_cycle sc
+            JOIN trading.strategy s ON sc.strategy_id = s.id
             WHERE sc.id IN :cycleIds
               AND sc.deleted_at IS NULL AND s.deleted_at IS NULL
             """, nativeQuery = true)
@@ -43,9 +43,9 @@ interface StrategyJpaRepository extends JpaRepository<StrategyEntity, UUID> {
     // ACTIVE 사용자의 ACTIVE 전략 전체 조회 (스케쥴러용) — 소프트 삭제 행 명시적 제외
     // 사용자 활성 여부는 trading 소유 복제본(user_notify_profile.is_active)만 본다 — root 소유 users 비의존
     @Query(value = """
-            SELECT s.* FROM strategy s
-            JOIN accounts a ON s.account_id = a.id
-            JOIN user_notify_profile p ON p.user_id = a.user_id
+            SELECT s.* FROM trading.strategy s
+            JOIN trading.accounts a ON s.account_id = a.id
+            JOIN trading.user_notify_profile p ON p.user_id = a.user_id
             WHERE p.is_active AND s.status = 'ACTIVE'
               AND s.deleted_at IS NULL AND a.deleted_at IS NULL
             """, nativeQuery = true)
@@ -53,12 +53,12 @@ interface StrategyJpaRepository extends JpaRepository<StrategyEntity, UUID> {
 
     // 정지·보관 전략 중 진행 중 사이클(end_date null)에 당일 접수 주문(상태 무관)이 있는 전략 — 마감 배치가 체결을 원장에 반영하는 리포트 전용
     @Query(value = """
-            SELECT s.* FROM strategy s
-            JOIN accounts a ON s.account_id = a.id
-            JOIN user_notify_profile p ON p.user_id = a.user_id
+            SELECT s.* FROM trading.strategy s
+            JOIN trading.accounts a ON s.account_id = a.id
+            JOIN trading.user_notify_profile p ON p.user_id = a.user_id
             WHERE p.is_active AND s.status IN ('PAUSED', 'ARCHIVED')
               AND s.deleted_at IS NULL AND a.deleted_at IS NULL
-              AND EXISTS (SELECT 1 FROM orders o JOIN strategy_cycle sc ON o.strategy_cycle_id = sc.id
+              AND EXISTS (SELECT 1 FROM trading.orders o JOIN trading.strategy_cycle sc ON o.strategy_cycle_id = sc.id
                           WHERE sc.strategy_id = s.id AND sc.deleted_at IS NULL AND sc.end_date IS NULL
                             AND o.trade_date = :tradeDate AND o.external_order_id IS NOT NULL
                             AND o.order_leg <> :unknownLeg)
@@ -91,8 +91,8 @@ interface StrategyJpaRepository extends JpaRepository<StrategyEntity, UUID> {
     // 사용자 계좌에 속한 모든 전략 소프트 삭제 (계정 탈퇴 cascade)
     @Modifying
     @Query(value = """
-            UPDATE strategy s SET deleted_at = :now
-            FROM accounts a WHERE s.account_id = a.id
+            UPDATE trading.strategy s SET deleted_at = :now
+            FROM trading.accounts a WHERE s.account_id = a.id
             AND a.user_id = :userId AND s.deleted_at IS NULL
             """, nativeQuery = true)
     void softDeleteByUserId(@Param("userId") UUID userId, @Param("now") Instant now);

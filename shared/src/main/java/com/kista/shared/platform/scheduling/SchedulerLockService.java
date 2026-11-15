@@ -1,7 +1,7 @@
 package com.kista.shared.platform.scheduling;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -10,14 +10,54 @@ import java.net.InetAddress;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class SchedulerLockService {
+
+    // 스키마 한정 테이블 이름만 허용 — SQL에 포매팅되므로 식별자 형식을 강제한다
+    private static final Pattern QUALIFIED_TABLE = Pattern.compile("^[a-z_]+\\.[a-z_]+$");
 
     private final JdbcTemplate jdbcTemplate;
     private final String ownerId = buildOwnerId();
+    private final String acquireSql; // tryAcquire용 — 만료된 락만 덮어쓴다
+    private final String forceAcquireSql; // takeOver용 — 다른 owner 락도 덮어쓴다
+    private final String markFinishedSql; // 완료 시각 기록
+    private final String releaseSql; // 락 즉시 해제
+
+    // 락 테이블은 프로세스별 스키마가 다르다(root public, trading-core trading) — 한 풀로 합쳐도 구분되도록 프로퍼티로 받는다
+    public SchedulerLockService(JdbcTemplate jdbcTemplate, @Value("${kista.scheduler-lock.table}") String table) {
+        if (!QUALIFIED_TABLE.matcher(table).matches()) {
+            throw new IllegalStateException("스케쥴러 락 테이블 이름은 schema.table 형식이어야 합니다.");
+        }
+        this.jdbcTemplate = jdbcTemplate;
+        String upsert = """
+                INSERT INTO %s AS l (name, lock_until, locked_at, locked_by, finished_at)
+                VALUES (?, now() + (? * interval '1 millisecond'), now(), ?, NULL)
+                ON CONFLICT (name) DO UPDATE
+                   SET lock_until = EXCLUDED.lock_until,
+                       locked_at = EXCLUDED.locked_at,
+                       locked_by = EXCLUDED.locked_by,
+                       finished_at = NULL
+                 WHERE l.lock_until <= now()%s
+                RETURNING name
+                """;
+        this.acquireSql = upsert.formatted(table, "");
+        this.forceAcquireSql = upsert.formatted(table, "\n                    OR l.locked_by <> EXCLUDED.locked_by");
+        this.markFinishedSql = """
+                UPDATE %s
+                   SET finished_at = now()
+                 WHERE name = ?
+                   AND locked_by = ?
+                """.formatted(table);
+        this.releaseSql = """
+                UPDATE %s
+                   SET lock_until = now()
+                 WHERE name = ?
+                   AND locked_by = ?
+                """.formatted(table);
+    }
 
     public boolean tryRun(String lockName, Duration lockAtMostFor, LockedTask task) throws InterruptedException {
         if (!tryAcquire(lockName, lockAtMostFor)) {
@@ -57,34 +97,13 @@ public class SchedulerLockService {
     // 획득 시 finished_at을 비워 "실행 중"으로 표시(운영 진단용 — 이를 읽던 배포 가드는 폐지됐다)
     // 시각은 Clock 빈이 아니라 DB 서버 now() — 인스턴스 간 시계 편차와 무관하게 만료를 판정한다
     private boolean tryAcquire(String lockName, Duration lockAtMostFor) {
-        List<String> rows = jdbcTemplate.queryForList("""
-                INSERT INTO scheduler_locks (name, lock_until, locked_at, locked_by, finished_at)
-                VALUES (?, now() + (? * interval '1 millisecond'), now(), ?, NULL)
-                ON CONFLICT (name) DO UPDATE
-                   SET lock_until = EXCLUDED.lock_until,
-                       locked_at = EXCLUDED.locked_at,
-                       locked_by = EXCLUDED.locked_by,
-                       finished_at = NULL
-                 WHERE scheduler_locks.lock_until <= now()
-                RETURNING name
-                """, String.class, lockName, lockAtMostFor.toMillis(), ownerId);
+        List<String> rows = jdbcTemplate.queryForList(acquireSql, String.class, lockName, lockAtMostFor.toMillis(), ownerId);
         return !rows.isEmpty();
     }
 
     // tryAcquire와 같되 만료 전이라도 다른 owner 락이면 덮어쓴다
     private boolean forceAcquire(String lockName, Duration lockAtMostFor) {
-        List<String> rows = jdbcTemplate.queryForList("""
-                INSERT INTO scheduler_locks (name, lock_until, locked_at, locked_by, finished_at)
-                VALUES (?, now() + (? * interval '1 millisecond'), now(), ?, NULL)
-                ON CONFLICT (name) DO UPDATE
-                   SET lock_until = EXCLUDED.lock_until,
-                       locked_at = EXCLUDED.locked_at,
-                       locked_by = EXCLUDED.locked_by,
-                       finished_at = NULL
-                 WHERE scheduler_locks.lock_until <= now()
-                    OR scheduler_locks.locked_by <> EXCLUDED.locked_by
-                RETURNING name
-                """, String.class, lockName, lockAtMostFor.toMillis(), ownerId);
+        List<String> rows = jdbcTemplate.queryForList(forceAcquireSql, String.class, lockName, lockAtMostFor.toMillis(), ownerId);
         return !rows.isEmpty();
     }
 
@@ -92,24 +111,14 @@ public class SchedulerLockService {
     // 기록 실패가 이미 끝난 배치를 실패로 보이게 하면 안 되므로 경고만 남긴다(finished_at은 운영 진단용일 뿐)
     private void markFinished(String lockName) {
         try {
-            jdbcTemplate.update("""
-                    UPDATE scheduler_locks
-                       SET finished_at = now()
-                     WHERE name = ?
-                       AND locked_by = ?
-                    """, lockName, ownerId);
+            jdbcTemplate.update(markFinishedSql, lockName, ownerId);
         } catch (RuntimeException e) {
             log.warn("[{}] 스케쥴러 완료 시각 기록 실패 — 배치는 정상 완료", lockName, e);
         }
     }
 
     private void release(String lockName) {
-        jdbcTemplate.update("""
-                UPDATE scheduler_locks
-                   SET lock_until = now()
-                 WHERE name = ?
-                   AND locked_by = ?
-                """, lockName, ownerId);
+        jdbcTemplate.update(releaseSql, lockName, ownerId);
     }
 
     // 프로세스 실행마다 고유 — docker restart처럼 hostname·pid가 같은 재기동도 이전 프로세스와 구분돼야 takeOver가 성립

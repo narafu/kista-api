@@ -10,8 +10,8 @@ import java.util.UUID;
 interface StrategyInfiniteJpaRepository extends JpaRepository<StrategyInfiniteEntity, UUID> {
 
     @Query(value = """
-            SELECT siv.* FROM strategy_infinite_version siv
-            JOIN strategy_version sv ON siv.strategy_version_id = sv.id
+            SELECT siv.* FROM trading.strategy_infinite_version siv
+            JOIN trading.strategy_version sv ON siv.strategy_version_id = sv.id
             WHERE sv.strategy_id = :strategyId
               AND sv.deleted_at IS NULL
               AND siv.deleted_at IS NULL

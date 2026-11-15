@@ -17,8 +17,8 @@ interface StrategyDcaRuleJpaRepository extends JpaRepository<StrategyDcaRuleEnti
     // 전략별 활성(삭제되지 않은) 최신 버전 — 규칙이 있는 버전 중 version_no 최대
     @Query(value = """
             SELECT DISTINCT ON (sv.strategy_id) sv.strategy_id AS strategyId, r.strategy_version_id AS strategyVersionId
-            FROM strategy_dca_rule r
-            JOIN strategy_version sv ON sv.id = r.strategy_version_id AND sv.deleted_at IS NULL
+            FROM trading.strategy_dca_rule r
+            JOIN trading.strategy_version sv ON sv.id = r.strategy_version_id AND sv.deleted_at IS NULL
             WHERE sv.strategy_id IN (:strategyIds)
             ORDER BY sv.strategy_id, sv.version_no DESC
             """, nativeQuery = true)

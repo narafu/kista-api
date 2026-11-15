@@ -131,3 +131,7 @@ logging:
   level:
     root: INFO
     com.kista: DEBUG
+
+kista:
+  scheduler-lock:
+    table: public.scheduler_locks # SchedulerLockService 락 테이블 — 스키마 한정 필수

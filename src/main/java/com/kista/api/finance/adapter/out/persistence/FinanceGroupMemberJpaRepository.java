@@ -23,7 +23,7 @@ interface FinanceGroupMemberJpaRepository extends JpaRepository<FinanceGroupMemb
     // PostgreSQL이 충돌 대상을 그 인덱스로 추론한다.
     @Modifying
     @Query(nativeQuery = true, value = """
-            INSERT INTO finance_group_members (id, group_id, user_id, role, joined_at)
+            INSERT INTO finance.finance_group_members (id, group_id, user_id, role, joined_at)
             VALUES (:id, :groupId, :userId, :role, now())
             ON CONFLICT (group_id, user_id) WHERE deleted_at IS NULL DO NOTHING
             """)
