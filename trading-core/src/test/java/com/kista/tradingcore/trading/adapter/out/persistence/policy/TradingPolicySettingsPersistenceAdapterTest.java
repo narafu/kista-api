@@ -119,4 +119,19 @@ class TradingPolicySettingsPersistenceAdapterTest {
         assertThat(loaded.brokerEnabled(Broker.BINANCE)).isFalse();
         assertThat(loaded.brokers().get(Broker.BINANCE).allowedIp()).isEqualTo("168.107.63.152");
     }
+
+    @Test
+    @DisplayName("저장 JSON의 brokers에 사라진 enum 키(GONE)가 있어도 그 키를 버리고 로드된다")
+    void loadDropsUnknownEnumKeys() throws Exception {
+        ObjectNode root = (ObjectNode) objectMapper.valueToTree(TradingPolicySettings.defaults());
+        ObjectNode brokers = (ObjectNode) root.get("brokers");
+        brokers.set("GONE", brokers.get("MOCK").deepCopy());
+        when(repository.findById(TradingPolicySettingsPersistenceAdapter.SETTING_KEY)).thenReturn(Optional.of(
+                new TradingPolicySettingsEntity(TradingPolicySettingsPersistenceAdapter.SETTING_KEY, objectMapper.writeValueAsString(root))));
+
+        TradingPolicySettings loaded = adapter.load();
+
+        assertThat(loaded).isEqualTo(TradingPolicySettings.defaults());
+        assertThat(loaded.brokers().keySet()).extracting(Enum::name).doesNotContain("GONE");
+    }
 }

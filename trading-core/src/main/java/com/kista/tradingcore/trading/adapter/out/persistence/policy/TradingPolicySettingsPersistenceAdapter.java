@@ -71,6 +71,8 @@ class TradingPolicySettingsPersistenceAdapter implements TradingPolicySettingsPo
             root.set(section, defaultsSection);
             return;
         }
+        // 삭제된 enum 상수 키(예: 삭제된 증권사)는 버린다
+        sectionNode.propertyNames().removeIf(name -> !defaultsSection.has(name));
         Iterator<Map.Entry<String, JsonNode>> defaultFields = defaultsSection.properties().iterator();
         while (defaultFields.hasNext()) {
             Map.Entry<String, JsonNode> entry = defaultFields.next();
