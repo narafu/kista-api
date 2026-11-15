@@ -1,6 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
-import com.kista.tradingcore.privacy.application.usecase.PrivacyTradeValidationUseCase;
+import com.kista.tradingcore.privacy.application.service.PrivacyTradeValidationService;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeValidationReport;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
@@ -20,7 +20,7 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 class PrivacyBaseGuard {
 
-    private final PrivacyTradeValidationUseCase validationService;
+    private final PrivacyTradeValidationService validationService;
     private final ApplicationEventPublisher eventPublisher; // 가드 발동 관리자 알림 (TradingErrorEvent 발행)
 
     // 이슈가 없으면 base 그대로, 있으면 관리자 알림 후 null. batchLabel은 알림 문구용 배치 이름

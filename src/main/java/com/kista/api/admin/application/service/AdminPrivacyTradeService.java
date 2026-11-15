@@ -22,7 +22,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 class AdminPrivacyTradeService implements AdminPrivacyTradeUseCase {
 
-    // privacy.application.usecase.PrivacyUseCase/PrivacyTradePort 직접 주입 대신 admin이 정의한
+    // privacy.application.service.PrivacyService/PrivacyTradePort 직접 주입 대신 admin이 정의한
     // 단일 포트로 조회+쓰기를 위임 — 등록(POST /api/internal/fida-orders 재사용)·수정 모두 이 포트 경유
     private final PrivacyQueryPort privacyQueryPort;
     private final AuditLogPort auditLogPort;

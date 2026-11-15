@@ -25,7 +25,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-// privacy.application.usecase.PrivacyUseCase/PrivacyTradePort 직접 주입 제거 후 단일 PrivacyQueryPort
+// privacy.application.service.PrivacyService/PrivacyTradePort 직접 주입 제거 후 단일 PrivacyQueryPort
 // 위임 + 감사 로그 호출만 검증(실제 저장/보정 로직은 trading-core로 완전히 이관됨)
 @ExtendWith(MockitoExtension.class)
 class AdminPrivacyTradeServiceTest {

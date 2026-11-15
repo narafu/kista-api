@@ -4,7 +4,7 @@ import com.kista.shared.contract.privacy.FidaOrderRequest;
 import com.kista.shared.contract.privacy.FidaOrderResponse;
 import com.kista.tradingcore.privacy.domain.model.FidaOrderCommand;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeSaveResult;
-import com.kista.tradingcore.privacy.application.usecase.PrivacyUseCase;
+import com.kista.tradingcore.privacy.application.service.PrivacyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class FidaOrderController {
 
-    private final PrivacyUseCase privacy;
+    private final PrivacyService privacy;
 
     @Operation(summary = "FIDA 주문 실행", description = "FIDA 계좌로 즉시 지정가 매매 주문 접수. X-Internal-Token 헤더 필수.")
     @ApiResponses({

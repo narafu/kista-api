@@ -88,7 +88,7 @@ class TradingServiceTest {
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CycleSnapshotCreator cycleSnapshotCreator; // CycleRotationService: StrategyCycle+CyclePosition 원자 저장
     @Mock PrivacyTradePort privacyTradePort;
-    @Mock com.kista.tradingcore.privacy.application.usecase.PrivacyTradeValidationUseCase privacyValidation; // 장전 점검 — 기본 이슈 없음
+    @Mock com.kista.tradingcore.privacy.application.service.PrivacyTradeValidationService privacyValidation; // 장전 점검 — 기본 이슈 없음
     @Mock DcaPlanInputCollector dcaInputCollector; // DCA 입력 수집 — 기존 시나리오는 DCA 전략이 없어 미사용
     @Mock DcaExecutionRecorder dcaExecutionRecorder;
     @Mock StrategyDcaDetailPort dcaDetailPort; // 개장 전 접수 대상(KIS DCA MOO) 판별

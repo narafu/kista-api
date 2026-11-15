@@ -2,7 +2,6 @@ package com.kista.tradingcore.privacy.application.service;
 
 import com.kista.tradingcore.privacy.application.event.PrivacyAlertRaisedEvent;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
-import com.kista.tradingcore.privacy.application.usecase.PrivacyUseCase;
 import com.kista.tradingcore.privacy.domain.model.FidaOrderCommand;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeSaveResult;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeValidationReport;
@@ -14,13 +13,13 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-class PrivacyService implements PrivacyUseCase {
+public class PrivacyService {
 
     private final PrivacyTradePort privacyTradePort;
     private final PrivacyTradeValidationService validationService;
     private final ApplicationEventPublisher eventPublisher;
 
-    @Override
+    // FIDA 주문 수신 처리 — 멱등 (같은 날짜+종목 동일 내용이면 200, 다른 내용이면 PrivacyTradeConflictException→409)
     public PrivacyTradeSaveResult executeFidaOrder(FidaOrderCommand command) {
         // FIDA 수신값은 KST 발행일 원본 — 변환 없이 그대로 검증·저장 (release_date는 거래일이 아님)
         PrivacyTradeValidationReport report = validationService.inspect(command);

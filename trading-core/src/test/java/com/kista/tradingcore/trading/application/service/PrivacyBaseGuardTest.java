@@ -1,6 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
-import com.kista.tradingcore.privacy.application.usecase.PrivacyTradeValidationUseCase;
+import com.kista.tradingcore.privacy.application.service.PrivacyTradeValidationService;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeValidationReport;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
@@ -24,7 +24,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PrivacyBaseGuardTest {
 
-    @Mock PrivacyTradeValidationUseCase validationService;
+    @Mock PrivacyTradeValidationService validationService;
     @Mock ApplicationEventPublisher eventPublisher;
     @InjectMocks PrivacyBaseGuard guard;
 

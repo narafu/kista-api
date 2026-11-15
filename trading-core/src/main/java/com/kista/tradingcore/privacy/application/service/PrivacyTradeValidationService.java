@@ -4,7 +4,7 @@ import com.kista.tradingcore.privacy.domain.model.FidaOrderCommand;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeValidationReport;
-import com.kista.tradingcore.privacy.application.usecase.PrivacyTradeValidationUseCase;
+import org.springframework.modulith.NamedInterface;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -12,7 +12,8 @@ import java.util.List;
 
 // PRIVACY 기준 매매표 방어 규칙 — FIDA 저장 시 경고/차단, 장전 전 자동 가드에 공통 사용
 @Service
-class PrivacyTradeValidationService implements PrivacyTradeValidationUseCase {
+@NamedInterface("api")
+public class PrivacyTradeValidationService {
 
     public PrivacyTradeValidationReport inspect(FidaOrderCommand command) {
         return inspect(command.holdings(), command.orders().stream()

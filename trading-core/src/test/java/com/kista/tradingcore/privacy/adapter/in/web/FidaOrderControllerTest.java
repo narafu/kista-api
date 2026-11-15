@@ -11,7 +11,7 @@ import com.kista.shared.kernel.OrderType;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeSaveResult;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.platform.security.TokenBlacklistPort;
-import com.kista.tradingcore.privacy.application.usecase.PrivacyUseCase;
+import com.kista.tradingcore.privacy.application.service.PrivacyService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -46,7 +46,7 @@ class FidaOrderControllerTest {
 
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean PrivacyUseCase privacy;
+    @MockitoBean PrivacyService privacy;
 
     private static final String VALID_TOKEN = "test-internal-token";
 

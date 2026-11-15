@@ -33,7 +33,7 @@ trading         주문·사이클 실행·전략 설정               domain/use
 stats           통계·백테스트·포트폴리오 조회            domain/usecase/port
 notify          매매 알림 리스너·게이트웨이              (없음)
 marketcalendar  미국 시장 휴장일                         domain/port
-privacy         FIDA 기준 매매표 SSOT                    domain/port/usecase/event
+privacy         FIDA 기준 매매표 SSOT                    domain/port/api/event
 account         계좌 자격증명·브로커 연결                domain/usecase/port/event
 web             전역 web 앱셸                            (없음)
 ```

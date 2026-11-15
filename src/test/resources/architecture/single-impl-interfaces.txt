@@ -85,8 +85,6 @@ com.kista.tradingcore.notify.application.port.output.TradingNotifyPort
 com.kista.tradingcore.notify.application.port.output.TradingRealtimeNotificationPort
 com.kista.tradingcore.notify.application.port.output.TradingUserNotificationPort
 com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort
-com.kista.tradingcore.privacy.application.usecase.PrivacyTradeValidationUseCase
-com.kista.tradingcore.privacy.application.usecase.PrivacyUseCase
 com.kista.tradingcore.stats.application.port.output.BinanceMarketDataPort
 com.kista.tradingcore.stats.application.port.output.BlockHeightPort
 com.kista.tradingcore.stats.application.port.output.CoinbaseMarketDataPort
