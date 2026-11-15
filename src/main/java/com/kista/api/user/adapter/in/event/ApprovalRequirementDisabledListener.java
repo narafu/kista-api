@@ -3,7 +3,7 @@ package com.kista.api.user.adapter.in.event;
 import com.kista.api.user.application.event.ApprovalRequirementDisabledEvent;
 import com.kista.shared.kernel.UserStatus;
 import com.kista.api.user.application.port.output.UserPort;
-import com.kista.api.user.application.usecase.UserUseCase;
+import com.kista.api.user.application.service.UserService;
 import com.kista.api.user.domain.model.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -19,7 +19,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 class ApprovalRequirementDisabledListener {
 
     private final UserPort userPort;
-    private final UserUseCase userUseCase;
+    private final UserService userUseCase;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)

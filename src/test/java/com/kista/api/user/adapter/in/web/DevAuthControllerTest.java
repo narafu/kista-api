@@ -3,9 +3,9 @@ package com.kista.api.user.adapter.in.web;
 import com.kista.api.user.adapter.in.web.security.*;
 import com.kista.shared.platform.security.*;
 import com.kista.api.user.domain.model.User;
-import com.kista.api.user.application.usecase.TokenUseCase;
-import com.kista.api.user.application.usecase.UserSettingsUseCase;
-import com.kista.api.user.application.usecase.UserUseCase;
+import com.kista.api.user.application.service.TokenService;
+import com.kista.api.user.application.service.UserSettingsService;
+import com.kista.api.user.application.service.UserService;
 import com.kista.api.user.application.port.output.UserPort;
 import com.kista.api.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,12 +53,12 @@ class DevAuthControllerTest {
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort;         // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean UserUseCase userUseCase;
+    @MockitoBean UserService userUseCase;
     @MockitoBean JwtIssuerService jwtIssuerService;
     @MockitoBean UserPort userPort;
-    @MockitoBean TokenUseCase tokenUseCase;                // RT 발급
+    @MockitoBean TokenService tokenUseCase;                // RT 발급
     @MockitoBean RefreshTokenCookieHelper cookieHelper;    // RT 쿠키 설정
-    @MockitoBean UserSettingsUseCase userSettingsUseCase;  // 복제본 재동기화
+    @MockitoBean UserSettingsService userSettingsUseCase;  // 복제본 재동기화
 
     private static final UUID DEV_USER_ID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID DEV_ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");

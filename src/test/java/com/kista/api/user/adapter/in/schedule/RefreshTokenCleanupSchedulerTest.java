@@ -1,6 +1,6 @@
 package com.kista.api.user.adapter.in.schedule;
 
-import com.kista.api.user.application.usecase.TokenUseCase;
+import com.kista.api.user.application.service.TokenService;
 import com.kista.shared.platform.scheduling.SchedulerJobRunner;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,7 +18,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class RefreshTokenCleanupSchedulerTest {
 
-    @Mock TokenUseCase tokenUseCase;
+    @Mock TokenService tokenUseCase;
     @Mock SchedulerJobRunner jobRunner;
     @Mock SchedulerLockService schedulerLockService;
 

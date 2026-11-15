@@ -7,8 +7,8 @@ import com.kista.api.user.adapter.in.web.dto.StrategySuggestionsRequest;
 import com.kista.api.user.adapter.in.web.dto.TelegramUpdateRequest;
 import com.kista.shared.kernel.NotificationType;
 import com.kista.shared.kernel.NotificationChannel;
-import com.kista.api.user.application.usecase.UserSettingsUseCase;
-import com.kista.api.user.application.usecase.UserProfileUseCase;
+import com.kista.api.user.application.service.UserSettingsService;
+import com.kista.api.user.application.service.UserProfileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,8 +28,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SettingsController {
 
-    private final UserProfileUseCase userProfileUseCase;
-    private final UserSettingsUseCase userSettingsUseCase; // 잔고검증/알림타입/운영전략 추천 목록 — user_settings·user_notification_prefs 테이블
+    private final UserProfileService userProfileUseCase;
+    private final UserSettingsService userSettingsUseCase; // 잔고검증/알림타입/운영전략 추천 목록 — user_settings·user_notification_prefs 테이블
 
     // 텔레그램 봇 설정 (botToken, chatId 저장 + getMe로 username 검증) — IllegalArgumentException→400 ProblemDetailExceptionHandler 처리
     @Operation(summary = "텔레그램 설정 저장", description = "텔레그램 봇 토큰과 채팅 ID를 AES-256 암호화하여 저장. body: {\"botToken\": \"...\", \"chatId\": \"...\"}")

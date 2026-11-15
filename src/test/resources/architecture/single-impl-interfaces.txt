@@ -58,11 +58,6 @@ com.kista.api.user.application.port.output.TelegramBotInfoPort
 com.kista.api.user.application.port.output.UserPort
 com.kista.api.user.application.port.output.UserSettingsPort
 com.kista.api.user.application.port.output.UserSummaryPort
-com.kista.api.user.application.usecase.GetUserSettingsQuery
-com.kista.api.user.application.usecase.TokenUseCase
-com.kista.api.user.application.usecase.UserProfileUseCase
-com.kista.api.user.application.usecase.UserSettingsUseCase
-com.kista.api.user.application.usecase.UserUseCase
 com.kista.tradingcore.account.application.port.output.AccountPort
 com.kista.tradingcore.broker.application.port.output.AccountTokenEvictionPort
 com.kista.tradingcore.broker.application.port.output.AdminMarketPricePort

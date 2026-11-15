@@ -6,7 +6,6 @@ import com.kista.api.user.domain.auth.RefreshToken;
 import com.kista.api.user.domain.auth.TokenConstants;
 import com.kista.api.user.domain.auth.TokenRefreshResult;
 import com.kista.api.user.domain.model.User;
-import com.kista.api.user.application.usecase.TokenUseCase;
 import com.kista.api.user.application.port.output.BlacklistPort;
 import com.kista.api.user.application.port.output.RefreshTokenPort;
 import com.kista.api.user.application.port.output.UserPort;
@@ -27,7 +26,7 @@ import java.util.UUID;
 @Service
 @Transactional
 @RequiredArgsConstructor
-class TokenService implements TokenUseCase {
+public class TokenService {
 
     private static final Duration RT_TTL = TokenConstants.RT_TTL; // 리프레시 토큰 유효 기간
     private static final Duration AT_TTL = TokenConstants.AT_TTL; // AT 수명 — 블랙리스트 등재 기간
@@ -39,7 +38,7 @@ class TokenService implements TokenUseCase {
     private final UserPort userPort;
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
-    @Override
+    // 로그인 성공 후 RT 발급 — rawToken 반환 (컨트롤러가 쿠키로 전달)
     public String issueRefreshToken(UUID userId, String userAgent) {
         // 동일 기기(User-Agent) 기존 RT 교체 — 따닥 로그인 고아 토큰 방지, 다른 기기 세션은 유지
         refreshTokenPort.deleteByUserIdAndUserAgent(userId, userAgent);
@@ -57,7 +56,7 @@ class TokenService implements TokenUseCase {
     // grace 초과 시 revokeAllSessionsAndReject()가 deleteAllByUserId 후 InvalidRefreshTokenException을 던지는데,
     // unchecked 예외가 전파되면 클래스 레벨 @Transactional 기본 롤백 규칙에 의해 방금 실행한 세션 폐기(delete)까지
     // 롤백되어 재사용 공격 탐지가 무력화됨 — noRollbackFor로 폐기 커밋 보장
-    @Override
+    // RTR: 구 RT 회전 마킹 + 새 RT 발급, 새 AT 발급에 필요한 userId/role 반환 (grace window 60초)
     @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
     public TokenRefreshResult refresh(String rawRefreshToken, String userAgent) {
         String hash = sha256Hex(rawRefreshToken);
@@ -101,7 +100,7 @@ class TokenService implements TokenUseCase {
         return new TokenRefreshResult(user.id(), user.role(), issueNewRt(rt.userId(), userAgent));
     }
 
-    @Override
+    // 로그아웃: RT 삭제 + AT jti 블랙리스트 등재 (jti/atExpiresAt null이면 jti 차단 생략)
     public void logout(@Nullable String rawRefreshToken, @Nullable String jti, @Nullable Instant atExpiresAt) {
         if (rawRefreshToken != null) {
             String hash = sha256Hex(rawRefreshToken);
@@ -116,12 +115,12 @@ class TokenService implements TokenUseCase {
         }
     }
 
-    @Override
+    // 만료 RT 일괄 정리 — 스케쥴러 전용
     public int cleanupExpiredTokens() {
         return refreshTokenPort.deleteAllExpired();
     }
 
-    @Override
+    // grace 기간이 지난 회전 RT 정리 — 스케쥴러 전용
     public int cleanupRotatedTokens() {
         // grace 2배 여유를 두어 극단적 지연 요청도 처리 후 삭제
         return refreshTokenPort.deleteAllRotatedBefore(Instant.now(clock).minus(RT_GRACE.multipliedBy(2)));

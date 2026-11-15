@@ -4,9 +4,9 @@ import com.kista.api.user.adapter.in.web.dto.TokenResponse;
 import com.kista.api.user.adapter.in.web.security.JwtIssuerService;
 import com.kista.api.user.adapter.in.web.security.RefreshTokenCookieHelper;
 import com.kista.api.user.domain.model.User;
-import com.kista.api.user.application.usecase.TokenUseCase;
-import com.kista.api.user.application.usecase.UserSettingsUseCase;
-import com.kista.api.user.application.usecase.UserUseCase;
+import com.kista.api.user.application.service.TokenService;
+import com.kista.api.user.application.service.UserSettingsService;
+import com.kista.api.user.application.service.UserService;
 import com.kista.api.user.application.port.output.UserPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -42,12 +42,12 @@ public class DevAuthController {
     private static final UUID   DEV_E2E_USER_ID  = UUID.fromString("00000000-0000-0000-0000-000000000003");
     private static final String DEV_E2E_KAKAO_ID = "dev-e2e-user";
 
-    private final UserUseCase              userUseCase;
+    private final UserService              userUseCase;
     private final JwtIssuerService         jwtIssuerService; // 자체 발급 ES256 JWT
     private final UserPort                 userPort;          // ADMIN 테스트 유저 직접 저장용
-    private final TokenUseCase             tokenUseCase;      // RT 발급
+    private final TokenService             tokenUseCase;      // RT 발급
     private final RefreshTokenCookieHelper cookieHelper;      // RT 쿠키 설정
-    private final UserSettingsUseCase      userSettingsUseCase; // trading-core 복제본 재동기화
+    private final UserSettingsService      userSettingsUseCase; // trading-core 복제본 재동기화
 
     @Operation(summary = "[DEV] UID로 사용자 승인 — 로컬 프로파일 전용", description = "지정한 userId를 APPROVED 상태로 변경. Telegram 없이 로컬 승인 처리 시 사용.")
     @ApiResponse(responseCode = "200", description = "승인 성공")

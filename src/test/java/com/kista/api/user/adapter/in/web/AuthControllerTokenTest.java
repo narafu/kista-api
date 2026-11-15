@@ -5,9 +5,9 @@ import com.kista.shared.platform.security.*;
 import com.kista.api.user.domain.auth.InvalidRefreshTokenException;
 import com.kista.api.user.domain.auth.TokenRefreshResult;
 import com.kista.api.user.domain.model.User;
-import com.kista.api.user.application.usecase.GetUserSettingsQuery;
-import com.kista.api.user.application.usecase.TokenUseCase;
-import com.kista.api.user.application.usecase.UserUseCase;
+import com.kista.api.user.application.service.UserSettingsService;
+import com.kista.api.user.application.service.TokenService;
+import com.kista.api.user.application.service.UserService;
 import com.kista.api.support.DomainFixtures;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,12 +45,12 @@ class AuthControllerTokenTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean UserUseCase userUseCase;
-    @MockitoBean TokenUseCase tokenUseCase;
+    @MockitoBean UserService userUseCase;
+    @MockitoBean TokenService tokenUseCase;
     @MockitoBean JwtIssuerService jwtIssuerService;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort;
-    @MockitoBean GetUserSettingsQuery getUserSettingsQuery;
+    @MockitoBean UserSettingsService getUserSettingsQuery;
 
     private static final UUID USER_ID = UUID.randomUUID();
 

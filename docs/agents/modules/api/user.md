@@ -1,10 +1,10 @@
 ## com.kista.api.user (`:api`)
 
-Spring Modulith 모듈(CLOSED) — 가입·승인·프로필·설정 + JWT/RefreshToken/블랙리스트/카카오 OAuth. "domain"(domain.model+domain.auth 병합)·"usecase"·"port"·"event" 4개 NamedInterface, service·adapter·config internal.
+Spring Modulith 모듈(CLOSED) — 가입·승인·프로필·설정 + JWT/RefreshToken/블랙리스트/카카오 OAuth. "domain"(domain.model+domain.auth 병합)·"port"·"event" NamedInterface + `UserService`(타입 단위 "api"), 나머지 service·adapter·config internal.
 
 - `NotificationChannel`은 `com.kista.shared.kernel` 소유(notify 라우팅과 공유). `User.DEFAULT_CHANNEL = NotificationChannel.NONE`을 서비스·컨트롤러에서 하드코딩하지 않는다.
-- `UserUseCase.changeRole`은 역할 저장과 `BlacklistPort.markRoleChanged`(기존 AT 무효화)를 user가 캡슐화한다. 자기 강등·마지막 ADMIN 검증과 감사 로그는 admin `AdminService` 몫이다.
-- `ApprovalPolicyPort`(가입 승인 필요 여부 FOR UPDATE 락 조회)는 user가 정의하고 admin이 구현하는 포트 역전이다. `ApprovalRequirementDisabledEvent`는 admin이 발행하고 user `ApprovalRequirementDisabledListener`(AFTER_COMMIT, REQUIRES_NEW)가 PENDING 사용자를 `UserUseCase.approve`로 전원 승인한다 — admin이 순수 downstream sink라 이벤트 소유를 user에 둔다.
+- `UserService.changeRole`은 역할 저장과 `BlacklistPort.markRoleChanged`(기존 AT 무효화)를 user가 캡슐화한다. 자기 강등·마지막 ADMIN 검증과 감사 로그는 admin `AdminService` 몫이다.
+- `ApprovalPolicyPort`(가입 승인 필요 여부 FOR UPDATE 락 조회)는 user가 정의하고 admin이 구현하는 포트 역전이다. `ApprovalRequirementDisabledEvent`는 admin이 발행하고 user `ApprovalRequirementDisabledListener`(AFTER_COMMIT, REQUIRES_NEW)가 PENDING 사용자를 `UserService.approve`로 전원 승인한다 — admin이 순수 downstream sink라 이벤트 소유를 user에 둔다.
 - `UserPort.findIdsByStatus`는 전 사용자 순회용이다(finance `UserModuleFinanceMemberAdapter`가 `FinanceMemberPort.activeMemberIds()`로 위임).
 - `UserCascadeDeleter`(`deleteMe`/`AdminService.deleteUser` 공통)는 cascade를 전부 `UserDeletedEvent`로 처리한다(직접 포트 호출 0 — user↔trading·finance·account 순환 제거, EPR 재시도 보장). trading-core 쪽 cascade는 Redis Stream 경유 AFTER_COMMIT 비동기라 탈퇴 HTTP 응답 시점엔 계좌 소프트 삭제가 미완료일 수 있다(최종적 일관성).
 - `AdminSeedPromoter`는 별도 빈이다 — `UserService.login()`이 `NOT_SUPPORTED`라 그 안에서 저장·발행하면 복제본 동기화 이벤트가 트랜잭션 없이 나가 리스너 예외가 로그인까지 전파되고 재시도해도 promote가 no-op이라 복제본이 영영 안 생긴다.

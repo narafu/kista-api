@@ -1,8 +1,7 @@
 package com.kista.api.web;
 
 import com.kista.api.notify.application.port.output.NotifyPort;
-import com.kista.api.user.application.usecase.GetUserSettingsQuery;
-import com.kista.api.user.application.usecase.UserSettingsUseCase;
+import com.kista.api.user.application.service.UserSettingsService;
 import com.kista.shared.kernel.NotificationType;
 import com.kista.shared.kernel.UserDeletedEvent;
 import com.kista.shared.platform.redis.RedisStreamConfig;
@@ -45,8 +44,7 @@ class UserEventResubmitEndToEndIT {
     @Autowired UserEventResubmitScheduler scheduler;
     @MockitoSpyBean StringRedisTemplate redisTemplate; // XADD 실패 주입용
     @MockitoBean NotifyPort notifyPort;                // 관리자 텔레그램 대신 호출 검증
-    @Autowired UserSettingsUseCase userSettingsUseCase;
-    @Autowired GetUserSettingsQuery getUserSettingsQuery;
+    @Autowired UserSettingsService userSettingsUseCase;
 
     private final UUID userId = UUID.randomUUID();
 
@@ -89,7 +87,7 @@ class UserEventResubmitEndToEndIT {
 
         userSettingsUseCase.updateNotificationPref(userId, NotificationType.TRADING_ALERT, false);
 
-        assertThat(getUserSettingsQuery.getByUserId(userId).isNotificationEnabled(NotificationType.TRADING_ALERT)).isFalse();
+        assertThat(userSettingsUseCase.getByUserId(userId).isNotificationEnabled(NotificationType.TRADING_ALERT)).isFalse();
         assertThat(jdbcTemplate.queryForObject("SELECT status FROM public.event_publication WHERE serialized_event LIKE ? AND listener_id LIKE ?",
                 String.class, "%" + userId + "%", "%UserEventStreamPublisher%")).isEqualTo("FAILED");
     }

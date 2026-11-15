@@ -9,7 +9,6 @@ import com.kista.api.user.application.event.UserReappliedEvent;
 import com.kista.api.user.domain.auth.TokenConstants;
 import com.kista.api.user.domain.model.User;
 import com.kista.shared.kernel.NotificationChannel;
-import com.kista.api.user.application.usecase.UserUseCase;
 import com.kista.api.user.application.port.output.*; import com.kista.tradingcore.trading.application.port.output.*;
 import com.kista.api.finance.application.port.output.*;
 import com.kista.api.notify.application.port.output.UserNotificationPort;
@@ -52,7 +51,7 @@ class UserServiceTest {
     @Mock BlacklistPort blacklistPort;
     @Mock RefreshTokenPort refreshTokenPort;
     @Mock ApprovalPolicyPort approvalPolicyPort;
-    @Mock ObjectProvider<UserUseCase> userUseCaseProvider;
+    @Mock ObjectProvider<UserService> userUseCaseProvider;
     @Mock UserNotifyProfilePublisher userNotifyProfilePublisher;
     @Mock AdminSeedPromoter adminSeedPromoter;
     @Mock FinanceGroupPort financeGroupPort; // 가입 시 개인 그룹 부트스트랩

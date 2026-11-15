@@ -3,9 +3,9 @@ package com.kista.api.user.adapter.in.web;
 import com.kista.api.user.adapter.in.web.security.JwtIssuerService;
 import com.kista.api.user.adapter.in.web.security.RefreshTokenCookieHelper;
 import com.kista.api.user.domain.model.User;
-import com.kista.api.user.application.usecase.GetUserSettingsQuery;
-import com.kista.api.user.application.usecase.TokenUseCase;
-import com.kista.api.user.application.usecase.UserUseCase;
+import com.kista.api.user.application.service.UserSettingsService;
+import com.kista.api.user.application.service.TokenService;
+import com.kista.api.user.application.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,12 +45,12 @@ class AuthControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean UserUseCase userUseCase;
-    @MockitoBean TokenUseCase tokenUseCase; // AuthController RT 발급 의존성
+    @MockitoBean UserService userUseCase;
+    @MockitoBean TokenService tokenUseCase; // AuthController RT 발급 의존성
     @MockitoBean RefreshTokenCookieHelper cookieHelper; // RT 쿠키 헬퍼 의존성
     @MockitoBean JwtDecoder jwtDecoder; // JwtDecoderConfig bean — WebMvcTest에서 명시 필요
     @MockitoBean JwtIssuerService jwtIssuerService;   // JWT 발급 서비스
-    @MockitoBean GetUserSettingsQuery getUserSettingsQuery; // AuthController.me() / kakaoCallback() 의존성
+    @MockitoBean UserSettingsService getUserSettingsQuery; // AuthController.me() / kakaoCallback() 의존성
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 

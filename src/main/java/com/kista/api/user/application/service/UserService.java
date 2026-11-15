@@ -7,7 +7,6 @@ import com.kista.api.user.application.event.UserRejectedEvent;
 import com.kista.api.user.application.event.UserReappliedEvent;
 import com.kista.api.user.domain.auth.TokenConstants;
 import com.kista.api.user.domain.model.User;
-import com.kista.api.user.application.usecase.UserUseCase;
 import com.kista.api.user.application.port.output.*;
 import com.kista.shared.platform.persistence.UuidV7;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.modulith.NamedInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +32,8 @@ import com.kista.shared.kernel.UserStatus;
 @Service
 @RequiredArgsConstructor
 @Transactional
-class UserService implements UserUseCase {
+@NamedInterface("api")
+public class UserService {
 
     private static final Duration REJECT_BLACKLIST_TTL = Duration.ofMinutes(15); // 거절 직후 AT 차단 기간
     private static final long PENDING_REAPPLY_COOLDOWN_HOURS = 1;               // PENDING 상태 재신청 쿨다운 (시간)
@@ -46,24 +47,22 @@ class UserService implements UserUseCase {
     private final BlacklistPort blacklistPort;              // 거절 즉시 AT 차단
     private final RefreshTokenPort refreshTokenPort;        // RT 삭제 (탈퇴/거절 시 전체 세션 종료)
     private final ApprovalPolicyPort approvalPolicyPort; // 승인설정 조회 (admin RuntimeSettingsService가 구현, 포트 역전)
-    private final ObjectProvider<UserUseCase> userUseCaseProvider; // OAuth 이후 트랜잭션 프록시 재진입
+    private final ObjectProvider<UserService> userUseCaseProvider; // OAuth 이후 트랜잭션 프록시 재진입
     private final UserNotifyProfilePublisher userNotifyProfilePublisher; // trading-core user_notify_profile 캐시 동기화
     private final AdminSeedPromoter adminSeedPromoter; // ADMIN seed promote 트랜잭션 경계 (login()이 NOT_SUPPORTED라 분리)
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
-    @Override
     @Transactional(readOnly = true)
     public User getById(UUID id) {
         return userPort.findByIdOrThrow(id);
     }
 
-    @Override
+    // 텔레그램 봇 명령 발신자 userId 조회
     @Transactional(readOnly = true)
     public java.util.Optional<UUID> findUserIdByTelegramChatId(String chatId) {
         return userPort.findByTelegramChatId(chatId).map(User::id);
     }
 
-    @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // OAuth HTTP 호출 + 신규 사용자 저장 — 트랜잭션 불필요 (단건 저장은 JPA auto-commit)
     public User login(String code, String redirectUri) {
         // 인가 코드를 카카오 액세스 토큰으로 교환
@@ -98,7 +97,6 @@ class UserService implements UserUseCase {
         return user;
     }
 
-    @Override
     public User register(String kakaoId, String nickname, UUID userId, String email) {
         // 기존 사용자면 반환, 신규이면 역할/상태 결정 후 저장 + 관리자 알림
         return userPort.findByKakaoId(kakaoId).orElseGet(() -> {
@@ -124,7 +122,6 @@ class UserService implements UserUseCase {
         });
     }
 
-    @Override
     public void approve(UUID userId) {
         // PENDING·REJECTED → ACTIVE, 이미 ACTIVE면 409 (중복 승인 차단)
         User updated = userPort.findByIdOrThrow(userId).approve();
@@ -135,7 +132,7 @@ class UserService implements UserUseCase {
         userNotifyProfilePublisher.publishStatusChanged(updated);
     }
 
-    @Override
+    // reason은 optional (blank -> null 정규화는 구현체 책임)
     public void reject(UUID userId, String reason) {
         User user = userPort.findByIdOrThrow(userId);
         // reason 정규화: trim 후 blank -> null
@@ -151,7 +148,6 @@ class UserService implements UserUseCase {
         refreshTokenPort.deleteAllByUserId(userId); // RT 전체 삭제 (거절된 사용자 세션 종료)
     }
 
-    @Override
     public void reapply(UUID userId) {
         User user = userPort.findByIdOrThrow(userId);
         Instant now = Instant.now(clock);
@@ -189,7 +185,7 @@ class UserService implements UserUseCase {
             throw new User.CooldownException(user.lastReappliedAt().plus(cooldownHours, ChronoUnit.HOURS));
     }
 
-    @Override
+    // 역할 저장 + 기존 AT 무효화 (자기 강등·마지막 ADMIN 검증은 호출자 정책)
     public void changeRole(UUID userId, UserRole role) {
         // 1단계: 역할 저장
         User user = userPort.findByIdOrThrow(userId);
@@ -198,7 +194,6 @@ class UserService implements UserUseCase {
         blacklistPort.markRoleChanged(userId, Instant.now(clock), TokenConstants.AT_TTL);
     }
 
-    @Override
     public void deleteMe(UUID userId) {
         userPort.findByIdOrThrow(userId); // 존재 확인
         userCascadeDeleter.deleteCascade(userId);

@@ -8,9 +8,9 @@ import com.kista.api.user.adapter.in.web.security.JwtIssuerService;
 import com.kista.api.user.adapter.in.web.security.RefreshTokenCookieHelper;
 import com.kista.api.user.domain.model.User;
 import com.kista.api.user.domain.model.UserSettings;
-import com.kista.api.user.application.usecase.GetUserSettingsQuery;
-import com.kista.api.user.application.usecase.TokenUseCase;
-import com.kista.api.user.application.usecase.UserUseCase;
+import com.kista.api.user.application.service.UserSettingsService;
+import com.kista.api.user.application.service.TokenService;
+import com.kista.api.user.application.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -35,12 +35,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final UserUseCase userUseCase;
-    private final TokenUseCase tokenUseCase;
+    private final UserService userUseCase;
+    private final TokenService tokenUseCase;
     private final JwtIssuerService jwtIssuerService;
     private final JwtDecoder jwtDecoder; // AT 파싱용 — logout 시 jti 추출
     private final RefreshTokenCookieHelper cookieHelper;
-    private final GetUserSettingsQuery getUserSettingsQuery; // UserResponse 알림 설정·추천 목록 조회용
+    private final UserSettingsService getUserSettingsQuery; // UserResponse 알림 설정·추천 목록 조회용
 
 
     // 카카오 OAuth 인가 코드로 로그인 — AT(body) + RT(HttpOnly 쿠키) 발급

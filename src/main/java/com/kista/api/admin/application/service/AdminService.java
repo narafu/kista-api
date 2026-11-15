@@ -4,7 +4,7 @@ import com.kista.shared.kernel.TimeZones;
 import com.kista.api.user.domain.model.User;
 import com.kista.api.user.domain.model.UserSummary;
 import com.kista.api.admin.application.usecase.AdminUserUseCase;
-import com.kista.api.user.application.usecase.UserUseCase;
+import com.kista.api.user.application.service.UserService;
 import com.kista.api.user.application.port.output.UserSummaryPort;
 import com.kista.api.admin.application.port.output.AuditLogPort;
 import com.kista.api.user.application.port.output.UserPort;
@@ -29,7 +29,7 @@ class AdminService implements AdminUserUseCase {
 
     private final UserPort userPort;
     private final UserSummaryPort userSummaryPort;   // 관리자 화면 전용 read-model
-    private final UserUseCase userUseCase; // 승인/거절/탈퇴 위임 (텔레그램 알림 + SSE 포함)
+    private final UserService userUseCase; // 승인/거절/탈퇴 위임 (텔레그램 알림 + SSE 포함)
     private final AuditLogPort auditLogPort;             // 감사 로그 기록
 
     private static final String TELEGRAM_ACTOR = "TELEGRAM_BOT"; // 텔레그램 인라인 버튼 경로 행위자 표기
@@ -60,7 +60,7 @@ class AdminService implements AdminUserUseCase {
 
     @Override
     public void approveUser(UUID adminId, UUID targetUserId) {
-        // UserUseCase 위임 (텔레그램 알림 + SSE 포함)
+        // UserService 위임 (텔레그램 알림 + SSE 포함)
         userUseCase.approve(targetUserId);
         log.info("관리자 사용자 승인: adminId={}, targetUserId={}", adminId, targetUserId);
         auditLogPort.log(adminId, "USER_APPROVE", "USER", targetUserId, null);
@@ -68,7 +68,7 @@ class AdminService implements AdminUserUseCase {
 
     @Override
     public void rejectUser(UUID adminId, UUID targetUserId, String reason) {
-        // UserUseCase 위임 (텔레그램 알림 + SSE 포함, reason 정규화는 UserService 책임)
+        // UserService 위임 (텔레그램 알림 + SSE 포함, reason 정규화는 UserService 책임)
         userUseCase.reject(targetUserId, reason);
         log.info("관리자 사용자 거절: adminId={}, targetUserId={}", adminId, targetUserId);
         auditLogPort.log(adminId, "USER_REJECT", "USER", targetUserId, Map.of("reason", reason == null ? "" : reason));

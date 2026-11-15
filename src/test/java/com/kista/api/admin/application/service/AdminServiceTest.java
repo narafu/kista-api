@@ -1,7 +1,7 @@
 package com.kista.api.admin.application.service;
 
 import com.kista.api.user.domain.model.UserSummary;
-import com.kista.api.user.application.usecase.UserUseCase;
+import com.kista.api.user.application.service.UserService;
 import com.kista.api.user.application.port.output.UserSummaryPort;
 import com.kista.api.admin.application.port.output.AuditLogPort;
 import com.kista.api.user.application.port.output.UserPort;
@@ -35,7 +35,7 @@ class AdminServiceTest {
 
     @Mock UserPort userPort;
     @Mock UserSummaryPort userSummaryPort;
-    @Mock UserUseCase userUseCase;
+    @Mock UserService userUseCase;
     @Mock AuditLogPort auditLogPort;
 
     @InjectMocks AdminService adminService;
@@ -118,7 +118,7 @@ class AdminServiceTest {
 
         adminService.changeRole(adminId, targetId, UserRole.ADMIN);
 
-        // 역할 저장 + AT 무효화는 user 모듈(UserUseCase.changeRole)이 담당 — admin은 검증과 감사 로그만
+        // 역할 저장 + AT 무효화는 user 모듈(UserService.changeRole)이 담당 — admin은 검증과 감사 로그만
         verify(userUseCase).changeRole(targetId, UserRole.ADMIN);
         verify(auditLogPort).log(eq(adminId), eq("USER_ROLE_CHANGE"), eq("USER"), eq(targetId), any());
     }
@@ -175,7 +175,7 @@ class AdminServiceTest {
 
         adminService.deleteUser(adminId, targetId);
 
-        // cascade 삭제는 UserUseCase.deleteMe로 위임
+        // cascade 삭제는 UserService.deleteMe로 위임
         verify(userUseCase).deleteMe(targetId);
         verify(auditLogPort).log(eq(adminId), eq("USER_DELETE"), eq("USER"), eq(targetId), any());
     }

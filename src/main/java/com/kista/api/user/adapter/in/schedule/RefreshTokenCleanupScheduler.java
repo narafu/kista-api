@@ -1,6 +1,6 @@
 package com.kista.api.user.adapter.in.schedule;
 
-import com.kista.api.user.application.usecase.TokenUseCase;
+import com.kista.api.user.application.service.TokenService;
 import com.kista.shared.platform.scheduling.SchedulerJobRunner;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +17,7 @@ import java.time.Duration;
 @ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true) // local에서 끄면 운영 DB·텔레그램과 중복 알림 발생 방지
 public class RefreshTokenCleanupScheduler {
 
-    private final TokenUseCase tokenUseCase;
+    private final TokenService tokenUseCase;
     private final SchedulerJobRunner jobRunner; // 스케쥴러 시작/종료 알림 (레거시 공통 골격 재사용)
     private final SchedulerLockService schedulerLockService;
 

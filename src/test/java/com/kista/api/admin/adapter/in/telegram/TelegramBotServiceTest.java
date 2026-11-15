@@ -12,7 +12,7 @@ import com.kista.api.admin.application.port.output.PortfolioQueryPort;
 import com.kista.shared.platform.telegram.TelegramHttpClient;
 import com.kista.shared.platform.telegram.TelegramProperties;
 import com.kista.api.admin.application.usecase.AdminUserUseCase;
-import com.kista.api.user.application.usecase.UserUseCase;
+import com.kista.api.user.application.service.UserService;
 import com.kista.api.user.domain.model.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,7 +37,7 @@ class TelegramBotServiceTest {
 
     @Mock TelegramHttpClient telegramHttpClient;
     @Mock PortfolioQueryPort portfolioQueryPort;
-    @Mock UserUseCase userUseCase;
+    @Mock UserService userUseCase;
     @Mock AdminUserUseCase adminUserUseCase;
 
     static final TelegramProperties PROPS = new TelegramProperties("admin-token", String.valueOf(12345L));

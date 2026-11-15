@@ -2,8 +2,8 @@ package com.kista.api.user.adapter.in.web;
 
 import tools.jackson.databind.ObjectMapper;
 import com.kista.shared.kernel.NotificationChannel;
-import com.kista.api.user.application.usecase.UserSettingsUseCase;
-import com.kista.api.user.application.usecase.UserProfileUseCase;
+import com.kista.api.user.application.service.UserSettingsService;
+import com.kista.api.user.application.service.UserProfileService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -32,8 +32,8 @@ class SettingsControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean UserProfileUseCase userProfileUseCase;
-    @MockitoBean UserSettingsUseCase userSettingsUseCase;
+    @MockitoBean UserProfileService userProfileUseCase;
+    @MockitoBean UserSettingsService userSettingsUseCase;
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
 

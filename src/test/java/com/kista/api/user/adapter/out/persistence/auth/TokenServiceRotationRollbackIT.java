@@ -2,7 +2,7 @@ package com.kista.api.user.adapter.out.persistence.auth;
 
 import com.kista.api.user.application.service.TokenUseCaseTestConfig;
 import com.kista.api.user.domain.auth.InvalidRefreshTokenException;
-import com.kista.api.user.application.usecase.TokenUseCase;
+import com.kista.api.user.application.service.TokenService;
 import com.kista.api.user.application.port.output.BlacklistPort;
 import com.kista.api.user.application.port.output.UserPort;
 import com.kista.api.web.RootDataJpaTestBase;
@@ -39,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("TokenService RT 재사용 공격 감지 — 실제 트랜잭션 커밋 검증 통합 테스트")
 class TokenServiceRotationRollbackIT extends RootDataJpaTestBase {
 
-    @Autowired TokenUseCase tokenUseCase;
+    @Autowired TokenService tokenUseCase;
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired Clock clock; // 서비스와 같은 고정 Clock — 시드 시각을 서비스 기준에 맞춘다
     @MockitoBean BlacklistPort blacklistPort;
