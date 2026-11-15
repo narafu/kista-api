@@ -73,9 +73,9 @@ import com.kista.shared.kernel.StrategyCycleSeedType;
 class TradingServiceTest {
 
     @Mock MarketCalendarPort marketCalendarPort;
-    @Mock BrokerPricePort tossPricePort;  // BrokerPricePort 직접 mock (TossPricePort 삭제됨)
+    @Mock BrokerPricePort tossPricePort;  // 시세 포트 mock
     @Mock BrokerOrderCorrectionPort brokerOrderPort;
-    @Mock ExecutionPort tossExecutionPort; // ExecutionPort 직접 mock (TossExecutionPort 삭제됨)
+    @Mock ExecutionPort tossExecutionPort; // 주문 실행 포트 mock
     @Mock InfiniteStrategy infiniteStrategy;
     @Mock ReverseInfiniteStrategy reverseStrategy;
     @Mock PrivacyStrategy privacyStrategy;

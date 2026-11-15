@@ -63,7 +63,7 @@ class ManualTradingServiceTest {
     @Mock AccountPort accountPort;
     @Mock OrderPort orderPort;
     @Mock PrivacyTradePort privacyTradePort;
-    @Mock BrokerPricePort tossPricePort;      // BrokerPricePort 직접 mock (TossPricePort 삭제됨)
+    @Mock BrokerPricePort tossPricePort;      // 시세 포트 mock
     @Mock CyclePositionPort cyclePositionPort;
     @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;

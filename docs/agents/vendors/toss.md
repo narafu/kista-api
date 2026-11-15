@@ -17,7 +17,7 @@
 
 ### 계좌번호 포맷
 
-- `XXX-XX-XXXXXX` (하이픈 포함) — Meritz `XXXXXXXX-XX`와 다름. Toss 호출은 `accounts.broker_account_code`(accountSeq)를 헤더에 쓴다(`TossHttpClient.buildHeaders`)
+- `XXX-XX-XXXXXX` (하이픈 포함). Toss 호출은 `accounts.broker_account_code`(accountSeq)를 헤더에 쓴다(`TossHttpClient.buildHeaders`)
 
 ### 토큰·인증
 

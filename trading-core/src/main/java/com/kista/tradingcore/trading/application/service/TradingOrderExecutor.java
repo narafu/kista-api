@@ -129,7 +129,7 @@ class TradingOrderExecutor {
     }
 
     // 주문 목록을 개별 접수 — 건별로 선점(SUBMITTING) 후 접수, 실패·선점 경합 주문은 건너뛰고 다음 주문 계속
-        private PlaceResult placeEach(List<Order> unordered, TradingAccount account, Instant cutoff) {
+    private PlaceResult placeEach(List<Order> unordered, TradingAccount account, Instant cutoff) {
         // INFINITE 보정 주문은 마지막에 접수 — 증권사는 접수 시 지정가 전체를 묶으므로 예수금이 모자라면 거절이 보정에만 생기고 base는 접수된다
         // (조회 순서가 비결정적이라 명시 정렬, 정렬은 안정적이라 나머지 순서는 유지)
         List<Order> orders = unordered.stream()
