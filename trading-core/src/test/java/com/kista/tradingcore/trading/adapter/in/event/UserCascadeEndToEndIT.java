@@ -112,7 +112,7 @@ class UserCascadeEndToEndIT {
         assertThat(profile.get("is_active")).isEqualTo(false);
         assertThat(profile.get("telegram_bot_token")).isNull();
         assertThat(profile.get("chat_id")).isNull();
-        assertThat(cascadePublicationStatus()).isEqualTo("COMPLETED");
+        assertThat(cascadePublicationCount()).isZero(); // completion-mode: delete — 완료되면 행이 삭제된다
 
         // 탈퇴 전에 만들어진 프로필 스냅샷이 늦게 도착해도 tombstone을 되살리지 않는다
         republishInTransaction(new UserNotifyProfileChangedEvent(userId, Map.of(), true, "token", "chat",
@@ -136,7 +136,7 @@ class UserCascadeEndToEndIT {
 
         verify(errorReportPort, atLeastOnce()).reportError(any());
         assertThat(jdbcTemplate.queryForObject("SELECT deleted_at IS NOT NULL FROM accounts WHERE id = ?", Boolean.class, accountId)).isTrue();
-        assertThat(cascadePublicationStatus()).isEqualTo("COMPLETED");
+        assertThat(cascadePublicationCount()).isZero(); // completion-mode: delete — 완료되면 행이 삭제된다
     }
 
     // 프로필 동기화 쓰기 경로(UserNotifyProfileSyncListener → TradingUserProfilePort.applyChange)가 실 컨텍스트에서 커밋되는지
@@ -161,6 +161,11 @@ class UserCascadeEndToEndIT {
     private String cascadePublicationStatus() {
         return jdbcTemplate.queryForObject("SELECT status FROM event_publication WHERE serialized_event LIKE ? AND listener_id LIKE ?",
                 String.class, "%" + userId + "%", "%UserCascadeListener%");
+    }
+
+    private Long cascadePublicationCount() {
+        return jdbcTemplate.queryForObject("SELECT count(*) FROM event_publication WHERE serialized_event LIKE ? AND listener_id LIKE ?",
+                Long.class, "%" + userId + "%", "%UserCascadeListener%");
     }
 
     private Integer cascadePublicationAttempts() {

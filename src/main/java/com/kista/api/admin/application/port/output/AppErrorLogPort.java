@@ -13,6 +13,6 @@ public interface AppErrorLogPort {
     void save(String errorType, String message, String stackTrace, Map<String, String> context);
     // 기간 범위 조회 (최신순, limit건) — from/to 기본값은 호출부가 결정(컨트롤러가 EPOCH/now 대입)
     List<AppErrorLog> findRecent(int limit, Instant from, Instant to);
-    // 소프트 삭제 — deleted_at 설정, 없으면 NoSuchElementException
-    void softDelete(UUID id);
+    // 처리 완료 표시 — resolved_at 설정(목록에서 제외), 없으면 NoSuchElementException
+    void resolve(UUID id);
 }

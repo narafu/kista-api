@@ -9,6 +9,7 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
+import org.springframework.core.env.Environment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.context.ActiveProfiles;
@@ -29,6 +30,9 @@ class TradingApplicationContextLoadTest {
     @Autowired
     private ApplicationContext context; // 컨텍스트 로드 성공 자체가 1차 검증
 
+    @Autowired
+    private Environment env; // EPR 완료 행 삭제 설정 확인용
+
     @Test
     void 트레이딩_컨텍스트는_JPA_리포지토리_전부와_보안_필터체인_하나를_갖는다() {
         assertThat(context.getBeanNamesForType(JpaRepository.class)).hasSize(TRADING_JPA_REPOSITORIES);
@@ -38,5 +42,10 @@ class TradingApplicationContextLoadTest {
         assertThat(context.getBeanNamesForType(ExceptionReporter.class)).hasSize(1);
         // JwtAuthFilter가 요구하는 블랙리스트 포트도 하나 — trading-core는 platform 조건부 빈, root는 user 어댑터
         assertThat(context.getBeanNamesForType(TokenBlacklistPort.class)).hasSize(1);
+    }
+
+    @Test
+    void EPR_완료_행은_삭제_모드다() {
+        assertThat(env.getProperty("spring.modulith.events.completion-mode")).isEqualTo("delete");
     }
 }

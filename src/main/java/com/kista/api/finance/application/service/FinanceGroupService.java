@@ -42,7 +42,7 @@ public class FinanceGroupService {
     public FinanceGroupInvitation invite(UUID groupId, UUID userId, long expiresInHours) {
         UUID targetGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         if (targetGroupId == null) {
-            targetGroupId = financeGroupPort.createGroup(userId);
+            targetGroupId = financeGroupPort.createGroup();
             financeGroupPort.addMember(targetGroupId, userId, FinanceGroup.MemberRole.OWNER);
         } else {
             // 이미 그룹이 있으면 경로의 그룹이 내 그룹이어야 한다 — 그룹이 없을 때는 새로 만들 그룹이라 경로 값을 쓰지 않는다(UI는 자리표시로 내 ID를 보낸다)

@@ -39,6 +39,7 @@ spring:
   modulith:
     detection-strategy: explicitly-annotated   # @ApplicationModule(id) 붙은 패키지만 모듈 — 패키지 깊이와 무관하게 ID 고정
     events:
+      completion-mode: delete   # 완료 행을 읽는 코드 없음 — 완료 시 행 삭제, 미완료 행만 남는다
       jdbc:
         schema: trading                 # trading 전용 event_publication — root(public)와 분리
         schema-initialization:

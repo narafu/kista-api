@@ -42,7 +42,7 @@ class FinanceUserDataEraseServiceTest {
     private final UUID groupId = UUID.randomUUID();
 
     private FinanceGroup sharedGroup() {
-        return new FinanceGroup(groupId, userId, null);
+        return new FinanceGroup(groupId, null);
     }
 
     private void fire() {

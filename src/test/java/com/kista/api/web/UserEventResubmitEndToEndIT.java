@@ -73,7 +73,7 @@ class UserEventResubmitEndToEndIT {
         scheduler.resubmitFailedUserEvents();
 
         verify(notifyPort).notifyError(argThat(e -> e.getMessage().contains("UserDeletedEvent")));
-        assertThat(publisherPublicationStatus()).isEqualTo("COMPLETED");
+        assertThat(publisherPublicationCount()).isZero(); // completion-mode: delete — 완료되면 행이 삭제된다
         assertThat(redisTemplate.<String, String>opsForStream().range(RedisStreamConfig.USER_DELETED_STREAM, Range.unbounded()))
                 .anyMatch(r -> r.getValue().get("payload").contains(userId.toString()));
     }
@@ -90,6 +90,11 @@ class UserEventResubmitEndToEndIT {
         assertThat(userSettingsService.getByUserId(userId).isNotificationEnabled(NotificationType.TRADING_ALERT)).isFalse();
         assertThat(jdbcTemplate.queryForObject("SELECT status FROM public.event_publication WHERE serialized_event LIKE ? AND listener_id LIKE ?",
                 String.class, "%" + userId + "%", "%UserEventStreamPublisher%")).isEqualTo("FAILED");
+    }
+
+    private Long publisherPublicationCount() {
+        return jdbcTemplate.queryForObject("SELECT count(*) FROM public.event_publication WHERE serialized_event LIKE ? AND listener_id LIKE ?",
+                Long.class, "%" + userId + "%", "%UserEventStreamPublisher%");
     }
 
     private String publisherPublicationStatus() {

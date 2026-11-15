@@ -7,7 +7,6 @@ import java.util.UUID;
 // 데이터 소유는 개별 리소스의 (userId, groupId) 이중축이 담당하고, 이 record는 순수 멤버십 단위다.
 public record FinanceGroup(
         UUID id,           // PK
-        UUID ownerUserId,  // FK → users.id, 그룹 생성자
         Instant createdAt  // DB created_at, 신규 등록 시 null
 ) {
     public enum MemberRole {

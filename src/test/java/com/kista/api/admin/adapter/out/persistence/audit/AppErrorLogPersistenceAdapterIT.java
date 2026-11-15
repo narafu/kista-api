@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Instant;
 import java.util.List;
@@ -29,6 +30,7 @@ class AppErrorLogPersistenceAdapterIT extends RootDataJpaTestBase {
 
     @Autowired AppErrorLogJpaRepository repo;
     @Autowired EntityManager entityManager;
+    @Autowired JdbcTemplate jdbcTemplate;
     @Autowired PlatformTransactionManager txManager; // 어댑터의 REQUIRES_NEW 저장은 테스트 트랜잭션 밖에서 커밋된다
 
     AppErrorLogPersistenceAdapter adapter;
@@ -44,6 +46,13 @@ class AppErrorLogPersistenceAdapterIT extends RootDataJpaTestBase {
         TransactionTemplate tx = new TransactionTemplate(txManager);
         tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         tx.executeWithoutResult(status -> repo.deleteAll());
+    }
+
+    // 수정은 별도 트랜잭션에서 커밋 — 테스트 트랜잭션이 행 락을 쥐면 @AfterEach 정리(REQUIRES_NEW)가 교착한다
+    private void inNewTx(Runnable work) {
+        TransactionTemplate tx = new TransactionTemplate(txManager);
+        tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        tx.executeWithoutResult(status -> work.run());
     }
 
     @Test
@@ -65,5 +74,58 @@ class AppErrorLogPersistenceAdapterIT extends RootDataJpaTestBase {
         assertThat(saved.errorType()).isEqualTo("TypeError");
         assertThat(saved.message()).isEqualTo("cannot read property");
         assertThat(saved.context()).containsEntry("pathname", "/login").containsEntry("caller", "TradingService");
+    }
+
+    @Test
+    @DisplayName("resolve() 뒤 목록에서 빠지고 resolved_at·deleted_at이 함께 채워진다")
+    void resolve_excludesFromFindRecent() {
+        adapter.save("TypeError", "m", "s", java.util.Map.of());
+        Instant from = Instant.now().minusSeconds(60);
+        Instant to = Instant.now().plusSeconds(1);
+        AppErrorLog saved = adapter.findRecent(50, from, to).getFirst();
+
+        inNewTx(() -> adapter.resolve(saved.id()));
+        entityManager.clear();
+
+        assertThat(adapter.findRecent(50, from, to)).isEmpty();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM public.app_error_logs WHERE id = ? AND resolved_at IS NOT NULL AND deleted_at IS NOT NULL",
+                Integer.class, saved.id())).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("백필 SQL로 resolved_at만 채워진 행(옛 이미지가 처리한 행)도 목록에서 빠진다")
+    void backfilledResolvedAtOnlyRow_isExcluded() {
+        adapter.save("TypeError", "m", "s", java.util.Map.of());
+        // V7 백필과 같은 상태: deleted_at이 있던 행에 resolved_at만 채워진 결과
+        inNewTx(() -> {
+            jdbcTemplate.update("UPDATE public.app_error_logs SET deleted_at = now() WHERE resolved_at IS NULL");
+            jdbcTemplate.update("UPDATE public.app_error_logs SET resolved_at = deleted_at WHERE deleted_at IS NOT NULL");
+        });
+        entityManager.clear();
+
+        assertThat(adapter.findRecent(50, Instant.now().minusSeconds(60), Instant.now().plusSeconds(1))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("이미 처리된 id 재처리는 NoSuchElementException이고 시각을 덮어쓰지 않는다")
+    void resolve_alreadyResolved_throwsNotFound() {
+        adapter.save("TypeError", "m", "s", java.util.Map.of());
+        AppErrorLog saved = adapter.findRecent(50, Instant.now().minusSeconds(60), Instant.now().plusSeconds(1)).getFirst();
+        inNewTx(() -> adapter.resolve(saved.id()));
+        entityManager.clear();
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> adapter.resolve(saved.id()))
+                .isInstanceOf(java.util.NoSuchElementException.class);
+    }
+
+    @Test
+    @DisplayName("deleted_at만 채워진 행(옛 이미지가 처리한 행)도 목록에서 빠진다")
+    void deletedAtOnlyRow_isExcluded() {
+        adapter.save("TypeError", "m", "s", java.util.Map.of());
+        inNewTx(() -> jdbcTemplate.update("UPDATE public.app_error_logs SET deleted_at = now()"));
+        entityManager.clear();
+
+        assertThat(adapter.findRecent(50, Instant.now().minusSeconds(60), Instant.now().plusSeconds(1))).isEmpty();
     }
 }

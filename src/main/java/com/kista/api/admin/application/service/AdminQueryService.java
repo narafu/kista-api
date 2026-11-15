@@ -149,6 +149,6 @@ public class AdminQueryService {
 
     @Transactional
     public void deleteErrorLog(UUID id) {
-        appErrorLogPort.softDelete(id);
+        appErrorLogPort.resolve(id);
     }
 }

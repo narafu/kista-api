@@ -19,6 +19,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -72,10 +73,12 @@ class RuntimeSettingsApprovalConcurrencyIT {
         // UserService.register()가 가입 시 개인 그룹(finance_groups + OWNER 멤버십)을 자동 생성하므로,
         // users를 하드 삭제하기 전에 그 그룹 자체와 멤버십부터 지워야 FK 위반이 나지 않는다
         // (finance_group_members_user_id_fkey, finance_groups_owner_user_id_fkey).
+        // 그룹은 소유자 컬럼이 아니라 멤버십 기준으로 찾는다 — 멤버 행을 먼저 지우면 그룹을 못 찾으므로 그룹 id를 먼저 모은다
+        List<UUID> groupIds = jdbcTemplate.queryForList(
+                "SELECT group_id FROM finance_group_members WHERE user_id IN (?, ?)", UUID.class, adminId, signupId);
         jdbcTemplate.update(
                 "DELETE FROM finance_group_members WHERE user_id IN (?, ?)", adminId, signupId);
-        jdbcTemplate.update(
-                "DELETE FROM finance_groups WHERE owner_user_id IN (?, ?)", adminId, signupId);
+        groupIds.forEach(id -> jdbcTemplate.update("DELETE FROM finance_groups WHERE id = ?", id));
         jdbcTemplate.update("DELETE FROM users WHERE id IN (?, ?)", adminId, signupId);
         executor.shutdownNow();
     }

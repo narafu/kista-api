@@ -33,8 +33,8 @@ public class FinanceGroupPersistenceAdapter implements FinanceGroupPort {
     }
 
     @Override
-    public UUID createGroup(UUID ownerUserId) {
-        FinanceGroupEntity entity = FinanceGroupEntity.fromModel(new FinanceGroup(null, ownerUserId, null));
+    public UUID createGroup() {
+        FinanceGroupEntity entity = FinanceGroupEntity.fromModel(new FinanceGroup(null, null));
         return groupJpaRepository.save(entity).getId();
     }
 

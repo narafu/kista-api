@@ -60,7 +60,7 @@ class AppErrorLogPersistenceAdapterTest {
     @Test
     void findRecent_returns_mapped_list() {
         AppErrorLogEntity entity = new AppErrorLogEntity(
-                null, "TossApiException", "Toss 오류", "stack", Map.of("caller", "TradingService"), null
+                null, "TossApiException", "Toss 오류", "stack", Map.of("caller", "TradingService"), null, null
         );
         Instant from = Instant.EPOCH;
         Instant to = Instant.now();
@@ -71,5 +71,17 @@ class AppErrorLogPersistenceAdapterTest {
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().errorType()).isEqualTo("TossApiException");
         assertThat(result.getFirst().context()).containsKey("caller");
+    }
+
+    @Test
+    void resolve_alreadyResolved_throwsNotFound_withoutOverwrite() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        Instant resolvedAt = Instant.parse("2026-01-01T00:00:00Z");
+        AppErrorLogEntity entity = new AppErrorLogEntity(id, "T", "m", "s", Map.of(), resolvedAt, null);
+        when(repo.findById(id)).thenReturn(java.util.Optional.of(entity));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> adapter.resolve(id))
+                .isInstanceOf(java.util.NoSuchElementException.class);
+        assertThat(entity.getResolvedAt()).isEqualTo(resolvedAt);
     }
 }

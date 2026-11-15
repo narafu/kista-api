@@ -59,6 +59,10 @@ class EventPublicationRegistryTest {
         Long remainingIncomplete = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM event_publication WHERE event_type LIKE '%BenchmarkAlertRaisedEvent' AND completion_date IS NULL", Long.class);
         assertThat(remainingIncomplete).isEqualTo(0L);
+        // completion-mode: delete — 완료된 행은 남지 않는다
+        Long remainingAll = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM event_publication WHERE event_type LIKE '%BenchmarkAlertRaisedEvent'", Long.class);
+        assertThat(remainingAll).isEqualTo(0L);
         verify(notifyPort, times(2)).notifyError(org.mockito.ArgumentMatchers.any()); // 최초 실패 1회 + 재제출 성공 1회
     }
 }

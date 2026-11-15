@@ -52,7 +52,7 @@ class FinanceGroupServiceTest {
     @DisplayName("무그룹 유저가 초대하면 새 그룹을 만들고 본인을 OWNER로 등록한 뒤 초대를 발급한다")
     void invite_noCurrentGroup_createsGroupAndAddsSelfAsOwner() {
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
-        when(financeGroupPort.createGroup(userId)).thenReturn(groupId);
+        when(financeGroupPort.createGroup()).thenReturn(groupId);
         FinanceGroupInvitation invitation = new FinanceGroupInvitation(UUID.randomUUID(), groupId, userId, null,
                 "code1234abcd5678", FinanceGroupInvitation.Status.PENDING, Instant.now(CLOCK).plus(72, ChronoUnit.HOURS), null);
         when(financeGroupPort.createInvitation(eq(groupId), eq(userId), anyString(), any(Instant.class)))
@@ -61,7 +61,7 @@ class FinanceGroupServiceTest {
         FinanceGroupInvitation result = financeGroupService.invite(groupId, userId, 72);
 
         assertThat(result).isEqualTo(invitation);
-        verify(financeGroupPort).createGroup(userId);
+        verify(financeGroupPort).createGroup();
         verify(financeGroupPort).addMember(groupId, userId, FinanceGroup.MemberRole.OWNER);
     }
 
@@ -78,7 +78,7 @@ class FinanceGroupServiceTest {
         FinanceGroupInvitation result = financeGroupService.invite(groupId, userId, 72);
 
         assertThat(result).isEqualTo(invitation);
-        verify(financeGroupPort, never()).createGroup(any());
+        verify(financeGroupPort, never()).createGroup();
     }
 
     @Test
@@ -289,7 +289,7 @@ class FinanceGroupServiceTest {
     @Test
     @DisplayName("listMyGroups는 findByMemberUserId 결과를 그대로 반환")
     void listMyGroups_delegatesToPort() {
-        FinanceGroup group = new FinanceGroup(groupId, userId, null);
+        FinanceGroup group = new FinanceGroup(groupId, null);
         when(financeGroupPort.findByMemberUserId(userId)).thenReturn(List.of(group));
 
         assertThat(financeGroupService.listMyGroups(userId)).containsExactly(group);

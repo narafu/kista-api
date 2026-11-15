@@ -1547,9 +1547,9 @@ flows:
         lane: ui
         to: [api, db]
         title: 조치 완료 처리
-        desc: 오류 로그 항목에서 삭제를 누르면 행을 지우지 않고 삭제 시각만 기록(소프트 삭제)해 목록에서 사라지게 한다.
-        code: [AdminObservabilityController#softDeleteErrorLog, AdminQueryService#deleteErrorLog, AppErrorLogPersistenceAdapter#softDelete]
-        state: "app_error_logs.deleted_at → 현재 시각"
+        desc: 오류 로그 항목에서 삭제를 누르면 행을 지우지 않고 처리 시각(resolved_at)만 기록해 목록에서 사라지게 한다.
+        code: [AdminObservabilityController#softDeleteErrorLog, AdminQueryService#deleteErrorLog, AppErrorLogPersistenceAdapter#resolve]
+        state: "app_error_logs.resolved_at → 현재 시각"
         fail: 없는 id면 404.
 
   admin-role:
