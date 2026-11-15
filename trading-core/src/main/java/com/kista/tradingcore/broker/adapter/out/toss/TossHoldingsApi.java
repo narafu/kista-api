@@ -71,8 +71,8 @@ class TossHoldingsApi {
         log.info("Toss 예수금 조회: USD=${}, KRW=₩{}, 환율={}", usdBuyable, krwBuyable, usdToKrwRate);
 
         return List.of(
-                new MarginItem(Currency.USD, BigDecimal.ZERO, BigDecimal.ZERO, usdBuyable, usdToKrwRate),
-                new MarginItem(Currency.KRW, BigDecimal.ZERO, BigDecimal.ZERO, krwBuyable, usdToKrwRate)
+                new MarginItem(Currency.USD, usdBuyable, usdToKrwRate),
+                new MarginItem(Currency.KRW, krwBuyable, usdToKrwRate)
         );
     }
 

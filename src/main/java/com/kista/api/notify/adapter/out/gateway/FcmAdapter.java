@@ -67,7 +67,7 @@ public class FcmAdapter implements UserNotificationPort {
                 }
             }
         } catch (FirebaseMessagingException e) {
-            log.error("FCM 전송 오류: {}", e.getMessage());
+            log.error("FCM 전송 오류", e);
         }
     }
 }

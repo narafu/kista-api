@@ -1,5 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.meritz;
 
+import com.kista.tradingcore.broker.domain.model.BrokerApiException;
 import com.kista.shared.kernel.Broker;
 import com.kista.tradingcore.broker.adapter.out.internal.CallIntervalGate;
 import com.kista.tradingcore.broker.adapter.out.internal.TokenCoordinator;
@@ -76,7 +77,7 @@ class MeritzHttpClientTest {
 
         assertThatThrownBy(() -> client.get(PATH, ACCOUNT, new LinkedMultiValueMap<>()))
                 .isInstanceOfSatisfying(MeritzApiException.class, e -> {
-                    assertThat(e.isRejected()).isTrue();
+                    assertThat(BrokerApiException.isRejection(e)).isTrue();
                     assertThat(e.rspCd()).isEqualTo("7936");
                 });
     }
@@ -99,7 +100,7 @@ class MeritzHttpClientTest {
         respond(HttpMethod.GET, HttpStatus.OK, code("9999"));
 
         assertThatThrownBy(() -> client.get(PATH, ACCOUNT, new LinkedMultiValueMap<>()))
-                .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(e.isRejected()).isTrue());
+                .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(BrokerApiException.isRejection(e)).isTrue());
     }
 
     @Test
@@ -108,7 +109,7 @@ class MeritzHttpClientTest {
         server.expect(requestTo(BASE + PATH)).andRespond(withException(new IOException("reset")));
 
         assertThatThrownBy(() -> client.post(PATH, ACCOUNT, Map.of("a", "b")))
-                .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(e.isRejected()).isFalse());
+                .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(BrokerApiException.isRejection(e)).isFalse());
     }
 
     @Test
@@ -117,7 +118,7 @@ class MeritzHttpClientTest {
         server.expect(requestTo(BASE + PATH)).andRespond(withStatus(HttpStatus.BAD_GATEWAY).body("<html>gw</html>"));
 
         assertThatThrownBy(() -> client.post(PATH, ACCOUNT, Map.of("a", "b")))
-                .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(e.isRejected()).isFalse());
+                .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(BrokerApiException.isRejection(e)).isFalse());
     }
 
     @Test
@@ -125,7 +126,7 @@ class MeritzHttpClientTest {
         when(authApi.getToken(ACCOUNT)).thenThrow(new MeritzApiException(null, "issue failed", null, false));
 
         assertThatThrownBy(() -> client.post(PATH, ACCOUNT, Map.of("a", "b")))
-                .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(e.isRejected()).isTrue());
+                .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(BrokerApiException.isRejection(e)).isTrue());
         server.verify();
     }
 
@@ -162,7 +163,7 @@ class MeritzHttpClientTest {
         respond(HttpMethod.POST, HttpStatus.INTERNAL_SERVER_ERROR, code("EGW00123"));
 
         assertThatThrownBy(() -> client.post(PATH, ACCOUNT, Map.of("odqt", "1")))
-                .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(e.isRejected()).isTrue());
+                .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(BrokerApiException.isRejection(e)).isTrue());
         server.verify();
     }
 

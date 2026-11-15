@@ -13,7 +13,7 @@
 ### @WebMvcTest + Spring Security
 - 슬라이스는 커스텀 `SecurityConfig` 대신 Boot 기본 Security가 적용된다. POST는 `.with(csrf())` 필수(없으면 403)
 - **`@WithMockUser` 금지**(principal이 UserDetails라 `@AuthenticationPrincipal UUID`에서 ClassCastException). `.with(authentication(new UsernamePasswordAuthenticationToken(UUID.fromString(uuid), null, List.of())))`, principal은 항상 `UUID`
-- `JwtAuthFilter`를 `@Import`하면 `@MockitoBean JwtDecoder jwtDecoder` 필수. `hasRole` 인가 검증은 `@Import({SecurityConfig.class, JwtAuthFilter.class})` 필수(없으면 ROLE 검사 없이 200 — `AdminPingControllerTest` 참고)
+- `JwtAuthFilter`를 `@Import`하면 `@MockitoBean JwtDecoder jwtDecoder` 필수. `hasRole` 인가 검증은 `@Import({SecurityConfig.class, JwtAuthFilter.class})` 필수(없으면 ROLE 검사 없이 200 — `AdminUserControllerTest` 참고)
 - `@SpringBootTest @ActiveProfiles("test")`는 `application-test.yml`에 `jwt.signing-key` EC JWK가 필요하다
 
 ### Mockito 주의

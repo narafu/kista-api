@@ -128,13 +128,13 @@ class BinanceHttpClientTest {
             case "RATE" -> assertThat(e).isExactlyInstanceOf(BrokerRateLimitException.class);
             case "UNKNOWN" -> {
                 assertThat(e).isInstanceOf(BinanceApiException.class);
-                assertThat(((BinanceApiException) e).isRejected()).isFalse();
+                assertThat(BrokerApiException.isRejection(((BinanceApiException) e))).isFalse();
                 assertThat(BrokerApiException.isRejection(e)).isFalse();
             }
             default -> {
                 assertThat(e).isInstanceOf(BinanceApiException.class);
                 BinanceApiException b = (BinanceApiException) e;
-                assertThat(b.isRejected()).isTrue();
+                assertThat(BrokerApiException.isRejection(b)).isTrue();
                 assertThat(b.code()).isEqualTo(code);
             }
         }
@@ -173,7 +173,7 @@ class BinanceHttpClientTest {
 
         assertThatThrownBy(() -> client.postSigned("/api/v3/order", params("symbol", "BTCUSDT"), AUTH, MAP))
                 .isInstanceOfSatisfying(BinanceApiException.class, e -> {
-                    assertThat(e.isRejected()).isTrue();
+                    assertThat(BrokerApiException.isRejection(e)).isTrue();
                     assertThat(e.code()).isEqualTo(-1021);
                 });
     }
@@ -186,7 +186,7 @@ class BinanceHttpClientTest {
         // 시각 조회 I/O 실패가 결과 불명(rejected=false)으로 바뀌면 주문이 SUBMITTING에 묶인다
         assertThatThrownBy(() -> client.postSigned("/api/v3/order", params("symbol", "BTCUSDT"), AUTH, MAP))
                 .isInstanceOfSatisfying(BinanceApiException.class, e -> {
-                    assertThat(e.isRejected()).isTrue();
+                    assertThat(BrokerApiException.isRejection(e)).isTrue();
                     assertThat(e.code()).isEqualTo(-1021);
                 });
     }
@@ -216,7 +216,7 @@ class BinanceHttpClientTest {
         server.expect(anything()).andRespond(withException(new SocketTimeoutException()));
         assertThatThrownBy(() -> client.getSigned("/api/v3/account", params(), AUTH, MAP))
                 .isInstanceOfSatisfying(BinanceApiException.class, e -> {
-                    assertThat(e.isRejected()).isFalse();
+                    assertThat(BrokerApiException.isRejection(e)).isFalse();
                     assertThat(e.status()).isZero();
                 });
     }

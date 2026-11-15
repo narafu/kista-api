@@ -5,7 +5,7 @@ Spring Modulith 모듈(CLOSED) — Meritz/Toss/Mock 증권사 + Upbit/Binance �
 ### 경계 규칙
 - 벤더 전용 모델(`domain.model.kis/toss/meritz`)은 broker 밖에서 쓰지 않는다 (가드: `HexagonalArchitectureTest.vendor_models_must_not_leak_outside_broker`). 새 소비자가 벤더 값이 필요하면 `domain/model`에 벤더 중립 타입을 신설한다.
 - broker는 `Account`를 참조하지 않는다 — 포트는 `BrokerAccountRef`를 받고 변환은 `Account.toBrokerRef()` 한 곳이 맡는다.
-- 소비자는 `BrokerApiException`(벤더 중립 상위 타입) 하나만 catch하고 `BrokerProblemDetails`가 503으로 매핑한다. `isRejected()`는 "증권사가 접수하지 않았음이 확실"일 때만 true — I/O·타임아웃·Toss 409 `request-in-progress`는 결과 불명이라 재전송하면 이중 주문이 될 수 있다. 판정 SSOT는 `BrokerApiException.isRejection(Throwable)`.
+- 소비자는 `BrokerApiException`(벤더 중립 상위 타입) 하나만 catch하고 `BrokerProblemDetails`가 503으로 매핑한다. `BrokerApiException.isRejection(e)`는 "증권사가 접수하지 않았음이 확실"일 때만 true — I/O·타임아웃·Toss 409 `request-in-progress`는 결과 불명이라 재전송하면 이중 주문이 될 수 있다. 판정 SSOT는 `BrokerApiException.isRejection(Throwable)`.
 - 취소 결과 `CancelOutcome`: 이미 종결된 주문(ALREADY_FILLED/ALREADY_CANCELED)은 예외가 아니라 반환값이다. Toss는 409 + error.code, Meritz는 취소 전 원주문 잔량 조회로 판정한다. 소비자는 switch 식으로 전 상수를 다룬다.
 - 브로커 호출 실패 정책(`wrap`/`tryGet`)은 `constraints.md` "파라미터 개수·브로커 호출 실패 정책".
 

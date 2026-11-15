@@ -1,5 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.toss;
 
+import com.kista.tradingcore.broker.domain.model.BrokerApiException;
 import com.kista.tradingcore.broker.adapter.out.internal.TokenCoordinator;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
@@ -256,7 +257,7 @@ class TossHttpClientTest {
         Thread.currentThread().interrupt(); // 백오프 sleep이 즉시 InterruptedException을 던지게 한다
         try {
             assertThatThrownBy(() -> client.getCommon(PATH, new LinkedMultiValueMap<>(), new ParameterizedTypeReference<String>() {}))
-                    .isInstanceOfSatisfying(TossApiException.class, e -> assertThat(e.isRejected()).isTrue());
+                    .isInstanceOfSatisfying(TossApiException.class, e -> assertThat(BrokerApiException.isRejection(e)).isTrue());
             assertThat(Thread.currentThread().isInterrupted()).isTrue(); // 인터럽트 상태 복원
         } finally {
             Thread.interrupted(); // 다음 테스트에 인터럽트 상태가 새지 않게 정리
@@ -583,7 +584,7 @@ class TossHttpClientTest {
         TossHttpClient client = newClient();
         when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
         expectPost(withStatus(HttpStatus.CONFLICT).body("{\"error\":{\"code\":\"request-in-progress\"}}"));
-        assertThat(postFailure(client).isRejected()).isFalse();
+        assertThat(BrokerApiException.isRejection(postFailure(client))).isFalse();
     }
 
     private boolean insufficientFundsFor(String body) {
@@ -617,7 +618,7 @@ class TossHttpClientTest {
         TossHttpClient client = newClient();
         when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
         expectPost(withStatus(HttpStatus.BAD_REQUEST).body("{\"error\":{\"code\":\"invalid-request\"}}"));
-        assertThat(postFailure(client).isRejected()).isTrue();
+        assertThat(BrokerApiException.isRejection(postFailure(client))).isTrue();
     }
 
     @Test
@@ -628,7 +629,7 @@ class TossHttpClientTest {
         when(tossAuthApi.recoverToken(any(), anyString(), anyString(), anyString(), anyBoolean()))
                 .thenReturn(new TossDistributedTokenCoordinator.RecoveredToken("token-x", false));
         for (int i = 0; i < 4; i++) expectPost(withUnauthorizedRequest());
-        assertThat(postFailure(client).isRejected()).isTrue();
+        assertThat(BrokerApiException.isRejection(postFailure(client))).isTrue();
     }
 
     @Test
@@ -637,7 +638,7 @@ class TossHttpClientTest {
         TossHttpClient client = newClient();
         when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
         expectPost(request -> { throw new java.io.IOException("read timed out"); });
-        assertThat(postFailure(client).isRejected()).isFalse();
+        assertThat(BrokerApiException.isRejection(postFailure(client))).isFalse();
     }
 
     @Test
@@ -646,7 +647,7 @@ class TossHttpClientTest {
         TossHttpClient client = newClient();
         when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
         expectPost(withStatus(HttpStatus.BAD_GATEWAY));
-        assertThat(postFailure(client).isRejected()).isFalse();
+        assertThat(BrokerApiException.isRejection(postFailure(client))).isFalse();
     }
 
     @Test
@@ -654,6 +655,6 @@ class TossHttpClientTest {
     void post_tokenAcquisitionFails_isRejected() {
         TossHttpClient client = newClient();
         when(tossAuthApi.getToken(any(), anyString(), anyString())).thenThrow(new TossApiException("redis down", null));
-        assertThat(postFailure(client).isRejected()).isTrue();
+        assertThat(BrokerApiException.isRejection(postFailure(client))).isTrue();
     }
 }

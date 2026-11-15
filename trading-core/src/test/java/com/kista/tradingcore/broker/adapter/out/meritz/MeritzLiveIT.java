@@ -1,5 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.meritz;
 
+import com.kista.tradingcore.broker.domain.model.BrokerApiException;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
@@ -133,7 +134,7 @@ class MeritzLiveIT {
             placed = adapter.place(instruction, account);
         } catch (MeritzApiException e) {
             // 결과 불명(rejected=false)은 접수됐을 수 있어 실측값으로 보지 않는다 — 증권사 앱에서 수동 확인
-            assertThat(e.isRejected()).as(label + " 확정 거절 아님(접수 여부 수동 확인): " + e.getMessage()).isTrue();
+            assertThat(BrokerApiException.isRejection(e)).as(label + " 확정 거절 아님(접수 여부 수동 확인): " + e.getMessage()).isTrue();
             System.out.printf("[MeritzLive] %s 거절 insufficientFunds=%s msg=%s%n", label, e.isInsufficientFunds(), e.getMessage());
             return;
         }

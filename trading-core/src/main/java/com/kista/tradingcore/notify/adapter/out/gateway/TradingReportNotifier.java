@@ -19,7 +19,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 // 매매 리포트 알림(Telegram/FCM)과 체결 건별 SSE 알림을 채널 라우팅과 분리 — 발행처가 트랜잭션 안이든 밖이든 fallbackExecution으로 항상 실행되게 함
 // root의 동명 클래스를 이관 — User/UserNotificationPort/RealtimeNotificationPort 대신 TradingUserProfile/
-// TradingUserNotificationPort/TradingRealtimeNotificationPort 사용(구현체는 후속 태스크에서 채움)
+// TradingUserNotificationPort/TradingRealtimeNotificationPort 사용
 @Component
 @RequiredArgsConstructor
 @Slf4j

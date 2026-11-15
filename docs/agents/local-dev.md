@@ -6,11 +6,11 @@
 ```bash
 # 일반 사용자 토큰
 TOKEN=$(curl -s -X POST localhost:8080/api/auth/dev-token | jq -r .accessToken)
-curl -i -H "Authorization: Bearer $TOKEN" localhost:8080/api/admin/_ping  # 403 기대
+curl -i -H "Authorization: Bearer $TOKEN" localhost:8080/api/admin/users  # 403 기대
 
 # ADMIN 토큰 (고정 UUID 00000000-0000-0000-0000-000000000002)
 ADMIN_TOKEN=$(curl -s -X POST localhost:8080/api/auth/dev-admin-token | jq -r .accessToken)
-curl -i -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8080/api/admin/_ping  # 200 기대
+curl -i -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8080/api/admin/users  # 200 기대
 
 # E2E 전용 빈 사용자 토큰 (고정 UUID ...0003, dev 시드 미적용 — kista-ui account-cache E2E가 사용)
 E2E_TOKEN=$(curl -s -X POST localhost:8080/api/auth/dev-e2e-token | jq -r .accessToken)

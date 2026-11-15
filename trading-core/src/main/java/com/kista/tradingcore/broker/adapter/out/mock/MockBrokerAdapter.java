@@ -188,7 +188,7 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
     @Override
     public List<MarginItem> getMargin(BrokerAccountRef account) {
         BigDecimal buyable = getUsdBuyableAmount(account);
-        return List.of(new MarginItem(Currency.USD, buyable, buyable, buyable, BigDecimal.ONE));
+        return List.of(new MarginItem(Currency.USD, buyable, BigDecimal.ONE));
     }
 
     // --- PortfolioPort ---

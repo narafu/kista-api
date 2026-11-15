@@ -94,8 +94,6 @@ class MeritzTradingApiTest {
 
         assertThat(m).singleElement().satisfies(i -> {
             assertThat(i.purchasableAmount()).isEqualByComparingTo("3459.0600");
-            assertThat(i.integratedOrderableAmount()).isEqualByComparingTo("3459.0600");
-            assertThat(i.foreignOrderableAmount()).isEqualByComparingTo("3445.0100");
             assertThat(i.usdToKrwRate()).isEqualByComparingTo("1325.5");
         });
     }

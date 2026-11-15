@@ -137,7 +137,7 @@ class UpbitHttpClientTest {
                     assertThat(e.status()).isEqualTo(400);
                     assertThat(e.errorName()).isEqualTo("invalid_parameter");
                     assertThat(e.getMessage()).doesNotContain("내부 원문");
-                    assertThat(e.isRejected()).isTrue();
+                    assertThat(BrokerApiException.isRejection(e)).isTrue();
                     assertThat(e.vendorLabel()).isEqualTo("Upbit");
                 });
     }

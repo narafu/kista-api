@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
-// 매주 일요일 KST 07:00 KB Land 주택 벤치마크 수집 및 저장
+// 매주 토요일 KST 08:00 KB Land 주택 벤치마크 수집 및 저장
 @Component
 @RequiredArgsConstructor
 @ConditionalOnWorkerRole

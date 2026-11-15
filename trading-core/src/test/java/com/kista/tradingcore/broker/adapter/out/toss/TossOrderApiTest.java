@@ -1,5 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.toss;
 
+import com.kista.tradingcore.broker.domain.model.BrokerApiException;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
 import com.kista.tradingcore.broker.domain.model.CancelOutcome;
@@ -134,7 +135,7 @@ class TossOrderApiTest {
             .thenReturn(new TossResult<>(new TossOrderApi.OrderResponse(null)));
 
         assertThatThrownBy(() -> tossOrderApi.place(instruction, ACCOUNT))
-            .isInstanceOfSatisfying(TossApiException.class, e -> assertThat(e.isRejected()).isTrue());
+            .isInstanceOfSatisfying(TossApiException.class, e -> assertThat(BrokerApiException.isRejection(e)).isTrue());
     }
 
     @Test

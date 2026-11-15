@@ -34,7 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// ADMIN role 가드 검증이 필요해 SecurityConfig·JwtAuthFilter를 명시적으로 @Import한다 (AdminPingControllerTest 패턴).
+// ADMIN role 가드 검증이 필요해 SecurityConfig·JwtAuthFilter를 명시적으로 @Import한다 (AdminUserControllerTest 패턴).
 @WebMvcTest(AdminFinanceCategoryController.class)
 @Import({SecurityConfig.class, RootSecurityPolicy.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
 @Execution(ExecutionMode.SAME_THREAD)

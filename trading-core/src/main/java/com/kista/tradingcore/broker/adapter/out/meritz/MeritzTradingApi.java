@@ -81,8 +81,7 @@ class MeritzTradingApi {
         List<EstimateRow> rows = estimateRows(account);
         EstimateRow usd = findCurrency(rows, "USD");
         BigDecimal total = totalOrderable(rows);
-        return List.of(new MarginItem(Currency.USD, total, orZero(usd == null ? null : usd.orderable()), total,
-                orZero(usd == null ? null : usd.rate())));
+        return List.of(new MarginItem(Currency.USD, total, orZero(usd == null ? null : usd.rate())));
     }
 
     // 포트 계약(미체결 매도 미차감 보유 수량)에 맞춰 잔고수량 rmnd_dqty를 쓴다 — seln_able_dqty는 미체결 매도를 이미 뺀 순수량이라

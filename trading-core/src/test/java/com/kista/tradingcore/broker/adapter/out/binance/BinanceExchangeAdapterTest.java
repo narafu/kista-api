@@ -157,7 +157,7 @@ class BinanceExchangeAdapterTest {
                 .andRespond(withSuccess(exchangeInfo("CANCEL_ONLY"), APPLICATION_JSON));
 
         assertThatThrownBy(() -> adapter.getTradingRules(StrategyTicker.BTC))
-                .isInstanceOfSatisfying(BinanceApiException.class, e -> assertThat(e.isRejected()).isFalse());
+                .isInstanceOfSatisfying(BinanceApiException.class, e -> assertThat(BrokerApiException.isRejection(e)).isFalse());
     }
 
     @Test
@@ -327,7 +327,7 @@ class BinanceExchangeAdapterTest {
         expectMyTrades("[{\"price\":\"65000.00\",\"qty\":\"0.00010000\",\"commission\":\"0.00000010\",\"commissionAsset\":\"BTC\"}]");
 
         assertThatThrownBy(() -> adapter.findOrderByExchangeOrderId(ACCOUNT, StrategyTicker.BTC, "28"))
-                .isInstanceOfSatisfying(BinanceApiException.class, e -> assertThat(e.isRejected()).isFalse());
+                .isInstanceOfSatisfying(BinanceApiException.class, e -> assertThat(BrokerApiException.isRejection(e)).isFalse());
     }
 
     @Test
@@ -380,7 +380,7 @@ class BinanceExchangeAdapterTest {
         expectLookupError("origClientOrderId", WIRE_ID, 502, "<html>bad gateway</html>");
 
         assertThatThrownBy(() -> adapter.findOrderByClientOrderId(ACCOUNT, StrategyTicker.BTC, UUID_ID))
-                .isInstanceOfSatisfying(BinanceApiException.class, e -> assertThat(e.isRejected()).isFalse());
+                .isInstanceOfSatisfying(BinanceApiException.class, e -> assertThat(BrokerApiException.isRejection(e)).isFalse());
     }
 
     @Test
@@ -398,7 +398,7 @@ class BinanceExchangeAdapterTest {
                 .andRespond(withException(new IOException("reset")));
 
         assertThatThrownBy(() -> adapter.findOrderByClientOrderId(ACCOUNT, StrategyTicker.BTC, UUID_ID))
-                .isInstanceOfSatisfying(BinanceApiException.class, e -> assertThat(e.isRejected()).isFalse());
+                .isInstanceOfSatisfying(BinanceApiException.class, e -> assertThat(BrokerApiException.isRejection(e)).isFalse());
     }
 
     @Test
@@ -406,7 +406,7 @@ class BinanceExchangeAdapterTest {
         expectOrderGet("orderId", "28", orderJson("FOO", "0", "0", "[]"));
 
         assertThatThrownBy(() -> adapter.findOrderByExchangeOrderId(ACCOUNT, StrategyTicker.BTC, "28"))
-                .isInstanceOfSatisfying(BinanceApiException.class, e -> assertThat(e.isRejected()).isFalse());
+                .isInstanceOfSatisfying(BinanceApiException.class, e -> assertThat(BrokerApiException.isRejection(e)).isFalse());
     }
 
     @Test

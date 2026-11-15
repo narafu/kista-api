@@ -1,5 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.meritz;
 
+import com.kista.tradingcore.broker.domain.model.BrokerApiException;
 import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.OrderDirection;
@@ -149,7 +150,7 @@ class MeritzOrderApiTest {
 
         assertThatThrownBy(() -> api.place(soxl(OrderType.LOC, OrderDirection.BUY), ACCOUNT))
                 .isInstanceOfSatisfying(MeritzApiException.class, e -> {
-                    assertThat(e.isRejected()).isTrue();
+                    assertThat(BrokerApiException.isRejection(e)).isTrue();
                     assertThat(e.rspCd()).isEqualTo("WARN_2");
                 });
         server.verify();
@@ -163,7 +164,7 @@ class MeritzOrderApiTest {
 
         assertThatThrownBy(() -> api.place(soxl(OrderType.LOC, OrderDirection.SELL), ACCOUNT))
                 .isInstanceOfSatisfying(MeritzApiException.class, e -> {
-                    assertThat(e.isRejected()).isTrue();
+                    assertThat(BrokerApiException.isRejection(e)).isTrue();
                     assertThat(e.rspCd()).isEqualTo("WARN_3");
                 });
         server.verify(); // 재전송은 1회뿐
@@ -174,7 +175,7 @@ class MeritzOrderApiTest {
         server.expect(requestTo(ORDERS + "buy")).andRespond(ok(orderResponse("0", 0)));
 
         assertThatThrownBy(() -> api.place(soxl(OrderType.LOC, OrderDirection.BUY), ACCOUNT))
-                .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(e.isRejected()).isFalse());
+                .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(BrokerApiException.isRejection(e)).isFalse());
     }
 
     private static String todayRow(long orderNo, String aspr, int cancelable, int ordered, int filled) {
@@ -218,7 +219,7 @@ class MeritzOrderApiTest {
     void cancel_unknown_aspr_type_is_rejected_without_sending() {
         expectToday(todayRow(2700586, "Z", 5, 5, 0));
         assertThatThrownBy(() -> api.cancel(new CancelInstruction(StrategyTicker.SOXL, "2700586"), ACCOUNT))
-                .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(e.isRejected()).isTrue());
+                .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(BrokerApiException.isRejection(e)).isTrue());
         server.verify(); // cancel POST 없음
     }
 
@@ -253,7 +254,7 @@ class MeritzOrderApiTest {
         expectToday("{\"oder_date\":\"20261022\",\"oder_no\":2700586,\"aspr_type_code\":\"2\",\"oder_able_qty\":0}");
         assertThatThrownBy(() -> api.cancel(new CancelInstruction(StrategyTicker.SOXL, "2700586"), ACCOUNT))
                 .isInstanceOfSatisfying(MeritzApiException.class, e -> {
-                    assertThat(e.isRejected()).isFalse();
+                    assertThat(BrokerApiException.isRejection(e)).isFalse();
                 });
         server.verify(); // cancel POST 없음
     }
@@ -283,7 +284,7 @@ class MeritzOrderApiTest {
         expectToday("");
         server.expect(requestTo(startsWith(ORDERS + "history"))).andRespond(ok("{\"rsp_cd\":\"5820\",\"data\":[]}"));
         assertThatThrownBy(() -> api.cancel(new CancelInstruction(StrategyTicker.SOXL, "9999999"), ACCOUNT))
-                .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(e.isRejected()).isFalse());
+                .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(BrokerApiException.isRejection(e)).isFalse());
         server.verify();
     }
 

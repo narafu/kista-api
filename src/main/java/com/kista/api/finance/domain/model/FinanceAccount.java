@@ -32,10 +32,6 @@ public record FinanceAccount(
         return new FinanceAccount(id, groupId, userId, accountType, name, accountNo, memo, institution, owner, createdAt);
     }
 
-    public FinanceAccount withAccountNo(String accountNo) {
-        return new FinanceAccount(id, groupId, userId, accountType, name, accountNo, memo, institution, owner, createdAt);
-    }
-
     @Getter
     @RequiredArgsConstructor
     public enum Type {
