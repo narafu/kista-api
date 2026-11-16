@@ -200,7 +200,7 @@ fable-ui 요청 반영(2026-11-13, `cross-repo.md` B절 U1·U2): ① 토큰에 `
 | "이미 그 상태"가 전용 예외(409)와 `IllegalStateException`(400)으로 갈린다 | `StrategyService.java:97,117,160` | 409로 통일. 응답 상태가 바뀌므로 `cross-repo.md`에 올리고 UI가 400에 기대는지 확인 뒤 |
 | HTTP 매핑이 없는 예외 2개 | `OrderStateConflictException`, `PrivacyValuationException` | 409·422로 매핑(05 P1의 통합 처리기에서) |
 | `BrokerCallGuard.wrap`이 증권사 예외가 아닌 실패를 `IllegalStateException`으로 바꿔 400이 된다 | `BrokerCallGuard.java:32-33` | 요청 잘못이 아니라 상대 시스템 실패다. 502로 매핑되는 예외로 바꾼다 |
-| raw catch 1곳, 예외 객체 미전달 1곳 | `TradingPriceFetcher.java:177`, `FcmAdapter.java:70` | 예외 객체 전달(S13 완료). **철회(2026-11-16)**: `TradingPriceFetcher`의 catch는 단건 fallback 분기라 `constraints.md`가 허용하는 raw catch다 — `questions.md` Q-19 |
+| raw catch 1곳, 예외 객체 미전달 1곳 | `TradingPriceFetcher.java:177`, `FcmAdapter.java:70` | 예외 객체 전달(S13 완료). **철회(2026-11-16)**: `TradingPriceFetcher`의 catch는 단건 fallback 분기라 `constraints.md`가 허용하는 raw catch다 — `questions.md` Q-23 |
 
 ## 9. 메서드·필드 단위 미사용 코드
 
