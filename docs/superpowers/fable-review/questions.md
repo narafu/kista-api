@@ -232,6 +232,16 @@
 - 멈춘 범위: 없음. 코드 변경은 S13에 들어갔다.
 - 답: ① 셋 다(2026-11-16). S13 배포(`f50ffb5d8`) 뒤 다시 센 값 그대로 한 트랜잭션에서 지웠다: 락 7·1행, `public.flyway_schema_history` drop, EPR 완료 877·365행. 덤프 `kista-server:/tmp/s13-cleanup-202611160453.sql`. `flyway.md`·`docker-infra.md`의 보존 문장을 고쳤다.
 
+### Q-17 ui spec 재수신에서 드러난 nullable 닉네임의 표시 문구와 배포 묶음
+- 상태: 자체 결정(문구는 사용자가 바꿀 수 있다)
+- 묶음·태스크: 04 단계 A 후속 / ui `190caf90`(실서버 spec 재수신)
+- 걸린 곳: ui가 KIS 제거 때 openapi.json을 jq로만 고쳐서, 실서버 spec과 KIS 무관한 차이가 남아 있었다. 출처는 `1915ba682`(jspecify required·nullable 정확화)다. 이 spec을 다시 받자 관리자 응답의 `nickname`·`ownerNickname`(카카오 닉네임 미동의 시 null), `AuditLogResponse.adminId`, `ErrorLogResponse.context`, `AdminAccountResponse.broker`가 `T | null`로 드러났다. ui는 이 필드들을 non-null로 다뤘다. 지침서에는 null 표시 문구가 없다.
+- 근거: `AdminUserResponse.java:15` `@Nullable String nickname`. ui typecheck 오류 23건. api 세션 확인 결과 Jackson 기본값이 ALWAYS라 null은 예전부터 내려왔다. 런타임 JSON은 바뀌지 않았다.
+- 선택지(문구): ① 표 셀은 copy.md 규칙대로 "-", 필터 라벨·승인/탈퇴 다이얼로그·토스트는 `ID <userId 앞 8자>`(ui `entities/admin/model/userLabel.ts`) ② 전부 "-"(다이얼로그가 "- 님을 승인합니다"가 되고 필터 후보끼리 구분되지 않는다) ③ api가 null 대신 "(알 수 없음)" 같은 문자열을 내려준다(계약 변경, ui와 같은 묶음이 필요하다).
+- 선택지(묶음): `1915ba682`는 이미 운영에 배포됐다(e044e983c의 조상). ui `190caf90`은 KIS 묶음(api 세 role + ui `b33118f1`·`4f94b3dc`)과 독립이고, 따로 배포해도 된다.
+- 멈춘 범위: 없음.
+- 답: 자체 결정(2026-11-15) 문구 ①, 묶음 독립. 닉네임 정렬은 다른 관리자 표처럼 null을 방향과 무관하게 맨 아래에 둔다. 문구를 바꾸려면 `userLabel` 한 곳과 표 셀 5곳(`AdminUsersTable`·`AdminPendingList`·`AdminAccountsTable`·`AdminTradesTable`·`AccountTable`)을 고친다.
+
 ### Q-18 ui 코인 제거 뒤 api 15 T4 전까지 남는 표시 문제(리뷰 1~5번)
 - 상태: 자체 결정
 - 묶음·태스크: ui S1 / ui 지침서 12, ui `6a3e0a14`
@@ -251,12 +261,13 @@
 - 답: 자체 결정(2026-11-16) ①. api 15 T4 뒤 ui가 spec을 다시 받으면 `Extract`는 아무 일도 하지 않게 된다. 그때 지운다.
 
 ### Q-20 대시보드 시장 차트의 "크립토 · 보조지표" 카테고리(IBIT 등 주식 ETF)
-- 상태: 사용자 결정 필요
+- 상태: 답변됨
 - 묶음·태스크: ui S1 / ui 지침서 12 목표 "코인이라는 개념이 ui에 없다"
 - 걸린 곳: 지침서 12는 코인 매매(업비트·바이낸스·BTC·ETH)를 지운다. 이 카테고리는 미국 주식 시장의 비트코인·이더리움 현물 ETF 시세 차트라서 그대로 뒀다. 카테고리 제목과 설명에는 "크립토"라는 말이 남아 있다.
 - 근거: ui `widgets/dashboard/marketChartCategories.ts:48` `title: '크립토 · 보조지표'`, `:50` `IBIT · 비트코인 현물`. 비회원 대시보드 스크린샷(2026-11-16)에서 셋째 차트 카드로 보인다.
 - 선택지: ① 그대로 둔다(주식 ETF이고, api 15 G9로 BITO·EETH도 DCA 종목에 들어온다) ② 제목만 "가상자산 ETF · 보조지표" 같은 이름으로 바꾼다 ③ 카테고리를 지운다.
-- 멈춘 범위: 없음. 기본값은 ①.
+- 멈춘 범위: 없음.
+- 답: 사용자 결정(2026-11-16) ① 그대로 둔다. 코인 매매가 아니라 미국 주식 시장의 ETF 시세 차트다. 다시 제안하지 않는다.
 
 ### Q-21 로컬 dev 시드가 업비트·바이낸스 계좌를 계속 만든다
 - 상태: 자체 결정
