@@ -9,6 +9,7 @@
 adapter/out/meritz/ ← MeritzHttpClient(본문 `rsp_cd` 기반 응답 판정 — HTTP 500도 본문 파싱, 토큰 거절 `EGW00121`/`EGW00123` 1회 재발급·재시도, GET만 한도 백오프, 앱키별 호출 간격 게이트)/MeritzAuthApi(`BrokerConnectionTestPort`·토큰 발급, 만료는 `expires_date` 기준)/MeritzPriceApi/MeritzTradingApi/MeritzOrderApi(주문·취소, 경고 `warn_cls_code` 1/3은 `warn_cnfr_yn=Y` 1회 재전송, 취소는 당일 주문체결내역에서 원주문 조회)/MeritzExchangeRegistry/MeritzConfig/MeritzBrokerAdapter(공통 6개 Port) — 계좌번호 없음(앱키가 계좌 식별), 상세 → `docs/agents/vendors/meritz.md`
 
 ### 기본 사실
+- 문서: 웹 [해외주식 주문](https://openapi.imeritz.com/apiservice?group_id=7f77b304-4970-4fc7-bc6c-82e8030925a5&api_id=b64fd90f-daa1-4512-9633-b517fe7837a2)(JS 렌더링이라 WebFetch로 본문이 안 보이고, 왼쪽 메뉴에서 다른 챕터로 이동한다). 전체 챕터 원본은 `https://openapi.imeritz.com/api-spec/download/json`(약 950k자, 에이전트는 이걸 읽는다)·`/api-spec/download/excel`.
 - Base `https://openapi.imeritz.com:9443`(`meritz.base-url`, trading-core `application.yml`). 모든 요청 헤더 `authorization: Bearer <token>` + `mac_address`(고정 상수 `0242AC110002`, 값 검증 없음).
 - 계좌번호가 없다: 앱키에 계좌 1개가 묶이며 요청에 `acno`·`asno`·`acnt_pwd`를 넣으면 실패한다. `accountNo=null`, appKey가 식별자(`Account.dedupeKeyOf`)다.
 - 토큰: `POST /oauth2/token`(form `grant_type=client_credentials&client_id&client_secret&scope=login`) → `access_token`, `expires_in`(43200), `expires_date`. 만료 전 재발급은 같은 토큰·같은 `expires_date`를 돌려준다(멱등). 만료는 **`expires_date`(KST) 기준**으로 잡는다 — `expires_in`은 상대값이 아니라 캐시가 최대 12시간 늦게 만료돼 `EGW00123`이 폭주한다. `oauth2/revoke`는 같은 앱키의 유일한 토큰을 끊으므로 호출 금지. 토큰 저장은 `broker_tokens` + `BrokerTokenCachePort`, 조정은 `DbTokenCoordinator`(Toss와 공용).
