@@ -48,8 +48,8 @@ class AssetSnapshotPersistenceAdapterTest extends RootDataJpaTestBase {
                 "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
                 otherUserId, "kakao_" + otherUserId, "ACTIVE", "USER");
         jdbcTemplate.update(
-                "INSERT INTO finance_groups (id, owner_user_id, created_at, updated_at) VALUES (?, ?, now(), now())",
-                groupId, userId);
+                "INSERT INTO finance_groups (id, created_at, updated_at) VALUES (?, now(), now())",
+                groupId);
         jdbcTemplate.update(
                 "INSERT INTO finance_accounts (id, group_id, user_id, account_type, name, created_at, updated_at) " +
                         "VALUES (?, ?, ?, 'SECURITIES', '테스트증권계좌', now(), now())",

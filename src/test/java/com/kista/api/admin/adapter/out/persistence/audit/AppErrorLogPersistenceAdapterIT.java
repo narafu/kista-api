@@ -77,7 +77,7 @@ class AppErrorLogPersistenceAdapterIT extends RootDataJpaTestBase {
     }
 
     @Test
-    @DisplayName("resolve() 뒤 목록에서 빠지고 resolved_at·deleted_at이 함께 채워진다")
+    @DisplayName("resolve() 뒤 목록에서 빠지고 resolved_at이 채워진다")
     void resolve_excludesFromFindRecent() {
         adapter.save("TypeError", "m", "s", java.util.Map.of());
         Instant from = Instant.now().minusSeconds(60);
@@ -89,22 +89,8 @@ class AppErrorLogPersistenceAdapterIT extends RootDataJpaTestBase {
 
         assertThat(adapter.findRecent(50, from, to)).isEmpty();
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM public.app_error_logs WHERE id = ? AND resolved_at IS NOT NULL AND deleted_at IS NOT NULL",
+                "SELECT count(*) FROM public.app_error_logs WHERE id = ? AND resolved_at IS NOT NULL",
                 Integer.class, saved.id())).isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("백필 SQL로 resolved_at만 채워진 행(옛 이미지가 처리한 행)도 목록에서 빠진다")
-    void backfilledResolvedAtOnlyRow_isExcluded() {
-        adapter.save("TypeError", "m", "s", java.util.Map.of());
-        // V7 백필과 같은 상태: deleted_at이 있던 행에 resolved_at만 채워진 결과
-        inNewTx(() -> {
-            jdbcTemplate.update("UPDATE public.app_error_logs SET deleted_at = now() WHERE resolved_at IS NULL");
-            jdbcTemplate.update("UPDATE public.app_error_logs SET resolved_at = deleted_at WHERE deleted_at IS NOT NULL");
-        });
-        entityManager.clear();
-
-        assertThat(adapter.findRecent(50, Instant.now().minusSeconds(60), Instant.now().plusSeconds(1))).isEmpty();
     }
 
     @Test
@@ -117,15 +103,5 @@ class AppErrorLogPersistenceAdapterIT extends RootDataJpaTestBase {
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> adapter.resolve(saved.id()))
                 .isInstanceOf(java.util.NoSuchElementException.class);
-    }
-
-    @Test
-    @DisplayName("deleted_at만 채워진 행(옛 이미지가 처리한 행)도 목록에서 빠진다")
-    void deletedAtOnlyRow_isExcluded() {
-        adapter.save("TypeError", "m", "s", java.util.Map.of());
-        inNewTx(() -> jdbcTemplate.update("UPDATE public.app_error_logs SET deleted_at = now()"));
-        entityManager.clear();
-
-        assertThat(adapter.findRecent(50, Instant.now().minusSeconds(60), Instant.now().plusSeconds(1))).isEmpty();
     }
 }

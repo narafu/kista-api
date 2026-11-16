@@ -72,7 +72,7 @@ class RuntimeSettingsApprovalConcurrencyIT {
         adminSettingsService.updateSettings(adminId, RuntimeSettingsBundle.defaults(), true);
         // UserService.register()가 가입 시 개인 그룹(finance_groups + OWNER 멤버십)을 자동 생성하므로,
         // users를 하드 삭제하기 전에 그 그룹 자체와 멤버십부터 지워야 FK 위반이 나지 않는다
-        // (finance_group_members_user_id_fkey, finance_groups_owner_user_id_fkey).
+        // (finance_group_members_user_id_fkey).
         // 그룹은 소유자 컬럼이 아니라 멤버십 기준으로 찾는다 — 멤버 행을 먼저 지우면 그룹을 못 찾으므로 그룹 id를 먼저 모은다
         List<UUID> groupIds = jdbcTemplate.queryForList(
                 "SELECT group_id FROM finance_group_members WHERE user_id IN (?, ?)", UUID.class, adminId, signupId);

@@ -268,3 +268,10 @@ HAVING max(v.version_no) FILTER (WHERE v.deleted_at IS NULL) < max(v.version_no)
 제약을 걸면서 고친 기존 테스트: `OrderPersistenceAdapterDbTest`(한 전략에 열린 사이클 둘 → 하나는 종료, 같은 leg의 코인 주문 둘 → leg 분리), `StrategyCyclePersistenceAdapterTest`(옛 사이클을 종료로), `OrderPersistenceAdapterTest`(`saveAndFlush` 검증).
 
 배포: trading 스키마 마이그레이션 + 주문 저장 경로라 매매 시간대 밖(KST 07:00~16:00)에 한다. 배포 직전 9절의 SQL 두 개를 다시 돌려 0건인지 본다(0건이 아니면 `CREATE UNIQUE INDEX`가 실패해 kista-trading이 기동하지 못한다). 배포 뒤 2거래일 관찰: 관리자 알림과 `docker logs kista-trading`의 `uq_orders_live_slot`·`uq_strategy_cycle_open` 0건, PRIVACY 가격 보정(`BUY 가격 보정 완료(개별)`)과 VR 롤오버가 있던 날의 정상 완료.
+
+## 11. T5·T8 실행 기록 (2026-11-16)
+
+- V7(`app_error_logs.resolved_at` 추가·백필)·V8(`finance_groups.owner_user_id` NULL 허용): 커밋 7150d7fa8.
+- contract 1단계: `V9__finance_groups_owner_user_id_drop.sql`(`-- contract-ok`)로 `owner_user_id` drop, 코드의 `app_error_logs.deleted_at` 매핑·조회·기록 제거.
+- 남은 것: `app_error_logs.deleted_at` drop. 이번 커밋이 배포된 다음 배포에서 `-- contract-ok`로 한다.
+- 운영 정리 SQL은 questions.md Q-16.

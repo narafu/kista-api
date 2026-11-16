@@ -63,8 +63,7 @@ class AppErrorLogPersistenceAdapter implements AppErrorLogPort {
                 message,
                 stackTrace,
                 context != null ? context : Map.of(), // Hibernate가 Map을 jsonb로 직접 매핑
-                null, // resolvedAt
-                null // deletedAt
+                null // resolvedAt
         );
     }
 
@@ -80,12 +79,11 @@ class AppErrorLogPersistenceAdapter implements AppErrorLogPort {
         AppErrorLogEntity entity = repo.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("앱 오류 로그를 찾을 수 없습니다: " + id));
         // 이미 처리된 행은 없는 것으로 본다(404 유지, 시각 덮어쓰기 금지)
-        if (entity.getResolvedAt() != null || entity.getDeletedAt() != null) {
+        if (entity.getResolvedAt() != null) {
             throw new NoSuchElementException("앱 오류 로그를 찾을 수 없습니다: " + id);
         }
         Instant now = Instant.now(clock);
         entity.setResolvedAt(now);
-        entity.setDeletedAt(now); // 옛 이미지 호환 — contract 때 제거
         repo.save(entity);
     }
 

@@ -50,11 +50,11 @@ class FinanceBudgetPersistenceAdapterTest extends RootDataJpaTestBase {
                 "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
                 otherUserId, "kakao_" + otherUserId, "ACTIVE", "USER");
         jdbcTemplate.update(
-                "INSERT INTO finance_groups (id, owner_user_id, created_at, updated_at) VALUES (?, ?, now(), now())",
-                groupId, userId);
+                "INSERT INTO finance_groups (id, created_at, updated_at) VALUES (?, now(), now())",
+                groupId);
         jdbcTemplate.update(
-                "INSERT INTO finance_groups (id, owner_user_id, created_at, updated_at) VALUES (?, ?, now(), now())",
-                otherGroupId, userId);
+                "INSERT INTO finance_groups (id, created_at, updated_at) VALUES (?, now(), now())",
+                otherGroupId);
     }
 
     // groupId=null(개인 예산) — 예산 record 시그니처는 (id, groupId, categoryId, userId, start, end, amount, createdAt)

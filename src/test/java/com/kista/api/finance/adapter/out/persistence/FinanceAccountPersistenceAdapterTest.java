@@ -40,8 +40,8 @@ class FinanceAccountPersistenceAdapterTest extends RootDataJpaTestBase {
                 "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
                 otherUserId, "kakao_" + otherUserId, "ACTIVE", "USER");
         jdbcTemplate.update(
-                "INSERT INTO finance_groups (id, owner_user_id, created_at, updated_at) VALUES (?, ?, now(), now())",
-                groupId, userId);
+                "INSERT INTO finance_groups (id, created_at, updated_at) VALUES (?, now(), now())",
+                groupId);
     }
 
     private FinanceAccount groupAccount(String name, String accountNo) {

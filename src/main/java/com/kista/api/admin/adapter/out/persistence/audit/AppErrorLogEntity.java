@@ -39,8 +39,4 @@ class AppErrorLogEntity extends BaseCreatedAtEntity {
 
     @Column(name = "resolved_at")
     private Instant resolvedAt; // 관리자 처리 일시 (null = 미처리)
-
-    // expand/contract 기간 한정 — 롤백·스케줄러 버전 어긋남 때 옛 이미지(@SQLRestriction deleted_at)가 같은 결과를 보게 resolved_at과 함께 쓴다. contract 때 제거
-    @Column(name = "deleted_at")
-    private Instant deletedAt;
 }
