@@ -14,7 +14,7 @@ public record AccountBalance(
         BigDecimal avgPrice,  // 평균 매입가 (holdings==0이면 null)
         BigDecimal deposit // 통합주문가능금액 (USD, 환전 여부 무관 — TTTC2101R itgr_ord_psbl_amt)
 ) {
-    public static final int LEDGER_SCALE = 2; // 원장 금액·평단 자릿수 — cycle_position deposit·avg_price numeric(20,2), 통화 무관(코인 DCA 포함)
+    public static final int LEDGER_SCALE = 2; // 원장 금액·평단 자릿수 — cycle_position deposit·avg_price numeric(20,2), 통화 무관
 
     public AccountBalance {
         Objects.requireNonNull(holdings, "holdings");

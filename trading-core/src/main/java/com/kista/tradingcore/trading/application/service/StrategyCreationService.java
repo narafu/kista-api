@@ -48,13 +48,12 @@ class StrategyCreationService {
 
     private static final String ACTIVE_TICKER_INDEX = "uq_strategy_account_ticker_active"; // V16 부분 유니크 인덱스
 
-    // 계좌 시장에서 종목 거래 가능 + DCA 규칙의 시장별 규칙(주문유형·금액·요일)
-    private void validateMarket(Account account, DcaStrategyConfig dca, StrategyTicker ticker) {
+    // 계좌 시장에서 종목 거래 가능
+    private void validateMarket(Account account, StrategyTicker ticker) {
         Market market = account.broker().getMarket();
         if (!ticker.tradableOn(market)) {
             throw new IllegalArgumentException("계좌와 종목의 시장이 다릅니다.");
         }
-        if (dca != null) dca.requireCompatible(market);
     }
 
     private final StrategyPort strategyPort;
@@ -72,10 +71,6 @@ class StrategyCreationService {
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 잔고 검증·시세 HTTP 호출 포함 — 검증은 트랜잭션 밖, 저장만 creationPersister 트랜잭션
     StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
         Account account = accountPort.requireOwnedAccount(accountId, userId);
-        // 코인 계좌는 DCA 전용 — 정책 조회보다 먼저 거부한다
-        if (account.broker().isCryptoExchange() && cmd.type() != StrategyType.DCA) {
-            throw new IllegalArgumentException("코인 계좌는 DCA 전략만 등록할 수 있습니다.");
-        }
         ResolvedCreation resolved = resolveCreationSettings(cmd);
         boolean dca = cmd.type() == StrategyType.DCA;
         if (dca && cmd.dca() == null) {
@@ -86,9 +81,9 @@ class StrategyCreationService {
 
         StrategyTicker resolvedTicker = resolved.ticker();
         // 시장 검증이 중간부터 시작(보유 자릿수) 검증보다 먼저 — 시장 불일치가 자릿수 문구에 가려지지 않게 한다
-        validateMarket(account, dcaConfig, resolvedTicker);
-        // 중간부터 시작 입력 검증 (전 전략 공통) — holdings>0이면 avgPrice>0 필수, 음수 거부, 주식 정수·코인 소수 8자리
-        BigDecimal initialHoldings = BootstrapPosition.validate(cmd.initialHoldings(), cmd.initialAvgPrice(), account.broker().getMarket());
+        validateMarket(account, resolvedTicker);
+        // 중간부터 시작 입력 검증 (전 전략 공통) — holdings>0이면 avgPrice>0 필수, 음수 거부, 정수 주
+        BigDecimal initialHoldings = BootstrapPosition.validate(cmd.initialHoldings(), cmd.initialAvgPrice());
         boolean bootstrap = initialHoldings.signum() > 0;
         // 시작예정일 검증 — 기본값 오늘(KST), 과거 거부
         LocalDate scheduledStart = resolveScheduledStart(cmd);
@@ -98,11 +93,11 @@ class StrategyCreationService {
         // 사용자 복제본이 없으면 배치가 이 전략을 돌릴 수 없다 — 등록 단계에서 거부
         tradingUserProfilePort.findByUserId(userId)
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
-        // 예수금 — 생략(null)은 0으로 여기서 한 번만 정규화, 전 전략 공통으로 음수 거부·계좌 통화(주식 USD·코인 견적 통화) 자릿수 검증
+        // 예수금 — 생략(null)은 0으로 여기서 한 번만 정규화, 전 전략 공통으로 음수 거부·계좌 통화 자릿수 검증
         BigDecimal initialDeposit = DepositAmounts.normalizeForRegistration(cmd.initialDeposit(), account.broker().getCurrency());
 
         // 중간부터 시작 시 시장가(전일종가) 1회 조회 — holdings=0이면 조회 자체를 건너뛰어 기존 동작 보존
-        // DCA는 시장가를 조회하지 않고 초기 투입 원가(보유 × 평단)를 start_amount로 둔다 — 코인은 BrokerPricePort 경로가 없다
+        // DCA는 시장가를 조회하지 않고 초기 투입 원가(보유 × 평단)를 start_amount로 둔다
         BigDecimal marketPrice = bootstrap && !dca ? fetchMarketPrice(account, resolvedTicker) : null;
         BigDecimal initialStockValue = !bootstrap ? BigDecimal.ZERO
                 : (dca ? cmd.initialAvgPrice() : marketPrice).multiply(initialHoldings).setScale(AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP);

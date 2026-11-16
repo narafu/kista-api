@@ -6,7 +6,6 @@ import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
-import com.kista.tradingcore.broker.application.service.CryptoExchanges;
 import com.kista.tradingcore.trading.application.service.support.UnassignedCashCalculator;
 import com.kista.tradingcore.trading.application.service.support.UnassignedCashCalculator.SeedHolder;
 import com.kista.tradingcore.trading.domain.model.AccountLedgerTotals;
@@ -28,8 +27,7 @@ public class AccountLedgerTotalsService {
 
     private final AccountPort accountPort;               // 소유권 검증
     private final UnassignedCashCalculator calculator;   // 시드 점유 전략·원장 목록, 미배정 현금
-    private final BrokerPricePort brokerPricePort;       // 주식 계좌 현재가
-    private final CryptoExchanges cryptoExchanges;       // 코인 계좌 현재가
+    private final BrokerPricePort brokerPricePort;       // 계좌 현재가
 
     // 계좌 원장 합산 조회 — 소유권 검증 포함
     public AccountLedgerTotals get(UUID accountId, UUID requesterId) {
@@ -50,9 +48,7 @@ public class AccountLedgerTotalsService {
         if (holdingsByTicker.isEmpty()) return BigDecimal.ZERO;
         List<StrategyTicker> tickers = List.copyOf(holdingsByTicker.keySet());
         String label = "원장 평가금 시세 조회: accountId=" + account.id();
-        Map<StrategyTicker, BigDecimal> prices = BrokerCallGuard.tryGet(label, () -> account.broker().isCryptoExchange()
-                ? cryptoExchanges.of(account.broker()).getCurrentPrices(tickers)
-                : brokerPricePort.getPrices(tickers, account.toBrokerRef())).orElse(null);
+        Map<StrategyTicker, BigDecimal> prices = BrokerCallGuard.tryGet(label, () -> brokerPricePort.getPrices(tickers, account.toBrokerRef())).orElse(null);
         if (prices == null || !prices.keySet().containsAll(tickers)) return null;
         return currency.round(holdingsByTicker.entrySet().stream()
                 .map(e -> e.getValue().multiply(prices.get(e.getKey())))

@@ -21,7 +21,7 @@ public record ManualTradeCorrectionCommand(
     public record Fill(
             @NotNull LocalDate tradeDate,   // KST 거래일
             @NotNull OrderDirection direction,
-            @NotNull @Positive BigDecimal quantity, // 주식은 정수, 코인은 소수 8자리까지 (서비스가 계좌 시장으로 검증)
+            @NotNull @Positive BigDecimal quantity, // 정수 주 (서비스가 검증)
             @NotNull @Positive BigDecimal price,
             String externalOrderId,   // 브로커 측 원본 주문 ID (선택)
             String memo

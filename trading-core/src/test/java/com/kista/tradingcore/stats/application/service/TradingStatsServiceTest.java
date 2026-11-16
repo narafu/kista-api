@@ -677,105 +677,32 @@ class TradingStatsServiceTest {
         assertThat(summary.totalUnrealizedPnl()).isEqualByComparingTo("30.00"); // 평가 130 - 원금 100
     }
 
-    // 통화별 합산 검증용 — Toss(USD)·BINANCE(USDT)·UPBIT(KRW)·MOCK 계좌 각 1개에 진행 중 DCA 사이클을 두고 원금을 100/200/300/400으로 구분한다
-    private record MultiCurrency(Account toss, Account binance, Account upbit, Account mock,
-                                 Map<UUID, StrategyCycle> cycleByAccount) {}
-
-    private MultiCurrency stubMultiCurrencyUser() {
-        Account toss = testAccount();
-        Account binance = new Account(UUID.randomUUID(), USER_ID, "바이낸스", null, "k", "s", null, Broker.BINANCE, null, null);
-        Account upbit = new Account(UUID.randomUUID(), USER_ID, "업비트", "n", "k", "s", null, Broker.UPBIT, null, null);
-        Account mock = new Account(UUID.randomUUID(), USER_ID, "모의", "0", "k", "s", null, Broker.MOCK, null, null);
-        Map<UUID, Account> accounts = new java.util.LinkedHashMap<>();
-        Map<UUID, StrategyCycle> cycleByAccount = new java.util.LinkedHashMap<>();
-        Map<UUID, Strategy> strategyByAccount = new java.util.LinkedHashMap<>();
-        String[] principals = {"100", "200", "300", "400"};
-        int i = 0;
-        for (Account a : List.of(toss, binance, upbit, mock)) {
-            Strategy s = new Strategy(UUID.randomUUID(), a.id(), StrategyType.DCA, StrategyStatus.ACTIVE,
-                    StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-            accounts.put(a.id(), a);
-            strategyByAccount.put(a.id(), s);
-            cycleByAccount.put(a.id(), activeCycle(s.id(), principals[i++], "2026-06-01"));
-        }
-        lenient().when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(toss, binance, upbit, mock));
-        lenient().when(strategyPort.findByAccountIds(any())).thenAnswer(inv -> {
-            Map<UUID, List<Strategy>> result = new java.util.HashMap<>();
-            for (UUID id : (java.util.Collection<UUID>) inv.getArgument(0)) result.put(id, List.of(strategyByAccount.get(id)));
-            return result;
-        });
-        lenient().when(strategyCyclePort.findByStrategyIds(any())).thenAnswer(inv -> {
-            java.util.Collection<UUID> ids = inv.getArgument(0);
-            return cycleByAccount.values().stream().filter(c -> ids.contains(c.strategyId())).toList();
-        });
-        return new MultiCurrency(toss, binance, upbit, mock, cycleByAccount);
-    }
-
-    @Test
-    void 합산_경로는_요청_통화_계좌만_포함하고_사이클_성과_목록은_전부_포함한다() {
-        MultiCurrency m = stubMultiCurrencyUser();
-
-        assertThat(statsService.getSummary(USER_ID, Currency.USD).activePrincipal()).isEqualByComparingTo("100");
-        assertThat(statsService.getSummary(USER_ID, Currency.USDT).activePrincipal()).isEqualByComparingTo("200");
-        assertThat(statsService.getSummary(USER_ID, Currency.KRW).activePrincipal()).isEqualByComparingTo("300");
-        assertThat(statsService.getCyclePerformances(USER_ID, null, null, null, null, 0, 10).items())
-                .extracting(CyclePerformance::accountId)
-                .containsExactlyInAnyOrder(m.toss().id(), m.binance().id(), m.upbit().id(), m.mock().id());
-    }
-
-    @Test
-    void equityCurve는_요청_통화_계좌만_합산한다() {
-        MultiCurrency m = stubMultiCurrencyUser();
-        StrategyCycle binanceCycle = m.cycleByAccount().get(m.binance().id());
-        when(cyclePositionPort.findByCycleIdsAndRange(eq(Set.of(binanceCycle.id())), any(), any())).thenReturn(List.of(
-                depositSnapshot(binanceCycle.id(), "200.00", "2026-06-02T01:00:00Z")));
-
-        EquityCurve curve = statsService.getEquityCurve(USER_ID, Currency.USDT, null,
-                LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
-
-        assertThat(curve.points()).hasSize(1);
-        assertThat(curve.points().getFirst().totalAsset()).isEqualByComparingTo("200.00");
-    }
-
     @Test
     void availableCurrencies는_요청_통화와_무관하다() {
-        // BINANCE만 가진 사용자가 USD로 요청 — 합계 0·byType 비어 있고 사용 통화는 [USDT]
-        Account binance = new Account(UUID.randomUUID(), USER_ID, "바이낸스", null, "k", "s", null, Broker.BINANCE, null, null);
-        Strategy s = new Strategy(UUID.randomUUID(), binance.id(), StrategyType.DCA, StrategyStatus.ACTIVE,
-                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(binance));
-        when(strategyPort.findByAccountIds(List.of(binance.id()))).thenReturn(Map.of(binance.id(), List.of(s)));
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(activeCycle(s.id(), "200", "2026-06-01")));
+        // TOSS(USD)만 가진 사용자가 KRW로 요청 — 합계 0·byType 비어 있고 사용 통화는 [USD]
+        stubUserWithStrategy();
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(activeCycle(STRATEGY_ID, "200", "2026-06-01")));
 
-        StatsSummary usd = statsService.getSummary(USER_ID, Currency.USD);
+        StatsSummary krw = statsService.getSummary(USER_ID, Currency.KRW);
 
-        assertThat(usd.byType()).isEmpty();
-        assertThat(usd.totalRealizedPnl()).isEqualByComparingTo("0");
-        assertThat(usd.availableCurrencies()).containsExactly(Currency.USDT);
-
-        // 4계좌 사용자 — enum 선언 순서, MOCK 제외
-        reset(accountPort, strategyPort, strategyCyclePort);
-        stubMultiCurrencyUser();
-        assertThat(statsService.getSummary(USER_ID, Currency.KRW).availableCurrencies())
-                .containsExactly(Currency.KRW, Currency.USD, Currency.USDT);
+        assertThat(krw.byType()).isEmpty();
+        assertThat(krw.totalRealizedPnl()).isEqualByComparingTo("0");
+        assertThat(krw.availableCurrencies()).containsExactly(Currency.USD);
     }
 
     @Test
     void availableCurrencies는_MOCK_계좌를_제외한다() {
-        // MOCK·BINANCE 계좌 각각 사이클 보유 — 사용 통화는 [USDT]만
+        // MOCK 계좌만 사이클 보유 — 사용 통화는 비어 있고, TOSS 계좌가 더해지면 [USD]만
+        Account toss = testAccount();
         Account mock = new Account(UUID.randomUUID(), USER_ID, "모의", "0", "k", "s", null, Broker.MOCK, null, null);
-        Account binance = new Account(UUID.randomUUID(), USER_ID, "바이낸스", null, "k", "s", null, Broker.BINANCE, null, null);
         Strategy mockStrategy = new Strategy(UUID.randomUUID(), mock.id(), StrategyType.DCA, StrategyStatus.ACTIVE,
                 StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        Strategy binanceStrategy = new Strategy(UUID.randomUUID(), binance.id(), StrategyType.DCA, StrategyStatus.ACTIVE,
-                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(mock, binance));
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(mock, toss));
         // 실제 포트처럼 요청한 id의 전략·사이클만 돌려준다
-        Map<UUID, List<Strategy>> strategyByAccount = Map.of(
-                mock.id(), List.of(mockStrategy), binance.id(), List.of(binanceStrategy));
+        Map<UUID, List<Strategy>> strategyByAccount = Map.of(mock.id(), List.of(mockStrategy), toss.id(), List.of(STRATEGY));
         List<StrategyCycle> allCycles = List.of(
                 activeCycle(mockStrategy.id(), "100", "2026-06-01"),
-                activeCycle(binanceStrategy.id(), "200", "2026-06-01"));
+                activeCycle(STRATEGY_ID, "200", "2026-06-01"));
         when(strategyPort.findByAccountIds(any())).thenAnswer(inv -> {
             Map<UUID, List<Strategy>> result = new java.util.HashMap<>();
             for (UUID id : (java.util.Collection<UUID>) inv.getArgument(0)) result.put(id, strategyByAccount.get(id));
@@ -786,20 +713,23 @@ class TradingStatsServiceTest {
             return allCycles.stream().filter(c -> ids.contains(c.strategyId())).toList();
         });
 
-        assertThat(statsService.getSummary(USER_ID, Currency.USD).availableCurrencies())
-                .containsExactly(Currency.USDT);
+        StatsSummary usd = statsService.getSummary(USER_ID, Currency.USD);
+
+        assertThat(usd.availableCurrencies()).containsExactly(Currency.USD);
+        assertThat(usd.activePrincipal()).isEqualByComparingTo("200"); // MOCK 원금 100은 합산 제외
     }
 
     @Test
     void summary_캐시는_통화별로_분리된다() {
-        stubMultiCurrencyUser();
+        stubUserWithStrategy();
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(activeCycle(STRATEGY_ID, "100", "2026-06-01")));
 
         StatsSummary usd = statsService.getSummary(USER_ID, Currency.USD);
-        StatsSummary usdt = statsService.getSummary(USER_ID, Currency.USDT);
+        StatsSummary krw = statsService.getSummary(USER_ID, Currency.KRW);
         statsService.getSummary(USER_ID, Currency.USD); // 캐시 적중
-        statsService.getSummary(USER_ID, Currency.USDT); // 캐시 적중
+        statsService.getSummary(USER_ID, Currency.KRW); // 캐시 적중
 
-        assertThat(usd.activePrincipal()).isNotEqualByComparingTo(usdt.activePrincipal());
+        assertThat(usd.activePrincipal()).isNotEqualByComparingTo(krw.activePrincipal());
         verify(accountPort, times(2)).findByUserId(USER_ID); // 통화당 1회
     }
 
@@ -1301,104 +1231,6 @@ class TradingStatsServiceTest {
         BigDecimal summaryTotal = summary.totalRealizedPnl().add(summary.totalUnrealizedPnl());
         assertThat(summaryTotal).isEqualByComparingTo("1520.00");
         assertThat(last.totalAsset().subtract(last.principal())).isEqualByComparingTo(summaryTotal);
-    }
-
-    // ── KRW(UPBIT) 응답 금액 정수 반올림 ─────────────────────────────────────────
-
-    // UPBIT 계좌·DCA 전략을 스텁하고 전략을 돌려준다 — 사이클 스텁은 호출 측이 한다
-    private Strategy stubUpbitStrategy() {
-        Account upbit = new Account(UUID.randomUUID(), USER_ID, "업비트", "n", "k", "s", null, Broker.UPBIT, null, null);
-        Strategy s = new Strategy(UUID.randomUUID(), upbit.id(), StrategyType.DCA, StrategyStatus.ACTIVE,
-                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(upbit));
-        when(strategyPort.findByAccountIds(List.of(upbit.id()))).thenReturn(Map.of(upbit.id(), List.of(s)));
-        return s;
-    }
-
-    private static StrategyCycle closedKrwCycle(UUID strategyId, String start, String end) {
-        return new StrategyCycle(UUID.randomUUID(), strategyId, new BigDecimal(start), new BigDecimal(end),
-                LocalDate.parse("2026-01-01"), LocalDate.parse("2026-01-31"), Instant.parse("2026-01-01T00:00:00Z"), null);
-    }
-
-    @Test
-    void krwSummary_roundsAmountsToScale0_ratiosUnchanged() {
-        Strategy s = stubUpbitStrategy();
-        StrategyCycle closed = closedKrwCycle(s.id(), "1000.40", "1100.75"); // 실현 100.35
-        StrategyCycle open = activeCycle(s.id(), "1500.20", "2026-06-01");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(closed, open));
-        when(cyclePositionPort.findLatestByCycleIds(Set.of(open.id())))
-                .thenReturn(Map.of(open.id(), depositSnapshot(open.id(), "2000.60", "2026-06-02T01:00:00Z"))); // 미실현 500.40
-
-        StatsSummary summary = statsService.getSummary(USER_ID, Currency.KRW);
-        StrategyTypeStats dca = summary.byType().getFirst();
-
-        assertThat(dca.realizedPnl()).hasToString("100");
-        assertThat(dca.unrealizedPnl()).hasToString("501"); // 총손익 600.75 → 601 − 실현 100
-        assertThat(summary.totalRealizedPnl()).hasToString("100");
-        assertThat(summary.totalUnrealizedPnl()).hasToString("501");
-        assertThat(summary.activePrincipal()).hasToString("1500");
-        // 평균 수익률은 반올림 전 실현손익(100.35)/원금(1000.40)으로 계산된다
-        assertThat(dca.avgReturnRate()).isEqualByComparingTo(
-                new BigDecimal("100.35").divide(new BigDecimal("1000.40"), 6, java.math.RoundingMode.HALF_UP)
-                        .setScale(4, java.math.RoundingMode.HALF_UP));
-    }
-
-    @Test
-    void krwSummary_negativeUnrealized_keepsSumInvariant() {
-        Strategy s = stubUpbitStrategy();
-        StrategyCycle open = activeCycle(s.id(), "1000.20", "2026-06-01");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(open));
-        when(cyclePositionPort.findLatestByCycleIds(Set.of(open.id())))
-                .thenReturn(Map.of(open.id(), depositSnapshot(open.id(), "999.45", "2026-06-02T01:00:00Z"))); // 평가손 -0.75
-
-        StatsSummary summary = statsService.getSummary(USER_ID, Currency.KRW);
-        StrategyTypeStats dca = summary.byType().getFirst();
-
-        // 총손익 -0.75 → -1, 실현 0이라 미실현 -1
-        assertThat(dca.realizedPnl().add(dca.unrealizedPnl())).hasToString("-1");
-        assertThat(summary.totalRealizedPnl().add(summary.totalUnrealizedPnl())).hasToString("-1");
-    }
-
-    @Test
-    void krwEquityCurve_pointsScale0() {
-        Strategy s = stubUpbitStrategy();
-        StrategyCycle open = activeCycle(s.id(), "1500.20", "2026-06-01");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(open));
-        when(cyclePositionPort.findByCycleIdsAndRange(eq(Set.of(open.id())), any(), any())).thenReturn(List.of(
-                depositSnapshot(open.id(), "2000.60", "2026-06-02T01:00:00Z")));
-
-        EquityCurve c = statsService.getEquityCurve(USER_ID, Currency.KRW, null,
-                LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
-
-        assertThat(c.points()).hasSize(1);
-        assertThat(c.points().getFirst().totalAsset()).hasToString("2001");
-        assertThat(c.points().getFirst().principal()).hasToString("1500");
-    }
-
-    @Test
-    void krwCycles_amountsScale0_pnlIsDifferenceOfRounded_returnRateFromRaw() {
-        Strategy s = stubUpbitStrategy();
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(closedKrwCycle(s.id(), "1000.40", "1100.75")));
-
-        CyclePerformance p = statsService.getCyclePerformances(USER_ID, null, null, null, null, 0, 10).items().getFirst();
-
-        assertThat(p.startAmount()).hasToString("1000");
-        assertThat(p.endAmount()).hasToString("1101");
-        assertThat(p.pnl()).hasToString("101"); // 반올림된 1101 − 1000
-        assertThat(p.returnRate()).isEqualByComparingTo(
-                new BigDecimal("100.35").divide(new BigDecimal("1000.40"), 4, java.math.RoundingMode.HALF_UP));
-    }
-
-    @Test
-    void krwCycles_openWithoutSnapshot_keepsNullAmounts() {
-        Strategy s = stubUpbitStrategy();
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(activeCycle(s.id(), "1500.20", "2026-06-01")));
-
-        CyclePerformance p = statsService.getCyclePerformances(USER_ID, null, null, null, null, 0, 10).items().getFirst();
-
-        assertThat(p.endAmount()).isNull();
-        assertThat(p.pnl()).isNull();
-        assertThat(p.startAmount()).hasToString("1500");
     }
 
     @Test

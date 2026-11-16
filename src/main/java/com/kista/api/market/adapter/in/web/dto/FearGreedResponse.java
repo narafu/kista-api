@@ -6,12 +6,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
-// CNN·크립토 두 소스를 한 번에 내려주는 번들 응답
+// CNN 공포탐욕지수 응답
 public record FearGreedResponse(
         @Schema(description = "CNN 공포탐욕지수 현재값 + 추이 이력")
-        SourceView cnn,
-        @Schema(description = "크립토 공포탐욕지수 현재값 + 추이 이력")
-        SourceView crypto) {
+        SourceView cnn) {
 
     // 소스별 현재값 + 추이 이력
     public record SourceView(
@@ -29,8 +27,8 @@ public record FearGreedResponse(
             @Schema(description = "등급", example = "NEUTRAL")
             String rating) {}
 
-    public static FearGreedResponse from(List<FearGreedSnapshot> cnn, List<FearGreedSnapshot> crypto) {
-        return new FearGreedResponse(toView(cnn), toView(crypto));
+    public static FearGreedResponse from(List<FearGreedSnapshot> cnn) {
+        return new FearGreedResponse(toView(cnn));
     }
 
     private static SourceView toView(List<FearGreedSnapshot> snapshots) {

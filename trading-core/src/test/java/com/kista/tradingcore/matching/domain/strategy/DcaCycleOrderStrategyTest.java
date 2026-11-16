@@ -35,7 +35,7 @@ class DcaCycleOrderStrategyTest {
     private final DcaCycleOrderStrategy strategy = new DcaCycleOrderStrategy();
 
     private static DcaRule rule(OrderDirection dir, String amount, OrderType type, DcaCondition... conds) {
-        return new DcaRule(KEY, dir, DcaFrequency.DAILY, null, null, type, null,
+        return new DcaRule(KEY, dir, DcaFrequency.DAILY, null, null, type,
                 new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal(amount), null), DcaShortfallPolicy.PARTIAL, List.of(conds));
     }
 
@@ -44,15 +44,15 @@ class DcaCycleOrderStrategyTest {
         return strategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, closes, ledger,
                 sellable == null ? null : BigDecimal.valueOf(sellable), fearGreed,
                 currentPrice == null ? null : new BigDecimal(currentPrice),
-                r.direction() == OrderDirection.BUY ? new BigDecimal("999999999999") : null, null));
+                r.direction() == OrderDirection.BUY ? new BigDecimal("999999999999") : null));
     }
 
     // 주식 BUY 가용 USD를 직접 지정 — 전일 종가 100 단일 봉, 캡가 = PriceCapPolicy.capFor(100)
     private DcaRuleDecision decideBuyWithCash(DcaShortfallPolicy policy, String amount, String cash) {
-        DcaRule r = new DcaRule(KEY, OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOC, null,
+        DcaRule r = new DcaRule(KEY, OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOC,
                 new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal(amount), null), policy, List.of());
         return strategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, List.of(new BigDecimal("100")), null,
-                null, null, null, cash == null ? null : new BigDecimal(cash), null));
+                null, null, null, cash == null ? null : new BigDecimal(cash)));
     }
 
     private static final BigDecimal CAP_100 = PriceCapPolicy.capFor(new BigDecimal("100"));
@@ -94,13 +94,13 @@ class DcaCycleOrderStrategyTest {
     @Test
     void plan은_앞_BUY_규칙_계획분을_뒤_규칙_가용에서_뺀다() { // 규칙 둘 각 2주(캡가), 가용은 3주분 → 2주 + 1주
         BigDecimal cash = CAP_100.multiply(BigDecimal.valueOf(3)).add(BigDecimal.ONE);
-        DcaRule r1 = new DcaRule("11111111-1111-1111-1111-111111111111", OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOC, null,
+        DcaRule r1 = new DcaRule("11111111-1111-1111-1111-111111111111", OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOC,
                 new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("200"), null), DcaShortfallPolicy.PARTIAL, List.of());
-        DcaRule r2 = new DcaRule("22222222-2222-2222-2222-222222222222", OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOC, null,
+        DcaRule r2 = new DcaRule("22222222-2222-2222-2222-222222222222", OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOC,
                 new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("200"), null), DcaShortfallPolicy.PARTIAL, List.of());
         List<DcaCycleOrderStrategy.DcaRuleInputs> due = List.of(r1, r2).stream()
                 .map(r -> new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, List.of(new BigDecimal("100")), null,
-                        null, null, null, cash, null)).toList();
+                        null, null, null, cash)).toList();
         var plan = strategy.plan(new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy.PlanContext(
                 new AccountBalance(0, null, BigDecimal.ZERO), StrategyTicker.UPRO, DAY, null, null, null, null,
                 new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy.PlanContext.DcaPlanInputs(due))).orElseThrow();
@@ -338,16 +338,16 @@ class DcaCycleOrderStrategyTest {
     @Test
     void 주식_plan은_규칙의_MOO_MOC를_그대로_정수_수량으로_주문한다() {
         // MOO BUY·MOC BUY·MOC SELL 각 300 / 전일 종가 87.12 → 3주, BUY는 캡가 91.48, SELL은 전일 종가
-        DcaRule moo = new DcaRule("11111111-1111-1111-1111-111111111111", OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOO, null,
+        DcaRule moo = new DcaRule("11111111-1111-1111-1111-111111111111", OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOO,
                 new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("300"), null), DcaShortfallPolicy.PARTIAL, List.of());
-        DcaRule mocBuy = new DcaRule("22222222-2222-2222-2222-222222222222", OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOC, null,
+        DcaRule mocBuy = new DcaRule("22222222-2222-2222-2222-222222222222", OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOC,
                 new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("300"), null), DcaShortfallPolicy.PARTIAL, List.of());
-        DcaRule mocSell = new DcaRule("33333333-3333-3333-3333-333333333333", OrderDirection.SELL, DcaFrequency.DAILY, null, null, OrderType.MOC, null,
+        DcaRule mocSell = new DcaRule("33333333-3333-3333-3333-333333333333", OrderDirection.SELL, DcaFrequency.DAILY, null, null, OrderType.MOC,
                 new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("300"), null), DcaShortfallPolicy.PARTIAL, List.of());
         List<DcaCycleOrderStrategy.DcaRuleInputs> due = List.of(moo, mocBuy, mocSell).stream()
                 .map(r -> new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, List.of(new BigDecimal("87.12")), SELL_LEDGER,
                         r.direction() == OrderDirection.SELL ? BigDecimal.valueOf(10) : null, null, null,
-                        r.direction() == OrderDirection.BUY ? new BigDecimal("100000") : null, null)).toList();
+                        r.direction() == OrderDirection.BUY ? new BigDecimal("100000") : null)).toList();
         var plan = strategy.plan(new CycleOrderStrategy.PlanContext(SELL_LEDGER, StrategyTicker.UPRO, DAY, null, null, null, null,
                 new CycleOrderStrategy.PlanContext.DcaPlanInputs(due))).orElseThrow();
 
@@ -357,7 +357,6 @@ class DcaCycleOrderStrategyTest {
                         org.assertj.core.groups.Tuple.tuple(OrderType.MOO, OrderTiming.AT_OPEN, OrderDirection.BUY, 3),
                         org.assertj.core.groups.Tuple.tuple(OrderType.MOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 3),
                         org.assertj.core.groups.Tuple.tuple(OrderType.MOC, OrderTiming.AT_CLOSE, OrderDirection.SELL, 3));
-        assertThat(plan.orders()).extracting(PlannedOrder::orderType).doesNotContain(OrderType.MARKET);
         assertThat(plan.orders()).extracting(PlannedOrder::price)
                 .usingElementComparator(BigDecimal::compareTo)
                 .containsExactly(new BigDecimal("91.48"), new BigDecimal("91.48"), new BigDecimal("87.12"));
@@ -368,7 +367,7 @@ class DcaCycleOrderStrategyTest {
         // 나누어떨어지지 않는 금액(300 / 87.12 = 3.44…)과 보유 비율(1000 × 25% = 250)에서 수량 scale 0 — 코인 수량 단위가 섞이면 실패
         DcaRuleDecision.Planned buy = (DcaRuleDecision.Planned) decide(rule(OrderDirection.BUY, "300", OrderType.MOC), "87.12", null);
         DcaRuleDecision.Planned sellAmount = (DcaRuleDecision.Planned) decide(rule(OrderDirection.SELL, "300", OrderType.MOC), "87.12", 1000);
-        DcaRule percentSell = new DcaRule(KEY, OrderDirection.SELL, DcaFrequency.DAILY, null, null, OrderType.MOC, null,
+        DcaRule percentSell = new DcaRule(KEY, OrderDirection.SELL, DcaFrequency.DAILY, null, null, OrderType.MOC,
                 new DcaSizing(DcaSizingType.HOLDING_PERCENT, null, new BigDecimal("25")), DcaShortfallPolicy.PARTIAL, List.of());
         DcaRuleDecision.Planned sellPercent = (DcaRuleDecision.Planned) decide(percentSell, "87.12", 1000);
 
@@ -377,7 +376,6 @@ class DcaCycleOrderStrategyTest {
         assertThat(sellPercent.quantity()).isEqualTo(new BigDecimal("250"));
         assertThat(List.of(buy, sellAmount, sellPercent)).allSatisfy(p -> {
             assertThat(p.quantity().scale()).isZero();
-            assertThat(p.notional()).isNull(); // 주식은 금액 지정 주문이 아니다
         });
     }
 

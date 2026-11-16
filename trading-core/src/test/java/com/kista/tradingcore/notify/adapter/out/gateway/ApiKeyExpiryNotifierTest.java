@@ -23,7 +23,7 @@ class ApiKeyExpiryNotifierTest {
     TradingUserProfilePort profilePort = mock(TradingUserProfilePort.class);
     ApiKeyExpiryNotifier notifier = new ApiKeyExpiryNotifier(notificationPort, profilePort);
     UUID userId = UUID.randomUUID();
-    ApiKeyExpiringEvent event = new ApiKeyExpiringEvent(userId, UUID.randomUUID(), "업비트", Broker.UPBIT, LocalDate.of(2026, 10, 25), 7);
+    ApiKeyExpiringEvent event = new ApiKeyExpiringEvent(userId, UUID.randomUUID(), "메리츠", Broker.MERITZ, LocalDate.of(2026, 10, 25), 7);
 
     @Test
     void loadsProfileAndNotifies() {

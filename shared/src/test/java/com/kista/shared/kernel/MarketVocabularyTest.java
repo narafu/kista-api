@@ -12,8 +12,6 @@ class MarketVocabularyTest {
 
     @Test
     void brokersCarryMarketAndCurrency() {
-        assertThat(Broker.UPBIT.getMarket()).isEqualTo(Market.CRYPTO_KRW);
-        assertThat(Broker.UPBIT.getCurrency()).isEqualTo(Currency.KRW);
         for (Broker stock : new Broker[]{Broker.TOSS, Broker.MOCK}) {
             assertThat(stock.getMarket()).isEqualTo(Market.US_STOCK);
             assertThat(stock.getCurrency()).isEqualTo(Currency.USD);
@@ -21,25 +19,14 @@ class MarketVocabularyTest {
     }
 
     @Test
-    void cryptoTickersTradeOnBothCryptoMarkets() {
-        assertThat(StrategyTicker.BTC.getMarkets()).containsExactly(Market.CRYPTO_KRW, Market.CRYPTO_USDT);
-        assertThat(StrategyTicker.ETH.tradableOn(Market.CRYPTO_USDT)).isTrue();
-        assertThat(StrategyTicker.BTC.tradableOn(Market.US_STOCK)).isFalse();
+    void stockTickersTradeOnUsStock() {
         assertThat(StrategyTicker.SOXL.getMarkets()).containsExactly(Market.US_STOCK);
-        assertThat(StrategyTicker.SOXL.tradableOn(Market.CRYPTO_USDT)).isFalse();
-        assertThat(StrategyTicker.BTC.isCrypto()).isTrue();
-        assertThat(StrategyTicker.SOXL.isCrypto()).isFalse();
-        assertThat(StrategyTicker.BTC.getTargetProfitRate()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(StrategyType.DCA.availableTickers()).contains(StrategyTicker.BTC, StrategyTicker.ETH);
-        assertThat(StrategyType.INFINITE.availableTickers()).doesNotContain(StrategyTicker.BTC, StrategyTicker.ETH);
-        assertThat(StrategyType.DCA.capability().orderTypes()).containsExactly(OrderType.MOO, OrderType.MOC, OrderType.MARKET);
-    }
-
-    @Test
-    void newSkipReasonsHaveKoreanLabels() {
-        assertThat(DcaSkipReason.BELOW_MIN_ORDER_AMOUNT.getLabel()).isEqualTo("최소 주문 금액 미달");
-        assertThat(DcaSkipReason.EXCHANGE_API_ERROR.getLabel()).isEqualTo("거래소 API 오류");
-        assertThat(DcaSkipReason.API_KEY_EXPIRED.getLabel()).isEqualTo("API 키 인증 실패");
+        assertThat(StrategyTicker.SOXL.tradableOn(Market.US_STOCK)).isTrue();
+        assertThat(StrategyTicker.BITO.tradableOn(Market.US_STOCK)).isTrue();
+        assertThat(StrategyTicker.BITO.getTargetProfitRate()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(StrategyType.DCA.availableTickers()).contains(StrategyTicker.BITO, StrategyTicker.EETH);
+        assertThat(StrategyType.INFINITE.availableTickers()).doesNotContain(StrategyTicker.BITO, StrategyTicker.EETH);
+        assertThat(StrategyType.DCA.capability().orderTypes()).containsExactly(OrderType.MOO, OrderType.MOC);
     }
 
     @Test
@@ -51,16 +38,8 @@ class MarketVocabularyTest {
     @Test
     void marketCapabilities() {
         assertThat(Market.US_STOCK.quoteCurrency()).isEqualTo(Currency.USD);
-        assertThat(Market.CRYPTO_KRW.quoteCurrency()).isEqualTo(Currency.KRW);
-        assertThat(Market.CRYPTO_USDT.quoteCurrency()).isEqualTo(Currency.USDT);
-        assertThat(Market.US_STOCK.isCrypto()).isFalse();
-        assertThat(Market.CRYPTO_KRW.isCrypto()).isTrue();
-        assertThat(Market.CRYPTO_USDT.isCrypto()).isTrue();
-        assertThat(Market.CRYPTO_KRW.minOrderAmount()).isEqualTo(new BigDecimal("5000"));
-        assertThat(Market.CRYPTO_USDT.minOrderAmount()).isEqualTo(new BigDecimal("5"));
         assertThat(Market.US_STOCK.minOrderAmount()).isEqualTo(BigDecimal.ZERO);
-        assertThat(Market.CRYPTO_KRW.amountScale()).isZero();
-        assertThat(Market.CRYPTO_USDT.amountScale()).isEqualTo(2);
+        assertThat(Market.US_STOCK.amountScale()).isEqualTo(2);
     }
 
     @Test
@@ -70,19 +49,13 @@ class MarketVocabularyTest {
 
     @Test
     void brokerCapabilityFlags() {
-        assertThat(Broker.UPBIT.isKeyOnlyCredentials()).isTrue();
         assertThat(Broker.MERITZ.isKeyOnlyCredentials()).isTrue();
-        assertThat(Broker.BINANCE.isKeyOnlyCredentials()).isTrue();
-        assertThat(Broker.BINANCE.getCurrency()).isEqualTo(Currency.USDT);
         for (Broker b : new Broker[]{Broker.TOSS, Broker.MOCK}) assertThat(b.isKeyOnlyCredentials()).isFalse();
         assertThat(Arrays.stream(Broker.values()).filter(Broker::isApiKeyExpiring))
-                .containsExactlyInAnyOrder(Broker.UPBIT, Broker.TOSS, Broker.MERITZ);
-        assertThat(Broker.UPBIT.getApiKeyExpirySource()).isEqualTo(ApiKeyExpirySource.BROKER_API);
+                .containsExactlyInAnyOrder(Broker.TOSS, Broker.MERITZ);
         assertThat(Stream.of(Broker.TOSS, Broker.MERITZ).map(Broker::getApiKeyExpirySource))
                 .containsOnly(ApiKeyExpirySource.ESTIMATED);
-        assertThat(Stream.of(Broker.MOCK, Broker.BINANCE).map(Broker::getApiKeyExpirySource))
-                .containsOnly(ApiKeyExpirySource.NONE);
-        assertThat(Arrays.stream(Broker.values()).filter(Broker::isCryptoExchange)).containsExactly(Broker.UPBIT, Broker.BINANCE);
+        assertThat(Broker.MOCK.getApiKeyExpirySource()).isEqualTo(ApiKeyExpirySource.NONE);
         for (Broker b : Broker.values()) assertThat(b.getCurrency()).isEqualTo(b.getMarket().quoteCurrency());
     }
 }

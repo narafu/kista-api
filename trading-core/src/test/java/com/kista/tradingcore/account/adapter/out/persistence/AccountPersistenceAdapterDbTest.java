@@ -19,7 +19,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-// V10 — account_no NULL 허용·api_key_expires_at·access key 해시가 기존 unique 인덱스를 재사용하는지 실 DB로 확인
+// V10 — account_no NULL 허용·api_key_expires_at·앱키 해시가 기존 unique 인덱스를 재사용하는지 실 DB로 확인
 @Import({AccountPersistenceAdapter.class, AccountNoHasher.class})
 @Execution(ExecutionMode.SAME_THREAD)
 class AccountPersistenceAdapterDbTest extends DataJpaTestBase {
@@ -29,10 +29,10 @@ class AccountPersistenceAdapterDbTest extends DataJpaTestBase {
     @Autowired JdbcTemplate jdbc;
 
     @Test
-    void upbitAccountRoundTripsAndDuplicateAccessKeyIsRejectedByIndex() {
+    void meritzAccountRoundTripsAndDuplicateAccessKeyIsRejectedByIndex() {
         UUID userId = UUID.randomUUID();
         Instant expiresAt = Instant.parse("2027-10-17T00:00:00Z");
-        Account saved = adapter.save(new Account(null, userId, "업비트", null, "dup-ak", "sk", null, Broker.UPBIT, null, expiresAt));
+        Account saved = adapter.save(new Account(null, userId, "메리츠", null, "dup-ak", "sk", null, Broker.MERITZ, null, expiresAt));
         em.flush();
         em.clear();
 
@@ -43,7 +43,7 @@ class AccountPersistenceAdapterDbTest extends DataJpaTestBase {
 
         // save는 INSERT를 flush까지 미루므로 같은 람다 안에서 flush해야 unique 위반이 드러난다(EntityManager flush는 Hibernate 예외 그대로)
         assertThatThrownBy(() -> {
-            adapter.save(new Account(null, UUID.randomUUID(), "업비트2", null, "dup-ak", "sk2", null, Broker.UPBIT, null, null));
+            adapter.save(new Account(null, UUID.randomUUID(), "메리츠2", null, "dup-ak", "sk2", null, Broker.MERITZ, null, null));
             em.flush();
         }).isInstanceOf(PersistenceException.class).hasMessageContaining("uq_accounts_account_no_hash");
     }

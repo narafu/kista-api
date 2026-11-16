@@ -24,7 +24,7 @@ public record DailyTransactionResponse(
             StrategyTicker ticker,
             @Schema(description = "종목명")
             String symbolName,
-            @Schema(description = "체결수량 (코인은 소수)")
+            @Schema(description = "체결수량")
             BigDecimal quantity,
             @Schema(description = "체결단가 (계좌 통화)")
             BigDecimal price,

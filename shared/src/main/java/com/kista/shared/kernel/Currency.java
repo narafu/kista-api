@@ -9,8 +9,7 @@ import java.util.Optional;
 public enum Currency {
     KRW(0),  // 원화
     USD(2),  // 미국 달러
-    JPY(0),  // 일본 엔
-    USDT(2); // 테더
+    JPY(0);  // 일본 엔
 
     private final int amountScale; // 금액 소수 자릿수 (반올림·표기 SSOT)
 
@@ -27,7 +26,7 @@ public enum Currency {
         return amount.setScale(amountScale, RoundingMode.HALF_UP);
     }
 
-    // 표기: KRW는 "15,000원", 그 외는 "10.50 USDT"
+    // 표기: KRW는 "15,000원", 그 외는 "10.50 USD"
     public String format(BigDecimal amount) {
         String number = String.format(Locale.ROOT, "%,." + amountScale + "f", round(amount)); // 기본 로케일 무관 — 콤마 그룹·점 소수
         return this == KRW ? number + "원" : number + " " + name();

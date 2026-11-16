@@ -86,7 +86,7 @@ class MetaControllerTest {
                 .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].orderTypes[0]").value(org.hamcrest.Matchers.contains("MOO")))
                 .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].divisionCounts").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.empty())))
                 .andExpect(jsonPath("$.strategyTypes[?(@.code=='INFINITE')].orderTypes").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.empty())))
-                .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].orderTypes").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.contains("MOO", "MOC", "MARKET"))))
+                .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].orderTypes").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.contains("MOO", "MOC"))))
                 .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].directions").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.contains("BUY", "SELL"))))
                 .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].frequencies").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.contains("DAILY", "WEEKLY", "MONTHLY"))))
                 .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].conditionIndicators").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.contains("AVG_PRICE", "SMA", "RSI", "FEAR_GREED"))))
@@ -118,22 +118,10 @@ class MetaControllerTest {
     void getBundle_exposesMarketAndCurrency() throws Exception {
         mockMvc.perform(get("/api/meta").with(authentication(userToken(DEV_USER_UUID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.brokers[?(@.code=='UPBIT')].market").value(org.hamcrest.Matchers.contains("CRYPTO_KRW")))
-                .andExpect(jsonPath("$.brokers[?(@.code=='UPBIT')].currency").value(org.hamcrest.Matchers.contains("KRW")))
-                .andExpect(jsonPath("$.brokers[?(@.code=='BINANCE')].market").value(org.hamcrest.Matchers.contains("CRYPTO_USDT")))
-                .andExpect(jsonPath("$.brokers[?(@.code=='BINANCE')].currency").value(org.hamcrest.Matchers.contains("USDT")))
-                .andExpect(jsonPath("$.brokers[?(@.code=='BINANCE')].label").value(org.hamcrest.Matchers.contains("바이낸스")))
-                .andExpect(jsonPath("$.brokers[?(@.code=='BINANCE')].minOrderAmount").value(org.hamcrest.Matchers.contains("5")))
-                .andExpect(jsonPath("$.brokers[?(@.code=='BINANCE')].amountScale").value(org.hamcrest.Matchers.contains(2)))
-                .andExpect(jsonPath("$.brokers[?(@.code=='UPBIT')].minOrderAmount").value(org.hamcrest.Matchers.contains("5000")))
-                .andExpect(jsonPath("$.brokers[?(@.code=='UPBIT')].apiKeyExpirySource").value(org.hamcrest.Matchers.contains("BROKER_API")))
-                .andExpect(jsonPath("$.brokers[?(@.code=='UPBIT')].amountScale").value(org.hamcrest.Matchers.contains(0)))
                 .andExpect(jsonPath("$.brokers[?(@.code=='TOSS')].minOrderAmount").value(org.hamcrest.Matchers.contains("0")))
                 .andExpect(jsonPath("$.brokers[?(@.code=='TOSS')].market").value(org.hamcrest.Matchers.contains("US_STOCK")))
                 .andExpect(jsonPath("$.brokers[?(@.code=='TOSS')].description").value(org.hamcrest.Matchers.contains("토스")))
                 .andExpect(jsonPath("$.tickers[0].market").doesNotExist())
-                .andExpect(jsonPath("$.tickers[?(@.code=='BTC')].markets[*]").value(org.hamcrest.Matchers.containsInAnyOrder("CRYPTO_KRW", "CRYPTO_USDT")))
-                .andExpect(jsonPath("$.tickers[?(@.code=='SOXL')].markets[*]").value(org.hamcrest.Matchers.contains("US_STOCK")))
-                .andExpect(jsonPath("$.dcaSkipReasons[?(@.code=='API_KEY_EXPIRED')].label").value(org.hamcrest.Matchers.contains("API 키 인증 실패")));
+                .andExpect(jsonPath("$.tickers[?(@.code=='SOXL')].markets[*]").value(org.hamcrest.Matchers.contains("US_STOCK")));
     }
 }

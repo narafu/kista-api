@@ -23,9 +23,7 @@ public record DcaRuleRequest(
         @NotNull DcaFrequency frequency,    // 주기
         @Nullable DayOfWeek dayOfWeek,                // WEEKLY 전용
         @Nullable Integer dayOfMonth,                 // MONTHLY 전용, null=말일
-        @NotNull OrderType orderType,       // 주식 MOO | MOC, 코인 MARKET
-        @Schema(description = "코인 실행 시각 (KST 0~23, 코인 필수). 주식 주문유형이면 무시")
-        @Nullable Integer executionHour,              // 코인 전용 실행 시각
+        @NotNull OrderType orderType,       // MOO | MOC
         @NotNull @Valid DcaSizingRequest sizing, // 규모
         @NotNull DcaShortfallPolicy shortfall,   // 가용 부족 정책
         @Nullable List<@Nullable DcaConditionRequest> conditions     // 추가 조건(AND) — null이면 빈 목록
@@ -37,9 +35,7 @@ public record DcaRuleRequest(
         // null은 그대로 넘긴다 — DcaRule이 빈 목록으로 정규화
         List<DcaCondition> domainConditions = conditions == null ? null
                 : conditions.stream().map(DcaConditionRequest::toDomain).toList();
-        // 주식 주문유형이면 실행 시각을 저장하지 않는다(무시) — 커널 검증은 방어선
-        Integer hour = orderType == OrderType.MARKET ? executionHour : null;
-        return new DcaRule(ruleKey, direction, frequency, dayOfWeek, dayOfMonth, orderType, hour,
+        return new DcaRule(ruleKey, direction, frequency, dayOfWeek, dayOfMonth, orderType,
                 sizing.toDomain(), shortfall, domainConditions);
     }
 }

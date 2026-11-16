@@ -79,7 +79,6 @@ class MeritzOrderApi {
             case MOC -> buy ? new String[]{"32", "7", formatPrice(p)} : new String[]{"34", "7", MARKET_PRICE}; // 매수 MOC는 LOC 캡
             case LIMIT -> new String[]{"01", "0", formatPrice(p)};                                    // 지정가
             case MOO -> buy ? new String[]{"01", "0", formatPrice(p)} : new String[]{"05", "0", MARKET_PRICE}; // 개장 후 지정가 근사 / 시장가 매도
-            case MARKET -> throw new IllegalArgumentException("MARKET 주문은 코인 거래소 전용입니다"); // 주식 경로 도달 불가 방어
         };
         Map<String, String> body = new LinkedHashMap<>();
         body.put("ovrs_stck_symb_iscd", instruction.ticker().name());

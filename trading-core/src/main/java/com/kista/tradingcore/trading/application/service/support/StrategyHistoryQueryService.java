@@ -72,8 +72,7 @@ public class StrategyHistoryQueryService {
                 : null;
 
         // 3단계: 기준가 결정 후 최소 시드 계산 — 실제 첫 주문(holdings=0)과 동일하게 전일종가 사용
-        // 코인 계좌(DCA)는 증권사 전일종가 경로가 없고 최소 시드도 없어 기준가 null
-        BigDecimal price = strategy.requiresPrivacyBase() || account.broker().getMarket().isCrypto()
+        BigDecimal price = strategy.requiresPrivacyBase()
                 ? null
                 : brokerPricePort.getPrevClose(ticker, account.toBrokerRef());
         BigDecimal basePrice = strategy.requiresPrivacyBase()

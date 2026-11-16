@@ -29,7 +29,7 @@ class FearGreedSnapshotEntity extends BaseCreatedAtEntity {
     private UUID id;
 
     @Column(name = "source", nullable = false, length = 20)
-    private String source; // "CRYPTO" | "CNN"
+    private String source; // "CNN"
 
     @Column(name = "snapshot_date", nullable = false)
     private Instant snapshotDate;

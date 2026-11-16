@@ -45,7 +45,7 @@ class TradingPolicyInternalControllerTest {
 
     private static final String FULL_BODY = """
             {
-              "brokers":{"TOSS":{"enabled":false},"MOCK":{"enabled":true},"UPBIT":{"enabled":false,"allowedIp":"168.107.63.152"},"MERITZ":{"enabled":false},"BINANCE":{"enabled":false,"allowedIp":"168.107.63.152"}},
+              "brokers":{"TOSS":{"enabled":false},"MOCK":{"enabled":true},"MERITZ":{"enabled":false}},
               "strategies":{
                 "INFINITE":{"enabled":true,"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}},
                 "PRIVACY":{"enabled":false,"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}},

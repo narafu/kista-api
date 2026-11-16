@@ -117,7 +117,6 @@ class DcaPlanInputCollectorTest {
         collected = collector.collect(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger);
         assertThat(collected.inputs().dueRules()).singleElement().satisfies(in -> {
             assertThat(in.market()).isEqualTo(com.kista.shared.kernel.Market.US_STOCK);
-            assertThat(in.tradingRules()).isNull();
         });
     }
 
@@ -165,7 +164,7 @@ class DcaPlanInputCollectorTest {
 
     @Test
     void not_execution_day_records_nothing() {
-        config(new DcaRule(KEY, OrderDirection.BUY, DcaFrequency.MONTHLY, null, 1, OrderType.MOC, null,
+        config(new DcaRule(KEY, OrderDirection.BUY, DcaFrequency.MONTHLY, null, 1, OrderType.MOC,
                 new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("300"), null), DcaShortfallPolicy.PARTIAL, List.of()));
         assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger)).isEmpty();
         verifyNoInteractions(candlePort);
@@ -529,7 +528,7 @@ class DcaPlanInputCollectorTest {
         when(ledgerBudget.remaining(any(), eq(TRADE_DATE))).thenReturn(new BigDecimal("200"));
         dca(OrderDirection.BUY, OrderType.MOC);
         assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger)).extracting(PlannedOrder::quantity).containsExactly(2);
-        config(new DcaRule(KEY, OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOC, null,
+        config(new DcaRule(KEY, OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOC,
                 new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("300"), null), DcaShortfallPolicy.REJECT, List.of()));
         assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger)).isEmpty();
         assertSkipped(DcaSkipReason.INSUFFICIENT_BALANCE);
@@ -558,7 +557,7 @@ class DcaPlanInputCollectorTest {
 
     // 15주 희망(1305/87.12) SELL 규칙 — 부족 정책만 바꾼다
     private static DcaRule sellRule(DcaShortfallPolicy policy) {
-        return new DcaRule(KEY, OrderDirection.SELL, DcaFrequency.DAILY, null, null, OrderType.MOC, null,
+        return new DcaRule(KEY, OrderDirection.SELL, DcaFrequency.DAILY, null, null, OrderType.MOC,
                 new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("1305"), null), policy, List.of());
     }
 

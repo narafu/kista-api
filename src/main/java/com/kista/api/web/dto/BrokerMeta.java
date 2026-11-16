@@ -5,21 +5,21 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 // 증권사 메타 — EnumMeta 3필드(code/label/description=약칭)에 시장·통화를 더한다. 시장·통화는 enum name 문자열(스키마 이름 충돌 방지)
 public record BrokerMeta(
-        @Schema(description = "enum name() 값", example = "UPBIT")
+        @Schema(description = "enum name() 값", example = "MERITZ")
         String code,        // enum name() 값
         @Schema(description = "한국어 표시 이름")
         String label,       // 한국어 표시 이름
         @Schema(description = "UI 모바일 약칭")
         String description, // UI 모바일 약칭 (기존 EnumMeta.description 자리 유지)
-        @Schema(description = "거래 시장", example = "CRYPTO_KRW")
+        @Schema(description = "거래 시장", example = "US_STOCK")
         String market,      // Market name()
         @Schema(description = "계좌 기준 통화", example = "KRW")
         String currency,    // Currency name()
         @Schema(description = "시장 최소 주문 금액 (견적 통화, plain 문자열 — 0은 하한 없음)", example = "5000")
         String minOrderAmount, // Market.minOrderAmount() plain 문자열
-        @Schema(description = "주문 금액 소수 자릿수 (KRW 0, USDT 2)", example = "0")
+        @Schema(description = "주문 금액 소수 자릿수 (KRW 0, USD 2)", example = "0")
         int amountScale,    // Market.amountScale()
-        @Schema(description = "API 키 만료일 출처 (NONE·BROKER_API·ESTIMATED)", example = "BROKER_API")
+        @Schema(description = "API 키 만료일 출처 (NONE·ESTIMATED)", example = "ESTIMATED")
         String apiKeyExpirySource // ApiKeyExpirySource name()
 ) {
     public static BrokerMeta from(Broker b) {

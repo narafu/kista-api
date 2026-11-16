@@ -38,7 +38,7 @@ public record AdminManualTradeCorrectionRequest(
             @NotNull LocalDate tradeDate,
             @Schema(description = "매매 방향", example = "BUY")
             @NotNull String direction,
-            @Schema(description = "체결 수량 (주식 정수, 코인 소수 8자리까지)")
+            @Schema(description = "체결 수량 (정수)")
             @NotNull @Positive BigDecimal quantity,
             @Schema(description = "체결 가격")
             @NotNull @Positive BigDecimal price,

@@ -71,14 +71,14 @@ public class AccountController {
     }
 
     // 계좌 API 키 교체 (소유권 검증 → 연결 테스트 통과 시 저장)
-    @Operation(summary = "계좌 API 키 수정", description = "새 앱 키·시크릿으로 증권사 연결을 검증한 뒤 저장하고 키 만료일(업비트 조회·그 외 추정 또는 입력값)을 갱신. 모의계좌는 불가.")
+    @Operation(summary = "계좌 API 키 수정", description = "새 앱 키·시크릿으로 증권사 연결을 검증한 뒤 저장하고 키 만료일(추정 또는 입력값)을 갱신. 모의계좌는 불가.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "수정 성공"),
             @ApiResponse(responseCode = "400", description = "모의계좌이거나 다른 계좌의 키"),
             @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
             @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음"),
-            @ApiResponse(responseCode = "409", description = "다른 계좌에 이미 등록된 키(업비트)"),
-            @ApiResponse(responseCode = "422", description = "키가 유효하지 않거나 IP 미허용·권한 부족")
+            @ApiResponse(responseCode = "409", description = "다른 계좌에 이미 등록된 키"),
+            @ApiResponse(responseCode = "422", description = "키가 유효하지 않거나 권한 부족")
     })
     @PutMapping("/{id}/credentials")
     public AccountResponse updateCredentials(

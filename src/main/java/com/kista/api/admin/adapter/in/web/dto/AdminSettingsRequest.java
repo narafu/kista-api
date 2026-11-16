@@ -34,24 +34,19 @@ public record AdminSettingsRequest(
         @Schema(description = "ETF 벤치마크 비교 자산 설정 (생략 시 기존 값 유지)")
         @Valid @Nullable BenchmarkRequest benchmarks
 ) {
-    // currentBrokers: 현재 저장된 증권사 정책 — 요청에 없는 증권사 키는 현재 값을 유지하고(구 UI 호환), allowedIp는 항상 현재 값을 유지한다
+    // currentBrokers: 현재 저장된 증권사 정책 — 요청에 없는 증권사 키는 현재 값을 유지하고(구 UI 호환)
     public RuntimeSettingsBundle toDomain(Map<Broker, BrokerSettings> currentBrokers) {
         // 모든 enum 키와 전략별 필수 필드를 먼저 변환·검증한 뒤 도메인 설정을 생성한다 — brokers/strategies는
         // trading-core 소유 정책(TradingPolicySettings), auth/benchmarks는 root 소유(RuntimeSettings)로 갈라 담는다.
         Map<Broker, BrokerSettings> brokerSettings = new EnumMap<>(currentBrokers);
         brokers.forEach((key, value) -> brokerSettings.put(key,
-                new BrokerSettings(require(value, "broker").enabled(), allowedIpOf(currentBrokers, key))));
+                new BrokerSettings(require(value, "broker").enabled())));
         Map<StrategyType, StrategyCreationSettings> strategySettings = new EnumMap<>(StrategyType.class);
         strategies.forEach((key, value) -> strategySettings.put(key,
                 require(value, "strategy").toDomain(key)));
         BenchmarkSettings benchmarkSettings = benchmarks != null ? benchmarks.toDomain() : null;
         return new RuntimeSettingsBundle(new RuntimeSettings(auth.approvalRequired(), benchmarkSettings),
                 new TradingPolicySettings(brokerSettings, strategySettings));
-    }
-
-    private static String allowedIpOf(Map<Broker, BrokerSettings> currentBrokers, Broker broker) {
-        BrokerSettings current = currentBrokers.get(broker);
-        return current != null ? current.allowedIp() : null;
     }
 
     private static <T> T require(T value, String label) {

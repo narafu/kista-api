@@ -52,12 +52,12 @@ class AccountPersistenceAdapterTest {
     }
 
     @Test
-    void save_upbitWithoutAccountNo_hashesAccessKeyWithNullAccountNo() {
-        Account upbit = new Account(null, UUID.randomUUID(), "업비트", null, "ak", "sk", null, Broker.UPBIT, null,
+    void save_meritzWithoutAccountNo_hashesAppKeyWithNullAccountNo() {
+        Account meritz = new Account(null, UUID.randomUUID(), "메리츠", null, "ak", "sk", null, Broker.MERITZ, null,
                 Instant.parse("2027-01-01T00:00:00Z"));
         when(accountJpaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        Account saved = adapter.save(upbit);
+        Account saved = adapter.save(meritz);
 
         verify(accountJpaRepository).save(argThat(e -> e.getAccountNo() == null && "hash:ak".equals(e.getAccountNoHash())
                 && Instant.parse("2027-01-01T00:00:00Z").equals(e.getApiKeyExpiresAt())));

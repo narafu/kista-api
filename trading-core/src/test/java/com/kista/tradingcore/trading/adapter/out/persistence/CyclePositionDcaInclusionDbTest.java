@@ -24,23 +24,19 @@ class CyclePositionDcaInclusionDbTest extends DataJpaTestBase {
     @Autowired CyclePositionJpaRepository repo;
 
     @Test
-    void user_and_account_queries_include_dca_and_crypto_accounts() {
+    void user_and_account_queries_include_dca() {
         UUID userId = UUID.randomUUID();
         UUID accountId = insertAccount(userId, "TOSS");
-        UUID upbitAccountId = insertAccount(userId, "UPBIT");
         UUID infinitePos = insertPosition(accountId, "INFINITE");
         UUID dcaPos = insertPosition(accountId, "DCA");
-        UUID upbitPos = insertPosition(upbitAccountId, "DCA"); // 코인 DCA도 포함 (통화는 서비스가 계좌에서 해석)
 
         Instant from = Instant.EPOCH;
         Instant to = Instant.now().plusSeconds(3600);
 
         assertThat(repo.findLatestPerStrategyByUserId(userId)).extracting(CyclePositionEntity::getId)
-                .containsExactlyInAnyOrder(infinitePos, dcaPos, upbitPos);
+                .containsExactlyInAnyOrder(infinitePos, dcaPos);
         assertThat(repo.findByAccountIdWithCursor(accountId, from, to, PageRequest.of(0, 10)))
                 .extracting(CyclePositionEntity::getId).containsExactlyInAnyOrder(infinitePos, dcaPos);
-        assertThat(repo.findByAccountIdWithCursor(upbitAccountId, from, to, PageRequest.of(0, 10)))
-                .extracting(CyclePositionEntity::getId).containsExactly(upbitPos);
     }
 
     @Test

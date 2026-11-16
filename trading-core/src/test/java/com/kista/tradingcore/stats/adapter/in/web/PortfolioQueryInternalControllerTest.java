@@ -54,18 +54,18 @@ class PortfolioQueryInternalControllerTest {
     @Test
     void 현재_포트폴리오_현황을_전략별_목록으로_조회한다() throws Exception {
         CyclePositionHistoryEntry entry = new CyclePositionHistoryEntry(
-                UUID.randomUUID(), UUID.randomUUID(), StrategyTicker.ETH, StrategyType.DCA,
+                UUID.randomUUID(), UUID.randomUUID(), StrategyTicker.BITO, StrategyType.DCA,
                 new BigDecimal("500.00"), new BigDecimal("3000.00"), new BigDecimal("2900.50"),
                 new BigDecimal("0.5"), Instant.now());
-        given(portfolioService.getCurrent(USER_ID)).willReturn(List.of(new PortfolioPosition(entry, Currency.USDT)));
+        given(portfolioService.getCurrent(USER_ID)).willReturn(List.of(new PortfolioPosition(entry, Currency.KRW)));
 
         mockMvc.perform(get("/api/internal/trading/stats/portfolio/current")
                         .header("X-Internal-Token", VALID_TOKEN)
                         .param("userId", USER_ID.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].strategyType").value("DCA"))
-                .andExpect(jsonPath("$[0].ticker").value("ETH"))
-                .andExpect(jsonPath("$[0].currency").value("USDT"))
+                .andExpect(jsonPath("$[0].ticker").value("BITO"))
+                .andExpect(jsonPath("$[0].currency").value("KRW"))
                 .andExpect(jsonPath("$[0].holdings").value(0.5))
                 .andExpect(jsonPath("$[0].avgPrice").value(2900.50));
     }

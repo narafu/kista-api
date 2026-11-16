@@ -17,13 +17,8 @@ public record OwnedStrategy(Strategy strategy, Account account) {
         return new OwnedStrategy(strategy, accountPort.requireOwnedAccount(strategy.accountId(), requesterId));
     }
 
-    // 계좌 통화(원장 예수금 단위 — 주식 USD, 코인 견적 통화)
+    // 계좌 통화(원장 예수금 단위)
     public Currency currency() {
         return account.broker().getCurrency();
-    }
-
-    // 코인 거래소 계좌 여부
-    public boolean crypto() {
-        return account.broker().getMarket().isCrypto();
     }
 }

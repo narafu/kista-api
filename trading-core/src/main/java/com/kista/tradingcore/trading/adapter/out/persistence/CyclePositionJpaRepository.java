@@ -62,7 +62,7 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
             @Param("from") Instant from,
             @Param("to") Instant to);
 
-    // 사용자 스코프 전략별 최신 포지션 1건 (관리자 /status — 본인 데이터만, native, 코인 계좌 포함: 통화 표기는 서비스가 계좌에서 해석)
+    // 사용자 스코프 전략별 최신 포지션 1건 (관리자 /status — 본인 데이터만, native, 통화 표기는 서비스가 계좌에서 해석)
     @Query(value = """
             SELECT DISTINCT ON (s.id) cp.* FROM trading.cycle_position cp
             JOIN trading.strategy_cycle sc ON cp.strategy_cycle_id = sc.id
@@ -100,7 +100,7 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
     List<CyclePositionEntity> findByCycleIdsAndRange(
             @Param("cycleIds") Set<UUID> cycleIds, @Param("from") Instant from, @Param("to") Instant to);
 
-    // 계좌 기준 커서 페이지네이션 (native — strategy_cycle → strategy → accounts JOIN, 코인 계좌 포함)
+    // 계좌 기준 커서 페이지네이션 (native — strategy_cycle → strategy → accounts JOIN)
     @Query(value = """
             SELECT cp.* FROM trading.cycle_position cp
             JOIN trading.strategy_cycle sc ON cp.strategy_cycle_id = sc.id

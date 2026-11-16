@@ -12,11 +12,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AccountTest {
 
     @Test
-    void dedupeKeyOf_binance_is_app_key() {
-        assertThat(Account.dedupeKeyOf(Broker.BINANCE, null, "K")).isEqualTo("K");
-    }
-
-    @Test
     void dedupeKeyOf_meritz_is_app_key() {
         assertThat(Account.dedupeKeyOf(Broker.MERITZ, null, "K")).isEqualTo("K");
         assertThat(Account.dedupeKeyOf(Broker.TOSS, "123", "K")).isEqualTo("123");
@@ -28,10 +23,9 @@ class AccountTest {
         Account meritzLater = account(Broker.MERITZ, 2);
         Account meritzEarlier = account(Broker.MERITZ, 1);
         Account mock = account(Broker.MOCK, 0);
-        Account binance = account(Broker.BINANCE, 3);
 
-        assertThat(List.of(toss, mock, meritzLater, binance, meritzEarlier).stream().sorted(Account.DISPLAY_ORDER).toList())
-                .containsExactly(meritzEarlier, meritzLater, binance, toss, mock);
+        assertThat(List.of(toss, mock, meritzLater, meritzEarlier).stream().sorted(Account.DISPLAY_ORDER).toList())
+                .containsExactly(meritzEarlier, meritzLater, toss, mock);
     }
 
     private static Account account(Broker broker, long createdEpochSecond) {

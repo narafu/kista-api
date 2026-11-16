@@ -134,34 +134,6 @@ class AccountControllerTest {
     }
 
     @Test
-    void register_upbit_responseHasNullAccountNoAndKrwCurrency() throws Exception {
-        java.time.Instant expiresAt = java.time.Instant.parse("2027-10-17T00:00:00Z");
-        when(accountService.register(any(), any())).thenReturn(new Account(UUID.randomUUID(), UUID.fromString(USER_ID),
-                "업비트", null, "ak", "sk", null, Broker.UPBIT, null, expiresAt));
-
-        mockMvc.perform(post("/api/accounts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"nickname\":\"업비트\",\"appKey\":\"ak\",\"secretKey\":\"sk\",\"broker\":\"UPBIT\"}")
-                        .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.broker").value("UPBIT"))
-                .andExpect(jsonPath("$.currency").value("KRW"))
-                .andExpect(jsonPath("$.accountNo").doesNotExist())
-                .andExpect(jsonPath("$.accountNoMasked").doesNotExist())
-                .andExpect(jsonPath("$.apiKeyExpiresAt").value("2027-10-17T00:00:00Z"));
-    }
-
-    @Test
-    void testConnection_upbit_passesBrokerToUseCase() throws Exception {
-        mockMvc.perform(post("/api/accounts/connection-tests")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"broker\":\"UPBIT\",\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
-                        .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
-                .andExpect(status().isNoContent());
-        verify(accountService).test(eq(Broker.UPBIT), eq("testkey1234"), eq("testsecret1234"));
-    }
-
-    @Test
     void register_duplicate_returns409WithCodeInBody() throws Exception {
         when(accountService.register(any(UUID.class), any(RegisterAccountCommand.class)))
                 .thenThrow(new Account.DuplicateAccountException("74420614-01"));
@@ -220,7 +192,7 @@ class AccountControllerTest {
     void updateCredentials_returns200() throws Exception {
         UUID id = UUID.randomUUID();
         when(accountService.updateCredentials(eq(id), eq(UUID.fromString(USER_ID)), any()))
-                .thenReturn(new Account(id, UUID.fromString(USER_ID), "업비트", null, "new-ak", "new-sk", null, Broker.UPBIT, null,
+                .thenReturn(new Account(id, UUID.fromString(USER_ID), "메리츠", null, "new-ak", "new-sk", null, Broker.MERITZ, null,
                         java.time.Instant.parse("2027-10-17T00:00:00Z")));
 
         mockMvc.perform(put("/api/accounts/{id}/credentials", id)

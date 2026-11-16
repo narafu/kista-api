@@ -14,19 +14,19 @@ public record AccountResponse(
         UUID id,
         @Schema(description = "계좌 별명", example = "내 메인 계좌")
         String nickname,
-        @Schema(description = "마스킹된 계좌번호 (업비트는 null)", example = "****0614")
+        @Schema(description = "마스킹된 계좌번호", example = "****0614")
         @Nullable String accountNoMasked,
-        @Schema(description = "전체 계좌번호 (본인 계좌, 토글 표시용 — 업비트는 null)", example = "74420614")
+        @Schema(description = "전체 계좌번호 (본인 계좌, 토글 표시용)", example = "74420614")
         @Nullable String accountNo,
         @Schema(description = "증권사", example = "TOSS")
         String broker,
         @Schema(description = "계좌 기준 통화(증권사 파생)", example = "USD")
         String currency,
-        @Schema(description = "거래소 API 키 만료 시각 (업비트는 API 조회, 토스·메리츠는 추정(+1년)·사용자 입력, 그 외 null)")
+        @Schema(description = "거래소 API 키 만료 시각 (토스·메리츠는 추정(+1년)·사용자 입력, 그 외 null)")
         @Nullable Instant apiKeyExpiresAt
 ) {
     public static AccountResponse from(Account a) {
-        // accountNo가 이미 전체 표시 형식 — TOSS: "131-01-001931", 업비트: null
+        // accountNo가 이미 전체 표시 형식 — TOSS: "131-01-001931"
         Broker broker = a.broker();
         return new AccountResponse(
                 a.id(),

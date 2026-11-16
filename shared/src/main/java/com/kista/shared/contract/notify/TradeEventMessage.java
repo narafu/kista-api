@@ -12,7 +12,7 @@ import org.jspecify.annotations.Nullable;
 public record TradeEventMessage(
         Kind kind,              // 알림 종류
         String ticker,          // 거래 종목
-        BigDecimal quantity,    // 체결 수량 (코인은 소수 가능, 구버전 정수 JSON도 수용)
+        BigDecimal quantity,    // 체결 수량 (구버전 정수 JSON도 수용)
         Double price,           // 체결 가격
         Double amount,          // 체결 금액
         Instant time,           // 발생 시각

@@ -100,7 +100,7 @@ public class BacktestService {
             throw new IllegalArgumentException("예수금은 0 이상이어야 합니다.");
         }
         int initialHoldings = BootstrapPosition.validate(command.initialHoldings() == null ? null : BigDecimal.valueOf(command.initialHoldings()),
-                command.initialAvgPrice(), Market.US_STOCK).intValueExact(); // 백테스트는 주식 전용 — 정수 보유
+                command.initialAvgPrice()).intValueExact(); // 정수 보유
         boolean hasSeed = command.seed() != null && command.seed().signum() > 0;
         if (!hasSeed && initialHoldings <= 0) {
             throw new IllegalArgumentException("예수금 또는 기존 보유(수량·평균단가) 중 하나는 있어야 합니다.");

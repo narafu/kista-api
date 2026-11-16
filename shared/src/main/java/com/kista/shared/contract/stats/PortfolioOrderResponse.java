@@ -14,7 +14,7 @@ public record PortfolioOrderResponse(
         StrategyTicker ticker,      // 거래 종목
         OrderDirection direction,   // 매매 방향
         OrderType orderType,        // 주문 유형
-        BigDecimal quantity,        // 주문 수량 (주식 정수 값·코인 소수)
+        BigDecimal quantity,        // 주문 수량 (정수 값)
         BigDecimal price,           // 주문 가격
-        Currency currency           // 계좌 통화 (USD·USDT·KRW)
+        Currency currency           // 계좌 통화 (USD·KRW)
 ) {}

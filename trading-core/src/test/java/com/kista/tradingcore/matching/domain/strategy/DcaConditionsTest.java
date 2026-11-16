@@ -26,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DcaConditionsTest {
 
     private static DcaRule config(DcaCondition... conditions) {
-        return new DcaRule("k", OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOC, null,
+        return new DcaRule("k", OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOC,
                 new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("300"), null), DcaShortfallPolicy.PARTIAL, List.of(conditions));
     }
 
@@ -137,23 +137,6 @@ class DcaConditionsTest {
     }
 
     @Test
-    void avgPriceUsdtDetailKeepsTwoDecimals() {
-        DcaRule c = config(new DcaCondition(DcaIndicator.AVG_PRICE, DcaOperator.LTE, null, new BigDecimal("-1.5")));
-        var holding = new AccountBalance(new BigDecimal("0.30736563"), new BigDecimal("2264.05"), BigDecimal.ZERO);
-        assertThat(DcaConditions.check(c, Market.CRYPTO_USDT, closes("2300"), holding, null, new BigDecimal("2300")))
-                .hasValueSatisfying(s -> assertThat(s.detail()).isEqualTo("전일 종가 2300.00 > 평단 2264.05 × (1 − 1.5%) = 2230.09"));
-    }
-
-    @Test
-    void avgPriceTargetRoundsByMarketAmountScale() {
-        DcaRule c = config(new DcaCondition(DcaIndicator.AVG_PRICE, DcaOperator.LTE, null, new BigDecimal("-1.5")));
-        // 목표가 1000.51 × 0.985 = 985.50235 — KRW(0자리)는 986, USD(2자리)는 985.50
-        var holding = new AccountBalance(BigDecimal.ONE, new BigDecimal("1000.51"), BigDecimal.ZERO);
-        var prev = new BigDecimal("986");
-        assertThat(DcaConditions.check(c, Market.CRYPTO_KRW, List.of(prev), holding, null, prev)).isEmpty();
-    }
-
-    @Test
     void avgPriceTargetRoundsToCentsOnUsStock() {
         DcaRule c = config(new DcaCondition(DcaIndicator.AVG_PRICE, DcaOperator.LTE, null, new BigDecimal("-1.5")));
         // 목표가 1000.51 × 0.985 = 985.50235 — USD(2자리)는 985.50이라 전일 종가 986은 미충족
@@ -161,21 +144,5 @@ class DcaConditionsTest {
         var prev = new BigDecimal("986");
         assertThat(DcaConditions.check(c, Market.US_STOCK, List.of(prev), holding, null, prev)).hasValueSatisfying(s ->
                 assertThat(s.reason()).isEqualTo(DcaSkipReason.CONDITION_NOT_MET));
-    }
-
-    @Test
-    void krwDetailShowsIntegerMoneyButTwoDecimalIndicators() {
-        DcaRule avg = config(new DcaCondition(DcaIndicator.AVG_PRICE, DcaOperator.LTE, null, new BigDecimal("-1.5")));
-        var holding = new AccountBalance(BigDecimal.ONE, new BigDecimal("1000.51"), BigDecimal.ZERO);
-        var prev = new BigDecimal("1000");
-        assertThat(DcaConditions.check(avg, Market.CRYPTO_KRW, List.of(prev), holding, null, prev)).hasValueSatisfying(s ->
-                assertThat(s.detail()).isEqualTo("전일 종가 1000 > 평단 1001 × (1 − 1.5%) = 986"));
-        DcaRule fg = config(new DcaCondition(DcaIndicator.FEAR_GREED, DcaOperator.LTE, null, new BigDecimal("25")));
-        assertThat(DcaConditions.check(fg, Market.CRYPTO_KRW, List.of(prev), null, new BigDecimal("26"), prev)).hasValueSatisfying(s ->
-                assertThat(s.detail()).isEqualTo("공포탐욕지수 26.00 > 25"));
-        DcaRule rsi = config(new DcaCondition(DcaIndicator.RSI, DcaOperator.LTE, null, new BigDecimal("30")));
-        List<BigDecimal> rising = IntStream.range(0, 15).mapToObj(i -> new BigDecimal(100 + i)).toList();
-        assertThat(DcaConditions.check(rsi, Market.CRYPTO_KRW, rising, null, null, rising.getLast())).hasValueSatisfying(s ->
-                assertThat(s.detail()).isEqualTo("RSI(14) 100.00 > 30"));
     }
 }

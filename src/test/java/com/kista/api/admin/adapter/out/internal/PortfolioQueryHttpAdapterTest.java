@@ -46,7 +46,7 @@ class PortfolioQueryHttpAdapterTest {
         server.enqueue(new MockResponse.Builder()
                 .code(200).addHeader("Content-Type", "application/json")
                 .body("[{\"strategyType\":\"VR\",\"ticker\":\"TQQQ\",\"currency\":\"USD\",\"holdings\":10,\"avgPrice\":100.50,\"deposit\":500.00,\"closingPrice\":105.00},"
-                        + "{\"strategyType\":\"DCA\",\"ticker\":\"ETH\",\"currency\":\"USDT\",\"holdings\":0.5,\"avgPrice\":2900,\"deposit\":0,\"closingPrice\":3000}]")
+                        + "{\"strategyType\":\"DCA\",\"ticker\":\"BITO\",\"currency\":\"KRW\",\"holdings\":0.5,\"avgPrice\":2900,\"deposit\":0,\"closingPrice\":3000}]")
                 .build());
 
         List<PortfolioCurrentResponse> current = adapter.getCurrent(userId);
@@ -55,7 +55,7 @@ class PortfolioQueryHttpAdapterTest {
         assertThat(current.getFirst().ticker()).isEqualTo(StrategyTicker.TQQQ);
         assertThat(current.getFirst().currency()).isEqualTo(Currency.USD);
         assertThat(current.getFirst().holdings()).isEqualByComparingTo("10");
-        assertThat(current.getLast().currency()).isEqualTo(Currency.USDT);
+        assertThat(current.getLast().currency()).isEqualTo(Currency.KRW);
         assertThat(current.getLast().holdings()).isEqualByComparingTo("0.5");
         RecordedRequest recorded = server.takeRequest();
         assertThat(recorded.getTarget()).contains("/api/internal/trading/stats/portfolio/current");

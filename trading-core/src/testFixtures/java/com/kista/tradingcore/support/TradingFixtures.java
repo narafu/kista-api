@@ -55,29 +55,9 @@ public final class TradingFixtures {
         return new Account(id, userId, "테스트계좌", "123-45-678901", "key", "secret", "1", Broker.TOSS, null, null);
     }
 
-    // 기본 업비트 계좌 — 계좌번호 없음(access key가 중복 판정 키)
-    public static Account upbitAccount(UUID id, UUID userId) {
-        return new Account(id, userId, "업비트", null, "access-key", "secret-key", null, Broker.UPBIT, null, null);
-    }
-
-    // 기본 바이낸스 계좌 — 계좌번호 없음(API key가 중복 판정 키)
-    public static Account binanceAccount(UUID id, UUID userId) {
-        return new Account(id, userId, "바이낸스", null, "binance-key", "binance-secret", null, Broker.BINANCE, null, null);
-    }
-
     // 배치 경로용 주식 계좌 투영 — stockAccount와 동일 값
     public static TradingAccount tradingAccount(UUID id, UUID userId) {
         return TradingAccount.from(stockAccount(id, userId));
-    }
-
-    // 배치 경로용 업비트 계좌 투영 — upbitAccount와 동일 값
-    public static TradingAccount upbitTradingAccount(UUID id, UUID userId) {
-        return TradingAccount.from(upbitAccount(id, userId));
-    }
-
-    // 배치 경로용 바이낸스 계좌 투영 — binanceAccount와 동일 값
-    public static TradingAccount binanceTradingAccount(UUID id, UUID userId) {
-        return TradingAccount.from(binanceAccount(id, userId));
     }
 
     // 배치 경로용 Toss 계좌 투영 — tossAccount와 동일 값
@@ -88,14 +68,7 @@ public final class TradingFixtures {
     // 주식 DCA 규칙 — 매일·고정 금액·PARTIAL(기존 단일 규칙 동작과 같은 부족 처리)
     public static DcaRule stockDcaRule(String ruleKey, OrderDirection direction, String amount, OrderType orderType,
                                        DcaCondition... conditions) {
-        return new DcaRule(ruleKey, direction, DcaFrequency.DAILY, null, null, orderType, null,
-                new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal(amount), null), DcaShortfallPolicy.PARTIAL, List.of(conditions));
-    }
-
-    // 코인 DCA 규칙 — 매일·고정 금액(원)·PARTIAL, executionHour 시각 실행
-    public static DcaRule cryptoDcaRule(String ruleKey, OrderDirection direction, String amount, int executionHour,
-                                        DcaCondition... conditions) {
-        return new DcaRule(ruleKey, direction, DcaFrequency.DAILY, null, null, OrderType.MARKET, executionHour,
+        return new DcaRule(ruleKey, direction, DcaFrequency.DAILY, null, null, orderType,
                 new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal(amount), null), DcaShortfallPolicy.PARTIAL, List.of(conditions));
     }
 

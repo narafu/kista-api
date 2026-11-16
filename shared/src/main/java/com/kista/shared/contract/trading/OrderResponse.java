@@ -22,7 +22,7 @@ public record OrderResponse(
         OrderTiming timing,         // 접수 시점
         OrderDirection direction,   // 매수/매도 방향
         String orderLeg,            // 전략 주문 다리 식별자
-        BigDecimal quantity,        // 주문 수량 (주식 정수 값·코인 소수)
+        BigDecimal quantity,        // 주문 수량 (정수 값)
         BigDecimal price,           // 주문 가격
         OrderStatus status,         // 주문 상태
         @Nullable String externalOrderId,     // 증권사 부여 주문 번호

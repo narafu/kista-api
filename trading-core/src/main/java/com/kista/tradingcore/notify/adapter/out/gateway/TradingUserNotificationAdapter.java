@@ -10,7 +10,6 @@ import com.kista.shared.kernel.UserPushNotificationRequestedEvent;
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 import com.kista.tradingcore.notify.application.port.output.TradingUserNotificationPort;
 import com.kista.tradingcore.account.application.event.ApiKeyExpiringEvent;
-import com.kista.tradingcore.trading.application.event.CryptoOrderFilledEvent;
 import com.kista.tradingcore.trading.application.event.DcaRoundSkippedEvent;
 import com.kista.shared.kernel.OrderDirection;
 import lombok.RequiredArgsConstructor;
@@ -135,15 +134,6 @@ class TradingUserNotificationAdapter implements TradingUserNotificationPort {
                 TelegramHttpClient.escapeHtml(e.accountNickname()), e.ticker().name(), direction, rule, e.tradeDate(), e.reason().getLabel(),
                 e.detail() == null ? "" : " — " + TelegramHttpClient.escapeHtml(e.detail()));
         notify(profile, "DCA 미주문", text);
-    }
-
-    @Override
-    public void notifyCryptoTrade(TradingUserProfile profile, CryptoOrderFilledEvent e) {
-        String side = e.direction() == OrderDirection.SELL ? "매도" : "매수";
-        String text = "[%s] %s %s 체결 — 수량 %s, 평균가 %s, 금액 %s".formatted(
-                TelegramHttpClient.escapeHtml(e.accountNickname()), e.ticker().name(), side,
-                e.filledQuantity().toPlainString(), e.currency().format(e.avgPrice()), e.currency().format(e.amount()));
-        notify(profile, "코인 체결", text);
     }
 
     @Override

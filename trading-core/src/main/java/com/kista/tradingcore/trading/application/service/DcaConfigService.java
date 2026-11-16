@@ -37,7 +37,6 @@ public class DcaConfigService {
         Account account = owned.account();
         strategy.requireNotArchived();
         if (!strategy.isDca()) throw new IllegalArgumentException("DCA 전략이 아닙니다.");
-        requested.requireCompatible(account.broker().getMarket()); // 수정도 등록과 같은 시장 규칙 — executionHour 수정 가능
         DcaStrategyConfig current = dcaDetailPort.findActiveByStrategyId(strategyId)
                 .orElseThrow(() -> new NoSuchElementException("DCA 설정이 없습니다: " + strategyId));
         // ruleKey 확정 — 기존 키는 보존(같은 날 재발동 방지), null은 신규 UUID, 현재 버전에 없는 키는 400. 방향 변경도 허용(규칙 단위)

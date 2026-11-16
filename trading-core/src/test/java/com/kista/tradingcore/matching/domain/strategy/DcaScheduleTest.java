@@ -27,7 +27,7 @@ class DcaScheduleTest {
     }
 
     private static DcaRule rule(OrderType type, DcaFrequency frequency, DayOfWeek dow, Integer dayOfMonth) {
-        return new DcaRule("k", OrderDirection.BUY, frequency, dow, dayOfMonth, type, type == OrderType.MARKET ? 9 : null,
+        return new DcaRule("k", OrderDirection.BUY, frequency, dow, dayOfMonth, type,
                 new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("100"), null), DcaShortfallPolicy.PARTIAL, List.of());
     }
 

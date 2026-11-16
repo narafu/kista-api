@@ -65,7 +65,7 @@ public class AccountService {
             if (appKey == null || appKey.isBlank()) appKey = "MOCK";
             if (secretKey == null || secretKey.isBlank()) secretKey = "MOCK";
         } else if (broker.isKeyOnlyCredentials()) {
-            accountNo = null; // 업비트·메리츠는 앱키에 계좌가 묶여 계좌번호를 받지 않는다 — 요청에 와도 무시(저장 안 함)
+            accountNo = null; // 메리츠는 앱키에 계좌가 묶여 계좌번호를 받지 않는다 — 요청에 와도 무시(저장 안 함)
             if (appKey == null || appKey.isBlank() || secretKey == null || secretKey.isBlank()) {
                 throw new IllegalArgumentException("API 키와 시크릿은 필수입니다.");
             }
@@ -78,24 +78,23 @@ public class AccountService {
         if (accountPort.countByUserId(userId) >= MAX_ACCOUNTS_PER_USER) {
             throw new IllegalStateException("계좌는 최대 " + MAX_ACCOUNTS_PER_USER + "개까지 등록할 수 있습니다.");
         }
-        // 전역 중복 체크 (크로스-유저, 해시 기반) — 업비트는 access key, 그 외 계좌번호
+        // 전역 중복 체크 (크로스-유저, 해시 기반) — 키 전용 증권사는 앱키, 그 외 계좌번호
         String dedupeKey = Account.dedupeKeyOf(broker, resolvedAccountNo, appKey);
         if (accountPort.existsByDedupeKey(dedupeKey)) {
             throw new Account.DuplicateAccountException(dedupeKey);
         }
-        // 동일 사용자 중복 체크 (V11 이전 NULL-hash 기존 레코드 대비 fallback) — 업비트 기존 계좌는 accountNo null이라 null-safe 비교
+        // 동일 사용자 중복 체크 (V11 이전 NULL-hash 기존 레코드 대비 fallback) — 키 전용 계좌는 accountNo null이라 null-safe 비교
         if (resolvedAccountNo != null) {
             accountPort.findByUserId(userId).stream()
                     .filter(a -> resolvedAccountNo.equals(a.accountNo()))
                     .findAny()
                     .ifPresent(a -> { throw new Account.DuplicateAccountException(resolvedAccountNo); });
         }
-        // 증권사별 자격증명+계좌 검증 — Toss: accountSeq, 업비트: 키 만료일
+        // 증권사별 자격증명+계좌 검증 — Toss: accountSeq
         BrokerAccountVerification verified = connectionTesters.of(broker)
                 .verifyAccount(appKey, secretKey, accountNo);
-        // 만료일 결정 — 업비트는 API 값, 토스·메리츠는 입력값 또는 추정(+1년), 그 외 없음
+        // 만료일 결정 — 토스·메리츠는 입력값 또는 추정(+1년), 그 외 없음
         Instant apiKeyExpiresAt = switch (broker.getApiKeyExpirySource()) {
-            case BROKER_API -> verified.apiKeyExpiresAt();
             case ESTIMATED -> manual != null ? manual : estimatedExpiry();
             case NONE -> null;
         };
@@ -136,7 +135,7 @@ public class AccountService {
         }
         // 사용자 입력 만료일은 증권사 검증 호출 전에 거른다
         Instant manual = manualExpiry(account.broker(), cmd.apiKeyExpiresOn());
-        // 업비트·메리츠는 앱키가 곧 중복 판정 키 — 다른 계좌가 이미 쓰는 키면 거부(같은 키 재입력은 허용)
+        // 메리츠는 앱키가 곧 중복 판정 키 — 다른 계좌가 이미 쓰는 키면 거부(같은 키 재입력은 허용)
         if (account.broker().isKeyOnlyCredentials() && !cmd.appKey().equals(account.appKey())
                 && accountPort.existsByDedupeKey(cmd.appKey())) {
             throw new Account.DuplicateAccountException(cmd.appKey());
@@ -147,9 +146,8 @@ public class AccountService {
         if (account.broker() == Broker.TOSS && !Objects.equals(verified.brokerAccountCode(), account.brokerAccountCode())) {
             throw new IllegalArgumentException("등록된 계좌와 다른 계좌의 API 키입니다.");
         }
-        // 만료일 결정 — 업비트는 API 값, 추정 증권사는 입력값 → 새 앱키면 재추정 → 같은 키면 유지, 그 외 기존 값
+        // 만료일 결정 — 추정 증권사는 입력값 → 새 앱키면 재추정 → 같은 키면 유지, 그 외 기존 값
         Instant apiKeyExpiresAt = switch (account.broker().getApiKeyExpirySource()) {
-            case BROKER_API -> verified.apiKeyExpiresAt();
             case ESTIMATED -> manual != null ? manual
                     : !cmd.appKey().equals(account.appKey()) ? estimatedExpiry() : account.apiKeyExpiresAt();
             case NONE -> account.apiKeyExpiresAt();

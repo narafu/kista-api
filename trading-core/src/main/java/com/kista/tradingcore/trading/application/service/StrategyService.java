@@ -71,7 +71,6 @@ public class StrategyService {
         // 먼저 PAUSED로 기록해 이후 배치가 이 전략으로 새 주문을 만들지 않게 한 뒤 미체결 주문을 정리한다
         // 일시 장애로 증권사 취소에 실패한 주문이 있으면 삭제하지 않는다(삭제된 전략의 주문이 증권사에 남지 않도록) — 전략은 PAUSED로 남는다
         // 자격증명 오류(키 만료·철회)는 재시도로 풀리지 않아 삭제를 막지 않는다 — 그 주문은 PLACED로 남고 관리자에게 알린다
-        orderCancelService.requireNoCryptoInFlight(strategyId, account); // 코인 체결 확인 중이면 PAUSED 기록 전에 거부
         stateWriter.pause(strategyId); // 보관 전략은 갱신 0건이어도 삭제는 진행한다
         CancelResult cancelled = orderCancelService.cancelOpenOrders(strategyId, account);
         if (cancelled.retryableFailedCount() > 0) {
@@ -94,7 +93,6 @@ public class StrategyService {
         }
         // 먼저 PAUSED로 기록해 이후 배치가 새 주문을 만들지 않게 하고, 배치가 정지 뒤 체결을 기록하지 않으므로 오늘 미체결 주문을 정리한다
         // 취소 실패분은 관리자 알림 후 PLACED로 남는다
-        orderCancelService.requireNoCryptoInFlight(strategyId, account); // 코인 체결 확인 중이면 PAUSED 기록 전에 거부
         if (!stateWriter.pause(strategyId)) { // 읽은 뒤 보관이 커밋된 경합
             throw new IllegalStateException("보관된 전략은 변경할 수 없습니다.");
         }
@@ -120,7 +118,6 @@ public class StrategyService {
         }
         requireTodayOrdersReported(strategyId, account);
         // PAUSED로 먼저 기록해 이후 배치가 새 주문을 만들지 않게 한 뒤 미체결 주문을 정리한다 — 취소 실패 시 PAUSED로 남는다
-        orderCancelService.requireNoCryptoInFlight(strategyId, account);
         stateWriter.pause(strategyId);
         CancelResult cancelled = orderCancelService.cancelOpenOrders(strategyId, account);
         if (cancelled.retryableFailedCount() > 0) {
@@ -133,9 +130,8 @@ public class StrategyService {
     }
 
     // 접수 주문이 마감 리포트에 반영되기 전에 보관하면 체결이 원장에 남지 않는다 — OrderCancelService와 같이 오늘·다음 거래일(개장 배치 tradeDate) 둘 다 본다
-    // 수동 보정 행(UNKNOWN_LEG)은 전략 주문이 아니라 제외. 코인은 리포트 마커가 없어(ManualTradeCorrectionService와 동일) 건너뛰고 체결 확인 중 주문은 requireNoCryptoInFlight가 막는다
+    // 수동 보정 행(UNKNOWN_LEG)은 전략 주문이 아니라 제외
     private void requireTodayOrdersReported(UUID strategyId, Account account) {
-        if (account.broker().getMarket().isCrypto()) return;
         ZonedDateTime now = ZonedDateTime.now(clock);
         for (LocalDate date : SessionTradeDates.tradeDateCandidates(now)) {
             boolean hasPlaced = orderPort.findByStrategyId(strategyId, date, date).stream()

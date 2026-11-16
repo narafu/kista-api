@@ -109,7 +109,7 @@ class AdminSettingsControllerTest {
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
                                     "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":true,"allowedValues":["DEPOSIT","HOLD","WITHDRAW"],"defaultValue":"HOLD"},"bandWidth":{"customizable":true,"allowedValues":[10,15,20],"defaultValue":15},"intervalWeeks":{"customizable":true,"allowedValues":[1,2,4],"defaultValue":2}}},
-                                    "DCA":{"enabled":false,"fields":{"ticker":{"customizable":true,"allowedValues":["UPRO","QLD","BITO","EETH","BTC","ETH"],"defaultValue":"UPRO"}}}
+                                    "DCA":{"enabled":false,"fields":{"ticker":{"customizable":true,"allowedValues":["UPRO","QLD","BITO","EETH"],"defaultValue":"UPRO"}}}
                                   }
                                 }
                                 """))
@@ -139,7 +139,7 @@ class AdminSettingsControllerTest {
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
                                     "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":true,"allowedValues":["DEPOSIT","HOLD","WITHDRAW"],"defaultValue":"HOLD"},"bandWidth":{"customizable":true,"allowedValues":[10,15,20],"defaultValue":15},"intervalWeeks":{"customizable":true,"allowedValues":[1,2,4],"defaultValue":2}}},
-                                    "DCA":{"enabled":false,"fields":{"ticker":{"customizable":true,"allowedValues":["UPRO","QLD","BITO","EETH","BTC","ETH"],"defaultValue":"UPRO"}}}
+                                    "DCA":{"enabled":false,"fields":{"ticker":{"customizable":true,"allowedValues":["UPRO","QLD","BITO","EETH"],"defaultValue":"UPRO"}}}
                                   },
                                   "benchmarks": {"etf": {"allowedValues": ["SPY", "QQQ"], "defaultValue": "QQQ"}}
                                 }
@@ -163,7 +163,7 @@ class AdminSettingsControllerTest {
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
                                     "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":false,"allowedValues":["DEPOSIT"],"defaultValue":"DEPOSIT"},"bandWidth":{"customizable":true,"allowedValues":[10,15,20],"defaultValue":15},"intervalWeeks":{"customizable":true,"allowedValues":[1,2,4],"defaultValue":2}}},
-                                    "DCA":{"enabled":false,"fields":{"ticker":{"customizable":true,"allowedValues":["UPRO","QLD","BITO","EETH","BTC","ETH"],"defaultValue":"UPRO"}}}
+                                    "DCA":{"enabled":false,"fields":{"ticker":{"customizable":true,"allowedValues":["UPRO","QLD","BITO","EETH"],"defaultValue":"UPRO"}}}
                                   }
                                 }
                                 """))
@@ -185,7 +185,7 @@ class AdminSettingsControllerTest {
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[0,20,30],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
                                     "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":true,"allowedValues":["DEPOSIT","HOLD","WITHDRAW"],"defaultValue":"HOLD"},"bandWidth":{"customizable":true,"allowedValues":[10,15,20],"defaultValue":15},"intervalWeeks":{"customizable":true,"allowedValues":[1,2,4],"defaultValue":2}}},
-                                    "DCA":{"enabled":false,"fields":{"ticker":{"customizable":true,"allowedValues":["UPRO","QLD","BITO","EETH","BTC","ETH"],"defaultValue":"UPRO"}}}
+                                    "DCA":{"enabled":false,"fields":{"ticker":{"customizable":true,"allowedValues":["UPRO","QLD","BITO","EETH"],"defaultValue":"UPRO"}}}
                                   }
                                 }
                                 """))
@@ -207,7 +207,7 @@ class AdminSettingsControllerTest {
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
                                     "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":true,"allowedValues":["DEPOSIT","HOLD","WITHDRAW"],"defaultValue":"HOLD"},"bandWidth":{"customizable":true,"allowedValues":[0,10,15],"defaultValue":10},"intervalWeeks":{"customizable":true,"allowedValues":[1,2,4],"defaultValue":2}}},
-                                    "DCA":{"enabled":false,"fields":{"ticker":{"customizable":true,"allowedValues":["UPRO","QLD","BITO","EETH","BTC","ETH"],"defaultValue":"UPRO"}}}
+                                    "DCA":{"enabled":false,"fields":{"ticker":{"customizable":true,"allowedValues":["UPRO","QLD","BITO","EETH"],"defaultValue":"UPRO"}}}
                                   }
                                 }
                                 """))
@@ -229,7 +229,7 @@ class AdminSettingsControllerTest {
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
                                     "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":true,"allowedValues":["DEPOSIT","HOLD","WITHDRAW"],"defaultValue":"HOLD"},"bandWidth":{"customizable":true,"allowedValues":[10,15,20],"defaultValue":15},"intervalWeeks":{"customizable":true,"allowedValues":[0,1,2],"defaultValue":1}}},
-                                    "DCA":{"enabled":false,"fields":{"ticker":{"customizable":true,"allowedValues":["UPRO","QLD","BITO","EETH","BTC","ETH"],"defaultValue":"UPRO"}}}
+                                    "DCA":{"enabled":false,"fields":{"ticker":{"customizable":true,"allowedValues":["UPRO","QLD","BITO","EETH"],"defaultValue":"UPRO"}}}
                                   }
                                 }
                                 """))
@@ -251,7 +251,7 @@ class AdminSettingsControllerTest {
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
                                     "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":true,"allowedValues":["DEPOSIT","HOLD","WITHDRAW"],"defaultValue":"HOLD"},"bandWidth":{"customizable":true,"allowedValues":[10,15,20],"defaultValue":15},"intervalWeeks":{"customizable":true,"allowedValues":[1,2,4],"defaultValue":2}}},
-                                    "DCA":{"enabled":false,"fields":{"ticker":{"customizable":true,"allowedValues":["UPRO","QLD","BITO","EETH","BTC","ETH"],"defaultValue":"UPRO"}}}
+                                    "DCA":{"enabled":false,"fields":{"ticker":{"customizable":true,"allowedValues":["UPRO","QLD","BITO","EETH"],"defaultValue":"UPRO"}}}
                                   },
                                   "benchmarks": {"etf": {"allowedValues": ["SPY", "TSLA"], "defaultValue": "SPY"}}
                                 }
@@ -271,10 +271,10 @@ class AdminSettingsControllerTest {
     }
 
     @Test
-    void updateSettings_withoutUpbitKey_preservesCurrentUpbitSettings() throws Exception {
-        // 현재 저장 값: UPBIT 활성 + 다른 IP — 현행 UI는 brokers에 UPBIT를 보내지 않는다
+    void updateSettings_withoutMeritzKey_preservesCurrentMeritzSettings() throws Exception {
+        // 현재 저장 값: MERITZ 활성 — 현행 UI는 brokers에 MERITZ를 보내지 않는다
         java.util.Map<Broker, BrokerSettings> currentBrokers = new java.util.EnumMap<>(TradingPolicySettings.defaults().brokers());
-        currentBrokers.put(Broker.UPBIT, new BrokerSettings(true, "10.0.0.1"));
+        currentBrokers.put(Broker.MERITZ, new BrokerSettings(true));
         TradingPolicySettings current = new TradingPolicySettings(currentBrokers, TradingPolicySettings.defaults().strategies());
         when(adminSettingsService.getSettings()).thenReturn(new RuntimeSettingsBundle(RuntimeSettings.defaults(), current));
         when(adminSettingsService.updateSettings(eq(ADMIN_ID), any(), eq(false)))
@@ -291,13 +291,12 @@ class AdminSettingsControllerTest {
                                     "INFINITE":{"enabled":true,"fields":{"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}}},
                                     "PRIVACY":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}}},
                                     "VR":{"enabled":true,"fields":{"ticker":{"customizable":false,"allowedValues":["TQQQ"],"defaultValue":"TQQQ"},"recurringMode":{"customizable":true,"allowedValues":["DEPOSIT","HOLD","WITHDRAW"],"defaultValue":"HOLD"},"bandWidth":{"customizable":true,"allowedValues":[10,15,20],"defaultValue":15},"intervalWeeks":{"customizable":true,"allowedValues":[1,2,4],"defaultValue":2}}},
-                                    "DCA":{"enabled":false,"fields":{"ticker":{"customizable":true,"allowedValues":["UPRO","QLD","BITO","EETH","BTC","ETH"],"defaultValue":"UPRO"}}}
+                                    "DCA":{"enabled":false,"fields":{"ticker":{"customizable":true,"allowedValues":["UPRO","QLD","BITO","EETH"],"defaultValue":"UPRO"}}}
                                   }
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.brokers.UPBIT.enabled").value(true))
-                .andExpect(jsonPath("$.brokers.UPBIT.allowedIp").value("10.0.0.1"))
+                .andExpect(jsonPath("$.brokers.MERITZ.enabled").value(true))
                 .andExpect(jsonPath("$.brokers.TOSS.enabled").value(false));
     }
 }

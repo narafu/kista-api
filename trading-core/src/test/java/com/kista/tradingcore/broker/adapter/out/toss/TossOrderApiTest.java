@@ -399,10 +399,4 @@ class TossOrderApiTest {
         assertThat(captor.getValue()).doesNotContainKey("clientOrderId");
     }
 
-    @Test
-    @DisplayName("MARKET 주문은 코인 거래소 전용이라 주식 어댑터가 거부한다")
-    void place_marketOrder_isRejected() {
-        OrderInstruction instruction = new OrderInstruction(StrategyTicker.SOXL, OrderDirection.BUY, OrderType.MARKET, 1, new BigDecimal("25.00"));
-        assertThatThrownBy(() -> tossOrderApi.place(instruction, ACCOUNT)).isInstanceOf(IllegalArgumentException.class);
-    }
 }

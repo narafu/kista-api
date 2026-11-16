@@ -101,13 +101,6 @@ class MeritzOrderApiTest {
     }
 
     @Test
-    void place_market_throws_illegal_argument() {
-        assertThatThrownBy(() -> api.place(soxl(OrderType.MARKET, OrderDirection.BUY), ACCOUNT))
-                .isInstanceOf(IllegalArgumentException.class);
-        server.verify();
-    }
-
-    @Test
     void place_priced_type_with_null_price_throws_without_sending() {
         OrderInstruction noPrice = new OrderInstruction(StrategyTicker.SOXL, OrderDirection.SELL, OrderType.LOC, 30, null);
         assertThatThrownBy(() -> api.place(noPrice, ACCOUNT)).isInstanceOf(IllegalArgumentException.class);

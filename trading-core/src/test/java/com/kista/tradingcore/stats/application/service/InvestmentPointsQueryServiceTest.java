@@ -107,20 +107,6 @@ class InvestmentPointsQueryServiceTest {
     }
 
     @Test
-    void STRATEGY_scope는_전략_계좌_통화를_싣는다() {
-        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
-        Account binance = new Account(ACCOUNT_ID, USER_ID, "바이낸스", "n", "k", "s", null, Broker.BINANCE, null, null);
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(binance);
-        when(strategyCyclePort.findByStrategyIds(Set.of(STRATEGY_ID))).thenReturn(List.of());
-        when(cyclePositionPort.findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any())).thenReturn(List.of());
-
-        InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsScope.STRATEGY,
-                STRATEGY_ID, Currency.USD, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
-
-        assertThat(result.currency()).isEqualTo(Currency.USDT);
-    }
-
-    @Test
     void 소유하지_않은_전략은_사이클_포지션_조회_전에_거부한다() {
         // 옛 api BenchmarkServiceTest의 "소유하지 않은 전략은 포지션을 읽기 전에 거부한다" 불변식이
         // 소유권 검증 로직과 함께 trading 쪽으로 이전됐다 — fast-fail이 실제로 strategyCyclePort/
@@ -187,62 +173,16 @@ class InvestmentPointsQueryServiceTest {
     }
 
     @Test
-    void PORTFOLIO_scope는_요청_통화_계좌_전략만_조회한다() {
-        UUID binanceId = UUID.randomUUID();
-        Strategy binanceStrategy = new Strategy(UUID.randomUUID(), binanceId, StrategyType.DCA, StrategyStatus.ACTIVE,
-                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(USER_ID), account(binanceId, Broker.BINANCE)));
-        when(strategyPort.findByAccountIds(List.of(binanceId))).thenReturn(Map.of(binanceId, List.of(binanceStrategy)));
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of());
-
-        InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsScope.PORTFOLIO, null,
-                Currency.USDT, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
-
-        assertThat(result.currency()).isEqualTo(Currency.USDT);
-        verify(strategyPort).findByAccountIds(List.of(binanceId));
-    }
-
-    @Test
-    void PORTFOLIO_USDT는_사용자_전체_포지션을_읽어도_USD_포지션이_섞이지_않는다() {
-        UUID binanceId = UUID.randomUUID();
-        Strategy usdtStrategy = new Strategy(UUID.randomUUID(), binanceId, StrategyType.DCA, StrategyStatus.ACTIVE,
-                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(USER_ID), account(binanceId, Broker.BINANCE)));
-        when(strategyPort.findByAccountIds(List.of(binanceId))).thenReturn(Map.of(binanceId, List.of(usdtStrategy)));
-        StrategyCycle usdtCycle = new StrategyCycle(UUID.randomUUID(), usdtStrategy.id(), null, BigDecimal.ZERO, null,
-                LocalDate.of(2026, 1, 5), null, Instant.parse("2026-01-05T00:00:00Z"), null);
-        StrategyCycle usdCycle = activeCycle("100.00", "2026-01-05");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(usdtCycle));
-        List<CyclePosition> usdt = List.of(
-                depositSnapshot(usdtCycle.id(), "100.00", "2026-01-05T01:00:00Z"),
-                depositSnapshot(usdtCycle.id(), "110.00", "2026-01-06T01:00:00Z"));
-        List<CyclePosition> usd = List.of(
-                depositSnapshot(usdCycle.id(), "100.00", "2026-01-05T01:00:00Z"),
-                depositSnapshot(usdCycle.id(), "300.00", "2026-01-06T01:00:00Z"));
-        // 사용자 전체 포지션(USD+USDT)을 돌려줘도 사이클 조인으로 USDT 사이클만 반영돼야 한다
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any()))
-                .thenReturn(java.util.stream.Stream.concat(usdt.stream(), usd.stream()).toList());
-
-        InvestmentPointsResult mixed = service.fetch(USER_ID, InvestmentPointsScope.PORTFOLIO, null,
-                Currency.USDT, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 6));
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(usdt);
-        InvestmentPointsResult only = service.fetch(USER_ID, InvestmentPointsScope.PORTFOLIO, null,
-                Currency.USDT, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 6));
-
-        assertThat(mixed.points()).isEqualTo(only.points());
-    }
-
-    @Test
     void STRATEGY_scope는_currency_파라미터를_무시하고_전략_계좌_통화를_쓴다() {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account(ACCOUNT_ID, Broker.BINANCE));
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account(ACCOUNT_ID, Broker.TOSS));
         when(strategyCyclePort.findByStrategyIds(Set.of(STRATEGY_ID))).thenReturn(List.of());
         when(cyclePositionPort.findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any())).thenReturn(List.of());
 
         InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsScope.STRATEGY,
-                STRATEGY_ID, Currency.USD, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
+                STRATEGY_ID, Currency.KRW, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
-        assertThat(result.currency()).isEqualTo(Currency.USDT);
+        assertThat(result.currency()).isEqualTo(Currency.USD);
     }
 
     @Test

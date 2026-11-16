@@ -16,7 +16,7 @@ class TradingPolicySettingsTest {
         TradingPolicySettings settings = TradingPolicySettings.defaults();
 
         assertThat(settings.brokers()).containsOnlyKeys(Broker.values());
-        assertThat(settings.brokers().entrySet()).allMatch(e -> java.util.Set.of(Broker.UPBIT, Broker.MERITZ, Broker.BINANCE).contains(e.getKey()) != e.getValue().enabled()); // UPBIT·MERITZ·BINANCE만 기본 비활성
+        assertThat(settings.brokers().entrySet()).allMatch(e -> (e.getKey() == Broker.MERITZ) != e.getValue().enabled()); // MERITZ만 기본 비활성
         assertThat(settings.strategies()).containsOnlyKeys(StrategyType.values());
         assertThat(settings.strategies().entrySet()).allMatch(e -> e.getValue().enabled() == (e.getKey() != StrategyType.DCA)); // DCA만 기본 비활성
         assertThat(settings.strategy(StrategyType.INFINITE).divisionCount())
@@ -28,31 +28,15 @@ class TradingPolicySettingsTest {
     }
 
     @Test
-    void upbitDefaultsToDisabledWithServerIp() {
-        BrokerSettings upbit = TradingPolicySettings.defaults().brokers().get(Broker.UPBIT);
-        assertThat(upbit.enabled()).isFalse();
-        assertThat(upbit.allowedIp()).isEqualTo("168.107.63.152");
-        assertThat(TradingPolicySettings.defaults().brokers().get(Broker.TOSS).allowedIp()).isNull();
-    }
-
-    @Test
-    void binanceDefaultsToDisabledWithServerIp() {
-        BrokerSettings b = TradingPolicySettings.defaults().brokers().get(Broker.BINANCE);
-        assertThat(b.enabled()).isFalse();
-        assertThat(b.allowedIp()).isEqualTo("168.107.63.152");
-    }
-
-    @Test
     void defaults_disable_meritz() {
         BrokerSettings meritz = TradingPolicySettings.defaults().brokers().get(Broker.MERITZ);
         assertThat(meritz.enabled()).isFalse();
-        assertThat(meritz.allowedIp()).isNull();
     }
 
     @Test
-    void dcaDefaultsAllowCryptoTickers() {
+    void dcaDefaultsAllowEtfTickers() {
         assertThat(TradingPolicySettings.defaults().strategy(StrategyType.DCA).ticker().allowedValues())
-                .containsExactly(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BITO, StrategyTicker.EETH, StrategyTicker.BTC, StrategyTicker.ETH);
+                .containsExactly(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BITO, StrategyTicker.EETH);
     }
 
     @Test
@@ -60,7 +44,7 @@ class TradingPolicySettingsTest {
         TradingPolicySettings defaults = TradingPolicySettings.defaults();
 
         assertThatThrownBy(() -> new TradingPolicySettings(
-                Map.of(Broker.TOSS, new BrokerSettings(true, null)), defaults.strategies()))
+                Map.of(Broker.TOSS, new BrokerSettings(true)), defaults.strategies()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("broker");
         assertThatThrownBy(() -> new TradingPolicySettings(defaults.brokers(),
@@ -109,7 +93,7 @@ class TradingPolicySettingsTest {
     void defaults_keep_dca_disabled_with_dca_tickers() {
         StrategyCreationSettings dca = TradingPolicySettings.defaults().strategy(StrategyType.DCA);
         assertThat(dca.enabled()).isFalse();
-        assertThat(dca.ticker().allowedValues()).containsExactly(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BITO, StrategyTicker.EETH, StrategyTicker.BTC, StrategyTicker.ETH);
+        assertThat(dca.ticker().allowedValues()).containsExactly(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BITO, StrategyTicker.EETH);
         assertThat(dca.ticker().defaultValue()).isEqualTo(StrategyTicker.UPRO);
         assertThat(dca.divisionCount()).isNull();
     }

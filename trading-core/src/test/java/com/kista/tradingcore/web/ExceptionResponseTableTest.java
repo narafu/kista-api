@@ -3,10 +3,8 @@ package com.kista.tradingcore.web;
 import com.kista.shared.kernel.AppErrorRaisedEvent;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
-import com.kista.tradingcore.broker.domain.model.BrokerIpNotAllowedException;
 import com.kista.tradingcore.broker.domain.model.BrokerPermissionDeniedException;
 import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
-import com.kista.tradingcore.broker.domain.model.BrokerWithdrawalEnabledException;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeConflictException;
 import com.kista.tradingcore.support.StubBrokerApiException;
 import com.kista.tradingcore.trading.domain.model.AlreadyOrderedTodayException;
@@ -69,8 +67,6 @@ class ExceptionResponseTableTest {
 
     static final List<Row> ROWS = List.of(
             // 증권사 자격증명·한도
-            new Row("BrokerWithdrawalEnabled", BrokerWithdrawalEnabledException::new, 422, "Broker Withdrawal Enabled", "BROKER_WITHDRAWAL_ENABLED", new BrokerWithdrawalEnabledException().getMessage(), false),
-            new Row("BrokerIpNotAllowed", BrokerIpNotAllowedException::new, 422, "Broker IP Not Allowed", "BROKER_IP_NOT_ALLOWED", new BrokerIpNotAllowedException().getMessage(), false),
             new Row("BrokerPermissionDenied", BrokerPermissionDeniedException::new, 422, "Broker Permission Denied", "BROKER_PERMISSION_DENIED", new BrokerPermissionDeniedException().getMessage(), false),
             new Row("BrokerCredential", BrokerCredentialException::new, 422, "Invalid Broker Credentials", "BROKER_CREDENTIAL_INVALID", new BrokerCredentialException().getMessage(), false),
             new Row("BrokerRateLimit", BrokerRateLimitException::new, 429, "Broker Rate Limit", "BROKER_RATE_LIMITED", new BrokerRateLimitException().getMessage(), false),

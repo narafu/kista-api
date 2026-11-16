@@ -128,13 +128,6 @@ class DcaExecutionRecorderTest {
     }
 
     @Test
-    void exchangeApiErrorAlsoNotifiesAdmin() {
-        when(port.insertIfAbsent(any())).thenReturn(true);
-        recorder.recordSkipped(ctx, DAY, KEY, OrderDirection.SELL, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", null);
-        verify(publisher, times(1)).publishEvent(any(TradingErrorEvent.class));
-    }
-
-    @Test
     void non_data_skip_does_not_alert_admin() {
         when(port.insertIfAbsent(any())).thenReturn(true);
         recorder.recordSkipped(ctx, DAY, KEY, OrderDirection.SELL, DcaSkipReason.BELOW_ONE_SHARE, "x", new BigDecimal("87.12"));

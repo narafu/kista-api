@@ -41,11 +41,11 @@ class FearGreedSnapshotPersistenceAdapterTest extends RootDataJpaTestBase {
     void findBySourceSince_multipleSnapshots_returnsAscendingWithLatestLast() {
         Instant base = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(3, ChronoUnit.HOURS);
 
-        snapshotAdapter.save(FearGreedSnapshot.of("CRYPTO", base, 10, FearGreedRating.EXTREME_FEAR));
-        snapshotAdapter.save(FearGreedSnapshot.of("CRYPTO", base.plus(1, ChronoUnit.HOURS), 50, FearGreedRating.NEUTRAL));
-        snapshotAdapter.save(FearGreedSnapshot.of("CRYPTO", base.plus(2, ChronoUnit.HOURS), 90, FearGreedRating.EXTREME_GREED));
+        snapshotAdapter.save(FearGreedSnapshot.of("OTHER", base, 10, FearGreedRating.EXTREME_FEAR));
+        snapshotAdapter.save(FearGreedSnapshot.of("OTHER", base.plus(1, ChronoUnit.HOURS), 50, FearGreedRating.NEUTRAL));
+        snapshotAdapter.save(FearGreedSnapshot.of("OTHER", base.plus(2, ChronoUnit.HOURS), 90, FearGreedRating.EXTREME_GREED));
 
-        List<FearGreedSnapshot> found = snapshotAdapter.findBySourceSince("CRYPTO", base);
+        List<FearGreedSnapshot> found = snapshotAdapter.findBySourceSince("OTHER", base);
 
         assertThat(found).hasSize(3);
         assertThat(found).extracting(FearGreedSnapshot::value).containsExactly(10, 50, 90); // 시각 오름차순
@@ -58,15 +58,15 @@ class FearGreedSnapshotPersistenceAdapterTest extends RootDataJpaTestBase {
     void findBySourceSince_separatesBySource() {
         Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
 
-        snapshotAdapter.save(FearGreedSnapshot.of("CRYPTO", now, 20, FearGreedRating.FEAR));
+        snapshotAdapter.save(FearGreedSnapshot.of("OTHER", now, 20, FearGreedRating.FEAR));
         snapshotAdapter.save(FearGreedSnapshot.of("CNN", now, 80, FearGreedRating.GREED));
 
-        List<FearGreedSnapshot> cryptoOnly = snapshotAdapter.findBySourceSince("CRYPTO", now.minus(1, ChronoUnit.HOURS));
+        List<FearGreedSnapshot> otherOnly = snapshotAdapter.findBySourceSince("OTHER", now.minus(1, ChronoUnit.HOURS));
         List<FearGreedSnapshot> cnnOnly = snapshotAdapter.findBySourceSince("CNN", now.minus(1, ChronoUnit.HOURS));
 
-        assertThat(cryptoOnly).hasSize(1);
-        assertThat(cryptoOnly.getFirst().source()).isEqualTo("CRYPTO");
-        assertThat(cryptoOnly.getFirst().value()).isEqualTo(20);
+        assertThat(otherOnly).hasSize(1);
+        assertThat(otherOnly.getFirst().source()).isEqualTo("OTHER");
+        assertThat(otherOnly.getFirst().value()).isEqualTo(20);
         assertThat(cnnOnly).hasSize(1);
         assertThat(cnnOnly.getFirst().source()).isEqualTo("CNN");
         assertThat(cnnOnly.getFirst().value()).isEqualTo(80);

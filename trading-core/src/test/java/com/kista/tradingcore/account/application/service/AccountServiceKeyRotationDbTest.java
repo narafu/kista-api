@@ -44,14 +44,14 @@ class AccountServiceKeyRotationDbTest extends DataJpaTestBase {
         UUID userId = UUID.randomUUID();
         String keyA = "race-ak-a-" + userId; // 잔존 행·병렬 DB 테스트와 충돌하지 않도록 실행마다 고유
         try {
-            adapter.save(new Account(null, userId, "업비트A", null, keyA, "sk", null, Broker.UPBIT, null, null));
-            Account b = adapter.save(new Account(null, userId, "업비트B", null, "race-ak-b-" + userId, "sk", null, Broker.UPBIT, null, null));
+            adapter.save(new Account(null, userId, "메리츠A", null, keyA, "sk", null, Broker.MERITZ, null, null));
+            Account b = adapter.save(new Account(null, userId, "메리츠B", null, "race-ak-b-" + userId, "sk", null, Broker.MERITZ, null, null));
             // 사전 중복 검사(existsByDedupeKey)가 통과한 뒤 다른 계좌가 먼저 같은 키를 쓴 경합을 재현 — 검사만 false로 고정
             AccountPersistenceAdapter racing = spy(adapter);
             doReturn(false).when(racing).existsByDedupeKey(keyA);
             BrokerConnectionTesters testers = mock(BrokerConnectionTesters.class);
             BrokerConnectionTestPort tester = mock(BrokerConnectionTestPort.class);
-            when(testers.of(Broker.UPBIT)).thenReturn(tester);
+            when(testers.of(Broker.MERITZ)).thenReturn(tester);
             when(tester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null, null));
             AccountService service = new AccountService(racing, testers, mock(BrokerEnabledPort.class),
                     mock(AccountTokenEvictionPort.class), mock(AccountOpenOrderCancelPort.class), mock(AccountDeletionWriter.class),

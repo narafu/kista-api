@@ -46,9 +46,7 @@ class BatchContextFactory {
         List<BatchContext> contexts = new ArrayList<>();
         for (Strategy strategy : strategies) {
             try {
-                // 코인 계좌 전략은 주식 개장·마감 배치 대상이 아니다(사이클·알림 판정 전에 조용히 제외) — 코인 DCA는 전용 스케줄러(묶음 C)가 실행
                 TradingAccount account = accountsById.get(strategy.accountId());
-                if (account != null && account.broker().isCryptoExchange()) continue;
                 StrategyCycle currentCycle = cyclesById.get(strategy.id());
                 if (currentCycle == null) {
                     throw new NoSuchElementException("활성 사이클 없음: strategyId=" + strategy.id());

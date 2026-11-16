@@ -16,7 +16,7 @@ public record RegisterStrategyCommand(
         StrategyCycleSeedType cycleSeedType,        // null이면 NONE으로 처리
         Integer divisionCount,                       // 분할 수 (20/30/40), null이면 런타임 기본값 적용 (INFINITE 전용)
         // 중간부터 시작 — 기존 보유 수량·평단가 (세 전략 공통, null/0이면 빈 포지션에서 시작)
-        BigDecimal initialHoldings,                   // 등록 시점 기존 보유 수량 (주식 정수, 코인 소수 8자리까지)
+        BigDecimal initialHoldings,                   // 등록 시점 기존 보유 수량 (정수 주)
         BigDecimal initialAvgPrice,                   // 등록 시점 기존 평단가 (initialHoldings>0이면 필수)
         // VR 전략 전용 필드 (비VR 경로는 null)
         Integer intervalWeeks,                       // 리밸런싱 주기 (주 단위, 1 이상, VR 전용)

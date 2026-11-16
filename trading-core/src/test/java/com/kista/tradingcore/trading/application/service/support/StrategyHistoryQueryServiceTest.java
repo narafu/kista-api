@@ -32,24 +32,4 @@ class StrategyHistoryQueryServiceTest {
     @Mock AccountPort accountPort;
     @Mock StrategyPort strategyPort;
     @Mock CyclePositionPort cyclePositionPort;
-
-    @Test
-    void getByStrategy_krwAccount_roundsDepositToScale0() {
-        UUID userId = UUID.randomUUID();
-        UUID accountId = UUID.randomUUID();
-        Strategy strategy = new Strategy(UUID.randomUUID(), accountId, StrategyType.DCA, StrategyStatus.ACTIVE,
-                StrategyTicker.BTC, StrategyCycleSeedType.NONE);
-        when(strategyPort.findByIdOrThrow(strategy.id())).thenReturn(strategy);
-        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.upbitAccount(accountId, userId));
-        when(cyclePositionPort.findByStrategyIdWithCursor(eq(strategy.id()), any(), any(), eq(11)))
-                .thenReturn(List.of(new CyclePositionHistoryEntry(UUID.randomUUID(), accountId, StrategyTicker.BTC, StrategyType.DCA,
-                        new BigDecimal("12345.67"), new BigDecimal("0.55"), new BigDecimal("0.53"), BigDecimal.TEN, Instant.now())));
-        // 이력 조회에 쓰지 않는 협력 객체는 null
-        var service = new StrategyHistoryQueryService(accountPort, strategyPort, cyclePositionPort,
-                null, null, null, null, null, FixedClockTestConfig.FIXED);
-
-        var page = service.getByStrategy(strategy.id(), userId, null, null, null, 10);
-
-        assertThat(page.items().getFirst().deposit()).hasToString("12346");
-    }
 }

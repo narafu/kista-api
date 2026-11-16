@@ -119,29 +119,18 @@ public class CapitalLedgerService {
 
         // 인출 가능액 = 장부 예수금 − 체결 전 BUY 약정 − 장중 취소 BUY의 보류 체결분. 오늘 마감 전 주문과 22:00 개장 배치가 미리 저장한 다음 거래일 주문이
         // 장부 예수금으로 체결되므로 두 날짜를 모두 빼야 체결 후 deposit이 음수가 되지 않는다(StrategyLedgerBudget.remaining과 같은 약정 정의)
-        List<Order> committedOrders;
-        List<Order> cancelledOrders;
-        if (owned.crypto()) {
-            // 코인은 체결 즉시 원장에 반영되고(CryptoLedgerRecorder) 마감 리포트가 없다 — 날짜 무관 미체결 주문만 약정, 취소분 보류 체결은 없다
-            // ponytail: 코인 실행기는 사이클 잠금 없이 원장을 읽어 주문한다 — 그 사이 인출이 커밋되면 체결 후 원장이 음수가 될 수 있다(다음 틱부터 매수 skip), 문제되면 접수 직전 잠금 재확인
-            committedOrders = orderPort.findOpenByAccountId(strategy.accountId()).stream()
-                    .filter(o -> cycle.id().equals(o.strategyCycleId()))
-                    .toList();
-            cancelledOrders = List.of();
-        } else {
-            List<LocalDate> dates = SessionTradeDates.tradeDateCandidates(ZonedDateTime.now(clock));
-            committedOrders = dates.stream()
-                    .flatMap(date -> orderPort.findPlannedOrPlacedByCycleAndDate(cycle.id(), date).stream())
-                    .toList();
-            // 장중 일부 체결 후 취소된 BUY의 체결분은 마감 리포트 전까지 장부에 없다 — 취소 직후 기록된 체결분을 빼고, 체결 조회가 실패해 기록이 없는(null) 건은 주문 금액 전체를 상한으로 뺀다.
-            // 리포트가 끝난 날짜는 체결분이 이미 장부에 반영돼 이중 차감이므로 제외한다(unreportedCancelledBuys).
-            cancelledOrders = dates.stream()
-                    .flatMap(date -> ledgerBudget.unreportedCancelledBuys(cycle, date).stream())
-                    .toList();
-        }
+        List<LocalDate> dates = SessionTradeDates.tradeDateCandidates(ZonedDateTime.now(clock));
+        List<Order> committedOrders = dates.stream()
+                .flatMap(date -> orderPort.findPlannedOrPlacedByCycleAndDate(cycle.id(), date).stream())
+                .toList();
+        // 장중 일부 체결 후 취소된 BUY의 체결분은 마감 리포트 전까지 장부에 없다 — 취소 직후 기록된 체결분을 빼고, 체결 조회가 실패해 기록이 없는(null) 건은 주문 금액 전체를 상한으로 뺀다.
+        // 리포트가 끝난 날짜는 체결분이 이미 장부에 반영돼 이중 차감이므로 제외한다(unreportedCancelledBuys).
+        List<Order> cancelledOrders = dates.stream()
+                .flatMap(date -> ledgerBudget.unreportedCancelledBuys(cycle, date).stream())
+                .toList();
         BigDecimal available = ledgerBudget.remaining(cycle, Optional.of(latest), committedOrders, cancelledOrders);
         if (amount.compareTo(available) > 0) {
-            // 금액 표기: USD는 kista-ui fmtUsd와 같은 $#,##0.00, 그 외는 Currency.format(15,000원·10.50 USDT). 음수 가용액은 0, 표시액을 그대로 요청해도 통과하도록 내림
+            // 금액 표기: USD는 kista-ui fmtUsd와 같은 $#,##0.00, 그 외는 Currency.format(15,000원). 음수 가용액은 0, 표시액을 그대로 요청해도 통과하도록 내림
             BigDecimal shown = available.max(BigDecimal.ZERO).setScale(owned.currency().amountScale(), RoundingMode.DOWN);
             String shownText = owned.currency() == Currency.USD
                     ? "$" + String.format(Locale.US, "%,.2f", shown) : owned.currency().format(shown);
@@ -202,8 +191,7 @@ public class CapitalLedgerService {
         if (cycle.isEnded() || !cycle.id().equals(first.id())) {
             throw new IllegalStateException(noActiveMessage);
         }
-        // 코인 계좌는 마감 리포트가 없다 — 체결 기록(CryptoLedgerRecorder)이 같은 사이클 잠금으로 직렬화된다
-        if (!owned.crypto()) requireOutsideReportWindow(strategy, reportWindowMessage);
+        requireOutsideReportWindow(strategy, reportWindowMessage);
         CyclePosition latest = cyclePositionPort.findLatestOne(cycle.id())
                 .orElseThrow(() -> new NoSuchElementException("최신 포지션 이력이 없습니다: cycleId=" + cycle.id()));
         return new LockedCycle(cycle, latest);

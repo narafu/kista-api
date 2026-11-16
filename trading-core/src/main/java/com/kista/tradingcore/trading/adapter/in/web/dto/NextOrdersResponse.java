@@ -35,9 +35,9 @@ public record NextOrdersResponse(
         BigDecimal otherStrategiesPlannedBuyUsd,       // 계좌 내 타 전략 당일 PLANNED BUY 합계
         @Schema(description = "전략 원장 대비 BUY 경고 (DCA·신규 BUY 없음·skip이면 null)")
         @Nullable LedgerCheckSummary ledgerCheck,
-        @Schema(description = "계좌 주문가능 USD 대비 오늘 BUY 경고 — 계좌 단위(계좌 내 모든 전략 동일 값), 조회 시점 추정, 경고 전용. MOCK·코인·필요 BUY 없음·증권사 조회 실패면 null")
+        @Schema(description = "계좌 주문가능 USD 대비 오늘 BUY 경고 — 계좌 단위(계좌 내 모든 전략 동일 값), 조회 시점 추정, 경고 전용. MOCK·필요 BUY 없음·증권사 조회 실패면 null")
         @Nullable AccountCashCheckSummary accountCashCheck,
-        @Schema(description = "계좌 보유(판매 가능) 수량 대비 오늘 SELL 경고 — (계좌, 종목) 단위(같은 종목 전략 동일 값), 조회 시점 추정, 경고 전용. MOCK·코인·필요 SELL 없음·증권사 조회 실패면 null")
+        @Schema(description = "계좌 보유(판매 가능) 수량 대비 오늘 SELL 경고 — (계좌, 종목) 단위(같은 종목 전략 동일 값), 조회 시점 추정, 경고 전용. MOCK·필요 SELL 없음·증권사 조회 실패면 null")
         @Nullable AccountHoldingsCheckSummary accountHoldingsCheck
 ) {
     public record PositionSnapshot(

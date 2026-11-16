@@ -551,27 +551,6 @@ class TradingPreviewServiceTest {
         verify(executionPort, never()).insertIfAbsent(any());
     }
 
-    @Test
-    void 코인_DCA는_단건_프리뷰를_지원하지_않는다() {
-        Account upbit = TradingFixtures.upbitAccount(UUID.randomUUID(), UUID.randomUUID());
-        Strategy btc = new Strategy(UUID.randomUUID(), upbit.id(), StrategyType.DCA,
-                StrategyStatus.ACTIVE, StrategyTicker.BTC, StrategyCycleSeedType.NONE);
-        when(strategyPort.findByIdOrThrow(btc.id())).thenReturn(btc);
-        when(accountPort.requireOwnedAccount(upbit.id(), upbit.userId())).thenReturn(upbit);
-
-        assertThatThrownBy(() -> service.preview(btc.id(), upbit.userId()))
-                .isInstanceOf(DcaManualExecutionUnsupportedException.class);
-    }
-
-    @Test
-    void previewBatch_cryptoAccount_returnsEmptyWithoutBrokerCalls() {
-        // 코인 계좌 전략은 전부 DCA — 미리보기 대상이 아니라 브로커 라우터(시세 조회)를 타지 않는다
-        Account upbit = TradingFixtures.upbitAccount(UUID.randomUUID(), UUID.randomUUID());
-        when(accountPort.requireOwnedAccount(upbit.id(), upbit.userId())).thenReturn(upbit);
-
-        assertThat(service.previewBatch(upbit.id(), upbit.userId())).isEmpty();
-        verifyNoInteractions(priceFetcher, planBuilder);
-    }
     // ===== 계좌 주문가능 USD 경고(accountCashCheck) =====
 
     private static PlannedOrder buyOrder(StrategyTicker ticker, int qty, String price) {

@@ -28,7 +28,6 @@ com.kista.api.finance.application.port.output.FinanceTransactionPort
 com.kista.api.finance.application.port.output.MonthlyClosingPort
 com.kista.api.market.application.port.output.CandleQueryPort
 com.kista.api.market.application.port.output.CnnFearGreedPort
-com.kista.api.market.application.port.output.CryptoFearGreedPort
 com.kista.api.market.application.port.output.FearGreedSnapshotPort
 com.kista.api.market.application.port.output.MarketCalendarQueryPort
 com.kista.api.notify.application.port.output.FcmDeviceTokenPort
@@ -55,15 +54,7 @@ com.kista.tradingcore.notify.application.port.output.TradingNotifyPort
 com.kista.tradingcore.notify.application.port.output.TradingRealtimeNotificationPort
 com.kista.tradingcore.notify.application.port.output.TradingUserNotificationPort
 com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort
-com.kista.tradingcore.stats.application.port.output.BinanceMarketDataPort
-com.kista.tradingcore.stats.application.port.output.BlockHeightPort
-com.kista.tradingcore.stats.application.port.output.CoinbaseMarketDataPort
-com.kista.tradingcore.stats.application.port.output.CryptoMarketMetricsPort
-com.kista.tradingcore.stats.application.port.output.HashrateHistoryPort
 com.kista.tradingcore.stats.application.port.output.HistoricalCandlePort
-com.kista.tradingcore.stats.application.port.output.HistoricalFxRatePort
-com.kista.tradingcore.stats.application.port.output.UpbitMarketDataPort
-com.kista.tradingcore.trading.application.port.output.CryptoFearGreedIndexPort
 com.kista.tradingcore.trading.application.port.output.CycleCapitalEventPort
 com.kista.tradingcore.trading.application.port.output.CyclePositionInfiniteDetailPort
 com.kista.tradingcore.trading.application.port.output.CyclePositionPort

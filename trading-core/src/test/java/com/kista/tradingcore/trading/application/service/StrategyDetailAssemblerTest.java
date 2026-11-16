@@ -39,7 +39,7 @@ class StrategyDetailAssemblerTest {
     @Mock DcaSummaryAssembler dcaSummaryAssembler;
 
     private final Strategy strategy = new Strategy(UUID.randomUUID(), UUID.randomUUID(), StrategyType.DCA, StrategyStatus.ACTIVE,
-            StrategyTicker.BTC, StrategyCycleSeedType.NONE);
+            StrategyTicker.UPRO, StrategyCycleSeedType.NONE);
 
     private StrategyDetailAssembler assembler() {
         return new StrategyDetailAssembler(strategyVersionPort, strategyInfiniteDetailPort, vrStrategyDetailService,
@@ -48,25 +48,11 @@ class StrategyDetailAssemblerTest {
     }
 
     @Test
-    void krwDetail_roundsDeposits() {
-        StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), strategy.id(), new BigDecimal("50000.00"), null,
-                LocalDate.parse("2026-06-01"), null, Instant.parse("2026-06-01T00:00:00Z"), null);
-        when(strategyCyclePort.findLatestByStrategyId(strategy.id())).thenReturn(Optional.of(cycle));
-        when(cyclePositionPort.findLatestOneByStrategyId(strategy.id())).thenReturn(Optional.of(
-                new CyclePosition(UUID.randomUUID(), cycle.id(), new BigDecimal("12345.67"), null, null, BigDecimal.ZERO, Instant.now(), null)));
-
-        StrategyDetail detail = assembler().toDetail(strategy, Market.CRYPTO_KRW);
-
-        assertThat(detail.initialDeposit()).hasToString("50000");
-        assertThat(detail.ledgerDeposit()).hasToString("12346");
-    }
-
-    @Test
-    void krwDetail_withoutPosition_keepsNullDeposits() {
+    void detail_withoutPosition_keepsNullDeposits() {
         when(strategyCyclePort.findLatestByStrategyId(strategy.id())).thenReturn(Optional.empty());
         when(cyclePositionPort.findLatestOneByStrategyId(strategy.id())).thenReturn(Optional.empty());
 
-        StrategyDetail detail = assembler().toDetail(strategy, Market.CRYPTO_KRW);
+        StrategyDetail detail = assembler().toDetail(strategy, Market.US_STOCK);
 
         assertThat(detail.initialDeposit()).isNull();
         assertThat(detail.ledgerDeposit()).isNull();

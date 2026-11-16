@@ -44,19 +44,6 @@ class OrderTest {
     }
 
     @Test
-    void cryptoMarketKeepsFractionalQuantity() {
-        Order o = Order.cryptoMarket(UUID.randomUUID(), UUID.randomUUID(), LocalDate.of(2026, 10, 18),
-                StrategyTicker.BTC, OrderDirection.BUY, "DCA_BUY", OrderTiming.AT_CLOSE,
-                new BigDecimal("0.00012345"), new BigDecimal("150000000"));
-
-        assertThat(o.quantity()).isEqualByComparingTo("0.00012345");
-        assertThat(o.status()).isEqualTo(OrderStatus.PLANNED);
-        assertThat(o.orderType()).isEqualTo(OrderType.MARKET);
-        assertThat(o.id()).isNull();
-        assertThat(o.externalOrderId()).isNull();
-    }
-
-    @Test
     void isBrokerSubmitted_접수번호와_전략_leg가_모두_있을때만_true() {
         Order base = Order.filledManual(UUID.randomUUID(), UUID.randomUUID(), LocalDate.of(2026, 9, 9), StrategyTicker.SOXL,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.ONE, BigDecimal.TEN, "ODNO1");

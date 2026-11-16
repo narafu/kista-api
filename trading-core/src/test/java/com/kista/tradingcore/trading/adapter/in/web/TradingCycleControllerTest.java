@@ -534,12 +534,12 @@ class TradingCycleControllerTest {
 
     // 요청 JSON의 규칙 1개(ruleKey 없음)와 짝인 도메인 설정
     private static final DcaStrategyConfig DCA_CONFIG = TradingFixtures.dcaConfig(
-            new DcaRule(null, OrderDirection.BUY, DcaFrequency.MONTHLY, null, null, OrderType.MOC, null,
+            new DcaRule(null, OrderDirection.BUY, DcaFrequency.MONTHLY, null, null, OrderType.MOC,
                     new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("300"), null), DcaShortfallPolicy.REJECT, List.of()));
 
     private static final String RULE_JSON = """
             {"ruleKey":null,"direction":"BUY","frequency":"MONTHLY","dayOfWeek":null,"dayOfMonth":null,
-             "orderType":"MOC","executionHour":null,"sizing":{"type":"AMOUNT","amount":300,"percent":null},
+             "orderType":"MOC","sizing":{"type":"AMOUNT","amount":300,"percent":null},
              "shortfall":"REJECT","conditions":%s}""";
 
     private static String dcaBody(String conditions) {
@@ -601,21 +601,6 @@ class TradingCycleControllerTest {
     }
 
     @Test
-    void register_dca_decimalInitialHoldings_passesBigDecimal() throws Exception {
-        when(tradingCycle.register(any(), any(), any())).thenReturn(dcaDetail());
-
-        mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
-                        .with(csrf()).with(authentication(userToken(USER_ID)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"type\":\"DCA\",\"ticker\":\"BTC\",\"initialHoldings\":\"0.01234567\",\"initialAvgPrice\":90000000,"
-                                + "\"dca\":{\"rules\":[" + RULE_JSON.formatted("[]") + "]}}"))
-                .andExpect(status().isCreated());
-        ArgumentCaptor<RegisterStrategyCommand> captor = ArgumentCaptor.forClass(RegisterStrategyCommand.class);
-        verify(tradingCycle).register(any(), any(), captor.capture());
-        assertThat(captor.getValue().initialHoldings()).isEqualByComparingTo("0.01234567");
-    }
-
-    @Test
     void register_duplicateTicker_returns409WithUserDetail() throws Exception {
         when(tradingCycle.register(any(), any(), any()))
                 .thenThrow(new com.kista.tradingcore.trading.domain.model.DuplicateStrategyTickerException());
@@ -648,20 +633,6 @@ class TradingCycleControllerTest {
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(tradingCycle);
         verify(dcaConfig, never()).updateConfig(any(), any(), any());
-    }
-
-    @Test
-    void register_dca_stockRule_ignoresExecutionHour() throws Exception {
-        // R5: 주식 주문유형이면 executionHour는 무시(null 저장)
-        when(tradingCycle.register(any(), any(), any())).thenReturn(dcaDetail());
-        mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
-                        .with(csrf()).with(authentication(userToken(USER_ID)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(dcaBody("[]").replace("\"executionHour\":null", "\"executionHour\":9")))
-                .andExpect(status().isCreated());
-        ArgumentCaptor<RegisterStrategyCommand> captor = ArgumentCaptor.forClass(RegisterStrategyCommand.class);
-        verify(tradingCycle).register(any(), any(), captor.capture());
-        assertThat(captor.getValue().dca().rules().getFirst().executionHour()).isNull();
     }
 
     @Test
@@ -740,7 +711,7 @@ class TradingCycleControllerTest {
 
     @Test
     void reconfigureDca_returns_typed_conditions() throws Exception {
-        DcaRule rule = new DcaRule(KEY, OrderDirection.BUY, DcaFrequency.MONTHLY, null, null, OrderType.MOC, null,
+        DcaRule rule = new DcaRule(KEY, OrderDirection.BUY, DcaFrequency.MONTHLY, null, null, OrderType.MOC,
                 new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("300"), null), DcaShortfallPolicy.REJECT, List.of(
                 new DcaCondition(DcaIndicator.RSI, DcaOperator.LTE, null, new BigDecimal("35")),
                 new DcaCondition(DcaIndicator.SMA, DcaOperator.LT, 200, null)));

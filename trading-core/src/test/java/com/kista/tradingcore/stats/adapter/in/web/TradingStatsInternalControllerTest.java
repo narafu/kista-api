@@ -72,17 +72,17 @@ class TradingStatsInternalControllerTest {
     @Test
     void currency_파라미터를_유스케이스에_전달하고_응답에_싣는다() throws Exception {
         given(investmentPointsQueryService.fetch(eq(USER_ID), eq(InvestmentPointsScope.PORTFOLIO),
-                isNull(), eq(com.kista.shared.kernel.Currency.USDT), isNull(), isNull()))
+                isNull(), eq(com.kista.shared.kernel.Currency.KRW), isNull(), isNull()))
                 .willReturn(new InvestmentPointsResult(
-                        List.of(), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1), null, com.kista.shared.kernel.Currency.USDT));
+                        List.of(), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1), null, com.kista.shared.kernel.Currency.KRW));
 
         mockMvc.perform(get("/api/internal/trading/stats/investment-points")
                         .header("X-Internal-Token", VALID_TOKEN)
                         .param("userId", USER_ID.toString())
                         .param("scope", "PORTFOLIO")
-                        .param("currency", "USDT"))
+                        .param("currency", "KRW"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.currency").value("USDT"));
+                .andExpect(jsonPath("$.currency").value("KRW"));
     }
 
     @Test

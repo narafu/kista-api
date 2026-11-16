@@ -64,14 +64,14 @@ class TradingStatsControllerTest {
 
     @Test
     void summary는_currency를_전달하고_availableCurrencies를_싣는다() throws Exception {
-        when(tradingStats.getSummary(USER_ID, Currency.USDT)).thenReturn(
+        when(tradingStats.getSummary(USER_ID, Currency.KRW)).thenReturn(
                 new StatsSummary(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, List.of(),
-                        List.of(Currency.USDT)));
+                        List.of(Currency.KRW)));
 
-        mockMvc.perform(get("/api/stats/summary").param("currency", "USDT")
+        mockMvc.perform(get("/api/stats/summary").param("currency", "KRW")
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.availableCurrencies[0]").value("USDT"));
+                .andExpect(jsonPath("$.availableCurrencies[0]").value("KRW"));
     }
 
     @Test

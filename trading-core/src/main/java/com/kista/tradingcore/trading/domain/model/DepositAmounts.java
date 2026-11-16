@@ -17,7 +17,7 @@ public final class DepositAmounts {
         return deposit;
     }
 
-    // 금액 자릿수 — 계좌 통화 소수 자릿수 이하(KRW 정수·USD/USDT 소수 2자리)
+    // 금액 자릿수 — 계좌 통화 소수 자릿수 이하(KRW 정수·USD 소수 2자리)
     public static void requireScale(BigDecimal amount, Currency currency) {
         if (amount.stripTrailingZeros().scale() > currency.amountScale()) {
             throw new IllegalArgumentException(currency.amountScale() == 0 ? "금액은 정수로 입력해야 합니다."

@@ -163,12 +163,6 @@ class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
-    public List<Order> findOpenByAccountId(UUID accountId) {
-        return toDomainList(repository.findByAccountIdAndStatusInOrderByTradeDateAscCreatedAtAsc(
-                accountId, OPEN_STATUSES));
-    }
-
-    @Override
     public List<Order> findAllByIds(Collection<UUID> ids) {
         return toDomainList(repository.findAllById(ids));
     }
@@ -213,7 +207,7 @@ class OrderPersistenceAdapter implements OrderPort {
         // 같은 계좌·거래일(KST)·ticker의 미체결 SELL 예약 수량을 합산한다
         BigDecimal quantity = repository.sumPlannedOrPlacedSellQuantityByAccountIdAndTradeDateAndTicker(
                 accountId, tradeDate, ticker.name());
-        return quantity != null ? quantity.intValueExact() : 0; // 주식 SELL 예약 전용 — 종목 필터라 코인 소수 수량은 섞이지 않는다
+        return quantity != null ? quantity.intValueExact() : 0; // SELL 예약 전용
     }
 
     @Override

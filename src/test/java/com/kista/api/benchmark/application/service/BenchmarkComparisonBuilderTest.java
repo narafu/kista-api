@@ -110,14 +110,14 @@ class BenchmarkComparisonBuilderTest {
     @Test
     void 빈_결과도_투자_통화를_싣는다() {
         BenchmarkComparison noData = builder.build(
-                BenchmarkScope.PORTFOLIO, null, Currency.USDT, BENCHMARK, List.of(), Map.of());
+                BenchmarkScope.PORTFOLIO, null, Currency.KRW, BENCHMARK, List.of(), Map.of());
         LocalDate d1 = LocalDate.of(2026, 1, 5);
         BenchmarkComparison insufficient = builder.build(
-                BenchmarkScope.PORTFOLIO, null, Currency.USDT, BENCHMARK, List.of(point(d1, "100")), prices(d1, "100", d1, "100"));
+                BenchmarkScope.PORTFOLIO, null, Currency.KRW, BENCHMARK, List.of(point(d1, "100")), prices(d1, "100", d1, "100"));
 
         assertThat(noData.emptyReason()).isEqualTo("NO_INVESTMENT_DATA");
-        assertThat(noData.investmentCurrency()).isEqualTo(Currency.USDT);
+        assertThat(noData.investmentCurrency()).isEqualTo(Currency.KRW);
         assertThat(insufficient.emptyReason()).isEqualTo("INSUFFICIENT_COMMON_MONTHS");
-        assertThat(insufficient.investmentCurrency()).isEqualTo(Currency.USDT);
+        assertThat(insufficient.investmentCurrency()).isEqualTo(Currency.KRW);
     }
 }

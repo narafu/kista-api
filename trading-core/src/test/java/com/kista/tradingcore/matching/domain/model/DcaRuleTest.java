@@ -3,7 +3,6 @@ package com.kista.tradingcore.matching.domain.model;
 import com.kista.shared.kernel.DcaFrequency;
 import com.kista.shared.kernel.DcaShortfallPolicy;
 import com.kista.shared.kernel.DcaSizingType;
-import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
 import org.junit.jupiter.api.Test;
@@ -13,13 +12,12 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 class DcaRuleTest {
 
-    private static DcaRule rule(String key, OrderDirection dir, OrderType type, Integer hour, DcaSizing sizing) {
-        return new DcaRule(key, dir, DcaFrequency.DAILY, null, null, type, hour, sizing, DcaShortfallPolicy.PARTIAL, List.of());
+    private static DcaRule rule(String key, OrderDirection dir, OrderType type, DcaSizing sizing) {
+        return new DcaRule(key, dir, DcaFrequency.DAILY, null, null, type, sizing, DcaShortfallPolicy.PARTIAL, List.of());
     }
 
     private static DcaSizing amount(String v) { return new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal(v), null); }
@@ -28,7 +26,7 @@ class DcaRuleTest {
 
     @Test
     void 보유비율은_BUY_규칙에_올_수_없다() {
-        assertThatIllegalArgumentException().isThrownBy(() -> rule("a", OrderDirection.BUY, OrderType.MOC, null, percent("10")));
+        assertThatIllegalArgumentException().isThrownBy(() -> rule("a", OrderDirection.BUY, OrderType.MOC, percent("10")));
     }
 
     @Test
@@ -45,68 +43,42 @@ class DcaRuleTest {
     }
 
     @Test
-    void MARKET인데_executionHour가_null이면_IAE() {
-        assertThatIllegalArgumentException().isThrownBy(() -> rule("a", OrderDirection.BUY, OrderType.MARKET, null, amount("5000")));
+    void MOO_MOC_외_주문유형은_IAE() {
+        assertThatIllegalArgumentException().isThrownBy(() -> rule("a", OrderDirection.BUY, OrderType.LOC, amount("5000")));
     }
 
     @Test
     void orderLeg는_DCA_접두_ruleKey_이고_withRuleKey는_키만_교체() {
-        DcaRule r = rule(null, OrderDirection.BUY, OrderType.MOC, null, amount("100")).withRuleKey("k1");
+        DcaRule r = rule(null, OrderDirection.BUY, OrderType.MOC, amount("100")).withRuleKey("k1");
         assertThat(r.orderLeg()).isEqualTo("DCA_k1");
     }
 
     @Test
     void 규칙_11개는_IAE() {
-        List<DcaRule> rules = IntStream.range(0, 11).mapToObj(i -> rule("k" + i, OrderDirection.BUY, OrderType.MOC, null, amount("100"))).toList();
+        List<DcaRule> rules = IntStream.range(0, 11).mapToObj(i -> rule("k" + i, OrderDirection.BUY, OrderType.MOC, amount("100"))).toList();
         assertThatIllegalArgumentException().isThrownBy(() -> new DcaStrategyConfig(rules));
     }
 
     @Test
     void ruleKey_중복은_IAE_null은_허용() {
-        DcaRule a = rule("k", OrderDirection.BUY, OrderType.MOC, null, amount("100"));
+        DcaRule a = rule("k", OrderDirection.BUY, OrderType.MOC, amount("100"));
         assertThatIllegalArgumentException().isThrownBy(() -> new DcaStrategyConfig(List.of(a, a)));
-        DcaRule n = rule(null, OrderDirection.BUY, OrderType.MOC, null, amount("100"));
+        DcaRule n = rule(null, OrderDirection.BUY, OrderType.MOC, amount("100"));
         assertThat(new DcaStrategyConfig(List.of(n, n)).rules()).hasSize(2);
-    }
-
-    @Test
-    void usdtMarketAllowsTwoDecimalsAndMin5() {
-        DcaRule ok = rule("a", OrderDirection.BUY, OrderType.MARKET, 9, amount("10.50"));
-        assertThatCode(() -> ok.requireCompatible(Market.CRYPTO_USDT)).doesNotThrowAnyException();
-        assertThatIllegalArgumentException().isThrownBy(() -> rule("a", OrderDirection.BUY, OrderType.MARKET, 9, amount("10.505")).requireCompatible(Market.CRYPTO_USDT))
-                .withMessage("코인 DCA 금액은 소수 2자리까지 입력할 수 있습니다.");
-        assertThatIllegalArgumentException().isThrownBy(() -> rule("a", OrderDirection.BUY, OrderType.MARKET, 9, amount("4.99")).requireCompatible(Market.CRYPTO_USDT))
-                .withMessage("코인 DCA 금액은 5.00 USDT 이상이어야 합니다.");
-    }
-
-    @Test
-    void krwMarketKeepsUpbitMessages() {
-        assertThatIllegalArgumentException().isThrownBy(() -> rule("a", OrderDirection.BUY, OrderType.MARKET, 9, amount("5000.5")).requireCompatible(Market.CRYPTO_KRW))
-                .withMessage("코인 DCA 금액은 원 단위 정수여야 합니다.");
-        assertThatIllegalArgumentException().isThrownBy(() -> rule("a", OrderDirection.BUY, OrderType.MARKET, 9, amount("4999")).requireCompatible(Market.CRYPTO_KRW))
-                .withMessage("코인 DCA 금액은 5,000원 이상이어야 합니다.");
-    }
-
-    @Test
-    void 주식_MOO_MOC는_주식_시장_규칙을_통과한다() {
-        for (OrderType type : List.of(OrderType.MOO, OrderType.MOC)) {
-            DcaRule r = rule("a", OrderDirection.BUY, type, null, amount("100.25"));
-            assertThatCode(() -> r.requireCompatible(Market.US_STOCK)).as(type.name()).doesNotThrowAnyException();
-        }
     }
 
     @Test
     void 주식_매주_규칙은_주말_요일을_거부한다() {
         for (java.time.DayOfWeek weekend : List.of(java.time.DayOfWeek.SATURDAY, java.time.DayOfWeek.SUNDAY)) {
             assertThatIllegalArgumentException().as(weekend.name()).isThrownBy(() -> new DcaRule("a", OrderDirection.BUY, DcaFrequency.WEEKLY,
-                            weekend, null, OrderType.MOC, null, amount("100"), DcaShortfallPolicy.PARTIAL, List.of()))
+                            weekend, null, OrderType.MOC, amount("100"), DcaShortfallPolicy.PARTIAL, List.of()))
                     .withMessage("주말 요일은 지정할 수 없습니다.");
         }
     }
 
     @Test
     void leg_접두사_왕복과_비DCA_leg_판별() {
-        DcaRule r = rule("weekly-1", OrderDirection.BUY, OrderType.MOC, null, amount("100"));
+        DcaRule r = rule("weekly-1", OrderDirection.BUY, OrderType.MOC, amount("100"));
         assertThat(DcaRule.isDcaLeg(r.orderLeg())).isTrue();
         assertThat(DcaRule.ruleKeyOf(r.orderLeg())).isEqualTo("weekly-1");
         assertThat(DcaRule.isDcaLeg(PlannedOrder.UNKNOWN_LEG)).isFalse();

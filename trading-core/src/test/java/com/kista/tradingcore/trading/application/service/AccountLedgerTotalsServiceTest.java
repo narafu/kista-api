@@ -8,8 +8,6 @@ import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
-import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
-import com.kista.tradingcore.broker.application.service.CryptoExchanges;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.shared.kernel.Broker;
 import com.kista.tradingcore.support.StubBrokerApiException;
@@ -41,8 +39,7 @@ class AccountLedgerTotalsServiceTest {
     AccountPort accountPort = mock(AccountPort.class);
     UnassignedCashCalculator calculator = mock(UnassignedCashCalculator.class);
     BrokerPricePort brokerPricePort = mock(BrokerPricePort.class);
-    CryptoExchanges cryptoExchanges = mock(CryptoExchanges.class);
-    AccountLedgerTotalsService service = new AccountLedgerTotalsService(accountPort, calculator, brokerPricePort, cryptoExchanges);
+    AccountLedgerTotalsService service = new AccountLedgerTotalsService(accountPort, calculator, brokerPricePort);
 
     UUID accountId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
@@ -129,22 +126,6 @@ class AccountLedgerTotalsServiceTest {
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(mock);
         assertThat(service.get(accountId, userId).unassignedCash()).isNull();
         verify(calculator, never()).available(any(BrokerAccountRef.class), any(BigDecimal.class));
-    }
-
-    @Test
-    void crypto_account_uses_exchange_prices_and_quote_currency() {
-        Account upbit = TradingFixtures.upbitAccount(accountId, userId);
-        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(upbit);
-        holders(holder(accountId, StrategyTicker.BTC, "300000", "0.5"));
-        CryptoExchangePort exchange = mock(CryptoExchangePort.class);
-        when(cryptoExchanges.of(Broker.UPBIT)).thenReturn(exchange);
-        when(exchange.getCurrentPrices(any())).thenReturn(Map.of(StrategyTicker.BTC, new BigDecimal("100000000")));
-
-        AccountLedgerTotals totals = service.get(accountId, userId);
-
-        assertThat(totals.currency()).isEqualTo(Currency.KRW);
-        assertThat(totals.evaluation()).isEqualByComparingTo("50000000");
-        verifyNoInteractions(brokerPricePort);
     }
 
     @Test

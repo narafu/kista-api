@@ -22,7 +22,7 @@ public class PortfolioQueryInternalController {
 
     private final PortfolioService portfolioService;
 
-    @Operation(summary = "현재 포트폴리오 현황 조회", description = "전략별 최신 포지션(코인 계좌 포함, 통화 표기). 없으면 빈 목록. X-Internal-Token 헤더 필수.")
+    @Operation(summary = "현재 포트폴리오 현황 조회", description = "전략별 최신 포지션(통화 표기). 없으면 빈 목록. X-Internal-Token 헤더 필수.")
     @GetMapping("/current")
     public List<PortfolioCurrentResponse> getCurrent(@RequestParam UUID userId) {
         return portfolioService.getCurrent(userId).stream()

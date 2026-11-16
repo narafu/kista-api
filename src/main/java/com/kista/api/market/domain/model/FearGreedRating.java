@@ -1,6 +1,6 @@
 package com.kista.api.market.domain.model;
 
-// 공포탐욕지수 등급 — 크립토(alternative.me)·CNN 공통 사용
+// 공포탐욕지수 등급
 public enum FearGreedRating {
     EXTREME_FEAR,
     FEAR,

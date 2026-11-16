@@ -50,7 +50,7 @@ public record AdminTradeResponse(
         @Nullable BigDecimal filledQuantity,
         @Schema(description = "체결 가격 (미체결 시 null)")
         @Nullable BigDecimal filledPrice,
-        @Schema(description = "price·filledPrice 통화 (Currency name, 계좌를 찾지 못하면 null)", example = "USDT")
+        @Schema(description = "price·filledPrice 통화 (Currency name, 계좌를 찾지 못하면 null)", example = "USD")
         @Nullable String currency
 ) {
     public static AdminTradeResponse from(OrderResponse t, Map<UUID, AccountSummaryResponse> accountMap,

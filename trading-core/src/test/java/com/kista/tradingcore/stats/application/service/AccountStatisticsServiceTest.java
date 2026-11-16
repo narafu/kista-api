@@ -81,36 +81,6 @@ class AccountStatisticsServiceTest {
     }
 
     @Test
-    void 일별_거래내역은_코인_소수_수량_체결을_포함한다() {
-        UUID coinAccount = UUID.randomUUID();
-        when(accountPort.findByUserId(userId)).thenReturn(List.of(account(coinAccount, Broker.BINANCE)));
-        when(orderPort.findFilledByUser(eq(userId), any(), any())).thenReturn(List.of(
-                filled(coinAccount, StrategyTicker.ETH, "0.0123", "3000.555")));
-
-        var item = service.getDailyTransactionsForUser(userId, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31))
-                .items().getFirst();
-
-        assertThat(item.quantity()).isEqualByComparingTo("0.0123");
-        assertThat(item.tradeAmount()).isEqualByComparingTo("36.91");
-        assertThat(item.currency()).isEqualTo(Currency.USDT);
-    }
-
-    @Test
-    void KRW_체결_금액은_정수로_반올림한다() {
-        UUID upbit = UUID.randomUUID();
-        when(accountPort.findByUserId(userId)).thenReturn(List.of(account(upbit, Broker.UPBIT)));
-        when(orderPort.findFilledByUser(eq(userId), any(), any())).thenReturn(List.of(
-                filled(upbit, StrategyTicker.BTC, "0.00031", "95000000")));
-
-        var item = service.getDailyTransactionsForUser(userId, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31))
-                .items().getFirst();
-
-        assertThat(item.tradeAmount()).isEqualByComparingTo("29450");
-        assertThat(item.tradeAmount().scale()).isZero();
-        assertThat(item.currency()).isEqualTo(Currency.KRW);
-    }
-
-    @Test
     void 주식_체결은_USD로_표기한다() {
         when(accountPort.findByUserId(userId)).thenReturn(List.of(account(accountId, Broker.TOSS)));
         when(orderPort.findFilledByUser(eq(userId), any(), any())).thenReturn(List.of(
@@ -143,19 +113,4 @@ class AccountStatisticsServiceTest {
                 null, null, new BigDecimal(qty), new BigDecimal(price));
     }
 
-    @Test
-    void getByAccount_krwAccount_roundsDepositToScale0() {
-        UUID upbitId = UUID.randomUUID();
-        Account upbit = new Account(upbitId, userId, "업비트", null, "key", "secret", null, Broker.UPBIT, null, null);
-        when(accountPort.requireOwnedAccount(upbitId, userId)).thenReturn(upbit);
-        var entry = new com.kista.tradingcore.trading.domain.model.CyclePositionHistoryEntry(
-                UUID.randomUUID(), upbitId, StrategyTicker.BTC, com.kista.shared.kernel.StrategyType.DCA,
-                new BigDecimal("12345.67"), new BigDecimal("0.55"), new BigDecimal("0.53"), BigDecimal.TEN, java.time.Instant.now());
-        when(cyclePositionPort.findByAccountIdWithCursor(eq(upbitId), any(), any(), eq(11))).thenReturn(List.of(entry));
-
-        var page = service.getByAccount(upbitId, userId, null, null, null, 10);
-
-        assertThat(page.items().getFirst().deposit()).hasToString("12346");
-        assertThat(page.items().getFirst().closingPrice()).hasToString("0.55");
-    }
 }

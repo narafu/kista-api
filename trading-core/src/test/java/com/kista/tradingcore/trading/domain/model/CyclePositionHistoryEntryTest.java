@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CyclePositionHistoryEntryTest {
 
     private static CyclePositionHistoryEntry entry(String deposit) {
-        return new CyclePositionHistoryEntry(UUID.randomUUID(), UUID.randomUUID(), StrategyTicker.BTC, StrategyType.DCA,
+        return new CyclePositionHistoryEntry(UUID.randomUUID(), UUID.randomUUID(), StrategyTicker.UPRO, StrategyType.DCA,
                 new BigDecimal(deposit), new BigDecimal("0.55"), new BigDecimal("0.53"), new BigDecimal("10"), Instant.now());
     }
 

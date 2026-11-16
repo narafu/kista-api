@@ -48,7 +48,7 @@ public class AccountPersistenceAdapter implements AccountPort {
 
     @Override
     public Account save(Account account) {
-        // 암호화는 AesStringConverter, 해시만 여기서 평문으로 계산 — 전역 중복 체크용 HMAC-SHA256, 업비트는 access key
+        // 암호화는 AesStringConverter, 해시만 여기서 평문으로 계산 — 전역 중복 체크용 HMAC-SHA256, 키 전용 증권사는 앱키
         AccountEntity entity = AccountEntity.fromModel(account, hasher.hash(account.dedupeKey()));
         AccountEntity saved = jpaRepository.save(entity);
         return toDomain(saved);

@@ -16,27 +16,23 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.concurrent.TimeUnit;
 
-@Tag(name = "공포탐욕지수", description = "CNN·크립토 Fear & Greed Index 조회")
+@Tag(name = "공포탐욕지수", description = "CNN Fear & Greed Index 조회")
 @RestController
 @RequestMapping("/api/market")
 @RequiredArgsConstructor
 public class FearGreedController {
 
     private static final String SOURCE_CNN = "CNN";
-    private static final String SOURCE_CRYPTO = "CRYPTO";
     private static final CacheControl FEAR_GREED_CACHE = CacheControl.maxAge(10, TimeUnit.MINUTES).cachePublic();
 
     private final FearGreedQueryService fearGreedQueryService;
 
-    @Operation(summary = "CNN·크립토 공포탐욕지수 조회 (현재값 + 추이)")
+    @Operation(summary = "CNN 공포탐욕지수 조회 (현재값 + 추이)")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping("/fear-greed")
     public ResponseEntity<FearGreedResponse> getFearGreed(
             @Parameter(description = "조회 기간(일)", example = "200") @RequestParam(defaultValue = "200") int days) {
-        // 두 소스를 각각 조회해 번들 응답으로 조립
-        FearGreedResponse response = FearGreedResponse.from(
-                fearGreedQueryService.getRecent(SOURCE_CNN, days),
-                fearGreedQueryService.getRecent(SOURCE_CRYPTO, days));
+        FearGreedResponse response = FearGreedResponse.from(fearGreedQueryService.getRecent(SOURCE_CNN, days));
         return ResponseEntity.ok().cacheControl(FEAR_GREED_CACHE).body(response);
     }
 }

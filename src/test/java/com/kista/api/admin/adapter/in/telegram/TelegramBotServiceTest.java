@@ -85,17 +85,17 @@ class TelegramBotServiceTest {
         when(portfolioQueryPort.getCurrent(any())).thenReturn(List.of(
                 new PortfolioCurrentResponse(StrategyType.INFINITE, StrategyTicker.SOXL, Currency.USD,
                         BigDecimal.TEN, new BigDecimal("19.5000"), new BigDecimal("1000.00"), new BigDecimal("20.00")),
-                new PortfolioCurrentResponse(StrategyType.DCA, StrategyTicker.ETH, Currency.USDT,
+                new PortfolioCurrentResponse(StrategyType.DCA, StrategyTicker.BITO, Currency.KRW,
                         new BigDecimal("0.5"), new BigDecimal("2900.00"), BigDecimal.ZERO, new BigDecimal("3000.00"))));
 
         sut.handle(update("/status"));
 
         String msg = sentMessage();
-        assertThat(msg).contains("<b>INFINITE SOXL</b>", "<b>DCA ETH</b>", "보유: 10", "보유: 0.5",
+        assertThat(msg).contains("<b>INFINITE SOXL</b>", "<b>DCA BITO</b>", "보유: 10", "보유: 0.5",
                 "예수금: 1,000.00 USD", "평가액: 200.00 USD", "총자산: 1,200.00 USD",
-                "평가액: 1,500.00 USDT", "총자산: 1,500.00 USDT")
+                "평가액: 1,500원", "총자산: 1,500원")
                 .doesNotContain("$")
-                .contains("\n\n<b>DCA ETH</b>"); // 블록 사이 빈 줄
+                .contains("\n\n<b>DCA BITO</b>"); // 블록 사이 빈 줄
     }
 
     @Test
@@ -133,14 +133,14 @@ class TelegramBotServiceTest {
         when(portfolioQueryPort.getHistory(any(), any(), any())).thenReturn(List.of(
                 new PortfolioOrderResponse(LocalDate.of(2026, 10, 16), StrategyTicker.TQQQ, OrderDirection.BUY,
                         OrderType.LOC, new BigDecimal("12"), new BigDecimal("22.5000"), Currency.USD),
-                new PortfolioOrderResponse(LocalDate.of(2026, 10, 16), StrategyTicker.ETH, OrderDirection.BUY,
-                        OrderType.MARKET, new BigDecimal("0.00500000"), new BigDecimal("3000.00"), Currency.USDT)));
+                new PortfolioOrderResponse(LocalDate.of(2026, 10, 16), StrategyTicker.BITO, OrderDirection.BUY,
+                        OrderType.MOC, new BigDecimal("0.00500000"), new BigDecimal("3000.00"), Currency.KRW)));
 
         sut.handle(update("/history 14"));
 
         assertThat(sentMessage()).contains(
                 "2026-10-16 TQQQ BUY LOC 12 @ 22.50 USD",
-                "2026-10-16 ETH BUY MARKET 0.005 @ 3,000.00 USDT");
+                "2026-10-16 BITO BUY MOC 0.005 @ 3,000원");
     }
 
     void run_command_returns_v2_info_immediately() {

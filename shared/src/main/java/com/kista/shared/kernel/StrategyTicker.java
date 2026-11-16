@@ -19,9 +19,7 @@ public enum StrategyTicker {
     UPRO(BigDecimal.ZERO, "PROSHARES ULTRAPRO S&P500 3X", Market.US_STOCK), // DCA 전용 — 익절률 미사용
     QLD(BigDecimal.ZERO, "PROSHARES ULTRA QQQ 2X", Market.US_STOCK),        // DCA 전용 — 익절률 미사용
     BITO(BigDecimal.ZERO, "PROSHARES BITCOIN ETF", Market.US_STOCK),       // DCA 전용 — 비트코인 선물 ETF(NYSE Arca)
-    EETH(BigDecimal.ZERO, "PROSHARES ETHER ETF", Market.US_STOCK),         // DCA 전용 — 이더리움 선물 ETF(NYSE Arca)
-    BTC(BigDecimal.ZERO, "BITCOIN", Market.CRYPTO_KRW, Market.CRYPTO_USDT), // 코인 DCA 전용 — 거래소 마켓 코드는 어댑터 레지스트리 소유
-    ETH(BigDecimal.ZERO, "ETHEREUM", Market.CRYPTO_KRW, Market.CRYPTO_USDT); // 코인 DCA 전용
+    EETH(BigDecimal.ZERO, "PROSHARES ETHER ETF", Market.US_STOCK);         // DCA 전용 — 이더리움 선물 ETF(NYSE Arca)
 
     private final BigDecimal targetProfitRate;  // 익절 목표 수익률 (매매 도메인 정책)
     private final String description;           // 종목 설명 (UI 메타)
@@ -35,11 +33,6 @@ public enum StrategyTicker {
 
     public boolean tradableOn(Market market) {
         return markets.contains(market);
-    }
-
-    // 자산군: 어떤 시장이든 코인 시장이면 코인 종목
-    public boolean isCrypto() {
-        return markets.stream().anyMatch(Market::isCrypto);
     }
 
     // 브로커 응답 String → StrategyTicker 변환. 미등록 종목이면 empty 반환 (필터링 용도)

@@ -16,8 +16,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DcaConfigRequestTest {
 
-    private static DcaRuleRequest rule(String amount, OrderType type, Integer hour) {
-        return new DcaRuleRequest(null, OrderDirection.BUY, DcaFrequency.DAILY, null, null, type, hour,
+    private static DcaRuleRequest rule(String amount, OrderType type) {
+        return new DcaRuleRequest(null, OrderDirection.BUY, DcaFrequency.DAILY, null, null, type,
                 new DcaSizingRequest(DcaSizingType.AMOUNT, new BigDecimal(amount), null), DcaShortfallPolicy.PARTIAL, null);
     }
 
@@ -31,14 +31,8 @@ class DcaConfigRequestTest {
     }
 
     @Test
-    void executionHourIsIgnoredForStockOrderTypes() {
-        assertThat(new DcaConfigRequest(List.of(rule("300", OrderType.MOC, 9))).toDomain().rules().getFirst().executionHour()).isNull();
-        assertThat(new DcaConfigRequest(List.of(rule("10000", OrderType.MARKET, 9))).toDomain().rules().getFirst().executionHour()).isEqualTo(9);
-    }
-
-    @Test
     void rulesKeepInputOrderAndSizing() {
-        var config = new DcaConfigRequest(List.of(rule("300", OrderType.MOC, null), rule("500", OrderType.MOO, null))).toDomain();
+        var config = new DcaConfigRequest(List.of(rule("300", OrderType.MOC), rule("500", OrderType.MOO))).toDomain();
         assertThat(config.rules()).extracting(r -> r.sizing().amount()).containsExactly(new BigDecimal("300"), new BigDecimal("500"));
     }
 }

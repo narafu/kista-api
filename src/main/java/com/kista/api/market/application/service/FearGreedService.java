@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 
-// CNN 공포탐욕지수 수집·저장 — 비공식 엔드포인트라 장애 버퍼로 DB에 쌓는다(CRYPTO는 조회 시 alternative.me 직접 호출)
+// CNN 공포탐욕지수 수집·저장 — 비공식 엔드포인트라 장애 버퍼로 DB에 쌓는다
 @Slf4j
 @Service
 @RequiredArgsConstructor

@@ -18,7 +18,6 @@ import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.matching.domain.strategy.InfiniteStrategy;
-import com.kista.tradingcore.trading.domain.model.DcaManualExecutionUnsupportedException;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
@@ -74,8 +73,6 @@ class TradingPreviewService {
         OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
         Strategy strategy = owned.strategy();
         Account account = owned.account();
-        // 코인 DCA는 실행 루프(CryptoDcaRoundExecutor) 전용이라 미리보기 경로가 없다 — 주식 DCA는 plan() 정규 경로로 미리보기
-        if (TradingAccount.from(account).brokerRef().broker().isCryptoExchange()) throw new DcaManualExecutionUnsupportedException(); // Account 직접 접근 금지 가드(trading_batch_path_must_not_carry_account_aggregate) — TradingAccount 투영 경유
         // 계산 실패로 생략된 전략은 404(사이클 없음)로 오인되지 않도록 원래 예외를 그대로 전파
         Map<UUID, RuntimeException> failures = new HashMap<>();
         NextOrdersPreview preview = previewBatch(strategy.accountId(), requesterId, failures).get(strategyId);
@@ -98,14 +95,11 @@ class TradingPreviewService {
         // 소유권 검증은 Account 애그리게이트로 끝내고, 이후 프리뷰 경로는 투영(TradingAccount)만 사용
         Account ownedAccount = accountPort.requireOwnedAccount(accountId, requesterId);
         TradingAccount account = TradingAccount.from(ownedAccount);
-        // today는 그 거래일 실제 마감 30분 전 경계(SessionTradeDates) — 단순 KST 날짜를 쓰면 PRIVACY findTodayTrade() 날짜가 1일 어긋난다. 코인은 KST 당일
-        LocalDate today = account.brokerRef().broker().isCryptoExchange() ? LocalDate.now(clock)
-                : SessionTradeDates.nextTradeDate(ZonedDateTime.now(clock), marketCalendarPort);
+        // today는 그 거래일 실제 마감 30분 전 경계(SessionTradeDates) — 단순 KST 날짜를 쓰면 PRIVACY findTodayTrade() 날짜가 1일 어긋난다
+        LocalDate today = SessionTradeDates.nextTradeDate(ZonedDateTime.now(clock), marketCalendarPort);
         // 휴장 거래일이면 계획 계산·브로커 호출 없이 전 전략을 MARKET_CLOSED로 skip — today 기준 1회만 판정
         boolean marketClosed = !marketCalendarPort.isMarketOpen(today);
-        // 코인 전략(전부 DCA)은 미리보기 대상이 아니다 — 결과 맵에서 빠진다. 주식 DCA는 포함
-        List<Strategy> strategies = account.brokerRef().broker().isCryptoExchange() ? List.of()
-                : strategyPort.findByAccountId(accountId).stream().filter(s -> !s.isArchived()).toList(); // 보관 전략은 미리보기 제외
+        List<Strategy> strategies = strategyPort.findByAccountId(accountId).stream().filter(s -> !s.isArchived()).toList(); // 보관 전략은 미리보기 제외
 
         // 전략 목록의 현재 사이클을 1회 배치 조회 (전략마다 개별 조회하던 것을 축소)
         List<UUID> strategyIds = strategies.stream().map(Strategy::id).toList();
@@ -200,7 +194,7 @@ class TradingPreviewService {
         return attachAccountHoldingsCheck(previews, strategies, account, today, freshSellByStrategyId);
     }
 
-    // 계좌 단위로 1회 판정해 모든 전략 카드에 같은 값을 붙인다 — 경고 전용(MOCK·코인·필요 BUY 없음·조회 실패면 null)
+    // 계좌 단위로 1회 판정해 모든 전략 카드에 같은 값을 붙인다 — 경고 전용(MOCK·필요 BUY 없음·조회 실패면 null)
     private Map<UUID, NextOrdersPreview> attachAccountCashCheck(Map<UUID, NextOrdersPreview> previews, TradingAccount account,
                                                                  BigDecimal totalAccountPlannedBuy, Map<UUID, BigDecimal> freshBuyByStrategyId,
                                                                  Map<UUID, BigDecimal> freshCorrectionByStrategyId) {
@@ -229,7 +223,7 @@ class TradingPreviewService {
         return previews;
     }
 
-    // (계좌, 종목)마다 1회 판정해 그 종목 전략 카드에 같은 값을 붙인다 — 경고 전용(MOCK·코인·필요 SELL 없음·조회 실패면 null)
+    // (계좌, 종목)마다 1회 판정해 그 종목 전략 카드에 같은 값을 붙인다 — 경고 전용(MOCK·필요 SELL 없음·조회 실패면 null)
     // 판매 가능 수량은 미체결 매도를 빼지 않은 보유 수량이라 필요량에 PLACED SELL도 포함한다(현금은 증권사가 PLACED를 차감하므로 제외)
     private Map<UUID, NextOrdersPreview> attachAccountHoldingsCheck(Map<UUID, NextOrdersPreview> previews, List<Strategy> strategies,
                                                                      TradingAccount account, LocalDate today,

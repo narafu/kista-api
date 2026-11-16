@@ -765,13 +765,13 @@ class BenchmarkServiceTest {
 
         BenchmarkComparison usd = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000", from, to);
-        BenchmarkComparison usdt = statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USDT, "1100000000", from, to);
+        BenchmarkComparison krw = statsService.getHousingBenchmarkComparison(
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.KRW, "1100000000", from, to);
 
         assertThat(usd.investmentCurrency()).isEqualTo(Currency.USD);
-        assertThat(usdt.investmentCurrency()).isEqualTo(Currency.USDT);
+        assertThat(krw.investmentCurrency()).isEqualTo(Currency.KRW);
         verify(investmentPointsPort, times(1)).fetch(any(), any(), any(), eq(Currency.USD), any(), any());
-        verify(investmentPointsPort, times(1)).fetch(any(), any(), any(), eq(Currency.USDT), any(), any());
+        verify(investmentPointsPort, times(1)).fetch(any(), any(), any(), eq(Currency.KRW), any(), any());
     }
 
     @Test

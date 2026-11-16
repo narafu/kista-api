@@ -107,11 +107,6 @@ public record DstInfo(
         return KstTradeDates.nextTradeDate(nowKst);
     }
 
-    // 오늘(KST)과 다음 거래일 후보 — 같은 날이면 1건. 04:00~마감 리포트 사이 접수된 오늘 주문과 개장 배치가 미리 저장한 다음 거래일 주문을 함께 볼 때 쓴다
-    public static List<LocalDate> tradeDateCandidates(ZonedDateTime nowKst) {
-        return Stream.of(nowKst.toLocalDate(), nextTradeDate(nowKst)).distinct().toList();
-    }
-
     // 시각 주입식 판단 — nextTradeDate 공용
     static LocalDate nextTradeDateAt(LocalDate today, LocalTime now) {
         return KstTradeDates.nextTradeDateAt(today, now);

@@ -121,7 +121,7 @@ class TradingCandidatePlannerDcaTest {
         List<DcaCycleOrderStrategy.DcaRuleInputs> due = Arrays.stream(rules)
                 .map(r -> new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, List.of(REFERENCE), LEDGER,
                         r.direction() == OrderDirection.SELL ? BigDecimal.TEN : null, null, PREMARKET,
-                        r.direction() == OrderDirection.BUY ? new BigDecimal("999999999999") : null, null))
+                        r.direction() == OrderDirection.BUY ? new BigDecimal("999999999999") : null))
                 .toList();
         when(collector.collect(eq(ctx), eq(DAY), any(), eq(List.of()), eq(PREMARKET), eq(LEDGER)))
                 .thenReturn(new DcaCollected(new CycleOrderStrategy.PlanContext.DcaPlanInputs(due), recoveries));

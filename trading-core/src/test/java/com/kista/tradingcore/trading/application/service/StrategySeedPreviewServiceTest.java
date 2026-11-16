@@ -14,9 +14,6 @@ import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
-import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
-import com.kista.tradingcore.broker.application.service.CryptoExchanges;
-import com.kista.tradingcore.broker.domain.model.CryptoBalance;
 import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy;
 import com.kista.tradingcore.trading.application.service.support.UnassignedCashCalculator;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
@@ -56,8 +53,6 @@ class StrategySeedPreviewServiceTest {
     @Mock MarginPort marginPort;
     @Mock StrategyPort strategyPort;
     @Mock CyclePositionPort cyclePositionPort;
-    @Mock CryptoExchanges cryptoExchanges;
-    @Mock CryptoExchangePort upbit;
 
     private StrategyService service;
     private Account account;
@@ -75,7 +70,7 @@ class StrategySeedPreviewServiceTest {
         // 시드 미리보기가 쓰는 협력자만 실제 주입, 나머지는 미사용이라 null
         StrategyHistoryQueryService strategyHistoryQueryService = new StrategyHistoryQueryService(
                 accountPort, strategyPort, cyclePositionPort, null, cycleStrategies, privacyTradePort, pricePort,
-                new UnassignedCashCalculator(strategyPort, cyclePositionPort, marginPort, cryptoExchanges), FIXED);
+                new UnassignedCashCalculator(strategyPort, cyclePositionPort, marginPort), FIXED);
         service = new StrategyService(
                 null, null, null, null,
                 accountPort, null, null, strategyHistoryQueryService, null, null, null, null, null, null, null, null, null);
@@ -168,37 +163,6 @@ class StrategySeedPreviewServiceTest {
 
         assertThat(result.availableCash()).isNull();
         assertThat(result.minSeed()).isNotNull(); // 가용 예수금 실패가 미리보기를 막지 않는다
-    }
-
-    @Test
-    void cryptoDca_usesExchangeQuoteBalance_withoutPriceOrMarginCall() {
-        Account crypto = new Account(accountId, userId, "업비트", null, "key", "secret", null, Broker.UPBIT, null, null);
-        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(crypto);
-        when(strategyPort.findByAccountId(accountId)).thenReturn(List.of());
-        when(cryptoExchanges.of(Broker.UPBIT)).thenReturn(upbit);
-        when(upbit.getBalance(any())).thenReturn(new CryptoBalance(new BigDecimal("500000"), BigDecimal.ZERO, Map.of()));
-
-        var result = service.strategySeedPreview(accountId, userId, StrategyType.DCA, StrategyTicker.BTC, 20);
-
-        // 코인 DCA — 최소 시드·기준가 없음, 가용 예수금은 거래소 KRW 주문 가능 잔고 − 원장 합
-        assertThat(result.basePrice()).isNull();
-        assertThat(result.minSeed()).isNull();
-        assertThat(result.availableCash()).isEqualByComparingTo("500000");
-        verify(pricePort, never()).getPrevClose(any(), any());
-        verify(marginPort, never()).getUsdBuyableAmount(any());
-    }
-
-    @Test
-    void cryptoBalanceFailureGivesNullAvailableCash() {
-        Account crypto = new Account(accountId, userId, "업비트", null, "key", "secret", null, Broker.UPBIT, null, null);
-        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(crypto);
-        when(strategyPort.findByAccountId(accountId)).thenReturn(List.of());
-        when(cryptoExchanges.of(Broker.UPBIT)).thenReturn(upbit);
-        when(upbit.getBalance(any())).thenThrow(new RuntimeException("거래소 오류"));
-
-        var result = service.strategySeedPreview(accountId, userId, StrategyType.DCA, StrategyTicker.BTC, 20);
-
-        assertThat(result.availableCash()).isNull(); // 조회 실패는 미리보기를 막지 않는다
     }
 
     @Test

@@ -83,17 +83,17 @@ class DashboardControllerTest {
     @Test
     void dailyTrades_returns_user_scoped_result_without_account_path() throws Exception {
         var result = new DailyTransactionResult(List.of(new DailyTransaction("2024-01-05", OrderDirection.BUY,
-                StrategyTicker.ETH, "ETH", new BigDecimal("0.0123"), new BigDecimal("3000.56"),
-                new BigDecimal("36.91"), Currency.USDT)));
+                StrategyTicker.BITO, "BITO", new BigDecimal("3"), new BigDecimal("30000"),
+                new BigDecimal("90000"), Currency.KRW)));
         when(accountStatistics.getDailyTransactionsForUser(any(), any(), any())).thenReturn(result);
 
         mockMvc.perform(get("/api/daily-trades")
                         .param("from", "2024-01-01").param("to", "2024-01-31")
                         .with(authentication(userToken(DEV_USER_UUID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[0].quantity").value(0.0123))
-                .andExpect(jsonPath("$.items[0].tradeAmount").value(36.91))
-                .andExpect(jsonPath("$.items[0].currency").value("USDT"))
+                .andExpect(jsonPath("$.items[0].quantity").value(3))
+                .andExpect(jsonPath("$.items[0].tradeAmount").value(90000))
+                .andExpect(jsonPath("$.items[0].currency").value("KRW"))
                 .andExpect(jsonPath("$.items[0].tradeAmountUsd").doesNotExist())
                 .andExpect(jsonPath("$.summary").doesNotExist());
     }

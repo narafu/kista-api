@@ -29,18 +29,13 @@ class DcaSummaryAssembler {
                         Market market, LocalDateTime nowKst, BigDecimal currentHoldings, BigDecimal avgPrice) {
         return new DcaSummary(config.rules().stream().map(rule -> {
             DcaExecution last = lastByRule.get(rule.ruleKey());
-            return assembleRule(rule, last, firstEligibleDate(cycleStartDate, last, rule, market, nowKst), market);
+            return assembleRule(rule, last, firstEligibleDate(cycleStartDate, last, nowKst), market);
         }).toList(), currentHoldings, avgPrice);
     }
 
-    // fromKstTradeDate(포함)부터 첫 실행 예정일 — 코인은 24/7 KST 단일 기준(휴장·US 세션 변환 없음)
+    // fromKstTradeDate(포함)부터 첫 실행 예정일
     DcaSummary.RuleSummary assembleRule(DcaRule source, DcaExecution last, LocalDate fromKstTradeDate, Market market) {
         DcaRule rule = withRoundedAmount(source, market); // 조회 요약 경로 — 계산용 규칙이 아니라 응답에 실리는 사본만 반올림
-        if (market.isCrypto()) {
-            return DcaSchedule.nextExecutionDay(fromKstTradeDate, rule, d -> true)
-                    .map(kst -> new DcaSummary.RuleSummary(rule, kst, kst, last))
-                    .orElseGet(() -> new DcaSummary.RuleSummary(rule, null, null, last));
-        }
         LocalDate fromUs = marketCalendarPort.usSessionDateOf(fromKstTradeDate);
         return DcaSchedule.nextExecutionDay(fromUs, rule, marketCalendarPort::isUsSessionOpen)
                 .map(us -> new DcaSummary.RuleSummary(rule, us, marketCalendarPort.kstTradeDateOf(us), last))
@@ -55,17 +50,8 @@ class DcaSummaryAssembler {
     }
 
     // 배치가 판정 가능한 첫 KST 거래일 (규칙 단위)
-    // 주식: TradingService.filterScheduledStart가 시작일 당일을 제외(tradeDate.isAfter(startDate)) — 오늘 회차 판정이 끝났으면 다음 날부터
-    // 코인: 시작일 제외 없음 — 실행 시각대의 마지막 틱(HH:50)까지는 판정 전이면 남은 틱이 오늘 실행하므로 오늘, 그 뒤이거나 오늘 이미 판정했으면 내일부터
-    LocalDate firstEligibleDate(LocalDate cycleStartDate, DcaExecution last, DcaRule rule, Market market, LocalDateTime nowKst) {
-        if (market.isCrypto()) {
-            LocalDate today = nowKst.toLocalDate();
-            int hour = nowKst.getHour();
-            boolean hourPassed = hour > rule.executionHour()
-                    || hour == rule.executionHour() && nowKst.getMinute() > CryptoDcaRoundExecutor.LAST_TICK_MINUTE;
-            boolean decidedToday = last != null && last.tradeDate().equals(today);
-            return hourPassed || decidedToday ? today.plusDays(1) : today;
-        }
+    // TradingService.filterScheduledStart가 시작일 당일을 제외(tradeDate.isAfter(startDate)) — 오늘 회차 판정이 끝났으면 다음 날부터
+    LocalDate firstEligibleDate(LocalDate cycleStartDate, DcaExecution last, LocalDateTime nowKst) {
         LocalDate from = SessionTradeDates.nextTradeDate(nowKst.atZone(TimeZones.KST), marketCalendarPort);
         if (last != null && last.tradeDate().equals(from)) from = from.plusDays(1);
         LocalDate afterStart = cycleStartDate.plusDays(1);

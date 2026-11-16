@@ -11,7 +11,6 @@ import com.kista.shared.kernel.UserPushNotificationRequestedEvent;
 import com.kista.shared.platform.telegram.TelegramHttpClient;
 import com.kista.tradingcore.account.application.event.ApiKeyExpiringEvent;
 import com.kista.tradingcore.notify.application.port.output.TradingNotifyPort;
-import com.kista.tradingcore.trading.application.event.CryptoOrderFilledEvent;
 import com.kista.tradingcore.trading.application.event.DcaRoundSkippedEvent;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.tradingcore.trading.application.port.output.TradingUserProfilePort;
@@ -227,34 +226,6 @@ class NotificationMessageSnapshotTest {
                 ⏭️ DCA 미주문 — 계좌
                 UPRO DCA (2026-11-14)
                 사유: 보유 수량 없음""");
-    }
-
-    @Test
-    @DisplayName("notifyCryptoTrade — 코인 체결 BUY KRW (CryptoOrderFilledEvent)")
-    void notifyCryptoTradeBuyKrw() {
-        send(a -> a.notifyCryptoTrade(PROFILE, new CryptoOrderFilledEvent(USER_ID, UUID.randomUUID(), UUID.randomUUID(), NICK,
-                StrategyTicker.BTC, OrderDirection.BUY, new BigDecimal("0.1234"), new BigDecimal("150000000"),
-                new BigDecimal("18510000"), Currency.KRW)));
-        assertSent("[내 &lt;계좌&gt; &amp; 1] BTC 매수 체결 — 수량 0.1234, 평균가 150,000,000원, 금액 18,510,000원",
-                "코인 체결", "[내 <계좌> & 1] BTC 매수 체결 — 수량 0.1234, 평균가 150,000,000원, 금액 18,510,000원");
-    }
-
-    @Test
-    @DisplayName("notifyCryptoTrade — 코인 체결 SELL USDT (CryptoOrderFilledEvent)")
-    void notifyCryptoTradeSellUsdt() {
-        send(a -> a.notifyCryptoTrade(PROFILE, new CryptoOrderFilledEvent(USER_ID, UUID.randomUUID(), UUID.randomUUID(), "바낸",
-                StrategyTicker.ETH, OrderDirection.SELL, new BigDecimal("1.5"), new BigDecimal("3000.456"),
-                new BigDecimal("4500.68"), Currency.USDT)));
-        assertSent("[바낸] ETH 매도 체결 — 수량 1.5, 평균가 3,000.46 USDT, 금액 4,500.68 USDT",
-                "코인 체결", "[바낸] ETH 매도 체결 — 수량 1.5, 평균가 3,000.46 USDT, 금액 4,500.68 USDT");
-    }
-
-    @Test
-    @DisplayName("notifyApiKeyExpiring — 오늘 만료, 만료일 추정 없는 브로커(UPBIT)")
-    void notifyApiKeyExpiringTodayBrokerApi() {
-        send(a -> a.notifyApiKeyExpiring(PROFILE, expiring(Broker.UPBIT, 0)));
-        assertSent("[내 &lt;계좌&gt; &amp; 1] 업비트 API 키가 오늘 만료됩니다. 키를 새로 발급해 교체해 주세요.", "API 키 만료",
-                "[내 <계좌> & 1] 업비트 API 키가 오늘 만료됩니다. 키를 새로 발급해 교체해 주세요.");
     }
 
     @Test

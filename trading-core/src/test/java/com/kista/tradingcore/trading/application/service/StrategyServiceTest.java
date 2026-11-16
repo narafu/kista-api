@@ -165,7 +165,7 @@ class StrategyServiceTest {
         StrategyHistoryQueryService strategyHistoryQueryService = new StrategyHistoryQueryService(
                 accountPort, strategyPort, cyclePositionPort, orderPort, historyStrategies,
                 privacyTradePort, brokerPricePort,
-                new UnassignedCashCalculator(strategyPort, cyclePositionPort, marginPort, null), FIXED);
+                new UnassignedCashCalculator(strategyPort, cyclePositionPort, marginPort), FIXED);
         strategyService = new StrategyService(
                 strategyPort,
                 strategyVersionPort,
@@ -344,22 +344,6 @@ class StrategyServiceTest {
         strategyService.pause(STRATEGY_ID, USER_ID);
 
         verify(strategyPort).updateStatusUnlessArchived(STRATEGY_ID, StrategyStatus.PAUSED);
-    }
-
-    @Test
-    @DisplayName("pauseWithPlacedCryptoOrderIsRefused: 코인 체결 확인 중이면 PAUSED 기록 전에 거부")
-    void pauseWithPlacedCryptoOrderIsRefused() {
-        Account account = ownerAccount();
-        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        doThrow(new OrderCancelException("체결 확인 중인 코인 주문이 있어 잠시 후 다시 시도해 주세요."))
-                .when(orderCancelService).requireNoCryptoInFlight(STRATEGY_ID, account);
-
-        assertThatThrownBy(() -> strategyService.pause(STRATEGY_ID, USER_ID))
-                .isInstanceOf(OrderCancelException.class);
-
-        verify(strategyPort, never()).save(any());
-        verify(orderCancelService, never()).cancelOpenOrders(any(), any());
     }
 
     @Test
@@ -630,19 +614,6 @@ class StrategyServiceTest {
                 .hasMessage("오늘 접수된 주문이 마감 반영된 뒤 보관할 수 있습니다.");
 
         verify(strategyPort, never()).archiveIfPaused(any());
-    }
-
-    @Test
-    void archive_skips_report_check_for_crypto_account() {
-        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(PAUSED_STRATEGY);
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
-        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.empty());
-        lenient().when(orderPort.findByStrategyId(any(), any(), any())).thenReturn(List.of(todayOrder("UUID1", "DCA")));
-        lenient().when(batchRunPort.isReported(any(), any())).thenReturn(false); // 코인은 리포트 마커가 없다
-
-        strategyService.archive(STRATEGY_ID, USER_ID);
-
-        verify(strategyPort).archiveIfPaused(STRATEGY_ID);
     }
 
     @Test
@@ -2733,83 +2704,17 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
     }
 
-    // 주식 DCA 다음 실행일 계산용 캘린더 stub — 코인 경로는 캘린더를 조회하지 않는다
+    // 주식 DCA 다음 실행일 계산용 캘린더 stub
     private void stubUsCalendar() {
         when(marketCalendarPort.usSessionDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).minusDays(1));
         when(marketCalendarPort.kstTradeDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).plusDays(1));
         when(marketCalendarPort.isUsSessionOpen(any())).thenReturn(true);
     }
 
-    private static DcaStrategyConfig cryptoDcaConfig() {
-        return TradingFixtures.dcaConfig(TradingFixtures.cryptoDcaRule(null, OrderDirection.BUY, "10000", 9));
-    }
-
-    private void stubDcaPolicyWithCrypto() {
+    private void stubDcaPolicy() {
         when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Optional.of(new StrategyCreationSettings(true,
-                new StrategyFieldSettings<>(true, List.of(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BTC, StrategyTicker.ETH),
+                new StrategyFieldSettings<>(true, List.of(StrategyTicker.UPRO, StrategyTicker.QLD),
                         StrategyTicker.UPRO), null, null, null, null)));
-    }
-
-    @Test
-    @DisplayName("주식 계좌에 코인 종목 DCA는 시장 불일치로 거부한다")
-    void register_dca_rejectsTickerMarketMismatch() {
-        stubDcaPolicyWithCrypto();
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-
-        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, dcaCommand(StrategyTicker.BTC, cryptoDcaConfig())))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("시장");
-        verify(strategyPort, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("주식 계좌에 코인 종목은 시장 불일치로 거부된다 — 중간부터 시작 소수 보유보다 시장 검증이 먼저")
-    void register_btcOnTossAccount_rejectedAsMarketMismatch() {
-        stubDcaPolicyWithCrypto();
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.stockAccount(ACCOUNT_ID, USER_ID));
-
-        // 시장 검증이 BootstrapPosition보다 늦으면 "정수여야" 문구가 먼저 나온다
-        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                dcaCommand(StrategyTicker.BTC, cryptoDcaConfig(), new BigDecimal("0.5"), new BigDecimal("100"))))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("계좌와 종목의 시장이 다릅니다.");
-    }
-
-    @Test
-    @DisplayName("코인 계좌는 DCA 외 전략을 등록할 수 없다")
-    void register_cryptoAccount_rejectsNonDca() {
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
-
-        // 정책 조회보다 먼저 거부하므로 정책 stub 없이도 코인 전용 규칙 메시지에 도달한다
-        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(StrategyType.INFINITE, StrategyTicker.SOXL, 20, null, null, null)))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("코인 계좌는 DCA 전략만 등록할 수 있습니다.");
-        verify(strategyPort, never()).save(any());
-        verifyNoInteractions(strategyCreationPolicyPort);
-    }
-
-    @Test
-    @DisplayName("코인 계좌 DCA는 MARKET·원 단위 정수 금액만 허용한다")
-    void register_cryptoDca_rejectsStockOrderType() {
-        stubDcaPolicyWithCrypto();
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
-
-        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, dcaCommand(StrategyTicker.BTC, dcaConfig(OrderDirection.BUY))))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("코인 DCA 주문유형은 시장가만");
-    }
-
-    @Test
-    @DisplayName("코인 계좌 BTC DCA는 실행 시각과 함께 저장된다")
-    void register_cryptoDca_succeeds() {
-        stubDcaRegistration(StrategyTicker.BTC);
-        stubDcaPolicyWithCrypto();
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
-        when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.BTC)).thenReturn(List.of());
-
-        StrategyDetail detail = strategyService.register(USER_ID, ACCOUNT_ID, dcaCommand(StrategyTicker.BTC, cryptoDcaConfig()));
-
-        assertThat(capturedSavedConfig()).isEqualTo(cryptoDcaConfig());
-        // 코인 DCA는 소수 원장이라 정수 보유 수량을 내보내지 않는다
-        assertThat(detail.currentHoldings()).isNull();
-        verifyNoInteractions(marginPort, brokerPricePort);
     }
 
     @Test
@@ -2882,7 +2787,7 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
     @Test
     @DisplayName("DCA 초기 예수금이 음수면 거절한다")
     void register_dca_rejectsNegativeDeposit() {
-        stubDcaPolicyWithCrypto();
+        stubDcaPolicy();
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.UPRO)).thenReturn(List.of());
@@ -2891,42 +2796,6 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
                 .deposit(new BigDecimal("-1")).dcaConfig(dcaConfig(OrderDirection.BUY)).build()))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("예수금은 0 이상이어야 합니다.");
         verify(strategyPort, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("크립토 DCA 소수 초기보유로 시작 원장을 만든다")
-    void 크립토_DCA_소수_초기보유로_시작원장_생성() {
-        stubDcaRegistration(StrategyTicker.BTC);
-        stubDcaPolicyWithCrypto();
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
-        when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.BTC)).thenReturn(List.of());
-
-        StrategyDetail detail = strategyService.register(USER_ID, ACCOUNT_ID,
-                dcaCommand(StrategyTicker.BTC, cryptoDcaConfig(), new BigDecimal("0.01234567"), new BigDecimal("90000000")));
-
-        assertThat(detail.currentHoldings()).isNull();
-        verify(cyclePositionPort).save(argThat(p -> p.holdings().compareTo(new BigDecimal("0.01234567")) == 0
-                && p.deposit().signum() == 0 && p.closingPrice() == null));
-        // 초기 투입 원가 = 0.01234567 × 90,000,000 = 1,111,110.30
-        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("1111110.30")) == 0));
-        verifyNoInteractions(marginPort, brokerPricePort);
-    }
-
-    @Test
-    @DisplayName("크립토 DCA 초기 투입 원가는 보유×평단을 소수 2자리 HALF_UP으로 반올림한다")
-    void 크립토_DCA_초기원가_2자리_반올림() {
-        stubDcaRegistration(StrategyTicker.BTC);
-        stubDcaPolicyWithCrypto();
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
-        when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.BTC)).thenReturn(List.of());
-
-        strategyService.register(USER_ID, ACCOUNT_ID,
-                dcaCommand(StrategyTicker.BTC, cryptoDcaConfig(), new BigDecimal("0.30736563"), new BigDecimal("2264.05")));
-
-        // 2264.05 × 0.30736563 = 695.8911...(원문 그대로 반올림)
-        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(
-                new BigDecimal("2264.05").multiply(new BigDecimal("0.30736563")).setScale(2, RoundingMode.HALF_UP)) == 0
-                && c.startAmount().scale() == 2));
     }
 
     @Test
@@ -3058,26 +2927,6 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
             assertThat(r.nextKstTradeDate()).isNotNull();
         });
         assertThat(detail.currentRound()).isNull();
-    }
-
-    @Test
-    @DisplayName("코인 DCA 전략 조회는 소수 보유 원장이어도 예외 없이 currentHoldings를 null로 둔다")
-    void getById_cryptoDca_fractionalHoldings_noException() {
-        Strategy dca = dcaStrategy(STRATEGY_ID, StrategyTicker.BTC);
-        CyclePosition fractional = new CyclePosition(null, CYCLE.id(), BigDecimal.ZERO, null, null,
-                new BigDecimal("0.00123"), null, null);
-        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(dca);
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID)); // 시장은 계좌 브로커에서
-        when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
-        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(fractional));
-        when(dcaDetailPort.findActiveByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(
-                TradingFixtures.dcaConfig(TradingFixtures.cryptoDcaRule(DCA_KEY, OrderDirection.BUY, "10000", 9))));
-        when(dcaExecutionPort.findLatestByStrategyIds(List.of(STRATEGY_ID))).thenReturn(Map.of());
-
-        StrategyDetail detail = strategyService.getById(STRATEGY_ID, USER_ID);
-
-        assertThat(detail.currentHoldings()).isNull();
-        assertThat(detail.dca().currentHoldings()).isEqualByComparingTo("0.00123"); // 원장 소수 보유는 DCA 블록이 싣는다
     }
 
     @Test

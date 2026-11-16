@@ -20,7 +20,7 @@ public record DcaExecution(
         DcaExecutionStatus status,  // ORDERED | SKIPPED
         DcaSkipReason skipReason,   // SKIPPED일 때만
         UUID orderId,               // ORDERED일 때 orders.id
-        BigDecimal quantity,        // 계획 수량 (축소 반영 — 코인은 소수)
+        BigDecimal quantity,        // 계획 수량 (축소 반영)
         BigDecimal referencePrice,  // 판정에 쓴 기준가 (데이터 실패 시 null)
         String detail,              // 사람용 사유 상세
         Instant createdAt           // 생성 시각

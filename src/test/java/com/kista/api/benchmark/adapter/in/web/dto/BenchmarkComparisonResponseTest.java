@@ -44,27 +44,6 @@ class BenchmarkComparisonResponseTest {
     }
 
     @Test
-    void PORTFOLIO_USDT는_investmentCurrency를_USDT로_표기한다() {
-        BenchmarkComparison comparison = new BenchmarkComparison(
-                BenchmarkScope.PORTFOLIO,
-                null,
-                Currency.USDT,
-                new BenchmarkComparison.Benchmark(
-                        BenchmarkAssetType.ETF, null, null, "SPY",
-                        "SPY (SPDR S&P 500 ETF Trust)", null),
-                new BenchmarkComparison.Period(null, null, 0),
-                null,
-                List.of(),
-                null,
-                "NO_INVESTMENT_DATA");
-
-        BenchmarkComparisonResponse response = BenchmarkComparisonResponse.from(comparison);
-
-        assertThat(response.quality().investmentCurrency()).isEqualTo("USDT");
-        assertThat(response.quality().notice()).contains("USDT");
-    }
-
-    @Test
     void ETF_비교는_USD_통화와_전용_notice를_반환한다() {
         BenchmarkComparison comparison = new BenchmarkComparison(
                 BenchmarkScope.PORTFOLIO,
@@ -90,22 +69,13 @@ class BenchmarkComparisonResponseTest {
     }
 
     @Test
-    void USDT_전략_ETF_비교는_투자_통화를_USDT로_표기한다() {
+    void KRW_전략_ETF_비교는_투자_통화를_KRW로_표기한다() {
         BenchmarkComparisonResponse response = BenchmarkComparisonResponse.from(
-                strategyComparison(Currency.USDT, BenchmarkAssetType.ETF));
+                strategyComparison(Currency.KRW, BenchmarkAssetType.ETF));
 
-        assertThat(response.quality().investmentCurrency()).isEqualTo("USDT");
+        assertThat(response.quality().investmentCurrency()).isEqualTo("KRW");
         assertThat(response.quality().benchmarkCurrency()).isEqualTo("USD");
-        assertThat(response.quality().notice()).contains("투자 성과는 USDT");
-    }
-
-    @Test
-    void USDT_전략_아파트_비교는_투자_통화를_USDT로_표기한다() {
-        BenchmarkComparisonResponse response = BenchmarkComparisonResponse.from(
-                strategyComparison(Currency.USDT, BenchmarkAssetType.HOUSING));
-
-        assertThat(response.quality().investmentCurrency()).isEqualTo("USDT");
-        assertThat(response.quality().notice()).contains("투자 성과는 USDT, 아파트 매매가격지수는 KRW");
+        assertThat(response.quality().notice()).contains("투자 성과는 KRW");
     }
 
     @Test
@@ -131,7 +101,7 @@ class BenchmarkComparisonResponseTest {
         boolean etf = assetType == BenchmarkAssetType.ETF;
         return new BenchmarkComparison(
                 BenchmarkScope.STRATEGY,
-                new StrategyRef(UUID.randomUUID(), StrategyType.DCA, StrategyTicker.ETH, currency),
+                new StrategyRef(UUID.randomUUID(), StrategyType.DCA, StrategyTicker.QLD, currency),
                 currency,
                 new BenchmarkComparison.Benchmark(
                         assetType, etf ? null : "1100000000", etf ? null : "서울",

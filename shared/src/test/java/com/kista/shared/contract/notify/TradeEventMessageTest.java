@@ -24,7 +24,7 @@ class TradeEventMessageTest {
 
     @Test
     void serializesFractionalQuantityAsPlainNumber() {
-        TradeEventMessage e = TradeEventMessage.buy("BTC", new BigDecimal("0.00012345"), 1.0, 1.0, "n", UUID.randomUUID(), null, Currency.USD, Instant.EPOCH);
+        TradeEventMessage e = TradeEventMessage.buy("SOXL", new BigDecimal("0.00012345"), 1.0, 1.0, "n", UUID.randomUUID(), null, Currency.USD, Instant.EPOCH);
         assertThat(mapper.writeValueAsString(e)).contains("\"quantity\":0.00012345");
     }
 
@@ -35,19 +35,19 @@ class TradeEventMessageTest {
     }
 
     private String json(BigDecimal q) {
-        return mapper.writeValueAsString(TradeEventMessage.buy("BTC", q, 1.0, 1.0, "n", UUID.randomUUID(), null, Currency.USD, Instant.EPOCH));
+        return mapper.writeValueAsString(TradeEventMessage.buy("SOXL", q, 1.0, 1.0, "n", UUID.randomUUID(), null, Currency.USD, Instant.EPOCH));
     }
 
     @Test
     void buyCarriesCurrency() {
-        assertThat(TradeEventMessage.buy("BTC", BigDecimal.ONE, 65000.0, 10.4, "바낸", UUID.randomUUID(), null, Currency.USDT, Instant.EPOCH).currency())
-                .isEqualTo(Currency.USDT);
+        assertThat(TradeEventMessage.buy("SOXL", BigDecimal.ONE, 65000.0, 10.4, "n", UUID.randomUUID(), null, Currency.KRW, Instant.EPOCH).currency())
+                .isEqualTo(Currency.KRW);
     }
 
     @Test
     void serializesCurrencyName() {
-        assertThat(mapper.writeValueAsString(TradeEventMessage.sell("BTC", BigDecimal.ONE, 1.0, 1.0, "n", null, null, Currency.USDT, Instant.EPOCH)))
-                .contains("\"currency\":\"USDT\"");
+        assertThat(mapper.writeValueAsString(TradeEventMessage.sell("SOXL", BigDecimal.ONE, 1.0, 1.0, "n", null, null, Currency.KRW, Instant.EPOCH)))
+                .contains("\"currency\":\"KRW\"");
     }
 
     @Test

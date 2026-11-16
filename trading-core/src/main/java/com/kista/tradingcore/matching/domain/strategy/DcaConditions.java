@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-// DCA 조건 판정 커널 — 주식(DcaCycleOrderStrategy)·코인 경로 공용 순수 계산
+// DCA 조건 판정 커널 — DcaCycleOrderStrategy가 쓰는 순수 계산
 public final class DcaConditions {
 
     private static final int INDICATOR_SCALE = 2; // 지표값(RSI·공포탐욕지수) 표시 자릿수 — 금액 아님

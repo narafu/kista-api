@@ -35,7 +35,7 @@ class ApiKeyExpirySchedulerTest {
     ApiKeyExpiryScheduler scheduler = new ApiKeyExpiryScheduler(accountPort, publisher, lock, Clock.fixed(now, TimeZones.KST));
 
     private Account account(Instant expiresAt) {
-        return new Account(UUID.randomUUID(), UUID.randomUUID(), "업비트", "n", "a", "s", null, Broker.UPBIT, now, expiresAt);
+        return new Account(UUID.randomUUID(), UUID.randomUUID(), "메리츠", "n", "a", "s", null, Broker.MERITZ, now, expiresAt);
     }
 
     @Test
@@ -66,11 +66,10 @@ class ApiKeyExpirySchedulerTest {
     }
 
     @Test
-    void nonUpbitAccountIgnored() {
-        // 만료일 출처가 없는 바이낸스·MOCK은 값이 있어도 무시한다
-        Account binance = new Account(UUID.randomUUID(), UUID.randomUUID(), "바이낸스", "n", "a", "s", null, Broker.BINANCE, now, now);
+    void mockAccountIgnored() {
+        // 만료일 출처가 없는 MOCK은 값이 있어도 발행 대상에서 제외한다
         Account mockAcc = new Account(UUID.randomUUID(), UUID.randomUUID(), "모의", "n", "a", "s", null, Broker.MOCK, now, now);
-        when(accountPort.findAll()).thenReturn(List.of(binance, mockAcc));
+        when(accountPort.findAll()).thenReturn(List.of(mockAcc));
 
         scheduler.publishDue();
 

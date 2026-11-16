@@ -1,7 +1,6 @@
 package com.kista.tradingcore.matching.domain.model;
 
 import com.kista.shared.kernel.DcaIndicator;
-import com.kista.shared.kernel.Market;
 
 import java.util.HashSet;
 import java.util.List;
@@ -31,10 +30,6 @@ public record DcaStrategyConfig(List<DcaRule> rules) {
     // 규칙 중 하나라도 해당 지표 조건을 쓰는지
     public boolean hasIndicator(DcaIndicator indicator) {
         return rules.stream().anyMatch(r -> r.hasIndicator(indicator));
-    }
-
-    public void requireCompatible(Market accountMarket) {
-        rules.forEach(r -> r.requireCompatible(accountMarket));
     }
 
     // 저장 전 ruleKey 확정 — null은 신규 규칙(UUID 발급), non-null은 existingKeys(현재 활성 버전)에 있어야 한다

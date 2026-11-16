@@ -37,7 +37,7 @@ class RuntimeConfigServiceTest {
     @Test
     void getSettings_combinesRootSettingsAndTradingPolicy() {
         Map<Broker, BrokerSettings> brokers = new EnumMap<>(TradingPolicySettings.defaults().brokers());
-        brokers.put(Broker.TOSS, new BrokerSettings(false, null));
+        brokers.put(Broker.TOSS, new BrokerSettings(false));
         TradingPolicySettings policy = new TradingPolicySettings(brokers, TradingPolicySettings.defaults().strategies());
         when(tradingPolicyPort.load()).thenReturn(policy);
 

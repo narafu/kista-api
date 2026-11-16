@@ -22,7 +22,7 @@ public record Order(
         OrderTiming timing,              // 접수 시점 (AT_OPEN=개장 선접수, AT_CLOSE=마감 배치)
         OrderDirection direction,        // 매수/매도 방향
         String orderLeg,                 // 전략 주문 다리 식별자
-        BigDecimal quantity,             // 주문 수량 — 주식은 정수 값, 코인은 소수 8자리
+        BigDecimal quantity,             // 주문 수량 — 정수 값
         BigDecimal price,                // 주문 가격 (LOC/MOC는 참고용, 실제 체결가 아님)
         OrderStatus status,              // 주문 상태
         String externalOrderId,          // 증권사 부여 주문 번호 (Toss: orderId), PLACED 이후 설정
@@ -79,14 +79,6 @@ public record Order(
         return new Order(null, accountId, strategyCycleId, tradeDate, ticker, OrderType.LIMIT,
                 timing, direction, UNKNOWN_LEG, quantity, price, OrderStatus.FILLED, externalOrderId,
                 quantity, price);
-    }
-
-    // 코인 시장가 주문 — MARKET·PLANNED 고정, 수량은 소수 8자리 (매수는 price=주문 금액 기준 참고가)
-    public static Order cryptoMarket(UUID accountId, UUID strategyCycleId, LocalDate tradeDate, StrategyTicker ticker,
-                                     OrderDirection direction, String orderLeg, OrderTiming timing,
-                                     BigDecimal quantity, BigDecimal price) {
-        return new Order(null, accountId, strategyCycleId, tradeDate, ticker, OrderType.MARKET, timing, direction,
-                orderLeg, quantity, price, OrderStatus.PLANNED, null, null, null);
     }
 
     // 증권사 접수 완료 표시 — externalOrderId 추가, 나머지 필드 유지

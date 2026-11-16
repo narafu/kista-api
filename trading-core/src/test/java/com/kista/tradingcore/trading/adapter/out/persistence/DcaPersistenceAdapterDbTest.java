@@ -64,14 +64,14 @@ class DcaPersistenceAdapterDbTest extends DataJpaTestBase {
 
     // 저장 왕복 비교용 규칙 — amount·percent는 DB numeric scale 2와 같은 형태로 쓴다
     private static DcaRule rule(String key, OrderDirection direction, DcaFrequency frequency, DayOfWeek dow,
-                                OrderType orderType, Integer hour, DcaSizing sizing, List<DcaCondition> conditions) {
-        return new DcaRule(key, direction, frequency, dow, null, orderType, hour, sizing, DcaShortfallPolicy.PARTIAL, conditions);
+                                OrderType orderType, DcaSizing sizing, List<DcaCondition> conditions) {
+        return new DcaRule(key, direction, frequency, dow, null, orderType, sizing, DcaShortfallPolicy.PARTIAL, conditions);
     }
 
     private static DcaSizing amount(String v) { return new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal(v), null); }
 
     private static DcaRule monthlyBuy(String key, List<DcaCondition> conditions) {
-        return rule(key, OrderDirection.BUY, DcaFrequency.MONTHLY, null, OrderType.MOC, null, amount("300.00"), conditions);
+        return rule(key, OrderDirection.BUY, DcaFrequency.MONTHLY, null, OrderType.MOC, amount("300.00"), conditions);
     }
 
     private static DcaStrategyConfig configWith(List<DcaCondition> conditions) {
@@ -100,7 +100,7 @@ class DcaPersistenceAdapterDbTest extends DataJpaTestBase {
     @Test
     void saves_and_loads_multiple_rules_in_input_order() {
         DcaRule sellPercent = new DcaRule(K2, OrderDirection.SELL, DcaFrequency.WEEKLY, DayOfWeek.WEDNESDAY, null,
-                OrderType.MOO, null, new DcaSizing(DcaSizingType.HOLDING_PERCENT, null, new BigDecimal("12.50")),
+                OrderType.MOO, new DcaSizing(DcaSizingType.HOLDING_PERCENT, null, new BigDecimal("12.50")),
                 DcaShortfallPolicy.REJECT, List.of(rsi("70.00")));
         DcaStrategyConfig config = new DcaStrategyConfig(List.of(monthlyBuy(K1, List.of(rsi("30.00"))), sellPercent));
         dcaDetail.save(versionId, config);
@@ -211,7 +211,7 @@ class DcaPersistenceAdapterDbTest extends DataJpaTestBase {
     @Test
     void save_returns_values_normalized_to_db_scale() {
         // 입력 scale(0)이 달라도 save() 반환값은 조회와 같은 scale 2
-        DcaRule raw = rule(K1, OrderDirection.BUY, DcaFrequency.DAILY, null, OrderType.MOC, null, amount("300"), List.of(rsi("35")));
+        DcaRule raw = rule(K1, OrderDirection.BUY, DcaFrequency.DAILY, null, OrderType.MOC, amount("300"), List.of(rsi("35")));
         DcaStrategyConfig saved = dcaDetail.save(versionId, new DcaStrategyConfig(List.of(raw)));
         assertThat(saved.rules().getFirst().conditions().getFirst().threshold()).isEqualByComparingTo("35").hasScaleOf(2);
         assertThat(saved.rules().getFirst().sizing().amount()).hasScaleOf(2);
@@ -225,17 +225,5 @@ class DcaPersistenceAdapterDbTest extends DataJpaTestBase {
         assertThat(dcaDetail.findActiveByStrategyIds(List.of())).isEmpty();
         // 활성 버전이 없는 전략 키도 빈 결과
         assertThat(dcaDetail.findActiveByStrategyIds(List.of(UUID.randomUUID()))).isEmpty();
-    }
-
-    @Test
-    void saveAndLoad_cryptoRuleWithExecutionHour() {
-        DcaRule crypto = rule(K1, OrderDirection.BUY, DcaFrequency.WEEKLY, DayOfWeek.SUNDAY, OrderType.MARKET, 23,
-                amount("10000.00"), List.of());
-        dcaDetail.save(versionId, new DcaStrategyConfig(List.of(crypto)));
-        em.flush();
-        em.clear();
-
-        DcaRule loaded = dcaDetail.findActiveByStrategyId(strategyId).orElseThrow().rules().getFirst();
-        assertThat(loaded).isEqualTo(crypto);
     }
 }

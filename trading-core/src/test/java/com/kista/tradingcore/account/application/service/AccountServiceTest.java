@@ -75,47 +75,6 @@ class AccountServiceTest {
     }
 
     @Test
-    @DisplayName("업비트 등록: 계좌번호를 무시하고 access key 해시로 중복 판정, 만료일 저장")
-    void register_upbit_ignoresAccountNoAndStoresExpiry() {
-        Instant expiresAt = Instant.parse("2027-10-17T00:00:00Z");
-        when(brokerEnabledPort.enabled(Broker.UPBIT)).thenReturn(true);
-        when(connectionTesters.of(Broker.UPBIT)).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount("ak", "sk", null)).thenReturn(new BrokerAccountVerification(null, expiresAt));
-        when(accountPort.countByUserId(userId)).thenReturn(0);
-        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        Account saved = accountService.register(userId,
-                new RegisterAccountCommand("업비트", "74420614-01", "ak", "sk", Broker.UPBIT, null));
-
-        assertThat(saved.accountNo()).isNull();
-        assertThat(saved.apiKeyExpiresAt()).isEqualTo(expiresAt);
-        verify(accountPort).existsByDedupeKey("ak");
-    }
-
-    @Test
-    @DisplayName("업비트 등록: 같은 access key가 이미 등록돼 있으면 409")
-    void register_upbit_duplicateAccessKey() {
-        when(brokerEnabledPort.enabled(Broker.UPBIT)).thenReturn(true);
-        when(accountPort.countByUserId(userId)).thenReturn(0);
-        when(accountPort.existsByDedupeKey("ak")).thenReturn(true);
-
-        assertThatThrownBy(() -> accountService.register(userId,
-                new RegisterAccountCommand("업비트", null, "ak", "sk", Broker.UPBIT, null)))
-                .isInstanceOf(Account.DuplicateAccountException.class);
-        verifyNoInteractions(connectionTesters);
-    }
-
-    @Test
-    @DisplayName("업비트 등록: access key가 비면 400")
-    void register_upbit_requiresKeys() {
-        when(brokerEnabledPort.enabled(Broker.UPBIT)).thenReturn(true);
-
-        assertThatThrownBy(() -> accountService.register(userId,
-                new RegisterAccountCommand("업비트", null, " ", "sk", Broker.UPBIT, null)))
-                .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
     @DisplayName("메리츠 등록: 계좌번호를 무시하고 키만 받으며 키가 비면 400")
     void register_meritz_ignores_account_no_and_requires_keys() {
         when(brokerEnabledPort.enabled(Broker.MERITZ)).thenReturn(true);
@@ -136,26 +95,6 @@ class AccountServiceTest {
     }
 
     @Test
-    @DisplayName("바이낸스 등록: 계좌번호를 무시하고 키만 받으며 키가 비면 400")
-    void register_binance_ignores_account_no_and_requires_keys() {
-        when(brokerEnabledPort.enabled(Broker.BINANCE)).thenReturn(true);
-        when(connectionTesters.of(Broker.BINANCE)).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount("ak", "sk", null)).thenReturn(new BrokerAccountVerification(null, null));
-        when(accountPort.countByUserId(userId)).thenReturn(0);
-        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        Account saved = accountService.register(userId,
-                new RegisterAccountCommand("바이낸스", "123", "ak", "sk", Broker.BINANCE, null));
-
-        assertThat(saved.accountNo()).isNull();
-        verify(connectionTester).verifyAccount("ak", "sk", null);
-        verify(accountPort).existsByDedupeKey("ak");
-        assertThatThrownBy(() -> accountService.register(userId,
-                new RegisterAccountCommand("바이낸스", null, " ", "sk", Broker.BINANCE, null)))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("API 키와 시크릿은 필수입니다.");
-    }
-
-    @Test
     @DisplayName("키 수정: 메리츠 새 키가 다른 계좌에 있으면 409")
     void update_credentials_meritz_rejects_key_used_by_other_account() {
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(
@@ -167,29 +106,18 @@ class AccountServiceTest {
     }
 
     @Test
-    @DisplayName("업비트 계좌(계좌번호 null)를 가진 사용자가 Toss 계좌를 등록해도 NPE가 나지 않는다")
-    void register_toss_whenUserAlreadyHasUpbitAccount_doesNotNpe() {
+    @DisplayName("메리츠 계좌(계좌번호 null)를 가진 사용자가 Toss 계좌를 등록해도 NPE가 나지 않는다")
+    void register_toss_whenUserAlreadyHasMeritzAccount_doesNotNpe() {
         when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(true);
         when(connectionTesters.of(any())).thenReturn(connectionTester);
         when(connectionTester.verifyAccount("appKey", "appSecret", "74420614")).thenReturn(new BrokerAccountVerification(null, null));
         when(accountPort.countByUserId(userId)).thenReturn(1);
-        when(accountPort.findByUserId(userId)).thenReturn(List.of(TradingFixtures.upbitAccount(UUID.randomUUID(), userId)));
+        when(accountPort.findByUserId(userId)).thenReturn(List.of(meritzAccount(UUID.randomUUID(), userId)));
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Account saved = accountService.register(userId, registerCmd());
 
         assertThat(saved.accountNo()).isEqualTo("74420614");
-    }
-
-    @Test
-    @DisplayName("업비트 연결 테스트: UPBIT 라우터로 위임")
-    void test_upbit_routesToUpbitTester() {
-        when(brokerEnabledPort.enabled(Broker.UPBIT)).thenReturn(true);
-        when(connectionTesters.of(Broker.UPBIT)).thenReturn(connectionTester);
-
-        accountService.test(Broker.UPBIT, "ak", "sk");
-
-        verify(connectionTester).verifyCredentials("ak", "sk");
     }
 
     @Test
@@ -481,32 +409,11 @@ class AccountServiceTest {
     }
 
     @Test
-    @DisplayName("키 수정: 연결 테스트 통과 시 저장하고 만료일을 갱신하며 토큰 캐시를 지운다")
-    void updateCredentials_upbit_savesAndEvictsTokenCache() {
-        Account upbit = TradingFixtures.upbitAccount(accountId, userId);
-        Instant expiresAt = Instant.parse("2027-10-17T00:00:00Z");
-        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(upbit);
-        when(accountPort.existsByDedupeKey("new-ak")).thenReturn(false);
-        when(connectionTesters.of(Broker.UPBIT)).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount("new-ak", "new-sk", null)).thenReturn(new BrokerAccountVerification(null, expiresAt));
-        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        Account saved = accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("new-ak", "new-sk", null));
-
-        assertThat(saved.appKey()).isEqualTo("new-ak");
-        assertThat(saved.apiKeyExpiresAt()).isEqualTo(expiresAt);
-        InOrder order = inOrder(accountPort, accountTokenEvictionPort);
-        order.verify(accountPort).save(any());
-        order.verify(accountTokenEvictionPort).evict(List.of(accountId));
-        verifyNoInteractions(brokerEnabledPort); // 키 교체는 신규 등록 정책 대상이 아니다
-    }
-
-    @Test
     @DisplayName("키 수정: 다른 무결성 위반(길이 초과 등)은 409로 바꾸지 않고 그대로 던진다")
     void rotationOtherIntegrityViolationPropagates() {
-        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.upbitAccount(accountId, userId));
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(meritzAccount(accountId, userId));
         when(accountPort.existsByDedupeKey("new-ak")).thenReturn(false);
-        when(connectionTesters.of(Broker.UPBIT)).thenReturn(connectionTester);
+        when(connectionTesters.of(Broker.MERITZ)).thenReturn(connectionTester);
         when(connectionTester.verifyAccount("new-ak", "new-sk", null)).thenReturn(new BrokerAccountVerification(null, null));
         when(accountPort.save(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("x", new RuntimeException("value too long for type character varying(512)")));
 
@@ -518,29 +425,15 @@ class AccountServiceTest {
     @Test
     @DisplayName("키 수정: 저장 시 unique 위반(경합)은 DuplicateAccountException으로 변환한다")
     void rotationUniqueViolationIsDuplicate() {
-        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.upbitAccount(accountId, userId));
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(meritzAccount(accountId, userId));
         when(accountPort.existsByDedupeKey("new-ak")).thenReturn(false);
-        when(connectionTesters.of(Broker.UPBIT)).thenReturn(connectionTester);
+        when(connectionTesters.of(Broker.MERITZ)).thenReturn(connectionTester);
         when(connectionTester.verifyAccount("new-ak", "new-sk", null)).thenReturn(new BrokerAccountVerification(null, null));
         when(accountPort.save(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("dup", new RuntimeException("duplicate key value violates unique constraint \"uq_accounts_account_no_hash\"")));
 
         assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("new-ak", "new-sk", null)))
                 .isInstanceOf(Account.DuplicateAccountException.class);
         verifyNoInteractions(accountTokenEvictionPort);
-    }
-
-    @Test
-    @DisplayName("키 수정: 업비트 같은 access key 재입력은 중복 검사를 건너뛰고 저장한다")
-    void updateCredentials_upbit_sameAccessKey_skipsDuplicateCheck() {
-        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.upbitAccount(accountId, userId));
-        when(connectionTesters.of(Broker.UPBIT)).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount("access-key", "rotated-sk", null)).thenReturn(new BrokerAccountVerification(null, null));
-        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("access-key", "rotated-sk", null));
-
-        verify(accountPort, never()).existsByDedupeKey(any());
-        verify(accountPort).save(any());
     }
 
     @Test
@@ -585,9 +478,9 @@ class AccountServiceTest {
     }
 
     @Test
-    @DisplayName("키 수정: 업비트 새 access key가 다른 계좌에 있으면 409, MOCK은 400, 남의 계좌는 403")
+    @DisplayName("키 수정: 메리츠 새 앱키가 다른 계좌에 있으면 409, MOCK은 400, 남의 계좌는 403")
     void updateCredentials_guards() {
-        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.upbitAccount(accountId, userId));
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(meritzAccount(accountId, userId));
         when(accountPort.existsByDedupeKey("taken")).thenReturn(true);
         assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("taken", "sk", null)))
                 .isInstanceOf(Account.DuplicateAccountException.class);
@@ -605,7 +498,7 @@ class AccountServiceTest {
         verify(accountPort, never()).save(any());
     }
 
-    // ---- API 키 만료일 결정 (토스·메리츠 추정/사용자 입력, 업비트 API 값) ----
+    // ---- API 키 만료일 결정 (토스·메리츠 추정/사용자 입력) ----
 
     private static final String MANUAL_REJECTED = "이 거래소는 API 키 만료일을 직접 바꿀 수 없습니다.";
     private static final String PAST_REJECTED = "API 키 만료일은 오늘 이후여야 합니다.";
@@ -652,39 +545,6 @@ class AccountServiceTest {
         Account saved = accountService.register(userId, tossRegister(LocalDate.of(2027, 3, 1)));
 
         assertThat(saved.apiKeyExpiresAt()).isEqualTo(Instant.parse("2027-02-28T15:00:00Z")); // KST 자정
-    }
-
-    @Test
-    void registerUpbitUsesBrokerValueAndRejectsManual() {
-        Instant expiresAt = Instant.parse("2027-10-17T00:00:00Z");
-        when(brokerEnabledPort.enabled(Broker.UPBIT)).thenReturn(true);
-        when(connectionTesters.of(Broker.UPBIT)).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount("ak", "sk", null)).thenReturn(new BrokerAccountVerification(null, expiresAt));
-        when(connectionTester.verifyAccount("ak2", "sk", null)).thenReturn(new BrokerAccountVerification(null, null));
-        when(accountPort.countByUserId(userId)).thenReturn(0);
-        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        assertThat(accountService.register(userId,
-                new RegisterAccountCommand("업비트", null, "ak", "sk", Broker.UPBIT, null)).apiKeyExpiresAt()).isEqualTo(expiresAt);
-        assertThat(accountService.register(userId,
-                new RegisterAccountCommand("업비트", null, "ak2", "sk", Broker.UPBIT, null)).apiKeyExpiresAt()).isNull();
-        assertThatThrownBy(() -> accountService.register(userId,
-                new RegisterAccountCommand("업비트", null, "ak3", "sk", Broker.UPBIT, LocalDate.of(2027, 3, 1))))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage(MANUAL_REJECTED);
-    }
-
-    @Test
-    void registerBinanceHasNoExpiry() {
-        when(brokerEnabledPort.enabled(Broker.BINANCE)).thenReturn(true);
-        when(connectionTesters.of(Broker.BINANCE)).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount("ak", "sk", null)).thenReturn(new BrokerAccountVerification(null, null));
-        when(accountPort.countByUserId(userId)).thenReturn(0);
-        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        Account saved = accountService.register(userId,
-                new RegisterAccountCommand("바이낸스", null, "ak", "sk", Broker.BINANCE, null));
-
-        assertThat(saved.apiKeyExpiresAt()).isNull();
     }
 
     @Test
@@ -776,11 +636,28 @@ class AccountServiceTest {
     }
 
     @Test
-    void updateUpbitManualRejected() {
-        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.upbitAccount(accountId, userId));
+    void registerMockRejectsManualExpiry() {
+        // MOCK은 만료일 출처가 NONE이라 수동 만료일을 거부하고 증권사 호출 전에 끊는다
+        when(brokerEnabledPort.enabled(Broker.MOCK)).thenReturn(true);
+
+        assertThatThrownBy(() -> accountService.register(userId,
+                new RegisterAccountCommand("모의", null, null, null, Broker.MOCK, LocalDate.of(2027, 3, 1))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage(MANUAL_REJECTED);
+        verify(accountPort, never()).save(any());
+    }
+
+    @Test
+    void updateMockManualRejected() {
+        Account mock = new Account(accountId, userId, "모의", "12345678-01", "MOCK", "MOCK", null, Broker.MOCK, null, null);
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(mock);
 
         assertThatThrownBy(() -> accountService.update(accountId, userId, new UpdateAccountCommand("닉", LocalDate.of(2027, 3, 1))))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage(MANUAL_REJECTED);
         verify(accountPort, never()).save(any());
+    }
+
+    // 키 전용(계좌번호 null) 계좌 — 앱키가 중복 판정 키
+    private static Account meritzAccount(UUID id, UUID userId) {
+        return new Account(id, userId, "메리츠", null, "access-key", "secret", null, Broker.MERITZ, null, null);
     }
 }

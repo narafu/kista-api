@@ -44,7 +44,6 @@ class PortfolioServiceTest {
     static final LocalDate FROM = LocalDate.of(2026, 1, 1);
     static final LocalDate TO = LocalDate.of(2026, 1, 31);
     final UUID stockAccountId = UUID.randomUUID();
-    final UUID binanceAccountId = UUID.randomUUID();
 
     private Account account(UUID id, Broker broker) {
         Account a = mock(Account.class);
@@ -55,19 +54,16 @@ class PortfolioServiceTest {
 
     private void stubAccounts() {
         Account toss = account(stockAccountId, Broker.TOSS);
-        Account binance = account(binanceAccountId, Broker.BINANCE);
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(toss, binance));
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(toss));
     }
 
     @Test
     void getCurrent는_계좌_통화를_붙인다() {
         stubAccounts();
         CyclePositionHistoryEntry toss = entry(stockAccountId, StrategyTicker.SOXL, StrategyType.INFINITE);
-        CyclePositionHistoryEntry coin = entry(binanceAccountId, StrategyTicker.ETH, StrategyType.DCA);
-        when(cyclePositionPort.findLatestPerStrategyByUser(USER_ID)).thenReturn(List.of(toss, coin));
+        when(cyclePositionPort.findLatestPerStrategyByUser(USER_ID)).thenReturn(List.of(toss));
 
-        assertThat(sut.getCurrent(USER_ID)).containsExactly(
-                new PortfolioPosition(toss, Currency.USD), new PortfolioPosition(coin, Currency.USDT));
+        assertThat(sut.getCurrent(USER_ID)).containsExactly(new PortfolioPosition(toss, Currency.USD));
     }
 
     @Test
@@ -84,11 +80,9 @@ class PortfolioServiceTest {
     void getHistory는_계좌_통화를_붙인다() {
         stubAccounts();
         Order toss = order(stockAccountId, StrategyTicker.TQQQ);
-        Order coin = order(binanceAccountId, StrategyTicker.ETH);
-        when(orderPort.findByUser(USER_ID, FROM, TO)).thenReturn(List.of(toss, coin));
+        when(orderPort.findByUser(USER_ID, FROM, TO)).thenReturn(List.of(toss));
 
-        assertThat(sut.getHistory(USER_ID, FROM, TO)).containsExactly(
-                new PortfolioOrder(toss, Currency.USD), new PortfolioOrder(coin, Currency.USDT));
+        assertThat(sut.getHistory(USER_ID, FROM, TO)).containsExactly(new PortfolioOrder(toss, Currency.USD));
     }
 
     @Test

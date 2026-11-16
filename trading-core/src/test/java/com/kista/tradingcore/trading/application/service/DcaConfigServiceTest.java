@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static com.kista.tradingcore.support.TradingFixtures.cryptoDcaRule;
 import static com.kista.tradingcore.support.TradingFixtures.dcaConfig;
 import static com.kista.tradingcore.support.TradingFixtures.stockDcaRule;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -149,15 +148,5 @@ class DcaConfigServiceTest {
         assertThatThrownBy(() -> service.updateConfig(STRATEGY_ID, USER_ID, config(KEY, OrderDirection.BUY, "300")))
                 .isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(dcaDetailPort);
-    }
-
-    @Test
-    void updateConfig_stockAccount_rejectsMarketOrderType() {
-        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(strategy(StrategyType.DCA));
-        DcaStrategyConfig crypto = dcaConfig(cryptoDcaRule(KEY, OrderDirection.BUY, "10000", 9));
-
-        assertThatThrownBy(() -> service.updateConfig(STRATEGY_ID, USER_ID, crypto))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("(MOC)만 허용");
-        verify(strategyVersionPort, never()).save(any());
     }
 }

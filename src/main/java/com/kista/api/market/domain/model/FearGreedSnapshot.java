@@ -3,11 +3,11 @@ package com.kista.api.market.domain.model;
 import java.time.Instant;
 import java.util.UUID;
 
-// 크립토·CNN 공포탐욕지수 시점별 스냅샷
+// CNN 공포탐욕지수 시점별 스냅샷
 public record FearGreedSnapshot(
         UUID id,
-        String source,         // "CRYPTO" | "CNN"
-        Instant snapshotDate,  // 수집 시각 (CRYPTO는 지수 기준일 UTC 00:00)
+        String source,         // "CNN"
+        Instant snapshotDate,  // 수집 시각
         int value,             // 0-100
         FearGreedRating rating,
         Instant createdAt

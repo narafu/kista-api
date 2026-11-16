@@ -47,12 +47,10 @@ class FearGreedControllerTest {
     private static final UUID USER_UUID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     @Test
-    void getFearGreed_returns_cnn_and_crypto_bundle() throws Exception {
+    void getFearGreed_returns_cnn_current_and_history() throws Exception {
         when(fearGreedQueryService.getRecent(eq("CNN"), anyInt())).thenReturn(List.of(
                 new FearGreedSnapshot(null, "CNN", Instant.parse("2026-06-21T00:00:00Z"), 60, FearGreedRating.GREED, null),
                 new FearGreedSnapshot(null, "CNN", Instant.parse("2026-06-22T00:00:00Z"), 72, FearGreedRating.GREED, null)));
-        when(fearGreedQueryService.getRecent(eq("CRYPTO"), anyInt())).thenReturn(List.of(
-                new FearGreedSnapshot(null, "CRYPTO", Instant.parse("2026-06-22T00:00:00Z"), 30, FearGreedRating.FEAR, null)));
 
         mockMvc.perform(get("/api/market/fear-greed")
                         .param("days", "90")
@@ -62,22 +60,7 @@ class FearGreedControllerTest {
                 .andExpect(jsonPath("$.cnn.current.value").value(72))
                 .andExpect(jsonPath("$.cnn.current.rating").value("GREED"))
                 .andExpect(jsonPath("$.cnn.history.length()").value(2))
-                .andExpect(jsonPath("$.cnn.history[0].date").value("2026-06-21T00:00:00Z"))
-                .andExpect(jsonPath("$.crypto.current.value").value(30));
-    }
-
-    @Test
-    void getFearGreed_empty_crypto_keeps_cnn_and_nulls_crypto_current() throws Exception {
-        // CRYPTO 외부 조회 실패 시 서비스가 빈 이력을 돌려준다 — CNN은 정상, crypto.current=null
-        when(fearGreedQueryService.getRecent(eq("CNN"), anyInt())).thenReturn(List.of(
-                new FearGreedSnapshot(null, "CNN", Instant.parse("2026-06-22T00:00:00Z"), 72, FearGreedRating.GREED, null)));
-        when(fearGreedQueryService.getRecent(eq("CRYPTO"), anyInt())).thenReturn(List.of());
-
-        mockMvc.perform(get("/api/market/fear-greed").param("days", "90"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.cnn.current.value").value(72))
-                .andExpect(jsonPath("$.crypto.current").doesNotExist())
-                .andExpect(jsonPath("$.crypto.history.length()").value(0));
+                .andExpect(jsonPath("$.cnn.history[0].date").value("2026-06-21T00:00:00Z"));
     }
 
     @Test

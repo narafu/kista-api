@@ -22,7 +22,7 @@ class HeartbeatAdapterTest {
     @Test
     void pingOpen_urlSet_sendsGet() {
         HeartbeatAdapter adapter = new HeartbeatAdapter(heartbeatRestClient,
-                new HeartbeatProperties("https://hc-ping.com/open-uuid", "https://hc-ping.com/close-uuid", "https://hc-ping.com/crypto-uuid"));
+                new HeartbeatProperties("https://hc-ping.com/open-uuid", "https://hc-ping.com/close-uuid"));
         adapter.pingOpen();
 
         ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
@@ -31,17 +31,8 @@ class HeartbeatAdapterTest {
     }
 
     @Test
-    void pingCrypto_urlSet_sendsGet() {
-        HeartbeatAdapter adapter = new HeartbeatAdapter(heartbeatRestClient,
-                new HeartbeatProperties(null, null, "https://hc-ping.com/crypto-uuid"));
-        adapter.pingCrypto();
-
-        verify(heartbeatRestClient.get()).uri("https://hc-ping.com/crypto-uuid");
-    }
-
-    @Test
     void pingClose_urlBlank_skipsWithoutCall() {
-        HeartbeatAdapter adapter = new HeartbeatAdapter(heartbeatRestClient, new HeartbeatProperties("", "", ""));
+        HeartbeatAdapter adapter = new HeartbeatAdapter(heartbeatRestClient, new HeartbeatProperties("", ""));
         adapter.pingClose();
         verifyNoInteractions(heartbeatRestClient);
     }
@@ -50,7 +41,7 @@ class HeartbeatAdapterTest {
     void ping_httpFailure_swallowedNotThrown() {
         // 핑 실패가 매매 흐름을 깨면 안 됨 — 로그만 남기고 삼킴
         HeartbeatAdapter adapter = new HeartbeatAdapter(heartbeatRestClient,
-                new HeartbeatProperties("https://hc-ping.com/open-uuid", null, null));
+                new HeartbeatProperties("https://hc-ping.com/open-uuid", null));
         when(heartbeatRestClient.get().uri(anyString()).retrieve().body(String.class))
                 .thenThrow(new RestClientException("timeout"));
         assertThatCode(adapter::pingOpen).doesNotThrowAnyException();

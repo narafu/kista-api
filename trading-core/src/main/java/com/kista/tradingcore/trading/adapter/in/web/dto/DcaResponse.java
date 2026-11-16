@@ -9,7 +9,7 @@ import org.jspecify.annotations.Nullable;
 // DCA 조회 응답 블록 — TradingCycleResponse.dca
 public record DcaResponse(
         List<DcaRuleResponse> rules,    // 규칙 목록 (입력 순서)
-        @Nullable BigDecimal currentHoldings,     // 원장 보유 수량 (코인 소수 포함, null 가능)
+        @Nullable BigDecimal currentHoldings,     // 원장 보유 수량 (null 가능)
         @Nullable BigDecimal avgPrice             // 원장 평단 (보유 없으면 null)
 ) {
     public static DcaResponse from(DcaSummary s) {

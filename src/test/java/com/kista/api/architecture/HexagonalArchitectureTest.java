@@ -59,8 +59,7 @@ class HexagonalArchitectureTest {
     // 벤더 전용 도메인 모델 패키지 — broker 어댑터만 안다
     private static final String[] VENDOR_MODEL_PACKAGES = {
             "com.kista.tradingcore.broker.domain.model.toss..",
-            "com.kista.tradingcore.broker.domain.model.upbit..", "com.kista.tradingcore.broker.domain.model.meritz..",
-            "com.kista.tradingcore.broker.domain.model.binance.."};
+            "com.kista.tradingcore.broker.domain.model.meritz.."};
     // Entity 판정: JPA 애너테이션 또는 *Entity 이름
     private static final DescribedPredicate<JavaClass> IS_ENTITY =
             simpleNameEndingWith("Entity").or(annotatedWith(jakarta.persistence.Entity.class))
@@ -71,7 +70,7 @@ class HexagonalArchitectureTest {
                     .or(resideInAnyPackage(VENDOR_MODEL_PACKAGES))
                     .or(IS_ENTITY).or(simpleNameEndingWith("JpaRepository")).as("인프라 타입");
     // 제거 대기 목록(single-impl-interfaces.txt)의 상한 — 목록에 새 항목을 더해 통과시키는 것을 막는다
-    private static final int PENDING_REMOVAL_CEILING = 82;
+    private static final int PENDING_REMOVAL_CEILING = 73;
     // 구현이 다른 모듈에 있어 순환을 끊는 포트(decisions.md "포트 역전(DIP)")
     private static final Set<String> DEPENDENCY_INVERSION_PORTS = Set.of(
             "com.kista.api.user.application.port.output.ApprovalPolicyPort",
@@ -262,7 +261,7 @@ class HexagonalArchitectureTest {
     }
 
     @Test
-    @DisplayName("broker 밖에서는 벤더 전용 도메인 모델(domain.model.toss/upbit/meritz/binance)을 참조하지 않는다 — 벤더 타입 침투 차단")
+    @DisplayName("broker 밖에서는 벤더 전용 도메인 모델(domain.model.toss/meritz)을 참조하지 않는다 — 벤더 타입 침투 차단")
     void vendor_models_must_not_leak_outside_broker() {
         // Toss 전용 타입(TossApiException/TossCandle 등)은 broker 어댑터 전용이다 — 소비자는 벤더 중립 타입
         // (BrokerApiException/BrokerCandle 등)만 안다. 신규 브로커 추가가 "구현체 1개 추가"로 끝나도록 잠근다.
@@ -336,8 +335,8 @@ class HexagonalArchitectureTest {
                 "com.kista.tradingcore.trading.application.service.AccountOpenOrderCanceller",   // 계좌 삭제 전 미체결 주문 취소(account 정의 포트가 Account를 넘김)
                 "com.kista.tradingcore.trading.application.service.UserTradingDataEraseService", // 탈퇴 미체결 취소(AccountService.listByUser → AccountOpenOrderCancelPort가 Account를 받음)
                 "com.kista.tradingcore.trading.application.service.DcaConfigService",            // 소유권 검증 + 계좌 브로커 시장 규칙 검증
-                "com.kista.tradingcore.trading.application.service.CapitalLedgerService",     // 소유권 검증 + 계좌 통화(금액 자릿수·문구)·코인 여부
-                "com.kista.tradingcore.trading.application.service.AccountLedgerTotalsService",  // 소유권 검증 + 계좌 통화(반올림)·코인 여부(시세 소스)
+                "com.kista.tradingcore.trading.application.service.CapitalLedgerService",     // 소유권 검증 + 계좌 통화(금액 자릿수·문구)
+                "com.kista.tradingcore.trading.application.service.AccountLedgerTotalsService",  // 소유권 검증 + 계좌 통화(반올림)
                 "com.kista.tradingcore.trading.application.service.support.OwnedStrategy"       // 전략+소유 계좌 검증 결과 — 서비스가 계좌 통화·시장·브로커를 읽는 단일 통로
         );
         // 제외 목록 오타·개명 감지 — 이름이 실제 클래스로 존재해야 한다

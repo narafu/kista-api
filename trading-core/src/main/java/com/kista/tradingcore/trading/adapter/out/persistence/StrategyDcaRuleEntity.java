@@ -64,10 +64,7 @@ class StrategyDcaRuleEntity extends BaseCreatedAtEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "order_type", nullable = false, length = 20)
-    private OrderType orderType; // MOO | MOC | MARKET
-
-    @Column(name = "execution_hour")
-    private Short executionHour; // 코인 실행 시각 (KST 0~23) — smallint라 Short로 매핑(Integer면 validate 불일치)
+    private OrderType orderType; // MOO | MOC
 
     @Enumerated(EnumType.STRING)
     @Column(name = "sizing_type", nullable = false, length = 20)
@@ -93,7 +90,6 @@ class StrategyDcaRuleEntity extends BaseCreatedAtEntity {
         e.dayOfWeek = r.dayOfWeek();
         e.dayOfMonth = r.dayOfMonth();
         e.orderType = r.orderType();
-        e.executionHour = r.executionHour() == null ? null : r.executionHour().shortValue();
         e.sizingType = r.sizing().type();
         // DB numeric(_,2)와 같은 scale로 정규화 — save() 반환값과 조회값을 일치시킨다
         e.amount = scale2(r.sizing().amount());
@@ -108,7 +104,6 @@ class StrategyDcaRuleEntity extends BaseCreatedAtEntity {
 
     DcaRule toDomain(List<DcaCondition> conditions) {
         return new DcaRule(ruleKey, direction, frequency, dayOfWeek, dayOfMonth, orderType,
-                executionHour == null ? null : executionHour.intValue(),
                 new DcaSizing(sizingType, amount, percent), shortfallPolicy, conditions);
     }
 }

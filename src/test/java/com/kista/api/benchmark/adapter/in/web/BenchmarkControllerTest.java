@@ -130,18 +130,18 @@ class BenchmarkControllerTest {
                 USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000", null, null))
                 .thenReturn(comparison(null));
         when(userStats.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USDT, "1100000000", null, null))
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.KRW, "1100000000", null, null))
                 .thenReturn(comparison(null));
 
         mockMvc.perform(get("/api/stats/housing-benchmark").with(authentication(auth())))
                 .andExpect(status().isOk());
-        mockMvc.perform(get("/api/stats/housing-benchmark").param("currency", "USDT").with(authentication(auth())))
+        mockMvc.perform(get("/api/stats/housing-benchmark").param("currency", "KRW").with(authentication(auth())))
                 .andExpect(status().isOk());
 
         verify(userStats).getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USD, "1100000000", null, null);
         verify(userStats).getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.USDT, "1100000000", null, null);
+                USER_ID, BenchmarkScope.PORTFOLIO, null, Currency.KRW, "1100000000", null, null);
     }
 
     @Test

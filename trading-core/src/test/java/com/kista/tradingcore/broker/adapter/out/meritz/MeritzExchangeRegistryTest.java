@@ -21,7 +21,5 @@ class MeritzExchangeRegistryTest {
             assertThat(registry.vendorId(t)).isEqualTo("0066");
             assertThat(registry.marketCode(t)).isEqualTo("AX");
         }
-        assertThatThrownBy(() -> registry.vendorId(StrategyTicker.BTC)).isInstanceOf(NoSuchElementException.class);
-        assertThatThrownBy(() -> registry.marketCode(StrategyTicker.BTC)).isInstanceOf(NoSuchElementException.class);
     }
 }

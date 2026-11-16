@@ -5,10 +5,7 @@ import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
-import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
 import com.kista.tradingcore.broker.application.port.output.MarginPort;
-import com.kista.tradingcore.broker.application.service.CryptoExchanges;
-import com.kista.tradingcore.broker.domain.model.CryptoBalance;
 import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
@@ -34,8 +31,7 @@ class UnassignedCashCalculatorTest {
     StrategyPort strategyPort = mock(StrategyPort.class);
     CyclePositionPort cyclePositionPort = mock(CyclePositionPort.class);
     MarginPort marginPort = mock(MarginPort.class);
-    CryptoExchanges cryptoExchanges = mock(CryptoExchanges.class);
-    UnassignedCashCalculator calc = new UnassignedCashCalculator(strategyPort, cyclePositionPort, marginPort, cryptoExchanges);
+    UnassignedCashCalculator calc = new UnassignedCashCalculator(strategyPort, cyclePositionPort, marginPort);
 
     private static Strategy strategy(UUID accountId, StrategyType type) {
         return new Strategy(UUID.randomUUID(), accountId, type, StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
@@ -76,22 +72,6 @@ class UnassignedCashCalculatorTest {
     }
 
     @Test
-    void crypto_account_uses_exchange_quote_available_minus_ledgers() {
-        UUID accountId = UUID.randomUUID();
-        Strategy dca = new Strategy(UUID.randomUUID(), accountId, StrategyType.DCA, StrategyStatus.ACTIVE, StrategyTicker.BTC, StrategyCycleSeedType.NONE);
-        deposit(dca, "300000");
-        when(strategyPort.findByAccountId(accountId)).thenReturn(List.of(dca));
-        CryptoExchangePort upbit = mock(CryptoExchangePort.class);
-        when(cryptoExchanges.of(Broker.UPBIT)).thenReturn(upbit);
-        // 주문 가능 견적 통화 — 접수 주문 잠금분(quoteLocked)은 이미 빠져 있다
-        when(upbit.getBalance(any())).thenReturn(new CryptoBalance(new BigDecimal("1000000"), new BigDecimal("50000"), Map.of()));
-
-        var ref = TradingFixtures.upbitAccount(accountId, UUID.randomUUID()).toBrokerRef();
-        assertThat(calc.available(accountId, ref)).isEqualByComparingTo("700000"); // 1,000,000 − 300,000
-        verify(marginPort, never()).getUsdBuyableAmount(any());
-    }
-
-    @Test
     void seedHolders_excludes_archived_and_zero_fills_missing_ledger() {
         UUID accountId = UUID.randomUUID();
         Strategy active = strategy(accountId, StrategyType.INFINITE);
@@ -116,8 +96,6 @@ class UnassignedCashCalculatorTest {
     @Test
     void applies_to_every_broker_except_mock() {
         assertThat(UnassignedCashCalculator.applies(Broker.TOSS)).isTrue();
-        assertThat(UnassignedCashCalculator.applies(Broker.UPBIT)).isTrue();
-        assertThat(UnassignedCashCalculator.applies(Broker.BINANCE)).isTrue();
         assertThat(UnassignedCashCalculator.applies(Broker.MOCK)).isFalse();
     }
 }

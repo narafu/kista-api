@@ -1,6 +1,5 @@
 package com.kista.tradingcore.matching.domain.model;
 
-import com.kista.shared.kernel.Market;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -13,13 +12,13 @@ class BootstrapPositionTest {
 
     @Test
     void 주식_정수_보유는_그대로_통과한다() {
-        assertThat(BootstrapPosition.validate(new BigDecimal("10"), new BigDecimal("40"), Market.US_STOCK)).isEqualByComparingTo("10");
+        assertThat(BootstrapPosition.validate(new BigDecimal("10"), new BigDecimal("40"))).isEqualByComparingTo("10");
     }
 
     @Test
     void 주식_소수_보유는_거부한다() {
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> BootstrapPosition.validate(new BigDecimal("0.5"), new BigDecimal("40"), Market.US_STOCK))
+                .isThrownBy(() -> BootstrapPosition.validate(new BigDecimal("0.5"), new BigDecimal("40")))
                 .withMessage("주식 보유 수량은 정수여야 합니다.");
     }
 
@@ -27,7 +26,7 @@ class BootstrapPositionTest {
     void 주식_보유가_int_범위를_넘으면_거부한다() {
         BigDecimal overMax = BigDecimal.valueOf(Integer.MAX_VALUE).add(BigDecimal.ONE);
         assertThatIllegalArgumentException()
-                .isThrownBy(() -> BootstrapPosition.validate(overMax, new BigDecimal("40"), Market.US_STOCK))
+                .isThrownBy(() -> BootstrapPosition.validate(overMax, new BigDecimal("40")))
                 .withMessage("주식 보유 수량이 허용 범위를 넘었습니다.");
     }
 }

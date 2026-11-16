@@ -62,7 +62,7 @@ class OrderEntity extends BaseAuditEntity {
     private BigDecimal price;
 
     @Column(nullable = false, precision = 20, scale = 8)
-    private BigDecimal quantity; // 주문 수량 (주식 정수·코인 소수 8자리)
+    private BigDecimal quantity; // 주문 수량 (정수 값, numeric(20,8))
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

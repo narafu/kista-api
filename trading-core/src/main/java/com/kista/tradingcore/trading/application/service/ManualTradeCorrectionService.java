@@ -7,7 +7,6 @@ import com.kista.tradingcore.trading.application.service.support.SelectionChain;
 import com.kista.tradingcore.trading.application.event.CycleEndedEvent;
 import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
 import com.kista.tradingcore.account.domain.model.Account;
-import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.Quantities;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.trading.domain.model.ManualTradeCorrectionCommand;
@@ -56,7 +55,6 @@ public class ManualTradeCorrectionService {
     private final MarketCalendarPort marketCalendarPort; // 실제 마감 리포트 시각
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher; // 사이클 종료 시 사용자 알림 — 커밋 후 이벤트로 위임
-    private static final int CRYPTO_SCALE = 8; // 코인 수량 소수 자릿수 상한 (업비트)
     private final CycleOrderStrategies cycleOrderStrategies; // 청산 시 사이클 종료 여부(endsCycleOnLiquidation) SSOT
 
     public ManualTradeCorrectionResult correctManualFills(ManualTradeCorrectionCommand command) {
@@ -89,7 +87,7 @@ public class ManualTradeCorrectionService {
             boolean isLastFill = i == command.fills().size() - 1;
 
             // fill 1건 반영: 검증 → FILLED 주문 이력 → 잔고 재계산 → 포지션 스냅샷
-            validateQuantity(fill, account.broker().getMarket());
+            validateQuantity(fill);
             validateSellQuantity(fill, balance);
             manualOrders.add(toManualOrder(fill, account, currentCycle, strategy));
             balance = applyFillAndSnapshot(fill, balance, currentCycle);
@@ -124,8 +122,6 @@ public class ManualTradeCorrectionService {
     // 마감 리포트 창(오늘 postClose 이후 ~ 리포트 마커 전) 거절 — 리포트는 postClose 이후 읽은 최신 포지션 잔고에 브로커 호출(수 초) 뒤 체결을 반영해 새 행을 append하므로,
     // 그 사이 append한 보정 스냅샷은 무시된다. 같은 기준: CapitalLedgerService#requireOutsideReportWindow
     private void rejectDuringReportWindow(Account account, Strategy strategy) {
-        // 코인 계좌는 마감 리포트가 없어 제외 (rejectUnidentifiedFillsBeforeReport와 같은 이유)
-        if (account.broker().getMarket().isCrypto()) return;
         // 창 판정과 리포트 대상 판정은 마감 배치와 같은 기준(CloseReportScope)
         if (CloseReportScope.inReportWindow(strategy, clock, batchRunPort, orderPort, marketCalendarPort)) {
             throw new IllegalStateException("오늘 마감 리포트가 끝나기 전에는 수동 체결 보정을 할 수 없습니다.");
@@ -153,8 +149,6 @@ public class ManualTradeCorrectionService {
     // 오늘(KST) 이후 거래일만 — 마감 리포트·재개는 KST 당일 기준이라 어제 이전은 리포트가 끝났거나 재개되지 않는다
     // 과거에 리포트가 실패한 우리 주문 체결은 번호를 넣으면 중복 검사에 걸리므로 번호 없는 보정을 막지 않는다
     private void rejectUnidentifiedFillsBeforeReport(ManualTradeCorrectionCommand command, Account account, Strategy strategy) {
-        // 코인 계좌는 마감 리포트를 거치지 않아(markReported 없음) isReported가 항상 false이므로 가드 제외
-        if (account.broker().getMarket().isCrypto()) return;
         LocalDate reportableFrom = LocalDate.now(clock);
         Set<LocalDate> dates = command.fills().stream()
                 .filter(f -> f.externalOrderId() == null || f.externalOrderId().isBlank())
@@ -172,13 +166,10 @@ public class ManualTradeCorrectionService {
         }
     }
 
-    // 수량 단위 검증 — 주식은 정수, 코인은 소수 8자리까지 (원장 normalize 기준)
-    private static void validateQuantity(ManualTradeCorrectionCommand.Fill fill, Market market) {
-        boolean crypto = market.isCrypto();
-        int scale = Quantities.normalize(fill.quantity()).scale();
-        if (crypto ? scale > CRYPTO_SCALE : scale > 0) {
-            throw new IllegalArgumentException(crypto ? "코인 체결 수량은 소수 8자리까지 입력할 수 있습니다."
-                    : "주식 체결 수량은 정수여야 합니다.");
+    // 수량 단위 검증 — 정수 주 (원장 normalize 기준)
+    private static void validateQuantity(ManualTradeCorrectionCommand.Fill fill) {
+        if (Quantities.normalize(fill.quantity()).scale() > 0) {
+            throw new IllegalArgumentException("주식 체결 수량은 정수여야 합니다.");
         }
     }
 

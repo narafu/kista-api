@@ -190,17 +190,6 @@ class ManualTradeCorrectionServiceTest {
     }
 
     @Test
-    void correctManualFills_cryptoAccountUnreported_passes() {
-        stubGuardFixture(List.of(orderWithLeg("LOC_BUY")), Broker.UPBIT);
-        lenient().when(batchRunPort.isReported(TODAY, STRATEGY_ID)).thenReturn(false);
-
-        service.correctManualFills(guardCommand(TODAY, null));
-
-        verify(orderPort).saveAll(any());
-        verify(batchRunPort, never()).isReported(any(), any());
-    }
-
-    @Test
     void correctManualFills_withExternalOrderNo_passes() {
         stubGuardFixture(List.of(orderWithLeg("LOC_BUY")));
 
@@ -303,23 +292,6 @@ class ManualTradeCorrectionServiceTest {
         ArgumentCaptor<CyclePosition> captor = ArgumentCaptor.forClass(CyclePosition.class);
         verify(cyclePositionPort).save(captor.capture());
         assertThat(captor.getValue().deposit()).isEqualByComparingTo("7200.05");
-        verify(orderPort).saveAll(any());
-    }
-
-    @Test
-    void 크립토_소수_보정() {
-        Strategy dca = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.DCA, StrategyStatus.ACTIVE,
-                StrategyTicker.BTC, StrategyCycleSeedType.NONE);
-        stubSelection(dca);
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID)); // 수량 단위는 계좌 시장 기준
-        ManualTradeCorrectionCommand.Fill buy = new ManualTradeCorrectionCommand.Fill(LocalDate.of(2026, 7, 1),
-                OrderDirection.BUY, new BigDecimal("0.00123456"), new BigDecimal("100000000"), "C-1", null);
-
-        ManualTradeCorrectionResult result = service.correctManualFills(command(buy));
-
-        // 기존 보유 2 + 0.00123456
-        assertThat(result.finalHoldings()).isEqualByComparingTo("2.00123456");
-        assertThat(result.finalDeposit()).isEqualByComparingTo("-116790.69"); // 기존 예수금 6665.31 − 0.00123456 × 1억
         verify(orderPort).saveAll(any());
     }
 
@@ -477,16 +449,6 @@ class ManualTradeCorrectionServiceTest {
 
         assertThatThrownBy(() -> service.correctManualFills(guardCommand(TODAY.minusDays(1), "EXT-1")))
                 .isInstanceOf(IllegalStateException.class).hasMessage(WINDOW_MSG);
-    }
-
-    @Test
-    void reportWindow_cryptoAccount_passes() {
-        stubWindowFixture(List.of(orderWithLeg("LOC_BUY")), Broker.UPBIT);
-
-        service.correctManualFills(guardCommand(TODAY.minusDays(1), "EXT-1"));
-
-        verify(orderPort).saveAll(any());
-        verify(batchRunPort, never()).isReported(any(), any());
     }
 
     @Test

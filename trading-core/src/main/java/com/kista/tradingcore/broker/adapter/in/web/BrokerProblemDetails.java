@@ -7,10 +7,8 @@ import com.kista.shared.platform.web.ProblemDetailMappings.Mapping;
 import com.kista.shared.platform.web.ProblemResponder;
 import com.kista.tradingcore.broker.domain.model.BrokerApiException;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
-import com.kista.tradingcore.broker.domain.model.BrokerIpNotAllowedException;
 import com.kista.tradingcore.broker.domain.model.BrokerPermissionDeniedException;
 import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
-import com.kista.tradingcore.broker.domain.model.BrokerWithdrawalEnabledException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -31,8 +29,6 @@ class BrokerProblemDetails implements ProblemDetailMappingContributor {
     @Override
     public Map<Class<? extends Exception>, Mapping> mappings() {
         return Map.of(
-                BrokerWithdrawalEnabledException.class, new Mapping(HttpStatus.UNPROCESSABLE_CONTENT, "Broker Withdrawal Enabled", ErrorCode.BROKER_WITHDRAWAL_ENABLED),
-                BrokerIpNotAllowedException.class,      new Mapping(HttpStatus.UNPROCESSABLE_CONTENT, "Broker IP Not Allowed", ErrorCode.BROKER_IP_NOT_ALLOWED),
                 BrokerPermissionDeniedException.class,  new Mapping(HttpStatus.UNPROCESSABLE_CONTENT, "Broker Permission Denied", ErrorCode.BROKER_PERMISSION_DENIED),
                 BrokerCredentialException.class,        new Mapping(HttpStatus.UNPROCESSABLE_CONTENT, "Invalid Broker Credentials", ErrorCode.BROKER_CREDENTIAL_INVALID),
                 BrokerRateLimitException.class,         new Mapping(HttpStatus.TOO_MANY_REQUESTS, "Broker Rate Limit", ErrorCode.BROKER_RATE_LIMITED));

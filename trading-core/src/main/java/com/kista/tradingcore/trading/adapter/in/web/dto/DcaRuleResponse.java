@@ -21,7 +21,6 @@ public record DcaRuleResponse(
         OrderDirection direction,
         DcaFrequency frequency, @Nullable DayOfWeek dayOfWeek, @Nullable Integer dayOfMonth,
         OrderType orderType,
-        @Nullable Integer executionHour,            // 코인 실행 시각 (KST, 주식 null)
         Sizing sizing,                    // 규모
         DcaShortfallPolicy shortfall,     // 가용 부족 정책
         List<DcaConditionResponse> conditions, // 추가 조건(AND), 입력 순서
@@ -41,7 +40,7 @@ public record DcaRuleResponse(
         LastExecution last = e == null ? null : new LastExecution(e.tradeDate(), e.status().name(),
                 e.skipReason() == null ? null : e.skipReason().name());
         return new DcaRuleResponse(r.ruleKey(), r.direction(), r.frequency(), r.dayOfWeek(), r.dayOfMonth(), r.orderType(),
-                r.executionHour(), new Sizing(r.sizing().type(), r.sizing().amount(), r.sizing().percent()), r.shortfall(),
+                new Sizing(r.sizing().type(), r.sizing().amount(), r.sizing().percent()), r.shortfall(),
                 r.conditions().stream().map(DcaConditionResponse::from).toList(), next, last);
     }
 }

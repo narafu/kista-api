@@ -176,9 +176,7 @@ class StrategyDetailAssembler {
                         pos.avgPrice(), pos.toBalance().wholeShares(), pos.deposit(),
                         divisionCount)).orElse(null);
 
-        // 코인은 소수 원장이라 wholeShares()를 부르지 않는다(StrategyDetail도 코인 보유 수량은 싣지 않음)
-        Integer currentHoldings = strategy.ticker().isCrypto() ? null
-                : latestPosition.map(pos -> pos.toBalance().wholeShares()).orElse(null);
+        Integer currentHoldings = latestPosition.map(pos -> pos.toBalance().wholeShares()).orElse(null);
 
         // 진행 중 사이클 여부 — CapitalLedgerService NO_ACTIVE_CYCLE 거절 조건(사이클 없음·최신 사이클 종료)의 반대
         boolean cycleInProgress = latestCycle.map(cycle -> !cycle.isEnded()).orElse(false);

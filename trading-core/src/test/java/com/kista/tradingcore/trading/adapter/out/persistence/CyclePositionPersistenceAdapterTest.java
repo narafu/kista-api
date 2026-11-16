@@ -582,15 +582,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
                 .containsExactly(new BigDecimal("10.00"), new BigDecimal("20.00"), new BigDecimal("30.00"));
     }
 
-    // ===== 코인 계좌 포함 조회 (findLatestPerStrategyByUser·계좌 커서) =====
-
-    private UUID insertBrokerAccount(String broker) {
-        UUID accId = UUID.randomUUID();
-        jdbcTemplate.update(
-                "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
-                accId, userId, "코인계좌", broker, accId.toString().substring(0, 8), "01", "key", "secret");
-        return accId;
-    }
+    // ===== 계정별 최신 포지션 조회 (findLatestPerStrategyByUser) =====
 
     // 지정 종목·삭제 여부로 전략 체인을 만들고 cycleId를 반환
     private UUID insertChain(UUID accId, String type, String ticker, boolean deletedStrategy) {
@@ -611,24 +603,14 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
     @Test
     void 전략별_최신_포지션을_반환한다() {
         Instant base = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(1, ChronoUnit.HOURS);
-        UUID binanceId = insertBrokerAccount("BINANCE");
         UUID tossCycle = insertChain(accountId, "INFINITE", "SOXL", false);
-        UUID coinCycle = insertChain(binanceId, "DCA", "ETH", false);
         insertPosition(tossCycle, new BigDecimal("100.00"), base, false);
         UUID tossLatest = insertPosition(tossCycle, new BigDecimal("200.00"), base.plusSeconds(60), false);
-        insertPosition(coinCycle, new BigDecimal("1.00"), base, false);
-        UUID coinLatest = insertPosition(coinCycle, new BigDecimal("2.00"), base.plusSeconds(60), false);
 
         List<CyclePositionHistoryEntry> result = cyclePositionAdapter.findLatestPerStrategyByUser(userId);
 
-        assertThat(result).extracting(CyclePositionHistoryEntry::id).containsExactlyInAnyOrder(tossLatest, coinLatest);
-        assertThat(result).filteredOn(e -> e.id().equals(tossLatest)).singleElement()
-                .satisfies(e -> assertThat(e.accountId()).isEqualTo(accountId));
-        assertThat(result).filteredOn(e -> e.id().equals(coinLatest)).singleElement()
-                .satisfies(e -> {
-                    assertThat(e.accountId()).isEqualTo(binanceId);
-                    assertThat(e.ticker()).isEqualTo(StrategyTicker.ETH);
-                });
+        assertThat(result).extracting(CyclePositionHistoryEntry::id).containsExactly(tossLatest);
+        assertThat(result).singleElement().satisfies(e -> assertThat(e.accountId()).isEqualTo(accountId));
     }
 
     @Test
@@ -639,16 +621,5 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         insertChain(accountId, "VR", "TQQQ", false); // 스냅샷 없음
 
         assertThat(cyclePositionAdapter.findLatestPerStrategyByUser(userId)).isEmpty();
-    }
-
-    @Test
-    void 계좌_커서_조회는_코인_계좌_포지션을_포함한다() {
-        Instant base = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(1, ChronoUnit.HOURS);
-        UUID binanceId = insertBrokerAccount("BINANCE");
-        UUID coinCycle = insertChain(binanceId, "DCA", "ETH", false);
-        UUID pos = insertPosition(coinCycle, new BigDecimal("2.00"), base, false);
-
-        assertThat(cyclePositionAdapter.findByAccountIdWithCursor(binanceId, Instant.EPOCH, Instant.now().plusSeconds(60), 10))
-                .extracting(CyclePositionHistoryEntry::id).containsExactly(pos);
     }
 }

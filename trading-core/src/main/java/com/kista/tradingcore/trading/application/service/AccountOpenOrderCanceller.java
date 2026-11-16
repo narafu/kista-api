@@ -23,8 +23,6 @@ class AccountOpenOrderCanceller implements AccountOpenOrderCancelPort {
     public int cancelOpenOrders(Account account) {
         int failed = 0;
         List<Strategy> strategies = strategyPort.findByAccountId(account.id());
-        // 코인 체결 확인 중 주문이 있으면 어떤 전략도 PAUSED로 만들기 전에 거부 — 일시중지된 전략의 주문은 동기화되지 않는다
-        strategies.forEach(st -> orderCancelService.requireNoCryptoInFlight(st.id(), account));
         for (Strategy strategy : strategies) {
             stateWriter.pause(strategy.id());
             failed += orderCancelService.cancelOpenOrders(strategy.id(), account).retryableFailedCount();

@@ -24,7 +24,7 @@ public interface AccountPort {
         return account;
     }
     int countByUserId(UUID userId);
-    // 전역 중복 체크 — Account.dedupeKey() 값(업비트 access key / 그 외 계좌번호)의 해시로 조회, 해시 계산은 adapter 내부
+    // 전역 중복 체크 — Account.dedupeKey() 값(메리츠 앱키 / 그 외 계좌번호)의 해시로 조회, 해시 계산은 adapter 내부
     boolean existsByDedupeKey(String dedupeKey);
     Account save(Account account);
     void delete(UUID id);

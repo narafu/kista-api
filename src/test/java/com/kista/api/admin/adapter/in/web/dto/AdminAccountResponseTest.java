@@ -13,21 +13,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class AdminAccountResponseTest {
 
-    AccountSummaryResponse upbit = new AccountSummaryResponse(UUID.randomUUID(), UUID.randomUUID(), "업비트 코인", null, Broker.UPBIT, Instant.now());
+    AccountSummaryResponse meritz = new AccountSummaryResponse(UUID.randomUUID(), UUID.randomUUID(), "메리츠 키전용", null, Broker.MERITZ, Instant.now());
     AccountSummaryResponse toss = new AccountSummaryResponse(UUID.randomUUID(), UUID.randomUUID(), "토스 메인", "12345678-01", Broker.TOSS, Instant.now());
 
     @Test
-    void upbitAccountNoIsNull() {
-        assertThat(AdminAccountResponse.from(upbit, null, List.of()).accountNoMasked()).isNull();
-        AdminAccountItem item = AdminAccountItem.from(upbit, Map.of());
+    void keyOnlyAccountNoIsNull() {
+        assertThat(AdminAccountResponse.from(meritz, null, List.of()).accountNoMasked()).isNull();
+        AdminAccountItem item = AdminAccountItem.from(meritz, Map.of());
         assertThat(item.accountNoMasked()).isNull();
         assertThat(item.accountNo()).isNull();
     }
 
     @Test
     void accountNicknameExposed() {
-        assertThat(AdminAccountResponse.from(upbit, null, List.of()).nickname()).isEqualTo("업비트 코인");
-        assertThat(AdminAccountItem.from(upbit, Map.of()).nickname()).isEqualTo("업비트 코인");
+        assertThat(AdminAccountResponse.from(meritz, null, List.of()).nickname()).isEqualTo("메리츠 키전용");
+        assertThat(AdminAccountItem.from(meritz, Map.of()).nickname()).isEqualTo("메리츠 키전용");
     }
 
     @Test

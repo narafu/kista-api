@@ -12,7 +12,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 
-// CNN 공포탐욕지수 수집 및 저장 (크립토는 조회 시 alternative.me 직접 호출)
+// CNN 공포탐욕지수 수집 및 저장
 // 07:00은 미국 정규장 마감(KST 05:00 DST / 06:00 비DST) 확정값, 12:00은 07:00 실패 대비 재수집(조회는 KST 일자별 최신 1건)
 @Component
 @RequiredArgsConstructor

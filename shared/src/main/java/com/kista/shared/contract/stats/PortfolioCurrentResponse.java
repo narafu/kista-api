@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
 public record PortfolioCurrentResponse(
         @Nullable StrategyType strategyType,  // 전략 유형
         @Nullable StrategyTicker ticker,      // 거래 종목
-        Currency currency,          // 계좌 통화 (USD·USDT·KRW)
+        Currency currency,          // 계좌 통화 (USD·KRW)
         BigDecimal holdings,        // 보유 수량
         @Nullable BigDecimal avgPrice,        // 평단가
         BigDecimal deposit,         // 예수금 (계좌 통화)

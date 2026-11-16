@@ -108,8 +108,8 @@ class StrategyUpdateWriter {
         if (cycle.isEnded() || !cycle.id().equals(first.id())) {
             throw new IllegalStateException("진행 중인 사이클이 바뀌어 예수금을 수정할 수 없습니다.");
         }
-        // 마감 리포트 창에는 in-place 예수금 변경이 리포트 append에 덮어써진다(코인은 리포트 없음)
-        if (!owned.crypto() && CloseReportScope.inReportWindow(owned.strategy(), clock, batchRunPort, orderPort, marketCalendarPort)) {
+        // 마감 리포트 창에는 in-place 예수금 변경이 리포트 append에 덮어써진다
+        if (CloseReportScope.inReportWindow(owned.strategy(), clock, batchRunPort, orderPort, marketCalendarPort)) {
             throw new IllegalStateException("오늘 마감 리포트가 끝나기 전에는 예수금을 수정할 수 없습니다.");
         }
         CyclePosition latest = cyclePositionPort.findLatestOne(cycle.id())

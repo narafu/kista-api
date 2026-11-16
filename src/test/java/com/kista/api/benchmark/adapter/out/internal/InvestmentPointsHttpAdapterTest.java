@@ -103,14 +103,14 @@ class InvestmentPointsHttpAdapterTest {
         UUID strategyId = UUID.randomUUID();
 
         InvestmentPointsPort.Result result = adapter.fetch(userId, BenchmarkScope.STRATEGY, strategyId,
-                com.kista.shared.kernel.Currency.USDT, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1));
+                com.kista.shared.kernel.Currency.KRW, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1));
 
         RecordedRequest recorded = server.takeRequest();
         assertThat(recorded.getTarget()).contains("/api/internal/trading/stats/investment-points");
         assertThat(recorded.getTarget()).contains("userId=" + userId);
         assertThat(recorded.getTarget()).contains("scope=STRATEGY");
         assertThat(recorded.getTarget()).contains("strategyId=" + strategyId);
-        assertThat(recorded.getTarget()).contains("currency=USDT");
+        assertThat(recorded.getTarget()).contains("currency=KRW");
         assertThat(result.currency()).isEqualTo(com.kista.shared.kernel.Currency.USD); // 응답 currency를 그대로 매핑
         assertThat(recorded.getTarget()).doesNotContain("granularity");
     }
