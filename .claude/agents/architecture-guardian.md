@@ -23,7 +23,7 @@ model: haiku
 - `*Store`·`*PersistenceAdapter`의 public 시그니처에 Entity 금지(`stores_expose_domain_types_only`). 아웃바운드 포트 인터페이스는 구현 2개 이상 또는 허용 목록(`interfaces_must_earn_their_keep`)
 - `adapter.in` → `adapter.out` 직접 참조는 관례상 금지(포트 경유)이며 ArchUnit은 앱셸 `web`·`tradingcore.web`에만 강제(`web_must_stay_pure_inbound_sink`)
 - 모듈 간: 상대 모듈의 NamedInterface로 공개된 타입만 참조 (`ModulithArchitectureTest`의 `ApplicationModules.verify()`)
-- 모듈별 추가 규칙: `sharedkernel`/`contract`/`platform`/`matching`은 다른 `com.kista` 모듈 의존 금지, `notify`는 순수 아웃바운드 게이트웨이, `web`은 순수 inbound sink, `@Aspect` 금지, 벤더 모델(`broker.domain.model.kis/toss`)은 broker 밖 유출 금지
+- 모듈별 추가 규칙: `sharedkernel`/`contract`/`platform`/`matching`은 다른 `com.kista` 모듈 의존 금지, `notify`는 순수 아웃바운드 게이트웨이, `web`은 순수 inbound sink, `@Aspect` 금지, 벤더 모델(`broker.domain.model.toss`)은 broker 밖 유출 금지
 
 ## 검증 절차
 

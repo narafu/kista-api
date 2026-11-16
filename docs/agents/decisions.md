@@ -86,7 +86,7 @@
 - 라이브·백테스트 별지점 평균: `CycleOrderComputer`·`BacktestEngine`. 공식이므로 바꿀 때 양쪽을 함께 본다
 - 페이지 슬라이싱: `StrategyHistoryQueryService`·`AccountStatisticsService`
 - 평단 필수 규칙: `BootstrapPosition`·`BacktestEngine`
-- "사용자를 찾을 수 없습니다": `BatchContextFactory`·`CryptoDcaRunner`
+- "사용자를 찾을 수 없습니다": `BatchContextFactory`
 - `UserEventRepublisher`의 같은 본문 메서드 2개
 - `validateWithdrawalSufficiency` 호출 2곳(인자·시점이 다르다)
 - 평단 가중평균 3곳(`AccountBalance`·`CapitalInjectionService`·`VrReconfigureService`): 체결 대 투입, VR 0주 null로 의미가 다르고 공식에 닿는다
@@ -134,7 +134,7 @@
 ### 알림·예외 문구 속 `orderId=`, `FinanceAccountService`의 `accountId`는 접두사로 바꾸지 않는다
 이유: 금융 accountId와 trading accountId를 혼동하지 않게 하기 위해서다. 재검토 조건: 없음. (cc6db1e64)
 
-### warn 로그 3곳(`AccountTokenEvictionAdapter`·`MeritzPriceApi`·`CryptoOrderSynchronizer`)은 그대로 둔다
+### warn 로그 2곳(`AccountTokenEvictionAdapter`·`MeritzPriceApi`)은 그대로 둔다
 이유: 스택이 필요할 가능성이 있어 판정을 보류했다. 재검토 조건: 없음. (cc6db1e64)
 
 ### 토스 `getCommon` 429 재시도는 호출 람다(`retryOnTooManyRequests`) 안에 둔다
@@ -174,7 +174,7 @@
 이유: UI '전체' 프리셋이 서버 기본 30일에 의존한다. 200은 컨트롤러 3곳의 관례다. 통일하면 API 계약이 바뀐다. 재검토 조건: 10 T3·T4 목록 규약 전환 때. (2026-11-09)
 
 ### 주식 전용 `*Usd` 필드명 유지
-대상: 미리보기, `MarginPort.getUsdBuyableAmount`, `TradeLegSummary.amountUsd`, `TradingReport.totalBoughtUsd/totalSoldUsd` 등. 이유: wire 키라 개명하면 UI 파일 다수가 바뀐다. 이벤트 필드는 EPR 직렬화 대상이라 개명하려면 `@JsonAlias`가 필요하다. 재검토 조건: 없음. (2026-11-10, fable 10 재심 유지. 코인 계좌 합류 트리거는 15 크립토 삭제로 사라졌다)
+대상: 미리보기, `MarginPort.getUsdBuyableAmount`, `TradeLegSummary.amountUsd`, `TradingReport.totalBoughtUsd/totalSoldUsd` 등. 이유: wire 키라 개명하면 UI 파일 다수가 바뀐다. 이벤트 필드는 EPR 직렬화 대상이라 개명하려면 `@JsonAlias`가 필요하다. 재검토 조건: 없음. (2026-11-10, fable 10 재심 유지.)
 
 ### 소유권 검증 중복 제거 기각, 응답 코드 400/404/403 구분 유지
 이유: 소유권 검증은 이미 중앙화돼 있다. 내부 토큰 경로는 userId가 바디로 들어오므로 입력 오류 400이 맞다. 재검토 조건: 없음. (2026-07 기각, 2026-11 fable 10 재심 유지)
@@ -189,7 +189,7 @@
 이유: kista-ui를 확인했고 UI 수정이 필요 없다. 재검토 조건: 없음. (2026-10-31)
 
 ### `ErrorCode` 상수 이름 변경·삭제 금지
-이유: kista-ui 계약이다. 예외: 15 C5의 `BROKER_IP_NOT_ALLOWED` 삭제. 재검토 조건: 없음. (2026-11 fable 10 재심 유지)
+이유: kista-ui 계약이다. 예외: `BROKER_IP_NOT_ALLOWED`·`BROKER_WITHDRAWAL_ENABLED`는 삭제했다. 재검토 조건: 없음. (2026-11 fable 10 재심 유지)
 
 ### stats 서비스의 `to` null→today 인라인 유지
 이유: CQ-04에서 호출부에 남기기로 했다. CQ-17의 Clock 주입과 충돌하지 않게 하기 위해서다. 재검토 조건: 없음. (2026-11)
@@ -355,8 +355,8 @@
 
 실행 계획 자체는 각 지침서에 있다. 여기는 뒤집지 말아야 할 방향만 둔다.
 
-### 브로커 구성: 주문은 메리츠·토스·Mock, KIS·업비트·바이낸스는 삭제
-이유: 메리츠를 우선하는 이유는 환율·매매 수수료다. 토스는 대중적인 증권사라 주문 연결을 남긴다(2026-11-12. 2026-11-11의 "토스 축소" 결정을 대체). KIS는 삭제했다(04 단계 A, 2026-11-15). 바이낸스·크립토 매매·대시보드 크립토 지표는 전부 삭제한다(15, 2026-11-13). 재검토 조건: 없음. (fable 04 0절, 15 0절)
+### 브로커 구성: 주문은 메리츠·토스·Mock, KIS·업비트·바이낸스는 삭제됨
+이유: 메리츠를 우선하는 이유는 환율·매매 수수료다. 토스는 대중적인 증권사라 주문 연결을 남긴다(2026-11-12. 2026-11-11의 "토스 축소" 결정을 대체). KIS는 삭제했다(04 단계 A, 2026-11-15). 바이낸스·업비트·크립토 매매·대시보드 크립토 지표는 삭제됨(2026-11, N18). 재검토 조건: 없음. (fable 04 0절, 15 0절)
 
 ### 공용 시세는 Alpaca, 주문 경로의 현재가는 계좌 증권사
 이유: 관리자 증권사 키로 받는 공용 시장 데이터를 없앤다(토스 키 1년 갱신 부담). 주문 경로(BUY 상한, DCA·VR 기준가)의 현재가는 계좌 증권사 시세 API이고, Alpaca는 화면과 확정 값에 쓴다. 값마다 출처는 하나다. 폴백 체인은 삭제한다. 확정 종가는 마감+20분이다. 환율은 Frankfurter 일 1회 참고환율이다. 재검토 조건: 없음. (2026-11-14, fable 14 D1~D5)
@@ -376,14 +376,14 @@
 ### 기능 존폐
 - 주택 벤치마크(KB Land)는 유지한다.
 - 수동 체결 보정은 동결하고, 06 뒤 마감 리포트 재실행으로 놓친 체결이 반영되면 삭제한다.
-- 코인 DCA 미리보기·DCA 수동 바로 주문·DCA 백테스트는 만들지 않는다.
+- DCA 수동 바로 주문·DCA 백테스트는 만들지 않는다.
 - CSV 가져오기·반복 거래(가계부)는 만들지 않는다.
 - `rejectReason`은 양쪽에서 삭제한다.
 
 (2026-11-13, fable 12 D1~D5, ui D7·D15·D16)
 
 ### 삭제된 전략·계좌 데이터는 루트에만 삭제 표시, 자식 데이터 보존
-이유: 권고안. 예외는 15 C2(바이낸스 계좌 과거 기록 완전 삭제)다. 1:1 상세 테이블 4개는 부모로 접고, 계좌를 삭제하면 자격증명도 삭제한다. 재검토 조건: 없음. (2026-11-13, fable 11 D1~D3)
+이유: 권고안. 예외는 코인 계좌(과거 기록 완전 삭제, V23)다. 1:1 상세 테이블 4개는 부모로 접고, 계좌를 삭제하면 자격증명도 삭제한다. 재검토 조건: 없음. (2026-11-13, fable 11 D1~D3)
 
 ### 매매 공식 결함 수정 F1·F3·F4·F6 진행, `trading-formulas.md`는 "변경 금지"가 아니라 "바꾸면 문서와 테스트를 함께 고친다"
 이유: "변경 금지" 문구 때문에 F1 같은 결함이 문서화된 동작으로 굳었다. 재검토 조건: 없음. (2026-11-12, fable 08)
@@ -392,20 +392,7 @@
 이유: 사용자 입력 분류다. 지우려면 가계부 데이터를 이전해야 한다. 재검토 조건: 없음. (2026-11-14, fable 15 C3)
 
 ### 운영 키 목록의 원본은 `.env.example`, `API_DOMAIN`은 Caddy가 infra.env에서 받는다
-이유: 시크릿은 sops + age로 kista-infra가 관리한다. `CMC_API_KEY`는 추가하지 않는다(삭제 예정 코드). 재검토 조건: 없음. (2026-11-11, cross-repo 결정 3·6)
-
-## 7. 코인 경로 — 지침서 15 실행 시 이 절을 통째로 지운다
-
-15(바이낸스·업비트·크립토 매매 삭제)가 끝나기 전까지 코드가 남아 있어서 둔다.
-
-- 코인 부분체결 뒤 취소된 주문은 FILLED로 확정한다. 업비트 시장가 매수는 자투리 때문에 cancel로 끝나는 일이 흔하다. 주식은 CANCELLED를 유지한다. (CQ-61)
-- `CryptoLedgerRecorder` 증분은 `divide(volume, 8, HALF_UP)`로 한다. 증분을 `LEDGER_SCALE(2)`로 먼저 반올림하면 최종 예수금이 0.01 어긋난다. (2026-11-08)
-- `CRYPTO_SCALE = 8`의 2벌은 근거 주석이 다르다(DB numeric 대 업비트 상한).
-- Upbit·Binance의 `execute/translate`, 역방향 티커 조회, `CryptoValuations`·`CryptoHashRibbons` prefix 평균은 각 2곳이라 유지한다.
-- `isCryptoExchange()`는 전략 타입이 아니라 증권사 capability 술어다.
-- stats 크립토 `ZoneOffset.UTC`는 외부 원본(UTC 일봉)을 그대로 쓴다.
-- 바이낸스 clientOrderId는 재전송하지 않는다. 결과가 불명이면 SUBMITTING을 유지한다. -1021은 ERROR 로그만 남긴다.
-- 출금 권한 주기 점검·가격 컬럼 정밀도 확장·-1021 시각 보정은 트리거 보류다. 입금 주소 표시·입금 알림·격리 마진 레버리지 DCA는 기각했다.
+이유: 시크릿은 sops + age로 kista-infra가 관리한다. 재검토 조건: 없음. (2026-11-11, cross-repo 결정 3·6)
 
 ## 8. 되돌릴 수 없는 운영 사실
 

@@ -5,6 +5,7 @@
 - `ProblemDetailAutoConfiguration`(공용 advice)은 `AutoConfiguration.imports`와 `AutoConfigureWebMvc.imports` 양쪽에 올라 `@WebMvcTest` 슬라이스에도 들어간다
 - `@Scheduled`를 쓰는 프로세스는 `@EnableScheduling` 필수 — 빠지면 에러 없이 조용히 무시된다(신규 부트 클래스 확인). 실행 시각·락 TTL → `docs/agents/scheduler-time-table.md`
 - `UuidV7.next()`는 `@UuidGenerator`를 못 타는 native INSERT·도메인 부여 id 전용이다. DB 기본값 `gen_random_uuid()`는 v4라 native INSERT는 id를 직접 넘긴다
+- EPR 완료 행은 `spring.modulith.events.completion-mode: delete`로 지운다(두 프로세스 모두, `application.yml`).
 - `TtlResultCache`는 비-빈 인메모리 캐시이고 단일 인스턴스 전제다 — 소비자가 각자 `new`로 소유한다
 - Redis Stream 컨슈머(`RedisStreamSubscriber` 상속)의 실패 정책: 유실 허용 소비자(app.error·푸시)는 기본 `ackOnFailure=true`, 정합성 소비자는 `false` + `maxDeliveries()` + `onGiveUp` 관리자 알림으로 override한다
 - `internalapi`(root→trading-core 클라이언트)는 trading-core에서 참조 금지 (가드: `GradleModuleBoundaryTest.tradingCoreMustNotCallRootInternalApi`)

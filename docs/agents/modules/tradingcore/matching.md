@@ -15,11 +15,11 @@ Spring Modulith 모듈(CLOSED) — 주문생성 커널(순수 계산). `domain/m
 - 최소시드 미리보기 `GET /api/accounts/{id}/strategy-seed-preview`(`StrategyHistoryQueryService.strategySeedPreview`)는 브로커 HTTP 호출을 포함해 `@Transactional(NOT_SUPPORTED)`다(`register()`와 동일). PRIVACY + 기준 매매표 없는 날은 `skipReason="NO_PRIVACY_BASE"`(basePrice/minSeed=null).
 
 ### DCA 전략 (`DcaCycleOrderStrategy`)
-- 주식은 공통 `plan`(규칙마다 `decideRule` → `Planned`/`Skipped`), 코인은 `CryptoDcaRoundExecutor`가 `decideRule`을 직접 호출한다. `needsCapCheck=false`.
-- BUY 부족 정책은 `decideRule`이 `DcaRuleInputs.availableCash`(원장 예수금 잔여)로 직접 판정한다: 가용 수량 = `floor(가용 / 캡가)`. REJECT는 부족하면 `INSUFFICIENT_BALANCE` skip, PARTIAL은 가용 수량으로 축소(1주도 못 사면 `INSUFFICIENT_BALANCE`). `plan()`이 앞 규칙의 BUY(수량 × 캡가)를 뒤 규칙 가용에서 빼 규칙 합계가 가용을 넘지 않게 한다(SELL의 `plannedSell`과 같은 방식). 코인의 열린 주문·같은 틱 차감은 `CryptoDcaRoundExecutor` 몫이라 `plan()` 누적은 주식 전용이다.
+- 공통 `plan`(규칙마다 `decideRule` → `Planned`/`Skipped`). `needsCapCheck=false`.
+- BUY 부족 정책은 `decideRule`이 `DcaRuleInputs.availableCash`(원장 예수금 잔여)로 직접 판정한다: 가용 수량 = `floor(가용 / 캡가)`. REJECT는 부족하면 `INSUFFICIENT_BALANCE` skip, PARTIAL은 가용 수량으로 축소(1주도 못 사면 `INSUFFICIENT_BALANCE`). `plan()`이 앞 규칙의 BUY(수량 × 캡가)를 뒤 규칙 가용에서 빼 규칙 합계가 가용을 넘지 않게 한다(SELL의 `plannedSell`과 같은 방식).
 - `availableCash`·SELL 상한 `sellableAfterReserved`가 null이면 "원장 조회 실패" `DATA_UNAVAILABLE` skip이다(상한 없음 값은 없다). SELL 상한은 수집기가 원장 보유 − 기존 SELL − 취소된 접수 SELL 체결분으로 계산하고 브로커는 조회하지 않는다.
-- 판정 순서(`decideRule`): ① 데이터(종가·원장·SELL 상한·모든 지표 계산 가능 여부) → ② 조건 AND(입력 순서, 처음 실패한 조건이 `CONDITION_NOT_MET`와 뒤집힌 연산자 detail을 남긴다) → ③ `NO_HOLDINGS`/`INSUFFICIENT_HOLDINGS`(SELL, 원장 보유 기준) → ④ `BELOW_ONE_SHARE`. AVG_PRICE는 보유 0주일 때 BUY는 통과하고 SELL은 통과 후 `NO_HOLDINGS`로 막힌다. 크립토 SELL 기준가는 현재가.
-- 코인 입력은 `DcaRuleInputs.tradingRules`(`CryptoTradingRules`, 코인이면 필수·주식 null)로 수수료·최소 명목가·수량 단위를 받는다. FEAR_GREED는 주식 CNN, 코인 `CryptoFearGreedIndexPort`(alternative.me)가 값을 공급한다.
+- 판정 순서(`decideRule`): ① 데이터(종가·원장·SELL 상한·모든 지표 계산 가능 여부) → ② 조건 AND(입력 순서, 처음 실패한 조건이 `CONDITION_NOT_MET`와 뒤집힌 연산자 detail을 남긴다) → ③ `NO_HOLDINGS`/`INSUFFICIENT_HOLDINGS`(SELL, 원장 보유 기준) → ④ `BELOW_ONE_SHARE`. AVG_PRICE는 보유 0주일 때 BUY는 통과하고 SELL은 통과 후 `NO_HOLDINGS`로 막힌다.
+- FEAR_GREED는 CNN 값을 쓴다.
 
 ## 테스트 패턴
 - `currentRound`(double) 단언: 정확한 정수는 `isEqualTo(5.0)`, 소수점은 `isCloseTo(1.33, within(0.01))`

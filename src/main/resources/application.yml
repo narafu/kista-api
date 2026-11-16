@@ -31,7 +31,7 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
-    table: flyway_schema_history_api   # 서비스별 이력 테이블 — 옛 flyway_schema_history(V1~V23)는 롤백 증거로 보존
+    table: flyway_schema_history_api   # 서비스별 이력 테이블 — 옛 공용 이력 테이블은 2026-11-16 운영에서 drop했다
     baseline-on-migrate: false          # 운영 첫 기동에만 SPRING_FLYWAY_BASELINE_ON_MIGRATE=true 로 override(RUNBOOK)
     validate-on-migrate: true
     default-schema: public

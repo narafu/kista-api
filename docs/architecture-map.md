@@ -91,7 +91,7 @@ flowchart LR
     end
     subgraph DATA["참조 데이터"]
         KB["KB부동산"]
-        FG["공포탐욕지수<br/>CNN · Crypto"]
+        FG["공포탐욕지수<br/>CNN"]
     end
     subgraph USERIO["인증·알림"]
         KAKAO["Kakao OAuth"]
@@ -100,7 +100,7 @@ flowchart LR
     end
     subgraph OPS["운영 관측·백업"]
         GRAF["Grafana Cloud<br/>OTLP 메트릭 push"]
-        HC["healthchecks.io<br/>개장·마감·코인 틱 heartbeat"]
+        HC["healthchecks.io<br/>개장·마감 heartbeat"]
         OBJ["OCI Object Storage<br/>kista-infra-backups"]
     end
 

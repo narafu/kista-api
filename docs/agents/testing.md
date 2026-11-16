@@ -8,7 +8,7 @@
 - Clock: `DataJpaTestBase`가 `FixedClockTestConfig`(고정 KST)를 포함한다. `@WebMvcTest`는 필요하면 `@Import(FixedClockTestConfig.class)`
 - ArchUnit `failOnEmptyShould=true` — 규칙 대상이 비면 실패한다
 - 매매 테스트 패턴 → `modules/tradingcore/trading-testing.md`, 매칭 커널 → `modules/tradingcore/matching.md` "테스트 패턴"
-- broker 밖 trading-core 테스트는 `broker.domain.model.kis/toss` 벤더 타입을 쓰지 않는다. 외부 API 실패는 `StubBrokerApiException`(가드: `tests_outside_broker_must_not_use_vendor_models`)
+- broker 밖 trading-core 테스트는 `broker.domain.model.toss` 벤더 타입을 쓰지 않는다. 외부 API 실패는 `StubBrokerApiException`(가드: `tests_outside_broker_must_not_use_vendor_models`)
 
 ### @WebMvcTest + Spring Security
 - 슬라이스는 커스텀 `SecurityConfig` 대신 Boot 기본 Security가 적용된다. POST는 `.with(csrf())` 필수(없으면 403)

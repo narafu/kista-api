@@ -1,7 +1,7 @@
 ## com.kista.tradingcore.trading (`:trading-core`)
 
 - 매매·VR 공식·VR 로직을 건드리기 전 `docs/agents/modules/tradingcore/trading-formulas.md`를 Read한다(자동 로드 안 됨).
-- DCA·코인 DCA 작업 시 `docs/agents/modules/tradingcore/dca.md`를 Read한다(자동 로드 안 됨).
+- DCA 작업 시 `docs/agents/modules/tradingcore/dca.md`를 Read한다(자동 로드 안 됨).
 - 매매·스케쥴러·주문 흐름은 `docs/agents/workflow.md` 인덱스, 흐름 원본은 `src/test/resources/architecture/flows.yml`.
 - 결정(유지·기각) 목록은 `docs/agents/decisions.md` — 구조 변경 제안 전에 클래스명으로 grep한다.
 
@@ -16,7 +16,7 @@
 
 ### 투자금 추가·인출·시드 수정
 - 대상 PRIVACY·INFINITE·DCA. 사이클을 유지하고, 사이클 잠금 후 재조회한 최신 포지션 행을 in-place 갱신하며 `startAmount`도 함께 바꾼다. 원금 변화는 같은 트랜잭션에서 `cycle_capital_event`(INJECT/WITHDRAW/RESET)에 남긴다(통계 원금 → `trading-formulas.md` "통계 원금")
-- 오늘 postClose 이후 리포트 마커 전이고 리포트 대상 주문이 있으면 400(`CloseReportScope`). 수동 체결 보정도 같은 창을 거절한다. 코인 계좌는 마감 리포트가 없어 제외
+- 오늘 postClose 이후 리포트 마커 전이고 리포트 대상 주문이 있으면 400(`CloseReportScope`). 수동 체결 보정도 같은 창을 거절한다
 - 인출 가능액 = 장부 예수금 − 체결 전 BUY 약정 − 리포트 전 취소 BUY의 기록 체결분(`StrategyLedgerBudget`). 강제 매도 없이 다음 주문 계산부터 반영한다. 인출 후 `startAmount ≤ 0`이거나 INFINITE 최소 시드 미만이면 400
 - 시드 수정은 비-VR 진행 중 사이클의 최신 포지션 `holdings=0`일 때만 허용, 종료 사이클이면 400(재개 후 수정)
 - 응답 `ledgerDeposit`이 UI 최대 인출 기준이다(DB `cycle_position.deposit`·도메인 `deposit`은 이름 유지)

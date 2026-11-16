@@ -10,7 +10,7 @@ adapter/out/meritz/ ← MeritzHttpClient(본문 `rsp_cd` 기반 응답 판정 �
 
 ### 기본 사실
 - Base `https://openapi.imeritz.com:9443`(`meritz.base-url`, trading-core `application.yml`). 모든 요청 헤더 `authorization: Bearer <token>` + `mac_address`(고정 상수 `0242AC110002`, 값 검증 없음).
-- 계좌번호가 없다: 앱키에 계좌 1개가 묶이며 요청에 `acno`·`asno`·`acnt_pwd`를 넣으면 실패한다. UPBIT처럼 `accountNo=null`, appKey가 식별자(`Account.dedupeKeyOf`)다.
+- 계좌번호가 없다: 앱키에 계좌 1개가 묶이며 요청에 `acno`·`asno`·`acnt_pwd`를 넣으면 실패한다. `accountNo=null`, appKey가 식별자(`Account.dedupeKeyOf`)다.
 - 토큰: `POST /oauth2/token`(form `grant_type=client_credentials&client_id&client_secret&scope=login`) → `access_token`, `expires_in`(43200), `expires_date`. 만료 전 재발급은 같은 토큰·같은 `expires_date`를 돌려준다(멱등). 만료는 **`expires_date`(KST) 기준**으로 잡는다 — `expires_in`은 상대값이 아니라 캐시가 최대 12시간 늦게 만료돼 `EGW00123`이 폭주한다. `oauth2/revoke`는 같은 앱키의 유일한 토큰을 끊으므로 호출 금지. 토큰 저장은 `broker_tokens` + `BrokerTokenCachePort`, 조정은 `DbTokenCoordinator`(Toss와 공용).
 - 숫자 필드는 문자열/숫자 혼재(`"417.0000000000"`, `36`) — 파서는 둘 다 받는다(수량을 `Integer.parseInt`하면 잔고 조회 전체가 실패).
 - 날짜(`date`, `oder_date`, `oder_sta_date`/`oder_fin_date`, `from`/`to`)는 **미국 거래일**. KST↔US 변환은 `UsTradeDates`만 쓰며 `MeritzPriceApi`·`MeritzTradingApi`가 allowlist에 있다 → constraints.md "시간 기준 정책".
@@ -50,7 +50,6 @@ adapter/out/meritz/ ← MeritzHttpClient(본문 `rsp_cd` 기반 응답 판정 �
 | MOC | `32`/`7`/캡 단가(매수 MOC 대신 LOC 캡) | `34`/`7`/`0` |
 | LIMIT | `01`/`0`/단가 | `01`/`0`/단가 |
 | MOO | `01`/`0`/캡 단가(개장 후 지정가 근사) | `05`/`0`/`0` 시장가(DCA "즉시 매도" 의도) |
-| MARKET | `IllegalArgumentException`(코인 전용) | 동일 |
 
 가격은 `setScale(2, HALF_UP).toPlainString()`(한도 4자리 이내). 단가·수량 누락은 송신 전에 차단한다.
 

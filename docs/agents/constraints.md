@@ -20,7 +20,7 @@
 
 ### 기본값·금액 자릿수
 - 매퍼(`toEntity`/`toDomain`)와 web DTO `toCommand()`는 기본값을 정하지 않는다. 생략은 null로 넘기고 도메인 resolver·팩토리·서비스 한 곳이 정한다(`0` sentinel 금지). 예외: DB 컬럼 자체가 nullable인 레거시 값
-- 금액 자릿수 리터럴 `2`·모듈별 `MONEY_SCALE` 금지. USD 가격·원장은 `Currency.USD.amountScale()`, 코인 DCA 계좌도 지나는 원장 경로는 `AccountBalance.LEDGER_SCALE`, 시장 통화가 정하는 값(주문 금액·DCA 표시)은 `Market`/`Currency`의 `amountScale()`
+- 금액 자릿수 리터럴 `2`·모듈별 `MONEY_SCALE` 금지. USD 가격은 `Currency.USD.amountScale()`, 원장 금액(통화 무관)은 `AccountBalance.LEDGER_SCALE`, 시장 통화가 정하는 값(주문 금액·DCA 표시)은 `Market`/`Currency`의 `amountScale()`
 - 원장 금액이 응답으로 나갈 때는 조립 서비스에서 `Currency.round()`. 비율은 반올림 전 값으로 계산. 가격·수량·지표값은 대상 아님
 
 ### 신규 파일 배치
