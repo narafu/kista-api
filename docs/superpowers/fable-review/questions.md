@@ -267,6 +267,22 @@
 - 멈춘 범위: 없음.
 - 답: 자체 결정(2026-11-16) ①. api 15 T4 실행 세션이 처리한다.
 
+### Q-18 테스트만 쓰는 도메인 메서드 2개를 테스트째 지울지
+- 상태: 사용자 결정 필요
+- 묶음·태스크: S13 / 13 U2
+- 걸린 곳: `AccountBalance.hasSufficientDepositFor`(`AccountBalance.java:61`, 테스트 6곳, 주석 "ManualTradingService 전용"은 낡음)와 `ReverseModePosition.calcLocBuyAmount`(`ReverseModePosition.java:42`, 테스트 1곳)는 main 호출처가 0이다. 13 9절은 "그 테스트가 공개 동작으로 같은 것을 확인할 수 있으면 삭제"라 했는데 옮길 공개 동작이 없다. 판정 로직(`BUY 합계`, `quotaBuyAmount`)은 다른 공개 경로가 이미 쓰고 테스트한다.
+- 선택지: ① 메서드와 그 테스트를 함께 지운다. 동작 변화 없음, 약 40줄 감소 ② 지금처럼 둔다. 죽은 메서드가 남고 낡은 주석만 고친다.
+- 권고: ①. 매매 공식은 `trading-formulas.md`와 실제 호출 경로 테스트가 SSOT라 죽은 메서드의 테스트가 공식을 지키지 않는다.
+- 멈춘 범위: 이 두 메서드만. 답이 없으면 ②로 둔다.
+
+### Q-19 `TradingPriceFetcher`의 raw catch를 `tryGet`으로 바꾸지 않는다
+- 상태: 자체 결정
+- 묶음·태스크: S13 / 13 U2(13 8절 표 "raw catch 1곳")
+- 걸린 곳: `TradingPriceFetcher.java:177`·`:191`의 `catch (Exception e)`는 일괄 조회 실패를 종목별 단건 fallback으로 넘기고, 단건까지 실패한 종목을 `failed`에 모으는 분기다. `constraints.md`는 서비스의 raw catch를 "이벤트 발행·분기가 있을 때만" 허용하므로 규칙 위반이 아니다. `tryGet`으로 바꾸면 로그 문구·레벨과 실패 종목 수집이 달라진다.
+- 선택지: ① 그대로 둔다 ② `tryGet`으로 바꾸고 실패 수집을 호출부로 옮긴다(동작 변경, 시세 경로).
+- 답: 자체 결정(2026-11-16) ①. 13 8절의 "raw catch 1곳" 문장을 고쳤다. 14 T3(시세 전환, N19)에서 이 파일이 바뀌면 그때 다시 본다.
+- 멈춘 범위: 없음.
+
 ## Fable 대기 작업 (2026-11-15 추가)
 
 Fable 한도가 돌아오면 한 세션에서 몰아서 한다. 위에서부터 순서대로 하고, 끝난 항목에는 결과 문서와 커밋 해시를 적는다. 검수만 하고 고치지 않는다. 고칠 결함은 로드맵에 후속 묶음으로 추가한다. 산출물은 `findings/30-post-hoc-review.md` 하나에 절로 나눈다.
