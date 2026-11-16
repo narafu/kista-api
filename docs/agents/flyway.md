@@ -7,7 +7,7 @@
 - 신규 테이블은 소유 서비스 디렉토리에만 추가한다(스키마 소유 → 이 문서 "DB 스키마 5분리").
 - root는 `src/main/resources/db/migration`(이력 `flyway_schema_history_api`, 기본 스키마 `public`), trading-core는 `trading-core/src/main/resources/db/migration-trading`(이력 `flyway_schema_history_trading`, 기본 스키마 `trading`)이다. 스키마 소유 표 → 이 문서 "DB 스키마 5분리".
 - 다른 서비스 소유 스키마 테이블을 참조하면(FK 포함) trading baseline이 root 테이블에 의존해 fresh DB 기동이 실패한다.
-- 두 서비스 모두 `V1__init.sql` baseline 하나로 스쿼시돼 있다(옛 공용 `public.flyway_schema_history`는 롤백 증거로 운영 DB에 보존, 수정·삭제 금지). 스키마 재편 이행은 2026-09 완료, 절차는 git 태그 `archive/docs-2026-11` 참고
+- 두 서비스 모두 `V1__init.sql` baseline 하나로 스쿼시돼 있다(옛 공용 `public.flyway_schema_history`는 2026-11-16 운영에서 drop했다). 스키마 재편 이행은 2026-09 완료, 절차는 git 태그 `archive/docs-2026-11` 참고
 - 이력이 스쿼시된 적이 있어 문서에 특정 버전 번호(`V24` 등)를 근거로 쓰지 않는다. 버전은 `git log`로 추적하고 문서에는 "어떤 컬럼/제약이 어느 파일에 있는지"만 기록한다.
 - 새 마이그레이션 번호는 소유 서비스 디렉토리의 최신 버전 다음 번호다(`ls`로 확인).
 

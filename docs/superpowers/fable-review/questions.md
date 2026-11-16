@@ -213,7 +213,7 @@
 - 멈춘 범위: 없음(T4 착수 전까지 답이 필요하다. 답이 없으면 ②로 진행해 계약을 깨지 않는다).
 
 ### Q-16 운영 정리 SQL 3건(11 D4 + EPR 완료 행)을 돌릴지
-- 상태: 사용자 결정 필요(11 D4는 "SQL을 보여 준 뒤 승인"으로 이미 승인. 실행 승인만 남았다)
+- 상태: 답함(2026-11-16 사용자 승인, 실행 완료)
 - 묶음·태스크: S13 / 11 T8
 - 걸린 곳: 운영 데이터를 지우는 SQL이라 로드맵 9-4에 따라 사용자 승인 뒤에만 돌린다. 읽기 전용 count는 2026-11-15에 확인했다.
   - ① 코드에 없는 스케줄러 락 행: `public.scheduler_locks` 7행(`fear-greed-12hourly`·`fear-greed-6hourly`·`fear-greed-daily`, trading-core로 옮겨 간 `market-calendar-monthly`·`market-calendar-startup`·`trading-close`·`trading-open`). 지침서에 없던 `trading.scheduler_locks`의 `ledger-reconciliation` 1행도 코드에 없다(`git grep` 0건).
@@ -230,6 +230,7 @@
 - 선택지: ① 셋 다 돌린다(③은 S13 배포 뒤에 돌려야 다시 쌓이지 않는다) ② ①·③만 돌리고 ②(옛 이력)는 남긴다 ③ 그대로 둔다(해는 없다).
 - 권고: ①. 시점은 S13 배포 뒤 매매 시간대 밖(KST 07:00~16:00). 미완료 EPR 행(`completion_date IS NULL`)은 건드리지 않는다.
 - 멈춘 범위: 없음. 코드 변경은 S13에 들어갔다.
+- 답: ① 셋 다(2026-11-16). S13 배포(`f50ffb5d8`) 뒤 다시 센 값 그대로 한 트랜잭션에서 지웠다: 락 7·1행, `public.flyway_schema_history` drop, EPR 완료 877·365행. 덤프 `kista-server:/tmp/s13-cleanup-202611160453.sql`. `flyway.md`·`docker-infra.md`의 보존 문장을 고쳤다.
 
 ## Fable 대기 작업 (2026-11-15 추가)
 

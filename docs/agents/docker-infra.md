@@ -159,7 +159,7 @@ UPDATE trading.orders SET status = 'FAILED' WHERE id = '<id>' AND status = 'SUBM
 
 ### 복구 뒤 앱 쪽 확인
 1. 복원 명령은 `kista-infra/README.md` "백업/복구"를 따른다
-2. 복원 후 두 이력 테이블 `flyway_schema_history_api`(root)·`flyway_schema_history_trading`(trading)의 최신 버전이 각각 배포 코드의 `db/migration`·`db/migration-trading` 버전과 일치하는지 확인 — 불일치 시 앱 기동 실패. 옛 공용 `public.flyway_schema_history`는 스키마 재편 롤백 증거로 보존된 테이블이라 검증 대상이 아니다
+2. 복원 후 두 이력 테이블 `flyway_schema_history_api`(root)·`flyway_schema_history_trading`(trading)의 최신 버전이 각각 배포 코드의 `db/migration`·`db/migration-trading` 버전과 일치하는지 확인 — 불일치 시 앱 기동 실패. 2026-11-16 이전 덤프에 남은 옛 공용 `public.flyway_schema_history`는 쓰지 않는 테이블이라 검증 대상이 아니다
 3. 앱 재기동 후 `/actuator/health` 200 확인 + 텔레그램 시작 알림 수신 확인
 
 ### 키 백업 (분실 시 복구 불가 — DB 백업과 별도 보관 필수)
