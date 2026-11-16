@@ -239,6 +239,7 @@ fida에 확인:
 | G6 | 차트 일봉의 출처가 토스에서 Alpaca로 바뀐다. 조정 방식은 지금과 같게 유지한다. 값이 달라지는 것이 확인되면 이 행에 적는다 | 14 T3 | ui: 변경 없음(예정) | 14 9절 |
 | G7 | 마감 리포트와 그 알림이 마감+10분에서 마감+20분으로 늦어진다. 화면에 리포트 예정 시각을 적은 곳이 있으면 고친다. infra `trading-guard.sh`의 시각 창(F3)이 리포트 종료 시각을 포함하는지 확인한다 | 14 T3 | ui·infra: 확인 | 14 D3 |
 | G8 | 운영 secret에서 뺄 키: `TOSS_ADMIN_CLIENT_ID`·`TOSS_ADMIN_CLIENT_SECRET`(14 T5 배포 뒤), `CMC_API_KEY`·`HEARTBEAT_CRYPTO_URL`·업비트 관련 키(15 T4 배포 뒤). 배포 전에 빼면 기동이 실패할 수 있으니 순서를 지킨다. healthchecks.io의 코인 체크 삭제와 토스 관리자 키 폐기는 사용자 작업이다 | 배포 완료를 이 행에 표시 | infra: sops 파일에서 제거 | 14 8절, 15 3절 |
+| G8 ↳ | **15 T4 몫 완료(kista-infra `0f48c57`, 2026-11-16 17:41 KST push, Server Deploy run 43833199985 success).** 서버 `/opt/kista-api/.env`에서 `CMC_API_KEY`·`HEARTBEAT_CRYPTO_URL` 제거 확인, 재적용 뒤 세 role healthy·ERROR 0. `UPBIT_*`·`BINANCE_*`·`KIS_*`는 처음부터 없음. healthchecks.io 코인 DCA 체크는 사용자가 삭제. infra 운영 설정(Caddy·모니터링·alert·runbook)에 코인 잔재 없음. 남은 것: `TOSS_ADMIN_CLIENT_ID`·`TOSS_ADMIN_CLIENT_SECRET`(14 T5 배포 뒤) | 14 T5 몫만 남음 | infra: 완료 | infra 회신 2026-11-16 |
 
 | G9 | DCA 종목에 `BITO`·`EETH`가 추가된다(`/api/meta`의 `tickers`와 DCA 허용 종목). ui가 종목 목록·아이콘·설명을 하드코딩한 곳이 있으면 고친다. 메타만 쓰면 변경 없음 | 15 T0 | ui: 확인 | 15 2-4절 |
 
