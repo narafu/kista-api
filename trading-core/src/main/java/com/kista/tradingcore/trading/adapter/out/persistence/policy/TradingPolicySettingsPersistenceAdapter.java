@@ -4,6 +4,7 @@ import com.kista.shared.kernel.TradingPolicySettings;
 import com.kista.tradingcore.trading.application.port.output.TradingPolicySettingsPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -13,6 +14,7 @@ import tools.jackson.databind.node.ObjectNode;
 import java.util.Iterator;
 import java.util.Map;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class TradingPolicySettingsPersistenceAdapter implements TradingPolicySettingsPort {
@@ -71,8 +73,12 @@ class TradingPolicySettingsPersistenceAdapter implements TradingPolicySettingsPo
             root.set(section, defaultsSection);
             return;
         }
-        // 삭제된 enum 상수 키(예: 삭제된 증권사)는 버린다
-        sectionNode.propertyNames().removeIf(name -> !defaultsSection.has(name));
+        // 삭제된 enum 상수 키(예: 삭제된 증권사)는 버린다 — DB 행은 관리자가 다시 저장할 때 바뀐다
+        sectionNode.propertyNames().removeIf(name -> {
+            if (defaultsSection.has(name)) return false;
+            log.warn("[정책] 알 수 없는 키를 버립니다: {}.{}", section, name);
+            return true;
+        });
         Iterator<Map.Entry<String, JsonNode>> defaultFields = defaultsSection.properties().iterator();
         while (defaultFields.hasNext()) {
             Map.Entry<String, JsonNode> entry = defaultFields.next();

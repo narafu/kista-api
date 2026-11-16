@@ -89,35 +89,18 @@ class TradingPolicySettingsPersistenceAdapterTest {
     }
 
     @Test
-    @DisplayName("UPBIT 키가 없는 기존 행은 defaults(UPBIT 비활성·허용 IP)로 보충되고 기존 브로커 allowedIp는 null로 로드된다")
-    void loadBackfillsUpbitAsDisabled() throws Exception {
+    @DisplayName("V23 이전 행의 삭제된 증권사 키(KIS·UPBIT·BINANCE)와 allowedIp 필드는 버리고 로드된다")
+    void loadDropsRemovedBrokerKeysAndAllowedIp() throws Exception {
         ObjectNode root = (ObjectNode) objectMapper.valueToTree(TradingPolicySettings.defaults());
         ObjectNode brokers = (ObjectNode) root.get("brokers");
-        brokers.remove("UPBIT");
-        brokers.properties().forEach(e -> ((ObjectNode) e.getValue()).remove("allowedIp"));
+        brokers.properties().forEach(e -> ((ObjectNode) e.getValue()).putNull("allowedIp"));
+        brokers.set("KIS", objectMapper.readTree("{\"enabled\": false, \"allowedIp\": null}"));
+        brokers.set("UPBIT", objectMapper.readTree("{\"enabled\": false, \"allowedIp\": \"168.107.63.152\"}"));
+        brokers.set("BINANCE", objectMapper.readTree("{\"enabled\": true, \"allowedIp\": \"168.107.63.152\"}"));
         when(repository.findById(TradingPolicySettingsPersistenceAdapter.SETTING_KEY)).thenReturn(Optional.of(
                 new TradingPolicySettingsEntity(TradingPolicySettingsPersistenceAdapter.SETTING_KEY, objectMapper.writeValueAsString(root))));
 
-        TradingPolicySettings loaded = adapter.load();
-
-        assertThat(loaded.brokerEnabled(Broker.UPBIT)).isFalse();
-        assertThat(loaded.brokers().get(Broker.UPBIT).allowedIp()).isEqualTo("168.107.63.152");
-        assertThat(loaded.brokers().get(Broker.TOSS).allowedIp()).isNull();
-        assertThat(loaded.brokerEnabled(Broker.TOSS)).isTrue();
-    }
-
-    @Test
-    @DisplayName("BINANCE 키가 없는 기존 행은 defaults(BINANCE 비활성·허용 IP)로 보충된다")
-    void loadBackfillsBinanceAsDisabled() throws Exception {
-        ObjectNode root = (ObjectNode) objectMapper.valueToTree(TradingPolicySettings.defaults());
-        ((ObjectNode) root.get("brokers")).remove("BINANCE");
-        when(repository.findById(TradingPolicySettingsPersistenceAdapter.SETTING_KEY)).thenReturn(Optional.of(
-                new TradingPolicySettingsEntity(TradingPolicySettingsPersistenceAdapter.SETTING_KEY, objectMapper.writeValueAsString(root))));
-
-        TradingPolicySettings loaded = adapter.load();
-
-        assertThat(loaded.brokerEnabled(Broker.BINANCE)).isFalse();
-        assertThat(loaded.brokers().get(Broker.BINANCE).allowedIp()).isEqualTo("168.107.63.152");
+        assertThat(adapter.load()).isEqualTo(TradingPolicySettings.defaults());
     }
 
     @Test
