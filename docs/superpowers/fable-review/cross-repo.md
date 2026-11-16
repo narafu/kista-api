@@ -265,6 +265,19 @@ fable-ui·fable-infra 세션이 떠 있지 않아(2026-11-14 새벽) SendMessage
 | 10 T4·13 U8·15 단계 U의 배포 | 규칙을 맞췄다(ui 로드맵 4-4): 모양이 바뀌는 것은 같은 날, 서버가 지울 것은 ui 먼저. ui 실행 세션이 준비되면 해당 행에 "ui 준비됨(커밋 해시)"을 적는다 |
 | 10 T8 가계부 집계 명세 | 다른 명세는 없다. ui 지침서 05의 2-1절 입출력을 그대로 쓴다 |
 
+### ui 회신 (2026-11-16, fable-ui — main `8743fa99` 기준 읽기 전용 조사)
+
+| 항목 | 내용 | api가 할 일 |
+|---|---|---|
+| 15 T4의 계약 상수 삭제(`questions.md` Q-15) | `BROKER_IP_NOT_ALLOWED` 참조 0건. `BROKER_WITHDRAWAL_ENABLED`는 문구 매핑 1줄(`entities/account/model/brokerCredentials.ts:16`)과 테스트 1건 — 코드가 안 오면 서버 `detail`로 폴백한다. `DcaSkipReason` 셋은 테스트 픽스처뿐이고 모르는 값은 코드 문자열로 폴백한다. `BROKER_API`는 수기 타입의 죽은 멤버. **배포 순서 제약 없음, api가 먼저 지워도 된다** | 15 T4 배포 뒤 이 표에 완료를 적는다. ui는 다음 `gen:types` 때 매핑 1줄·테스트 1건을 지운다 |
+| 15 T6 | `brokers[].market`·`minOrderAmount`·`amountScale`·`executionHour`·`allowedIp`를 읽는 제품 코드 0건. 종목의 `markets`·`market`은 없으면 주식으로 판정한다. **최상위 `markets`(가계부 시장)는 지우면 화면이 깨진다** | 최상위 `markets`는 남긴다(15의 11절) |
+| H절 로그아웃 | 프록시(`app/api/auth/logout/route.ts:18-27`)는 지금도 RT 쿠키만 보낸다. ui 지침서에 AT를 싣는 항목이 없다. 넣는다면 ui 지침서 11 태스크 2이고 2줄이다. 순서는 api 먼저 | H절의 ①(로그아웃 경로를 무효 토큰 익명 통과에)은 사용자 승인 뒤 S12 남은 작업과 같은 커밋에서 한다. 그 배포 뒤 ui에 알린다 |
+| 13 5절 요청 ①~④ | ui 코드로 끝난 것은 없다. ① `status` 클레임: ui는 아직 읽지 않고 생겨도 깨지지 않는다 ② `TOKEN_STALE_ROLE`: ui 변경 없이 받는다(401 → 갱신 → 재시도) ③ **`status-stream`은 ui가 아직 구독한다**(`app/pending/PendingStatusWatcher.tsx:10`) — api는 지우지 않고 PENDING 허용 경로에 남긴다 ④ `rejectReason`을 읽는 제품 코드 0건 | PENDING 차단 구현 때 허용 경로 9개에 `GET /api/auth/me`·`status-stream`이 들어 있는지 확인 |
+| PENDING AT에서 `role` 제거 | 코드 추적으로는 깨지는 화면이 없다(proxy는 JWT의 `role`을 읽지 않고 `/me` 본문을 읽는다, 403은 로그아웃을 일으키지 않는다). 운영은 `approvalRequired=false`라 실제 PENDING 사용자로 본 적은 없다 | 없음 |
+| 계좌 등록 `broker` 생략(Q-14) | 생략 경로 0건 | 없음(Q-14는 MOCK 기본값 유지) |
+| 2026-11-16 삭제한 `trade-dates`·계좌 범위 `daily-trades` | 제품 호출 0건. 생성 타입에만 남았고 다음 `gen:types`에서 빠진다 | 없음 |
+| 10 T7 `fieldErrors`, 13 U8 | ui 스위치는 꺼져 있어 api가 먼저 내도 안전하다. HTTP 400에 기대는 분기는 여전히 0건 | 없음 |
+
 ## H. S12(13 U1 중 PENDING 차단 제외) 실행에서 나온 ui 영향 (2026-11-15, fable-api 실행 세션)
 
 ui 코드 변경은 필요 없다. ui가 부르는 `/api/auth` 경로 6개(`kakao/callback`·`refresh`·`logout`·`me`·`approval-requests`·`status-stream`)의 인가 결과는 그대로다.
@@ -309,3 +322,14 @@ ui 코드 변경은 필요 없다. ui가 부르는 `/api/auth` 경로 6개(`kaka
 - 자동 배포를 잠시 끄는 스위치가 두 레포 어디에도 없다. 전환은 I-2 첫 줄로 버티지만, 다음에 role 구성이 또 바뀔 일이 있으면 워크플로 변수 하나(`DEPLOY_PAUSED`)를 두는 편이 낫다 — 지금은 만들지 않는다.
 - api `deploy/server/docker-compose.yml:80` 주석("`TradingSchedulerInternalController`가 게이팅 없이 항상 노출")은 코드와 다르다(`:21`에 게이트가 있다). `compose-invariants.bats`는 재발행 플래그를 `kista-trading`만 단언해 `constraints.md`의 서술보다 좁다. 둘 다 M의 배포 파일 수정에서 없어진다. (2026-11-15 P4: 주석은 고쳤다.)
 - P4(2026-11-15): compose `environment:`의 `SCHEDULER_ENABLED`가 `KISTA_ROLE`(kista-api=web, kista-scheduler·kista-trading=worker)로 바뀌었다. kista-infra 쪽 secrets·reconcile에는 두 키 모두 없어 할 일이 없다. M에서 role 이름이 `kista-web`·`kista-worker`로 바뀔 때 값은 그대로 따라간다.
+
+### I-5. kista-infra 회신 (2026-11-16, infra `344da10` 기준 — fable-infra 읽기 전용 조사)
+
+- **I-2 표의 7개 동작은 그대로다.** 줄 번호만 옮겨졌다: `build-bundle.sh:19-23`, `reconcile.sh:144`(`--remove-orphans` 없음), `reconcile.sh:76`(자동 롤백), `resolve-request.sh:39-43`·`:70-72`·`:75-79`, `state-lib.sh:22`, `reconcile.sh:183-194`(release 5개).
+- **보정 1**: M 합병 push가 멈추는 첫 지점은 `resolve-request.sh:70-72`("state에 없는 role")이고 `build-bundle.sh`는 두 번째다. 서버는 건드리지 않는다.
+- **보정 2**: 전환 배포에서 새 role의 헬스 게이트가 실패하면 자동 롤백이 exit 2로 끝나고 실패한 새 컨테이너가 떠 있는 채로 남는다(코드 읽기 기준). 옛 role을 올리기 전에 `docker stop`이 먼저다.
+- **I-1은 시작되지 않았다.** infra 로드맵에는 있다(infra `guides/03-instance-topology.md` 5-1·T7). bats 픽스처는 실제 state를 읽지 않는다. 같이 고칠 문서: infra `README.md:30-31`, `server-deploy.yml:98,101` 주석.
+- **I-4 첫 항목은 맞다.** 워크플로로는 후퇴할 수 없다. 올바른 롤백: 서버에서 `nohup bash /opt/kista-infra/bin/reconcile.sh kista-api <옛 release id>` 뒤 `state/kista-api.yml`을 실제 적용 SHA로 수동 커밋(infra `README.md:64-69`). api `deploy/server/README.md`의 롤백 절은 05 단계 M의 배포 파일 수정에서 고친다(05의 15절).
+- **G7(`trading-guard.sh:13-14`)**: 개장 창 월~금 22:20~23:40 KST, 마감 창 화~토 04:20~06:20 KST, 고정 KST(서머타임·휴장·조기 마감 개념 없음). infra 배포의 compose·`.env` 해시가 바뀔 때만 적용되고 앱 reconcile에는 없다. api 답(2026-11-16 운영 `trading.scheduler_locks`): 마감 배치는 마감 30분 전에 시작해 리포트까지 한 번에 돌고, 2026-11-13 거래일은 05:30:00 → 06:10:10 KST였다(리포트 자체는 약 10초). 14 T3으로 리포트가 마감+20분이 되면 비서머타임 종료가 06:20:10쯤이라 창 상한(06:20)을 넘는다 → **14 T3 배포 전에 infra가 상한을 06:30으로 올린다**(`trading-guard.bats` 포함). 조기 마감일의 마감 배치는 그날 마감 30분 전(비서머타임 02:30 KST, 서머타임 01:30)에 시작해 창 밖이다 — 가드가 덮지 못하는 기존 공백이고 infra 배포를 그 시각에 하지 않는 것으로 버틴다. 백업 cron(06:40 KST)과는 겹치지 않는다.
+- **G8(sops `secrets/kista-api.env`)**: `KIS_*`·`UPBIT_*`·`BINANCE_*` 없음. 남은 제거 대상은 `TOSS_ADMIN_CLIENT_ID`·`TOSS_ADMIN_CLIENT_SECRET`(14 T5 배포 뒤), `CMC_API_KEY`·`HEARTBEAT_CRYPTO_URL`(15 T4 배포 뒤) 넷이다. 각 배포가 끝나면 api가 infra에 알린다.
+- 2026-11-16 api 배포 4회(13:47~14:23 KST): reconcile 전부 success, 롤백·경고 0, drift 보고 0, Caddy 5xx 0.

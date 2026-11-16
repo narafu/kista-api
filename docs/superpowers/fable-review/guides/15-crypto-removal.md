@@ -269,3 +269,28 @@ WHERE completion_date IS NULL AND event_type ILIKE '%crypto%' GROUP BY 1;
 - 삭제 표시된 코인 행을 읽어야 하는 기능이 나온다: 탈퇴 사용자 정리(`TradingUserCascadeListener`에서 시작)가 후보다. C2(완전 삭제)로 행이 없어지므로 읽을 것이 없다. 완전 삭제 뒤에도 그 기능이 0행으로 정상 종료하는지 테스트로 확인하고 진행한다.
 
 배포(단계 A): **되돌릴 수 없다.** 삭제 마이그레이션이 나가면 이전 이미지로 되돌려도 지운 행은 돌아오지 않는다. 복구 수단은 덤프뿐이다. 코드 쪽 문제는 롤백하지 않고 앞으로 고친다. 그래서 배포 전 확인표(로드맵 9-4)에 넣는다: 위 SQL 결과, 4절의 삭제 SQL과 예상 행 수, 덤프 파일 경로, kista-ui의 코인 화면 제거가 배포됐다는 확인(`cross-repo.md` G1). 매매 시간대 밖. 단계 B(T6)는 그 뒤 1거래일이 지나고 kista-ui의 메타 필드 참조가 빠졌다는 기록이 `cross-repo.md`에 있을 때 한다.
+
+## 11. 2차 실행 전 보정 (2026-11-16, Fable — 본문·10절과 다르면 이 절이 우선)
+
+근거는 `findings/30-post-hoc-review.md` 0절(운영 조회 2026-11-16 14:30 KST)과 ui 회신(`cross-repo.md` G절 "ui 회신 2026-11-16").
+
+**순서: 단계 A(T3~T5)를 05 단계 M 앞에 한다.** 선행 넷 가운데 S17 배포, 사용자 단계 P ①, ui G1 배포(2026-11-16 `8743fa99`), S16이 끝났다. 남은 단계 P ②(관리자 설정에서 `BINANCE` 비활성, DCA 허용 종목에서 `BTC`·`ETH` 제거)는 **선행 조건에서 뺀다.** 4절 3번의 마이그레이션이 같은 값을 지우고, 살아 있는 코인 계좌·전략이 0이며, ui에 코인 계좌 등록 경로가 없다. 사용자가 화면에서 먼저 내려도 해는 없다.
+
+**정책 JSON은 마이그레이션이 반드시 고쳐야 한다(코드가 대신해 주지 않는다).** `TradingPolicySettingsPersistenceAdapter.backfillSection`(`dfdecd8c4`)은 `brokers`·`strategies`의 **최상위 키**만 버린다. `strategies.DCA.ticker.allowedValues` 배열 안의 `"BTC"`·`"ETH"`는 걸러지지 않아 `StrategyTicker`에서 상수를 지우면 역직렬화가 `IllegalStateException`으로 실패한다. 운영 값(2026-11-16):
+
+- `brokers`: `KIS`(false)·`MOCK`·`TOSS`·`UPBIT`(false, allowedIp 있음)·`MERITZ`·`BINANCE`(**true**, allowedIp 있음)
+- `strategies.DCA.ticker.allowedValues`: `["UPRO","QLD","BTC","ETH"]`, `defaultValue`: `"QLD"`
+
+4절 3번에 더한다: ① `brokers.KIS` 키도 지운다(04 단계 A가 남긴 것) ② `allowedValues`에서 `BTC`·`ETH`를 뺀 결과가 비지 않고 `defaultValue`를 포함하는지를 마이그레이션 안에서 단언한다(`StrategyFieldSettings` 생성자가 같은 조건으로 예외를 던진다) ③ 6절 4번 테스트의 입력은 위 운영 JSON 전문이다(`findings/30` 0절의 조회 명령으로 다시 뜬다). `BITO`·`EETH`를 마이그레이션에서 허용 목록에 넣지 않는다(Q-08의 사용자 확인이 먼저다).
+
+**4절에 더할 정리 1건.** `trading.scheduler_locks`의 `crypto-dca` 행(코드가 사라지면 Q-16과 같은 고아 행)을 같은 마이그레이션에서 지운다.
+
+**가드(4절 1번)의 뜻.** 살아 있는 코인 계좌·전략이 있으면 Flyway가 실패하고 `kista-trading`이 기동하지 못한다. 그래서 T3의 확인 SQL(10절)을 **push 직전에** 한 번 더 돌린다. 2026-11-16 값: BINANCE·UPBIT live 0(total 각 1), BTC·ETH 전략 live 0.
+
+**Q-15(코인 전용 계약 상수).** Fable 권고는 ① 삭제다(`questions.md` Q-15 검토). 사용자 확인이 오면 T4에서 `ErrorCode.BROKER_WITHDRAWAL_ENABLED`·`BrokerWithdrawalEnabledException`, `DcaSkipReason`의 `BELOW_MIN_ORDER_AMOUNT`·`EXCHANGE_API_ERROR`·`API_KEY_EXPIRED`를 함께 지우고 `constraints.md`의 "`ErrorCode` 상수 이름 변경·삭제 금지" 문장은 그대로 둔다(이번 삭제는 사용자 승인 예외다). 확인이 없으면 ②(상수만 남김)로 간다. ui는 순서 제약이 없다고 회신했다. 배포 뒤 `cross-repo.md` G절에 "ui: `gen:types` + `brokerCredentials.ts:16` 매핑 1줄·테스트 1건 삭제"를 남긴다.
+
+**T6(단계 B) 주의.** `/api/meta`의 최상위 `markets` 키는 가계부 시장 목록이라 남긴다(ui `AssetRecordList.tsx:90` 등이 `meta.markets.map`을 부른다). 지우는 것은 `brokers[].market`·`minOrderAmount`·`amountScale`과 종목의 `markets`·`market`뿐이다. ui는 이 필드들을 읽는 제품 코드가 0건이라고 회신했다(2026-11-16) — T6의 ui 선행 조건은 충족됐다.
+
+**번호.** 다음 마이그레이션은 trading `V23`, root `V11`이다(2026-11-16 운영 이력 기준). 착수할 때 `ls`로 다시 센다.
+
+**배포 뒤 infra 통지.** `CMC_API_KEY`·`HEARTBEAT_CRYPTO_URL`이 kista-infra `secrets/kista-api.env`에 남아 있다(2026-11-16 infra 회신). T4 배포가 끝나면 `cross-repo.md` G8에 완료를 적고 infra 세션에 알린다. 업비트·바이낸스·KIS 키는 이미 없다.

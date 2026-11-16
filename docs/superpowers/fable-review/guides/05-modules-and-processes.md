@@ -639,3 +639,34 @@ ssh kista-server 'docker ps -a --format "{{.Names}}\t{{.Status}}" | grep kista-'
 - 6절 규칙 7("1,500줄 미만 모듈은 3단 패키지를 강제하지 않는다")과 `PENDING_REMOVAL_CEILING`: 지금 82/82다. R ⑥(01 단계 C와 묶음)에서 포트를 지울 때마다 목록과 상한을 같이 내린다.
 - 8절 단계 C의 선행은 넷에서 셋이 됐다(`findings/29` 1-3): 메리츠 호출 간격의 공유, `remaining()`을 사이클 행 락 안에서 구하기, 유일 제약 위반의 409 매핑. 토큰 lease 일반화는 KIS 삭제로 빠진다. 여전히 하지 않는다.
 - 11절의 "`AccountBudgetLock` JVM 락 유지"에 덧붙인다: 주석의 "계좌 row FOR UPDATE로 승격"은 틀린 방향이다. 불변식이 사이클 단위라 승격한다면 사이클 행 락이다. 지금은 주석만 "엔진 단일 프로세스 전제(05 1-1)"로 고친다(단계 R의 문서 반영 때).
+
+## 15. 3차 실행 전 보정 (2026-11-16, Fable — 14절과 다르면 이 절이 우선)
+
+`questions.md` F-04의 답이다. 근거는 `findings/30-post-hoc-review.md` 0·5절과 kista-infra 회신(`cross-repo.md` I-5, infra `344da10` 기준).
+
+**선행 상태.** P3·P4(`1dc134c78`·`33b129e1a`), 04 단계 A·B(`a43b5af51`·`c882fbf3e`)가 main에 들어가 배포됐다. M 브랜치는 아직 없다.
+
+**15를 M 앞에 둔다(14-1의 판정 규칙을 고친다).** 14-1은 "P3·P4·04 A가 main에 들어간 날 선행 넷이 끝나 있으면"이라고 날짜를 박았다. 그 규칙의 목적은 ui 일정이 M을 막지 않게 하는 것이었는데, ui G1이 2026-11-16에 배포됐고 M은 어차피 S11·S15 T2 관찰(2026-11-16~18)이 끝나야 전환할 수 있다. 그래서: **15 단계 A(T3~T5) → 1거래일 관찰 → M 브랜치 시작.** 15의 11절이 남은 선행(사용자 단계 P ②)을 뺐다. 15 단계 B(T6)는 M 전환 뒤로 미뤄도 된다(메타 필드와 컬럼 하나라 합병과 겹치는 파일이 적다). M 브랜치를 시작한 뒤에는 끼워 넣지 않는다는 문장은 그대로다.
+
+**M 브랜치 세션의 첫 작업.** 14-2의 수치(빈 수, 락 이름 R 8·T 7, 삭제 테스트 수, `flows.yml` 줄 번호)는 KIS·코인 삭제 전 값이다. 다시 세고 시작한다. 2026-11-16 운영의 락 이름은 `public` 8, `trading` 6(`crypto-dca` 포함 — 15 뒤 5)이고 겹침은 여전히 0이다.
+
+**런북(14-3) 보정.**
+
+| 곳 | 보정 |
+|---|---|
+| D-1 e | M 합병 push가 멈추는 첫 지점은 infra `resolve-request.sh:70-72`("state에 없는 role", exit 1)다. `build-bundle.sh:19-23`은 두 번째 방어선이다. 어느 쪽이든 번들 업로드 전이라 서버는 그대로고, 텔레그램 `[배포 실패] kista-api reconcile`과 api 커밋 status `deploy/production` failure가 온다(예정된 소음) |
+| 0단계 | 명령 전부를 2026-11-16 운영에서 시험 실행했다(읽기 전용). 컬럼·스트림 이름이 맞고 결과는 EPR 0·0, 락 held f·f, SUBMITTING 0, 스트림 pending 0이었다. `XLEN`은 `user.deleted` 0, `notify-profile.changed` 2, `app.error` 10, `push-notification.requested` 329 |
+| 0단계 | release id는 config SHA + 접미사 꼴이다(2026-11-16 `current` = `33b129e1af32-58a8bec9`, `previous` = `…-3657bfdb`). role 이미지만 바뀐 배포도 release가 새로 생기고 5개만 보존되므로 **당일 다시 적는다** |
+| 2단계 | `insert … select *`는 그대로 쓴다. 두 스키마의 `event_publication` 컬럼 순서가 같다(2026-11-16 확인: id, listener_id, event_type, serialized_event, publication_date, completion_date, status, completion_attempts, last_resubmission_date). S13이 완료 행 삭제를 켜서 평소 두 테이블은 0행이다 |
+| 5단계 no-go | worker 게이트가 실패하면 reconcile의 자동 롤백은 직전 compose에 `kista-worker`가 없어 exit 2로 끝나고 **실패한 `kista-worker` 컨테이너가 떠 있는 채로 남는다**(infra 코드 읽기 기준). 롤백 1번의 `docker stop kista-worker`를 옛 role을 올리기 전에 반드시 먼저 한다(이중 실행 방지). `kista-web`도 같다 |
+| 4단계 | 실패한 infra run은 Re-run으로 다시 쓸 수 있다(checkout이 `ref: main`이라 재실행 시점의 state를 읽는다) |
+| 롤백 3번 | 맞다(infra 확인). 워크플로로는 어느 조합으로도 후퇴할 수 없다. 서버에서 `reconcile.sh kista-api <옛 release id>` 실행 뒤 infra `state/kista-api.yml`을 실제 적용 SHA로 수동 커밋한다 |
+| 배포 파일(14-2) | `deploy/server/README.md`의 롤백 절("state를 그 SHA로 수정·커밋 뒤 dispatch")은 동작하지 않는다(`cross-repo.md` I-4 확정). M의 배포 파일 수정에서 위 한 줄로 고친다 |
+
+**kista-infra 준비 상태(2026-11-16).** I-1(state 키 브랜치)은 시작되지 않았다. infra 로드맵에는 있다(infra `guides/03-instance-topology.md` 5-1, T7). bats 픽스처는 실제 state를 읽지 않아 반드시 고칠 것은 없어 보인다(실행 미확인). infra 03 5-1의 순서(옛 scheduler·trading 정지 → state 키 → reconcile → Caddy 확인 뒤 옛 api 정지)는 14-3의 "옛 api를 살려 두는 변형"과 같고, 14-3의 기본안(전체 정지)과는 옛 api를 내리는 시점이 다르다. 사용자가 전체 정지를 고르면 infra 03 5-1을 14-3에 맞춘다(infra 세션 몫, D-7 c와 같은 커밋).
+
+**일정.** 전환 창 후보는 15 단계 A 배포와 1거래일 관찰이 끝난 뒤의 토요일이다. 2026-11-26(목)은 휴장, 11-27(금)은 조기 마감이다. 11-28(토)에 전환하면 0단계의 `trading-close` `finished_at`이 조기 마감 시각대(KST 03시대)로 찍힌다 — 정상이다. 일시와 전체 정지 여부는 여전히 사용자 결정이다.
+
+**M 목록 전체의 재검수는 하지 않았다.** `findings/29`의 M 목록은 2026-11-15 판정 그대로 두고, 위 "첫 작업"의 재측정에서 어긋난 것만 M 브랜치 세션이 14-4의 기본값으로 처리한다.
+
+**P4 후속 — role 기본값(M10에서 함께 고친다).** `kista.role`의 기본값이 `${KISTA_ROLE:all}`이다(root `application.yml:132`, trading-core `:116`). 운영은 prod 프로필이 기본값 없는 `${KISTA_ROLE}`이라 안전하지만, 로컬은 gitignore된 `application-local.yml`에 `kista.role: web`이 없으면 스케줄러(매매 배치 포함)가 켜진 채 뜬다. 옛 `scheduler.enabled: false`는 P4 뒤로 읽히지 않는다. 2026-11-16 이 저장소의 Windows 작업 PC에서 두 로컬 파일이 옛 키만 갖고 있어 `kista.role: web`으로 고쳤다. **다른 PC의 로컬 파일은 사용자가 확인한다**(`grep -n "role\|scheduler" src/main/resources/application-local.yml trading-core/src/main/resources/application-local.yml`). M10에서 기본값을 `web`으로 바꾸고(1-3절 "기본값은 꺼짐"), `all`이 필요한 테스트는 프로퍼티로 지정한다. `docs/agents/local-dev.md`에 "로컬 파일에 `kista.role: web`을 넣는다"를 한 줄 더한다.
