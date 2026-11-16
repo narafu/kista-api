@@ -180,6 +180,7 @@ class TossOrderApi {
         return switch (type) {
             case LOC, MOC -> "CLS"; // MOC 미지원 → LIMIT+CLS로 장마감 경매 참여
             case LIMIT, MOO -> "DAY";
+            case LIMIT_VWAP -> throw new IllegalArgumentException("토스증권은 Limit VWAP 주문을 지원하지 않습니다.");
         };
     }
 

@@ -11,7 +11,8 @@ public enum OrderType {
     LOC("LOC(종가지정가)"),     // Limit On Close: 종가 지정가 주문
     MOC("MOC(종가시장가)"),     // Market On Close: 종가 시장가 주문
     LIMIT("LIMIT(지정가)"),     // 일반 지정가 주문
-    MOO("MOO(시가시장가)");     // Market On Open: 장개시 시장가 — 매수는 브로커 어댑터가 캡 지정가로 변환
+    MOO("MOO(시가시장가)"),     // Market On Open: 장개시 시장가 — 매수는 브로커 어댑터가 캡 지정가로 변환
+    LIMIT_VWAP("LIMIT VWAP(지정가 VWAP)"); // 지정가 VWAP — 접수부터 장마감까지 VWAP 분할 체결, 메리츠 전용
 
     private final String label; // 한국어 표시 이름 (메타 orderTypes)
 }

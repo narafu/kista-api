@@ -34,7 +34,7 @@ public final class FillSimulator {
         List<Execution> executions = new ArrayList<>();
         for (PlannedOrder order : pendingOrders) {
             if (!fillsOhlc(order, candle)) continue;
-            BigDecimal fillPrice = order.orderType() == OrderType.LIMIT ? limitFillPrice(order, candle) : candle.close();
+            BigDecimal fillPrice = isLimitLike(order) ? limitFillPrice(order, candle) : candle.close();
             executions.add(Execution.ofManualFill(candle.date(), order.ticker(), order.direction(),
                     order.quantity(), fillPrice, order.orderLeg()));
         }
@@ -48,9 +48,14 @@ public final class FillSimulator {
                 : order.price().max(candle.open());
     }
 
+    // 지정가 계열 — LIMIT_VWAP은 일봉 백테스트에서 LIMIT과 동일하게 근사
+    private static boolean isLimitLike(PlannedOrder order) {
+        return order.orderType() == OrderType.LIMIT || order.orderType() == OrderType.LIMIT_VWAP;
+    }
+
     // 주문타입별 OHLC 체결 조건 — LIMIT만 저가/고가 터치, 나머지(MOC/LOC)는 종가 기준
     private static boolean fillsOhlc(PlannedOrder order, DailyCandle candle) {
-        if (order.orderType() != OrderType.LIMIT) return fills(order, candle.close());
+        if (!isLimitLike(order)) return fills(order, candle.close());
         return order.direction() == OrderDirection.BUY
                 ? candle.low().compareTo(order.price()) <= 0
                 : candle.high().compareTo(order.price()) >= 0;

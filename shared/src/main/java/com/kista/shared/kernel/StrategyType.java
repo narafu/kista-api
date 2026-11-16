@@ -24,14 +24,15 @@ public enum StrategyType {
         return switch (this) {
             case INFINITE -> StrategyCapability.basic(
                     EnumSet.of(StrategyTicker.MAGX, StrategyTicker.USD, StrategyTicker.TQQQ, StrategyTicker.SOXL),
-                    false, false, true, true, List.of(20, 30, 40));
-            case PRIVACY -> StrategyCapability.basic(EnumSet.of(StrategyTicker.SOXL), true, true, false, true, List.of());
-            case VR -> StrategyCapability.basic(EnumSet.of(StrategyTicker.TQQQ), true, false, false, false, List.of());
+                    false, false, true, true, List.of(20, 30, 40), Set.of());
+            case PRIVACY -> StrategyCapability.basic(EnumSet.of(StrategyTicker.SOXL), true, true, false, true, List.of(),
+                    EnumSet.of(Broker.MERITZ, Broker.MOCK)); // FIDA Limit VWAP 주문은 메리츠(·Mock)만 지원
+            case VR -> StrategyCapability.basic(EnumSet.of(StrategyTicker.TQQQ), true, false, false, false, List.of(), Set.of());
             case DCA -> new StrategyCapability(
                     EnumSet.of(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BITO, StrategyTicker.EETH),
                     false, false, false, false, List.of(),
                     List.of(OrderType.MOO, OrderType.MOC), List.of(OrderDirection.BUY, OrderDirection.SELL),
-                    List.of(DcaFrequency.values()), List.of(DcaIndicator.values()));
+                    List.of(DcaFrequency.values()), List.of(DcaIndicator.values()), Set.of());
         };
     }
 

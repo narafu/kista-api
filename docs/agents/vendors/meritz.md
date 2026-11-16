@@ -49,7 +49,10 @@ adapter/out/meritz/ ← MeritzHttpClient(본문 `rsp_cd` 기반 응답 판정 �
 | LOC | `32`/`7`/단가 | `32`/`7`/단가 |
 | MOC | `32`/`7`/캡 단가(매수 MOC 대신 LOC 캡) | `34`/`7`/`0` |
 | LIMIT | `01`/`0`/단가 | `01`/`0`/단가 |
+| LIMIT_VWAP | `35`/`0`/단가 | `35`/`0`/단가 |
 | MOO | `01`/`0`/캡 단가(개장 후 지정가 근사) | `05`/`0`/`0` 시장가(DCA "즉시 매도" 의도) |
+
+LIMIT_VWAP(PRIVACY 전용): 스펙에 실행 구간 파라미터가 없어 접수 시점부터 장마감까지 VWAP으로 돈다(PRIVACY는 마감 30분 전 접수). PRIVACY 전략은 매수·매도 모두 장마감 30분 전 LIMIT VWAP(메리츠 35)으로 접수한다, 등록은 MERITZ·MOCK만.
 
 가격은 `setScale(2, HALF_UP).toPlainString()`(한도 4자리 이내). 단가·수량 누락은 송신 전에 차단한다.
 

@@ -8,6 +8,7 @@ com.kista.tradingcore.privacy/   ← Spring Modulith 모듈(CLOSED) — FIDA 기
   adapter/out/persistence/ ← PrivacyTradeBaseEntity + PrivacyTradeBaseOrderEntity + JpaRepository + PrivacyTradePersistenceAdapter
 
 ### PRIVACY 전략 패턴 (기준 매매표)
+- **주문 방식**: PRIVACY 전략은 매수·매도 모두 장마감 30분 전 LIMIT VWAP(메리츠 35)으로 접수한다, 등록은 MERITZ·MOCK만. 기준표 데이터는 LIMIT 그대로 두고 `PrivacyStrategy`가 주문 생성 시 `LIMIT_VWAP`으로 변환한다.
 - `privacy_trade_bases` (`PrivacyTradeBaseEntity`): 전역 SSOT — 모든 PRIVACY 계좌가 공유, **account_id 없음**
   - `(release_date, ticker)` UNIQUE (`uq_privacy_trade_bases_release_date_ticker`) — 하루에 종목당 기준 매매표 1건
   - `updated_at` 없음 — `BaseCreatedAtEntity` 상속 (`createdAt`만)

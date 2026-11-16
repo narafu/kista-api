@@ -78,6 +78,7 @@ class MeritzOrderApi {
             case LOC -> new String[]{"32", "7", formatPrice(p)};                                      // LOC
             case MOC -> buy ? new String[]{"32", "7", formatPrice(p)} : new String[]{"34", "7", MARKET_PRICE}; // 매수 MOC는 LOC 캡
             case LIMIT -> new String[]{"01", "0", formatPrice(p)};                                    // 지정가
+            case LIMIT_VWAP -> new String[]{"35", "0", formatPrice(p)};                              // Limit VWAP — 접수부터 장마감까지
             case MOO -> buy ? new String[]{"01", "0", formatPrice(p)} : new String[]{"05", "0", MARKET_PRICE}; // 개장 후 지정가 근사 / 시장가 매도
         };
         Map<String, String> body = new LinkedHashMap<>();

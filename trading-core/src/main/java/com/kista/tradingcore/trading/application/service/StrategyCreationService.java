@@ -80,6 +80,10 @@ class StrategyCreationService {
         DcaStrategyConfig dcaConfig = dca ? cmd.dca().withAssignedKeys(Set.of()) : null;
 
         StrategyTicker resolvedTicker = resolved.ticker();
+        // 증권사 제한 — 전략 타입이 지원하지 않는 증권사 계좌면 등록 거부(PRIVACY는 Limit VWAP 지원 증권사만)
+        if (!cmd.type().capability().supportsBroker(account.broker())) {
+            throw new IllegalArgumentException("%s 전략은 이 증권사에서 등록할 수 없습니다.".formatted(cmd.type().getDescription()));
+        }
         // 시장 검증이 중간부터 시작(보유 자릿수) 검증보다 먼저 — 시장 불일치가 자릿수 문구에 가려지지 않게 한다
         validateMarket(account, resolvedTicker);
         // 중간부터 시작 입력 검증 (전 전략 공통) — holdings>0이면 avgPrice>0 필수, 음수 거부, 정수 주

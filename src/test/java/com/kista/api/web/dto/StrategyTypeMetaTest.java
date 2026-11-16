@@ -24,6 +24,7 @@ class StrategyTypeMetaTest {
         assertThat(meta.tickerFixed()).isTrue();          // PRIVACY: SOXL 단일
         assertThat(meta.supportsReverseMode()).isFalse();
         assertThat(meta.divisionCounts()).isEmpty();
+        assertThat(meta.supportedBrokers()).containsExactlyInAnyOrder("MERITZ", "MOCK"); // Limit VWAP 지원 증권사만
     }
 
     @Test

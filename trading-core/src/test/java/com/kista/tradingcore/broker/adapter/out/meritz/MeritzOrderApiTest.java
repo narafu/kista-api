@@ -82,6 +82,8 @@ class MeritzOrderApiTest {
             "MOC,   SELL, sell, 34, 7, 0",
             "LIMIT, BUY,  buy,  01, 0, 82.11",
             "LIMIT, SELL, sell, 01, 0, 82.11",
+            "LIMIT_VWAP, BUY,  buy,  35, 0, 82.11",
+            "LIMIT_VWAP, SELL, sell, 35, 0, 82.11",
             "MOO,   BUY,  buy,  01, 0, 82.11",
             "MOO,   SELL, sell, 05, 0, 0",
     })

@@ -42,7 +42,7 @@ class PrivacyStrategyTest {
     }
 
     private static PrivacyPlannedTrade buy(int quantity, String price) {
-        return new PrivacyPlannedTrade(DATE, TICKER, OrderType.LOC, OrderDirection.BUY, quantity, new BigDecimal(price));
+        return new PrivacyPlannedTrade(DATE, TICKER, OrderType.LIMIT, OrderDirection.BUY, quantity, new BigDecimal(price));
     }
 
     private static PrivacyPlannedTrade sell(int quantity, String price) {
@@ -67,6 +67,17 @@ class PrivacyStrategyTest {
                 .containsExactly("PRIVACY_BUY_01", "PRIVACY_BUY_02");
         assertThat(sellOrders(orders)).extracting(PlannedOrder::orderLeg)
                 .containsExactly("PRIVACY_SELL_01");
+    }
+
+    @Test
+    @DisplayName("FIDA LIMIT 기준표 주문은 BUY·SELL(명시·잔량 전부) 모두 LIMIT_VWAP으로 변환한다")
+    void convertsLimitToLimitVwap() {
+        PrivacyPlan base = base(240, List.of(buy(100, "10"), sell(50, "12"), sellNull("13")));
+        List<PlannedOrder> orders = strategy.buildOrders(balance(240, INITIAL_USD_DEPOSIT), PRICE, base);
+
+        assertThat(orders).isNotEmpty().allMatch(o -> o.orderType() == OrderType.LIMIT_VWAP);
+        assertThat(buyOrders(orders)).hasSize(1);
+        assertThat(sellOrders(orders)).hasSize(2);
     }
 
     @Test

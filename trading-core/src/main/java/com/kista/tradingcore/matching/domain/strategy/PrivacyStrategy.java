@@ -68,7 +68,7 @@ public class PrivacyStrategy {
                 }
                 // 배수 적용 — 버림은 PlannedOrder 생성 직전에만 (중간 버림 시 소수점 배수에서 수량 손실 발생)
                 BigDecimal qty = BigDecimal.valueOf(t.quantity()).multiply(multiple);
-                buyEntries.add(new BuyEntry(t.price(), qty, t.orderType(), t.tradeDate(), t.ticker()));
+                buyEntries.add(new BuyEntry(t.price(), qty, executionType(t.orderType()), t.tradeDate(), t.ticker()));
             } else {
                 if (t.quantity() == null) {
                     if (nullSellTemplate != null) {
@@ -115,6 +115,11 @@ public class PrivacyStrategy {
         return Stream.concat(buyOrders.stream(), sellOrders.stream()).toList();
     }
 
+    // FIDA는 장마감 30분 전 Limit VWAP으로 체결하므로 같은 방식으로 따라간다 — 기준표 LIMIT만 변환
+    private static OrderType executionType(OrderType type) {
+        return type == OrderType.LIMIT ? OrderType.LIMIT_VWAP : type;
+    }
+
     private List<PlannedOrder> sortOrdersForStableLegs(List<PlannedOrder> orders) {
         return orders.stream()
                 .sorted(Comparator
@@ -147,7 +152,7 @@ public class PrivacyStrategy {
         for (int i = 0; i < explicit.size(); i++) {
             PrivacyPlannedTrade t = explicit.get(i);
             int qty = rawQtys.get(i).setScale(0, RoundingMode.DOWN).intValue();
-            result.add(PlannedOrder.of(t.tradeDate(), t.ticker(), t.orderType(), SELL, qty, t.price(), AT_CLOSE));
+            result.add(PlannedOrder.of(t.tradeDate(), t.ticker(), executionType(t.orderType()), SELL, qty, t.price(), AT_CLOSE));
         }
 
         // null SELL 없는 경우만 fraction 보정 — null SELL이 있으면 remaining이 자동 흡수
@@ -191,7 +196,7 @@ public class PrivacyStrategy {
             return result;
         }
         result.add(PlannedOrder.of(nullTemplate.tradeDate(), nullTemplate.ticker(),
-                nullTemplate.orderType(), SELL, remaining, nullTemplate.price(), AT_CLOSE));
+                executionType(nullTemplate.orderType()), SELL, remaining, nullTemplate.price(), AT_CLOSE));
         return result;
     }
 

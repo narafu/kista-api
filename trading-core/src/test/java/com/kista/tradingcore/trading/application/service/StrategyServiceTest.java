@@ -53,6 +53,7 @@ import java.util.UUID;
 
 import static com.kista.tradingcore.support.StrategyCommands.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -270,6 +271,10 @@ class StrategyServiceTest {
         return TradingFixtures.stockAccount(ACCOUNT_ID, USER_ID);
     }
 
+    private Account accountOn(Broker broker) {
+        return new Account(ACCOUNT_ID, USER_ID, "테스트계좌", "74420614", "key", "secret", null, broker, null, null);
+    }
+
     private TradingUserProfile activeUserProfile() {
         return TradingFixtures.tradingUserProfile(USER_ID);
     }
@@ -315,7 +320,8 @@ class StrategyServiceTest {
     }
 
     private void stubSuccessfulRegistration(StrategyType type, StrategyTicker ticker) {
-        Account account = ownerAccount();
+        // PRIVACY는 Limit VWAP 지원 증권사(메리츠)만 등록 가능 — 나머지는 기본 Toss 계좌
+        Account account = type == StrategyType.PRIVACY ? accountOn(Broker.MERITZ) : ownerAccount();
         UUID strategyId = UUID.randomUUID();
         UUID cycleId = UUID.randomUUID();
         Strategy saved = new Strategy(strategyId, ACCOUNT_ID, type, StrategyStatus.ACTIVE, ticker,
@@ -1341,6 +1347,20 @@ class StrategyServiceTest {
     }
 
     @Test
+    @DisplayName("PRIVACY register()는 Toss 계좌면 거부하고 Mock 계좌는 허용한다")
+    void register_privacy_rejectsUnsupportedBroker() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(accountOn(Broker.TOSS));
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, register(StrategyType.PRIVACY).build()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageEndingWith("니다.");
+
+        stubSuccessfulRegistration(StrategyType.PRIVACY, StrategyTicker.SOXL);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(accountOn(Broker.MOCK));
+        assertThatCode(() -> strategyService.register(USER_ID, ACCOUNT_ID, register(StrategyType.PRIVACY).build()))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     @DisplayName("PRIVACY register()는 initialDeposit null이면 0으로 저장한다")
     void register_privacy_nullDeposit_persistsZero() {
         stubSuccessfulRegistration(StrategyType.PRIVACY, StrategyTicker.SOXL);
@@ -2339,7 +2359,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("PRIVACY register() 중간부터 시작 — CyclePositionInfiniteDetail을 저장하지 않는다")
     void register_privacy_bootstrap_savesPositionWithoutInfiniteDetail() {
-        Account account = ownerAccount();
+        Account account = accountOn(Broker.MERITZ);
         StrategyTicker ticker = defaultTicker(StrategyType.PRIVACY);
         UUID strategyId = UUID.randomUUID();
         UUID cycleId = UUID.randomUUID();
@@ -2529,7 +2549,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("INFINITE·PRIVACY·VR register() 음수 예수금은 거부하고 저장하지 않는다")
     void register_nonDca_rejectsNegativeDeposit() {
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(accountOn(Broker.MERITZ));
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         for (StrategyType type : List.of(StrategyType.INFINITE, StrategyType.PRIVACY, StrategyType.VR)) {
             assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
@@ -2542,7 +2562,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("INFINITE·PRIVACY·VR register() 계좌 통화(USD) 자릿수를 넘는 예수금은 거부하고 저장하지 않는다")
     void register_nonDca_rejectsDepositBeyondCurrencyScale() {
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(accountOn(Broker.MERITZ));
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         for (StrategyType type : List.of(StrategyType.INFINITE, StrategyType.PRIVACY, StrategyType.VR)) {
             assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,

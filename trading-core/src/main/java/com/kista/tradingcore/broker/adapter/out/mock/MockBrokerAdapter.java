@@ -144,7 +144,7 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
         for (PlacedOrderView order : placed) {
             if (!fills(order, candle)) continue; // 미체결 — TradingReporter.markFilledOrders가 CANCELLED로 기록
             BigDecimal fillPrice = switch (order.orderType()) {
-                case LIMIT -> limitFillPrice(order, candle);
+                case LIMIT, LIMIT_VWAP -> limitFillPrice(order, candle);
                 case MOO -> candle.open(); // 장개시 시장가 — 시가 체결
                 default -> candle.close(); // MOC/LOC — 종가 체결
             };
@@ -160,7 +160,7 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
         // MOO 매수는 DCA 캡 지정가를 달고 온다 — 운영처럼 시가가 캡을 넘으면 미체결
         if (order.orderType() == OrderType.MOO) return !buy || order.price() == null || candle.open().compareTo(order.price()) <= 0;
         if (order.orderType() == OrderType.MOC) return true; // 시장가 — 항상 체결
-        if (order.orderType() == OrderType.LIMIT) {
+        if (order.orderType() == OrderType.LIMIT || order.orderType() == OrderType.LIMIT_VWAP) { // VWAP도 지정가로 근사
             return buy ? candle.low().compareTo(order.price()) <= 0 : candle.high().compareTo(order.price()) >= 0; // 저가/고가 터치
         }
         return buy ? candle.close().compareTo(order.price()) <= 0 : candle.close().compareTo(order.price()) >= 0; // LOC: 종가 기준

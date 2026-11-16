@@ -30,7 +30,9 @@ public record StrategyTypeMeta(
         @Schema(description = "DCA 실행 주기 name() 목록")
         List<String> frequencies,      // DCA 실행 주기 옵션
         @Schema(description = "DCA 조건 지표 name() 목록")
-        List<String> conditionIndicators // DCA 조건 지표 옵션
+        List<String> conditionIndicators, // DCA 조건 지표 옵션
+        @Schema(description = "등록 가능 증권사 name() 목록 (빈 목록이면 전체 허용)")
+        List<String> supportedBrokers  // 등록 가능 증권사 — 빈 목록이면 전체 허용
 ) {
     public static StrategyTypeMeta from(StrategyType t) {
         StrategyCapability capability = t.capability();
@@ -42,7 +44,8 @@ public record StrategyTypeMeta(
                 capability.supportsReverseMode(),
                 capability.divisionCounts(),
                 names(capability.orderTypes()), names(capability.directions()),
-                names(capability.frequencies()), names(capability.conditionIndicators())
+                names(capability.frequencies()), names(capability.conditionIndicators()),
+                capability.supportedBrokers().stream().map(Enum::name).toList()
         );
     }
 

@@ -37,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -125,6 +126,17 @@ class TossOrderApiTest {
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
         verify(tossHttpClient).post(anyString(), any(), captor.capture(), any(ParameterizedTypeReference.class));
         assertThat(captor.getValue().get("timeInForce")).isEqualTo("DAY");
+    }
+
+    @Test
+    @DisplayName("LIMIT_VWAP 주문 → 전송 없이 IllegalArgumentException")
+    void place_limitVwap_rejectedWithoutSending() {
+        OrderInstruction instruction = new OrderInstruction(StrategyTicker.SOXL, OrderDirection.BUY, OrderType.LIMIT_VWAP, 1, new BigDecimal("25.00"));
+
+        assertThatThrownBy(() -> tossOrderApi.place(instruction, ACCOUNT))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageEndingWith("니다.");
+        verifyNoInteractions(tossHttpClient);
     }
 
     @Test

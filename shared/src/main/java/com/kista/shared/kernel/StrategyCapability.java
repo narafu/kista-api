@@ -17,7 +17,8 @@ public record StrategyCapability(
         List<OrderType> orderTypes,           // 사용자 선택 주문유형 — 빈 목록이면 선택 없음 (DCA만 값)
         List<OrderDirection> directions,      // 사용자 선택 방향 — 빈 목록이면 선택 없음 (DCA만 값)
         List<DcaFrequency> frequencies,       // DCA 실행 주기 옵션
-        List<DcaIndicator> conditionIndicators // DCA 조건 지표 옵션
+        List<DcaIndicator> conditionIndicators, // DCA 조건 지표 옵션
+        Set<Broker> supportedBrokers          // 등록 가능 증권사 — 빈 집합이면 전체 허용
 ) {
     public StrategyCapability {
         // 방어적 복사 — 상수 공유 중 외부 변경 차단, EnumSet 순서(ordinal)를 유지해 UI 티커 정렬을 보존
@@ -25,6 +26,9 @@ public record StrategyCapability(
         availableTickers = Collections.unmodifiableSet(availableTickers.isEmpty()
                 ? EnumSet.noneOf(StrategyTicker.class)
                 : EnumSet.copyOf(availableTickers));
+        supportedBrokers = Collections.unmodifiableSet(supportedBrokers.isEmpty()
+                ? EnumSet.noneOf(Broker.class)
+                : EnumSet.copyOf(supportedBrokers));
         divisionCounts = List.copyOf(divisionCounts);
         orderTypes = List.copyOf(orderTypes);
         directions = List.copyOf(directions);
@@ -35,8 +39,13 @@ public record StrategyCapability(
     // 비DCA 전략 공용 — DCA 선택지 4종을 빈 목록으로 채운다
     public static StrategyCapability basic(Set<StrategyTicker> tickers, boolean tickerFixed, boolean requiresPrivacyBase,
                                            boolean supportsReverseMode, boolean supportsCycleSeed,
-                                           List<Integer> divisionCounts) {
+                                           List<Integer> divisionCounts, Set<Broker> supportedBrokers) {
         return new StrategyCapability(tickers, tickerFixed, requiresPrivacyBase, supportsReverseMode, supportsCycleSeed, divisionCounts,
-                List.of(), List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of(), supportedBrokers);
+    }
+
+    // 증권사 등록 가능 여부 — 빈 집합은 전체 허용
+    public boolean supportsBroker(Broker broker) {
+        return supportedBrokers.isEmpty() || supportedBrokers.contains(broker);
     }
 }

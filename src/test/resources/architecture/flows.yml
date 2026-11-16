@@ -318,7 +318,7 @@ flows:
         title: PRIVACY 기준표 장전 점검
         desc: >-
           PRIVACY 전략이 있으면 주문 계획 전에 다음 거래일 기준표를 다시 점검한다. 경고·차단 이슈가 하나라도 있으면 기준표를 쓰지 않고
-          관리자에게 알린다(저장 때는 경고였던 "보유 중인데 매도 없음"도 여기서는 차단 사유다). PRIVACY 주문은 모두 장마감(AT_CLOSE)이라
+          관리자에게 알린다(저장 때는 경고였던 "보유 중인데 매도 없음"도 여기서는 차단 사유다). PRIVACY 주문은 모두 장마감(AT_CLOSE)·LIMIT VWAP이라
           개장 배치에서는 조기 경보이고, 실제 차단은 같은 가드를 쓰는 마감 배치가 한다.
         code: [TradingService#screenPrivacyBase, PrivacyBaseGuard#screen]
         cond: PRIVACY 전략이 있고 기준표가 있을 때
@@ -499,7 +499,7 @@ flows:
         code: [AccountPort#requireOwnedAccount, StrategyCreationService#resolveCreationSettings, BootstrapPosition#validate,
                StrategyCreationService#resolveScheduledStart, StrategyCreationService#validateUniqueTicker,
                InfiniteMinSeedGuard#minSeed, DepositAmounts#normalizeForRegistration]
-        fail: 위반이면 400, 계좌+종목 중복은 409(DuplicateStrategyTickerException, 전 전략 유형 공통). DCA도 같은 계좌·종목 전략은 1개(매수·매도는 한 전략의 규칙)이고 런타임 정책(기본 비활성)이 켜져 있어야 등록된다. DCA 규칙 ruleKey는 서버가 발급한다(등록 요청에 ruleKey를 보내면 400, 수정 시 기존 키 재전송·생략=신규·없는 키 400). 중간부터 시작(initialHoldings·initialAvgPrice)은 DCA에도 허용하며 정수 주다. 예수금(initialDeposit)은 전 유형 공통으로 0 이상·계좌 통화 금액 자릿수 이하(생략=0)여야 하며 DCA는 이를 받아 시작 금액 = 예수금 + 평단×보유로 기록하고, 일반 수정(PUT)은 DCA 시드 변경을 거부한다. INFINITE는 시작 금액(예수금+보유 평가금)이 최소 시드(전일종가×분할×2) 미만이면 400 — 전일종가 조회가 실패하면 이 검증만 건너뛴다(폼이 같은 기준으로 먼저 막는다).
+        fail: 위반이면 400(PRIVACY는 MERITZ·MOCK 계좌만 등록 가능 — 그 외 증권사 400), 계좌+종목 중복은 409(DuplicateStrategyTickerException, 전 전략 유형 공통). DCA도 같은 계좌·종목 전략은 1개(매수·매도는 한 전략의 규칙)이고 런타임 정책(기본 비활성)이 켜져 있어야 등록된다. DCA 규칙 ruleKey는 서버가 발급한다(등록 요청에 ruleKey를 보내면 400, 수정 시 기존 키 재전송·생략=신규·없는 키 400). 중간부터 시작(initialHoldings·initialAvgPrice)은 DCA에도 허용하며 정수 주다. 예수금(initialDeposit)은 전 유형 공통으로 0 이상·계좌 통화 금액 자릿수 이하(생략=0)여야 하며 DCA는 이를 받아 시작 금액 = 예수금 + 평단×보유로 기록하고, 일반 수정(PUT)은 DCA 시드 변경을 거부한다. INFINITE는 시작 금액(예수금+보유 평가금)이 최소 시드(전일종가×분할×2) 미만이면 400 — 전일종가 조회가 실패하면 이 검증만 건너뛴다(폼이 같은 기준으로 먼저 막는다).
 
       - id: balance
         lane: trading
@@ -654,7 +654,7 @@ flows:
         title: 배치에서 사용
         desc: >-
           개장·마감 배치 모두 주문 계획 전에 기준표를 다시 점검해 이슈가 있으면 기준표를 쓰지 않고(신규 PRIVACY 주문 없음) 관리자에게 알린다.
-          이슈가 없으면 거래일의 기준표로 PRIVACY 주문(모두 장마감)을 계산한다. 배수는 고정 시작 금액이 아니라 전일 종가 기준 우리 자산 ÷ FIDA 자산이며, 평가 불가(자산 0 이하·평단·가격 없음)면 그 전략만 격리하고 관리자에게 알린다. 사용자 "바로 주문"·주문 미리보기도 같은 점검으로 차단한다(알림 없이 PRIVACY_BASE_BLOCKED — 바로 주문은 409로 거부).
+          이슈가 없으면 거래일의 기준표로 PRIVACY 주문(모두 장마감 30분 전 LIMIT VWAP, 메리츠 35)을 계산한다. 배수는 고정 시작 금액이 아니라 전일 종가 기준 우리 자산 ÷ FIDA 자산이며, 평가 불가(자산 0 이하·평단·가격 없음)면 그 전략만 격리하고 관리자에게 알린다. 사용자 "바로 주문"·주문 미리보기도 같은 점검으로 차단한다(알림 없이 PRIVACY_BASE_BLOCKED — 바로 주문은 409로 거부).
         code: [TradingPriceFetcher#loadPriceContext, PrivacyBaseGuard#screen, PrivacyBaseGuard#usable, StrategyOrderPlanBuilder#build, PrivacyTradePersistenceAdapter#findTodayTrade]
         cond: ACTIVE PRIVACY 전략이 있을 때
 
