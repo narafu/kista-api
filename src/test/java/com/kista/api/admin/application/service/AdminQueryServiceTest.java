@@ -19,9 +19,7 @@ import java.time.LocalDate;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -96,18 +94,6 @@ class AdminQueryServiceTest {
         ArgumentCaptor<LocalDate> captor = ArgumentCaptor.forClass(LocalDate.class);
         verify(privacyQueryPort).findBasesFromTradeDate(captor.capture());
         assertThat(captor.getValue()).isEqualTo(expected);
-    }
-
-    @Test
-    void listStrategyTradeDates_포트로_위임한다() {
-        UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
-        UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
-        when(tradingQueryPort.findStrategyTradeDates(accountId, strategyId))
-                .thenReturn(List.of(LocalDate.of(2026, 7, 1)));
-
-        List<LocalDate> result = service.listStrategyTradeDates(accountId, strategyId);
-
-        assertThat(result).containsExactly(LocalDate.of(2026, 7, 1));
     }
 
     @Test

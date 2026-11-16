@@ -49,11 +49,6 @@ class BrokerRouter implements PortfolioPort, MarginPort, SellableQuantityPort,
     }
 
     @Override
-    public List<MarginItem> getMargin(BrokerAccountRef account) {
-        return of(account).getMargin(account);
-    }
-
-    @Override
     public BigDecimal getUsdBuyableAmount(BrokerAccountRef account) {
         return of(account).getUsdBuyableAmount(account);
     }

@@ -2,7 +2,6 @@ package com.kista.tradingcore.broker.adapter.out.toss;
 
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.shared.kernel.Currency;
-import com.kista.tradingcore.broker.domain.model.MarginItem;
 import com.kista.tradingcore.broker.domain.model.PresentBalanceResult;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.StrategyTicker;
@@ -87,60 +86,6 @@ class TossHoldingsApiTest {
     }
 
     @Test
-    @DisplayName("getMargin: USD·KRW 통화별 2건 반환 (통합 아님)")
-    void getMargin_returnsUsdAndKrwSeparately() {
-        stubNoAccountHeader();
-        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenAnswer(inv -> {
-                @SuppressWarnings("unchecked")
-                org.springframework.util.MultiValueMap<String, String> params =
-                    (org.springframework.util.MultiValueMap<String, String>) inv.getArgument(2);
-                String currency = params.getFirst("currency");
-                String amount = "USD".equals(currency) ? "100.00" : "140000";
-                return new TossResult<>(new TossHoldingsApi.BuyableAmountResponse(amount));
-            });
-        when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(new TossResult<>(new TossHoldingsApi.ExchangeRateResult("1400.00", "1400.00")));
-
-        List<MarginItem> items = tossHoldingsApi.getMargin(ACCOUNT);
-
-        // 통합 아님 — USD·KRW 원본 금액 각각 반환
-        assertThat(items).hasSize(2);
-        MarginItem usdItem = items.getFirst();
-        assertThat(usdItem.currency()).isEqualTo(Currency.USD);
-        assertThat(usdItem.purchasableAmount()).isEqualByComparingTo("100.00");
-        assertThat(usdItem.usdToKrwRate()).isEqualByComparingTo("1400.00");
-        MarginItem krwItem = items.get(1);
-        assertThat(krwItem.currency()).isEqualTo(Currency.KRW);
-        assertThat(krwItem.purchasableAmount()).isEqualByComparingTo("140000");
-    }
-
-    @Test
-    @DisplayName("getMargin: 환율 조회 실패 시 USD·KRW 금액은 원본 반환")
-    void getMargin_exchangeRateZero_returnsOriginalAmounts() {
-        stubNoAccountHeader();
-        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenAnswer(inv -> {
-                @SuppressWarnings("unchecked")
-                org.springframework.util.MultiValueMap<String, String> params =
-                    (org.springframework.util.MultiValueMap<String, String>) inv.getArgument(2);
-                String currency = params.getFirst("currency");
-                String amount = "USD".equals(currency) ? "100.00" : "50000";
-                return new TossResult<>(new TossHoldingsApi.BuyableAmountResponse(amount));
-            });
-        when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(null);
-
-        List<MarginItem> items = tossHoldingsApi.getMargin(ACCOUNT);
-
-        assertThat(items).hasSize(2);
-        assertThat(items.getFirst().currency()).isEqualTo(Currency.USD);
-        assertThat(items.getFirst().purchasableAmount()).isEqualByComparingTo("100.00");
-        assertThat(items.get(1).currency()).isEqualTo(Currency.KRW);
-        assertThat(items.get(1).purchasableAmount()).isEqualByComparingTo("50000");
-    }
-
-    @Test
     @DisplayName("현재 환율 조회: USD/KRW만 전달하고 과거 dateTime은 보내지 않는다")
     void getExchangeRate_usesCurrentUsdKrwQueryOnly() {
         when(tossHttpClient.getCommon(
@@ -197,6 +142,21 @@ class TossHoldingsApiTest {
     }
 
     @Test
+    @DisplayName("getPresentBalance: 병렬 호출 중 TossApiException 발생 시 언래핑되어 그대로 전파된다")
+    void getPresentBalance_exceptionInParallelTask_propagatesUnwrapped() {
+        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(new TossResult<>(new TossHoldingsApi.HoldingsResponse(List.of())));
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
+            .thenThrow(new TossApiException("Toss 매수가능금액 조회 실패", null));
+        when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(new TossResult<>(new TossHoldingsApi.ExchangeRateResult("1400.00", "1400.00")));
+
+        assertThatThrownBy(() -> tossHoldingsApi.getPresentBalance(ACCOUNT))
+            .isInstanceOf(TossApiException.class)
+            .hasMessage("Toss 매수가능금액 조회 실패");
+    }
+
+    @Test
     @DisplayName("getPresentBalance: holdings·USD·KRW·환율 4개 호출이 병렬 실행된다")
     void getPresentBalance_fourCallsRunInParallel() throws Exception {
         // 4개 독립 호출이 모두 barrier에 동시 도달해야만 진행 — 순차 실행이면 타임아웃으로 실패
@@ -225,45 +185,6 @@ class TossHoldingsApiTest {
         PresentBalanceResult result = tossHoldingsApi.getPresentBalance(ACCOUNT);
 
         assertThat(result).isNotNull();
-    }
-
-    @Test
-    @DisplayName("getMargin: USD·KRW·환율 3개 호출이 병렬 실행된다")
-    void getMargin_threeCallsRunInParallel() throws Exception {
-        // 3개 독립 호출이 모두 barrier에 동시 도달해야만 진행 — 순차 실행이면 타임아웃으로 실패
-        CyclicBarrier barrier = new CyclicBarrier(3);
-
-        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenAnswer(inv -> {
-                barrier.await(2, TimeUnit.SECONDS);
-                @SuppressWarnings("unchecked")
-                MultiValueMap<String, String> params = (MultiValueMap<String, String>) inv.getArgument(2);
-                String currency = params.getFirst("currency");
-                String amount = "USD".equals(currency) ? "100.00" : "140000";
-                return new TossResult<>(new TossHoldingsApi.BuyableAmountResponse(amount));
-            });
-        when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), any(ParameterizedTypeReference.class)))
-            .thenAnswer(inv -> {
-                barrier.await(2, TimeUnit.SECONDS);
-                return new TossResult<>(new TossHoldingsApi.ExchangeRateResult("1400.00", "1400.00"));
-            });
-
-        List<MarginItem> items = tossHoldingsApi.getMargin(ACCOUNT);
-
-        assertThat(items).hasSize(2);
-    }
-
-    @Test
-    @DisplayName("병렬 호출 중 TossApiException 발생 시 언래핑되어 그대로 전파된다")
-    void getMargin_exceptionInParallelTask_propagatesUnwrapped() {
-        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenThrow(new TossApiException("Toss 매수가능금액 조회 실패", null));
-        when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(new TossResult<>(new TossHoldingsApi.ExchangeRateResult("1400.00", "1400.00")));
-
-        assertThatThrownBy(() -> tossHoldingsApi.getMargin(ACCOUNT))
-            .isInstanceOf(TossApiException.class)
-            .hasMessage("Toss 매수가능금액 조회 실패");
     }
 
     @Test

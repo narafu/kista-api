@@ -37,11 +37,6 @@ public class TossBrokerAdapter implements BrokerCapabilitiesPort, BrokerStatisti
     }
 
     @Override
-    public List<MarginItem> getMargin(BrokerAccountRef account) {
-        return tossHoldingsApi.getMargin(account);
-    }
-
-    @Override
     public BigDecimal getUsdBuyableAmount(BrokerAccountRef account) {
         return tossHoldingsApi.getUsdBuyableAmount(account);
     }

@@ -1,12 +1,7 @@
 package com.kista.tradingcore.trading.adapter.in.web;
 
-import com.kista.shared.kernel.StrategyCycleSeedType;
-import com.kista.shared.kernel.StrategyStatus;
-import com.kista.shared.kernel.StrategyTicker;
-import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
-import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.shared.platform.security.InternalTokenAuthFilter;
 import com.kista.shared.platform.security.JwtAuthFilter;
 import com.kista.shared.platform.security.SecurityConfig;
@@ -24,7 +19,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -61,20 +55,5 @@ class TradingInternalQueryControllerTest {
                         .header("X-Internal-Token", VALID_TOKEN)
                         .param("from", "2026-01-01").param("to", "2026-01-31"))
                 .andExpect(status().isOk());
-    }
-
-    @Test
-    void listStrategyTradeDates_다른_계좌의_전략이면_404() throws Exception {
-        UUID accountId = UUID.randomUUID();
-        UUID otherAccountId = UUID.randomUUID();
-        UUID strategyId = UUID.randomUUID();
-        Strategy strategy = new Strategy(strategyId, accountId, StrategyType.INFINITE,
-                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        given(strategyPort.findByIdOrThrow(strategyId)).willReturn(strategy);
-
-        mockMvc.perform(get("/api/internal/trading/accounts/{accountId}/strategies/{strategyId}/trade-dates",
-                        otherAccountId, strategyId)
-                        .header("X-Internal-Token", VALID_TOKEN))
-                .andExpect(status().isNotFound());
     }
 }

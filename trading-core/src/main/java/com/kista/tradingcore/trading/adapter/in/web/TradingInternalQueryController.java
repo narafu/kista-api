@@ -5,7 +5,6 @@ import com.kista.shared.contract.trading.StrategyResponse;
 import com.kista.shared.contract.trading.StrategySummaryResponse;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
-import com.kista.tradingcore.trading.domain.model.Strategy;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +14,6 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.UUID;
@@ -65,22 +63,5 @@ public class TradingInternalQueryController {
     public Map<UUID, StrategySummaryResponse> getStrategySummariesByCycleIds(@RequestBody Set<UUID> cycleIds) {
         return strategyPort.findSummariesByCycleIds(cycleIds).entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, e -> TradingContractMapper.toResponse(e.getValue())));
-    }
-
-    @Operation(summary = "전략 단건 거래일 목록")
-    @GetMapping("/accounts/{accountId}/strategies/{strategyId}/trade-dates")
-    public List<LocalDate> listStrategyTradeDates(@PathVariable UUID accountId, @PathVariable UUID strategyId) {
-        requireStrategyOwnedByAccount(accountId, strategyId);
-        return orderPort.findTradeDatesByStrategyId(strategyId);
-    }
-
-    // 경로 계층 정합성 검증 — 기존 AdminQueryService.requireStrategyOwnedByAccount와 동일 규칙,
-    // 소유권 검증이 데이터를 가진 trading 쪽으로 이전됐다. 여기서 던진 404는 admin의
-    // TradingQueryHttpAdapter가 다시 NoSuchElementException으로 되돌린다.
-    private void requireStrategyOwnedByAccount(UUID accountId, UUID strategyId) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        if (!strategy.accountId().equals(accountId)) {
-            throw new NoSuchElementException("전략이 해당 계좌에 속하지 않습니다");
-        }
     }
 }

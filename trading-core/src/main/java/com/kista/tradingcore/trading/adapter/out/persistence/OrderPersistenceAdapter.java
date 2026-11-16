@@ -217,11 +217,6 @@ class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
-    public List<Order> findFilledByAccount(UUID accountId, LocalDate from, LocalDate to) {
-        return toDomainList(repository.findFilledByAccountIdAndTradeDateBetween(accountId, from, to));
-    }
-
-    @Override
     public List<Order> findFilledByUser(UUID userId, LocalDate from, LocalDate to) {
         return toDomainList(repository.findFilledByUserIdAndTradeDateBetween(userId, from, to));
     }
@@ -230,11 +225,6 @@ class OrderPersistenceAdapter implements OrderPort {
     public List<Order> findByStrategyId(UUID strategyId, LocalDate from, LocalDate to) {
         return toDomainList(repository.findByStrategyIdAndTradeDateBetweenOrderByTradeDateDesc(
                 strategyId, from, to));
-    }
-
-    @Override
-    public List<LocalDate> findTradeDatesByStrategyId(UUID strategyId) {
-        return repository.findDistinctTradeDatesByStrategyId(strategyId);
     }
 
     @Override

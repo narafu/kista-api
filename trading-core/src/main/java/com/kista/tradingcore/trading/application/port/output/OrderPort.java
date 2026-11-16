@@ -80,17 +80,11 @@ public interface OrderPort {
     // 계좌·거래일·종목 기준 PLANNED/SUBMITTING/PLACED SELL 예약 수량 합계 (판매가능수량 중복 배정 방지용)
     int sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(UUID accountId, LocalDate tradeDate, StrategyTicker ticker);
 
-    // 계좌 기준 체결 주문 조회(filled_quantity > 0 — 취소 전 부분 체결된 CANCELLED 포함) (일별 거래내역 달력용)
-    List<Order> findFilledByAccount(UUID accountId, LocalDate from, LocalDate to);
-
     // 유저 기준 체결 주문 조회(filled_quantity > 0 — 취소 전 부분 체결된 CANCELLED 포함) (대시보드 배치 조회 — 보유 계좌 전체 합산, 1회 조회)
     List<Order> findFilledByUser(UUID userId, LocalDate from, LocalDate to);
 
     // 전략 기준 기간 내 주문 전체 조회 (사용자 주문내역 탭용) — strategy_cycle을 통한 JOIN 필요
     List<Order> findByStrategyId(UUID strategyId, LocalDate from, LocalDate to);
-
-    // 전략 기준 distinct 거래일 목록 조회 (관리자 주문 보정 거래일 드롭다운용)
-    List<LocalDate> findTradeDatesByStrategyId(UUID strategyId);
 
     // AT_OPEN + PLANNED 주문 조회 (개장 스케쥴러·수동 실행 선접수용)
     List<Order> findAtOpenPlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);

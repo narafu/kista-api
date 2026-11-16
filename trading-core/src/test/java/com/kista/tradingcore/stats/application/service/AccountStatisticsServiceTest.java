@@ -112,10 +112,11 @@ class AccountStatisticsServiceTest {
 
     @Test
     void 주식_체결은_USD로_표기한다() {
-        when(orderPort.findFilledByAccount(eq(accountId), any(), any())).thenReturn(List.of(
+        when(accountPort.findByUserId(userId)).thenReturn(List.of(account(accountId, Broker.TOSS)));
+        when(orderPort.findFilledByUser(eq(userId), any(), any())).thenReturn(List.of(
                 filled(accountId, StrategyTicker.SOXL, "10", "20.5")));
 
-        var item = service.getDailyTransactions(accountId, userId, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31))
+        var item = service.getDailyTransactionsForUser(userId, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31))
                 .items().getFirst();
 
         assertThat(item.tradeAmount()).isEqualByComparingTo("205.00");

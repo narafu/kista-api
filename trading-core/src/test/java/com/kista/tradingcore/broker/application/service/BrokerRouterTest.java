@@ -218,7 +218,7 @@ class BrokerRouterTest {
     @Test
     @DisplayName("등록되지 않은 증권사는 IllegalArgumentException")
     void unknownBroker() {
-        assertThatThrownBy(() -> router.getMargin(ref(Broker.MOCK)))
+        assertThatThrownBy(() -> router.getUsdBuyableAmount(ref(Broker.MOCK)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("지원하지 않는 증권사입니다.");
     }

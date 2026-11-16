@@ -6,7 +6,6 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.adapter.out.internal.CallIntervalGate;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.Execution;
-import com.kista.tradingcore.broker.domain.model.MarginItem;
 import com.kista.tradingcore.broker.domain.model.PresentBalanceResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,18 +83,6 @@ class MeritzTradingApiTest {
         expect("/trading/v1/overseas/orders/estimate", "{\"rsp_cd\":\"5766\",\"data\":[{\"crcd\":\"KRW\",\"oder_crnc_oder_able_camt\":\"1\"}]}");
 
         assertThat(api.getUsdBuyableAmount(ACCOUNT)).isEqualByComparingTo("1");
-    }
-
-    @Test
-    void margin_has_single_usd_item() {
-        expect("/trading/v1/overseas/orders/estimate", ESTIMATE);
-
-        List<MarginItem> m = api.getMargin(ACCOUNT);
-
-        assertThat(m).singleElement().satisfies(i -> {
-            assertThat(i.purchasableAmount()).isEqualByComparingTo("3459.0600");
-            assertThat(i.usdToKrwRate()).isEqualByComparingTo("1325.5");
-        });
     }
 
     @Test

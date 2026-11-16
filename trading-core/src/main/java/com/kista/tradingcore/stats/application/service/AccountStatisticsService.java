@@ -48,13 +48,6 @@ public class AccountStatisticsService {
                 portfolioPort.getPresentBalance(account.toBrokerRef()));
     }
 
-    public DailyTransactionResult getDailyTransactions(UUID accountId, UUID requesterId,
-                                                        LocalDate from, LocalDate to) {
-        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        return toDailyTransactionResult(orderPort.findFilledByAccount(accountId, from, to),
-                Map.of(accountId, account.broker().getCurrency()));
-    }
-
     // 유저 스코프 일별 거래내역 조회 (대시보드 위젯용 — 보유 계좌 전체 합산, 1회 조회)
     public DailyTransactionResult getDailyTransactionsForUser(UUID requesterId, LocalDate from, LocalDate to) {
         // accountId → 계좌 통화 (Broker 견적 통화)

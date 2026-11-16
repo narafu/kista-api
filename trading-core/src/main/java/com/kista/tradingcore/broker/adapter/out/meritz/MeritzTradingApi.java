@@ -2,13 +2,11 @@ package com.kista.tradingcore.broker.adapter.out.meritz;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.platform.time.UsTradeDates;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.Execution;
-import com.kista.tradingcore.broker.domain.model.MarginItem;
 import com.kista.tradingcore.broker.domain.model.PresentBalanceResult;
 import com.kista.tradingcore.broker.domain.model.SellableQuantity;
 import lombok.RequiredArgsConstructor;
@@ -75,13 +73,6 @@ class MeritzTradingApi {
     // 전 행 합이 실제 매수 가능 USD (2026-10-30 실측: USD 행 4501.94 + KRW 행 3577.99 = KRW 예수금 95% ÷ 환율)
     BigDecimal getUsdBuyableAmount(BrokerAccountRef account) {
         return totalOrderable(estimateRows(account));
-    }
-
-    List<MarginItem> getMargin(BrokerAccountRef account) {
-        List<EstimateRow> rows = estimateRows(account);
-        EstimateRow usd = findCurrency(rows, "USD");
-        BigDecimal total = totalOrderable(rows);
-        return List.of(new MarginItem(Currency.USD, total, orZero(usd == null ? null : usd.rate())));
     }
 
     // 포트 계약(미체결 매도 미차감 보유 수량)에 맞춰 잔고수량 rmnd_dqty를 쓴다 — seln_able_dqty는 미체결 매도를 이미 뺀 순수량이라

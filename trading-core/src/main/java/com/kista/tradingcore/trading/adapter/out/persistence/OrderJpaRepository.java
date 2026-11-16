@@ -118,19 +118,6 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
 
-    // 계좌·날짜범위 체결 주문 조회 (daily-trades) — 최신순, 체결 판정은 filled_quantity > 0 (취소 전 부분 체결된 CANCELLED 포함)
-    @Query(value = """
-            SELECT * FROM trading.orders
-            WHERE account_id = :accountId
-              AND trade_date BETWEEN :from AND :to
-              AND filled_quantity > 0
-            ORDER BY trade_date DESC, created_at DESC
-            """, nativeQuery = true)
-    List<OrderEntity> findFilledByAccountIdAndTradeDateBetween(
-            @Param("accountId") UUID accountId,
-            @Param("from") LocalDate from,
-            @Param("to") LocalDate to);
-
     // 전략 기준 기간 내 주문 전체 조회 — strategy_cycle 경유 JOIN
     @Query(value = """
             SELECT o.* FROM trading.orders o
@@ -148,16 +135,6 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     // AT_OPEN 타이밍 PLANNED 주문 조회 (개장 스케쥴러·수동 실행 시 즉시 선접수용)
     List<OrderEntity> findByStrategyCycleIdAndTradeDateAndTimingAndStatus(
             UUID strategyCycleId, LocalDate tradeDate, OrderTiming timing, OrderStatus status);
-
-    // 전략 기준 distinct 거래일 목록 조회 — 관리자 주문 보정 거래일 드롭다운용
-    @Query(value = """
-            SELECT DISTINCT o.trade_date FROM trading.orders o
-            JOIN trading.strategy_cycle sc ON o.strategy_cycle_id = sc.id
-            WHERE sc.strategy_id = :strategyId
-              AND sc.deleted_at IS NULL
-            ORDER BY o.trade_date DESC
-            """, nativeQuery = true)
-    List<LocalDate> findDistinctTradeDatesByStrategyId(@Param("strategyId") UUID strategyId);
 
     // 사이클 기준 BUY 체결금액 합계 (VR 전략 누적 매수금 계산용) — 체결 판정은 filled_quantity > 0 (취소 전 부분 체결된 CANCELLED 포함)
     // orders 테이블은 soft-delete 없음 — deleted_at 조건 불필요

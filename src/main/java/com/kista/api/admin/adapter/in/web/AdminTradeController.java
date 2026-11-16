@@ -17,7 +17,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -50,14 +49,6 @@ public class AdminTradeController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return toResponses(adminQueryService.listTrades(from, to));
-    }
-
-    @Operation(summary = "전략별 거래일 목록 조회")
-    @GetMapping("/accounts/{accountId}/strategies/{strategyId}/trade-dates")
-    public List<LocalDate> listStrategyTradeDates(
-            @PathVariable UUID accountId,
-            @PathVariable UUID strategyId) {
-        return adminQueryService.listStrategyTradeDates(accountId, strategyId);
     }
 
     // 관리자 수동 체결 보정 — fills 배열 순서대로 여러 건을 원자적으로 반영

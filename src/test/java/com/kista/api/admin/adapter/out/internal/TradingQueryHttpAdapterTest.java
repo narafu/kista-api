@@ -21,7 +21,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.UUID;
 
@@ -138,13 +137,5 @@ class TradingQueryHttpAdapterTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().id()).isEqualTo(strategyId);
-    }
-
-    @Test
-    void findStrategyTradeDates_404_응답은_NoSuchElementException으로_변환된다() {
-        server.enqueue(new MockResponse.Builder().code(404).build());
-
-        assertThatThrownBy(() -> adapter.findStrategyTradeDates(UUID.randomUUID(), UUID.randomUUID()))
-                .isInstanceOf(NoSuchElementException.class);
     }
 }

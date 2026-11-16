@@ -1,13 +1,10 @@
 package com.kista.tradingcore.broker.application.port.output;
 
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
-import com.kista.tradingcore.broker.domain.model.MarginItem;
 
 import java.math.BigDecimal;
-import java.util.List;
 
-// 증거금 조회 — Toss: buying-power USD+KRW
+// 매수 가능 USD 조회 — Toss: buying-power(USD), Meritz: 주문가능금액 합
 public interface MarginPort {
-    List<MarginItem> getMargin(BrokerAccountRef account);
     BigDecimal getUsdBuyableAmount(BrokerAccountRef account);
 }

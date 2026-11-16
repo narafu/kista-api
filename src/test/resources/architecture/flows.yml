@@ -824,12 +824,12 @@ flows:
       - id: orders-account
         lane: ui
         to: [trading, db]
-        title: 계좌 단위 일별 거래내역
+        title: 일별 거래내역
         desc: >-
           계좌의 체결 내역은 증권사를 부르지 않고 DB에 저장된 체결 주문(체결수량이 있는 주문)을 기간으로 읽어 일자·방향·종목·수량·단가·금액으로 합산해 돌려준다.
-          사용자 전체를 합친 조회(GET /api/daily-trades)는 대시보드 달력이 쓰고, 계좌별 조회(GET /api/accounts/{id}/daily-trades)는 같은 계산을 계좌 하나로 한정한다. 코인 체결도 포함하며 행은 소수 quantity·tradeAmount·계좌 통화 currency를 싣는다.
-        code: [StatisticsController#getDailyTransactions, AccountStatisticsService#getDailyTransactions, AccountStatisticsService#toDailyTransactionResult]
-        fail: 계좌 소유자가 아니면 403.
+          사용자 전체를 합친 조회(GET /api/daily-trades)는 대시보드 달력이 쓴다. 코인 체결도 포함하며 행은 소수 quantity·tradeAmount·계좌 통화 currency를 싣는다.
+        code: [DashboardController#getDailyTransactions, AccountStatisticsService#getDailyTransactionsForUser, AccountStatisticsService#toDailyTransactionResult]
+        fail: 주문의 계좌가 사용자 계좌 목록에 없으면 서버 오류로 처리한다.
 
       - id: strategy-detail
         lane: ui

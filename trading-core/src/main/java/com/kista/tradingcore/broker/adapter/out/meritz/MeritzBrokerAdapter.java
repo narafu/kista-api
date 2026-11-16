@@ -32,11 +32,6 @@ public class MeritzBrokerAdapter implements BrokerCapabilitiesPort {
     }
 
     @Override
-    public List<MarginItem> getMargin(BrokerAccountRef account) {
-        return tradingApi.getMargin(account);
-    }
-
-    @Override
     public BigDecimal getUsdBuyableAmount(BrokerAccountRef account) {
         return tradingApi.getUsdBuyableAmount(account);
     }

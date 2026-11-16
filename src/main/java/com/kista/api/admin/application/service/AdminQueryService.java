@@ -135,12 +135,6 @@ public class AdminQueryService {
         return tradingQueryPort.findStrategiesByAccountIds(accountIds);
     }
 
-    // 선택한 전략의 distinct 거래일 목록 조회 (관리자 주문 보정 거래일 드롭다운용)
-    // accountId로 경로 계층 정합성 검증 — 전략이 해당 계좌 소속이 아니면 NoSuchElementException
-    public List<LocalDate> listStrategyTradeDates(UUID accountId, UUID strategyId) {
-        return tradingQueryPort.findStrategyTradeDates(accountId, strategyId);
-    }
-
     // 앱 에러 로그 조회 / 소프트 삭제 — AdminObservabilityController 전용(from/to 기본값은 컨트롤러가 EPOCH/now로 대입)
     @Transactional(readOnly = true)
     public List<AppErrorLog> listErrorLogs(int limit, Instant from, Instant to) {

@@ -51,5 +51,5 @@
 
 ### 소유권 검증
 - `account.verifyOwnedBy(requesterId)` 불일치 시 `SecurityException`(403은 `ProblemDetailMappings.GENERIC`). 서비스는 `AccountPort.requireOwnedAccount(accountId, requesterId)`(`findByIdOrThrow` + `verifyOwnedBy`)를 쓴다
-- 전략·사이클 소유권은 `strategy.accountId()`가 요청 계좌와 같은지로 본다(예: `TradingInternalQueryController.requireStrategyOwnedByAccount`)
+- 전략·사이클 소유권은 `strategy.accountId()`가 요청 계좌와 같은지로 본다(예: `OwnedStrategy.load`)
 - 전략 소유권 + 계좌 조회를 함께 하는 trading 서비스는 `OwnedStrategy.load(...)`(`application/service/support`)를 공용 통로로 쓴다. stats는 모듈 경계상 별도(`InvestmentPointsQueryService`)

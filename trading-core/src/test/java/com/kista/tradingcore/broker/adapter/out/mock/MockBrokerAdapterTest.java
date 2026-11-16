@@ -1,6 +1,5 @@
 package com.kista.tradingcore.broker.adapter.out.mock;
 
-import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.broker.adapter.out.toss.TossPriceApi;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.BrokerCandle;
@@ -8,7 +7,6 @@ import com.kista.tradingcore.broker.domain.model.SellableQuantity;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.broker.domain.model.Execution;
-import com.kista.tradingcore.broker.domain.model.MarginItem;
 import com.kista.tradingcore.broker.domain.model.OrderInstruction;
 import com.kista.tradingcore.broker.domain.model.OrderResult;
 import com.kista.shared.kernel.OrderType;
@@ -425,7 +423,7 @@ class MockBrokerAdapterTest {
         assertThat(prevClose).isEqualByComparingTo("120.00");
     }
 
-    // --- 스모크: getPresentBalance / getMargin ---
+    // --- 스모크: getPresentBalance ---
 
     @Test
     @DisplayName("getPresentBalance는 예외 없이 값을 채워 반환한다")
@@ -438,14 +436,5 @@ class MockBrokerAdapterTest {
         PresentBalanceResult result = adapter().getPresentBalance(ACCOUNT);
 
         assertThat(result).isNotNull();
-    }
-
-    @Test
-    @DisplayName("getMargin은 예외 없이 값을 채워 반환한다")
-    void getMarginSmokeTest() {
-        List<MarginItem> margin = adapter().getMargin(ACCOUNT);
-
-        assertThat(margin).isNotEmpty();
-        assertThat(margin.getFirst().currency()).isEqualTo(Currency.USD);
     }
 }

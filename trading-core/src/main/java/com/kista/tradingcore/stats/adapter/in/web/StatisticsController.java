@@ -9,12 +9,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -41,25 +39,6 @@ public class StatisticsController {
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId) {
         return PortfolioSummaryResponse.from(accountStatistics.getPresentBalance(accountId, userId));
-    }
-
-    // 일별거래내역 조회 — 저장된 체결 주문 기록 기준(외부 브로커 API 미호출)
-    @Operation(summary = "일별 거래내역 조회", description = "저장된 체결 주문 기록 기준 지정 기간 동안의 일별 거래내역 조회 (외부 브로커 API 호출 없음).")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "조회 성공"),
-            @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
-            @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음")
-    })
-    @GetMapping("/daily-trades")
-    public DailyTransactionResponse getDailyTransactions(
-            @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
-            @PathVariable UUID accountId,
-            @AuthenticationPrincipal UUID userId,
-            @Parameter(description = "조회 시작일", example = "2025-01-01")
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @Parameter(description = "조회 종료일", example = "2025-01-31")
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return DailyTransactionResponse.from(accountStatistics.getDailyTransactions(accountId, userId, from, to));
     }
 
     // 복수 종목 전일종가 조회 — 전략 생성 화면 최소 시드 기준가와 동일 소스로 통일 (전략 등록 후 실제 첫 주문도 holdings=0이면 전일종가 사용)

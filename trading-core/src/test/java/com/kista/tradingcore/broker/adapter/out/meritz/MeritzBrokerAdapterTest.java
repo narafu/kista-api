@@ -33,11 +33,9 @@ class MeritzBrokerAdapterTest {
         OrderInstruction order = mock(OrderInstruction.class);
         CancelInstruction cancel = mock(CancelInstruction.class);
         when(priceApi.getPrice(StrategyTicker.SOXL, account)).thenReturn(BigDecimal.TEN);
-        when(tradingApi.getMargin(account)).thenReturn(List.of());
 
         assertThat(adapter.supports()).isEqualTo(Broker.MERITZ);
         assertThat(adapter.getPrice(StrategyTicker.SOXL, account)).isEqualByComparingTo("10");
-        assertThat(adapter.getMargin(account)).isEmpty();
         adapter.place(order, account);
         adapter.cancel(cancel, account);
         verify(orderApi).place(order, account);

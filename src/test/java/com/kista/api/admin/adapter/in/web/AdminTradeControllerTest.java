@@ -43,7 +43,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.kista.api.admin.application.port.output.AppErrorLogPort;
 import com.kista.shared.kernel.UserRole;
 import com.kista.shared.kernel.UserStatus;
-import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.api.web.RootSecurityPolicy;
@@ -109,34 +108,6 @@ class AdminTradeControllerTest {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].ticker").value("SOXL"))
                 .andExpect(jsonPath("$[0].currency").doesNotExist());
-    }
-
-    @Test
-    void listStrategyTradeDates_adminRole_returns200() throws Exception {
-        UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
-        UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
-        when(adminQueryService.listStrategyTradeDates(accountId, strategyId))
-                .thenReturn(List.of(LocalDate.of(2026, 7, 1)));
-
-        mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies/{strategyId}/trade-dates",
-                        accountId, strategyId)
-                        .with(authentication(adminToken(ADMIN_UUID))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0]").value("2026-07-01"));
-    }
-
-    @Test
-    void listStrategyTradeDates_다른_계좌의_전략이면_404() throws Exception {
-        UUID wrongAccountId = UUID.randomUUID();
-        UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
-        // 서비스가 accountId 불일치 시 NoSuchElementException을 던지도록 stub — ProblemDetailExceptionHandler가 404로 매핑
-        when(adminQueryService.listStrategyTradeDates(wrongAccountId, strategyId))
-                .thenThrow(new java.util.NoSuchElementException("전략이 해당 계좌에 속하지 않습니다"));
-
-        mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies/{strategyId}/trade-dates",
-                        wrongAccountId, strategyId)
-                        .with(authentication(adminToken(ADMIN_UUID))))
-                .andExpect(status().isNotFound());
     }
 
     @Test

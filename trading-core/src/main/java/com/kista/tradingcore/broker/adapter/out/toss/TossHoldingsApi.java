@@ -3,8 +3,6 @@ package com.kista.tradingcore.broker.adapter.out.toss;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.SellableQuantity;
-import com.kista.shared.kernel.Currency;
-import com.kista.tradingcore.broker.domain.model.MarginItem;
 import com.kista.tradingcore.broker.domain.model.PresentBalanceResult;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.domain.model.toss.TossApiException;
@@ -50,30 +48,6 @@ class TossHoldingsApi {
 
     public BigDecimal getUsdBuyableAmount(BrokerAccountRef account) {
         return fetchBuyingPower(account, "USD");
-    }
-
-    // USD·KRW 예수금 통화별 조회 (통합 아님 — UI 표시용)
-    public List<MarginItem> getMargin(BrokerAccountRef account) {
-        // USD·KRW 예수금·환율 3개 독립 HTTP 호출을 virtual thread로 병렬 실행
-        BigDecimal usdBuyable;
-        BigDecimal krwBuyable;
-        BigDecimal usdToKrwRate;
-        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            Future<BigDecimal> usdFuture = executor.submit(() -> fetchBuyingPower(account, "USD"));
-            Future<BigDecimal> krwFuture = executor.submit(() -> fetchBuyingPower(account, "KRW"));
-            Future<BigDecimal> rateFuture = executor.submit(this::fetchUsdToKrwRate);
-            usdBuyable = await(usdFuture);
-            krwBuyable = await(krwFuture);
-            usdToKrwRate = await(rateFuture);
-        }
-
-        // 잔고 진단 로그 — cashBuyingPower API 실제 반환값 확인용
-        log.info("Toss 예수금 조회: USD=${}, KRW=₩{}, 환율={}", usdBuyable, krwBuyable, usdToKrwRate);
-
-        return List.of(
-                new MarginItem(Currency.USD, usdBuyable, usdToKrwRate),
-                new MarginItem(Currency.KRW, krwBuyable, usdToKrwRate)
-        );
     }
 
     public PresentBalanceResult getPresentBalance(BrokerAccountRef account) {

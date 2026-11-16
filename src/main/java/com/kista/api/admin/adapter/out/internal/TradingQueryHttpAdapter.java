@@ -4,7 +4,6 @@ import com.kista.api.admin.application.port.output.TradingQueryPort;
 import com.kista.shared.contract.trading.OrderResponse;
 import com.kista.shared.contract.trading.StrategySummaryResponse;
 import com.kista.shared.contract.trading.StrategyResponse;
-import com.kista.shared.platform.internalapi.InternalApiStatusHandlers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
@@ -57,14 +56,5 @@ class TradingQueryHttpAdapter implements TradingQueryPort {
                 .uri("/api/internal/trading/strategy-summaries")
                 .body(cycleIds)
                 .retrieve().body(new ParameterizedTypeReference<Map<UUID, StrategySummaryResponse>>() {});
-    }
-
-    @Override
-    public List<LocalDate> findStrategyTradeDates(UUID accountId, UUID strategyId) {
-        RestClient.ResponseSpec spec = internalApiRestClient.get()
-                .uri("/api/internal/trading/accounts/{accountId}/strategies/{strategyId}/trade-dates", accountId, strategyId)
-                .retrieve();
-        return InternalApiStatusHandlers.notFoundAsNoSuchElement(spec, "전략이 해당 계좌에 속하지 않습니다")
-                .body(new ParameterizedTypeReference<List<LocalDate>>() {});
     }
 }
