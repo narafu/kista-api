@@ -287,7 +287,7 @@ WHERE completion_date IS NULL AND event_type ILIKE '%crypto%' GROUP BY 1;
 
 **가드(4절 1번)의 뜻.** 살아 있는 코인 계좌·전략이 있으면 Flyway가 실패하고 `kista-trading`이 기동하지 못한다. 그래서 T3의 확인 SQL(10절)을 **push 직전에** 한 번 더 돌린다. 2026-11-16 값: BINANCE·UPBIT live 0(total 각 1), BTC·ETH 전략 live 0.
 
-**Q-15(코인 전용 계약 상수).** Fable 권고는 ① 삭제다(`questions.md` Q-15 검토). 사용자 확인이 오면 T4에서 `ErrorCode.BROKER_WITHDRAWAL_ENABLED`·`BrokerWithdrawalEnabledException`, `DcaSkipReason`의 `BELOW_MIN_ORDER_AMOUNT`·`EXCHANGE_API_ERROR`·`API_KEY_EXPIRED`를 함께 지우고 `constraints.md`의 "`ErrorCode` 상수 이름 변경·삭제 금지" 문장은 그대로 둔다(이번 삭제는 사용자 승인 예외다). 확인이 없으면 ②(상수만 남김)로 간다. ui는 순서 제약이 없다고 회신했다. 배포 뒤 `cross-repo.md` G절에 "ui: `gen:types` + `brokerCredentials.ts:16` 매핑 1줄·테스트 1건 삭제"를 남긴다.
+**Q-15(코인 전용 계약 상수) — 사용자 결정(2026-11-16): ① 함께 삭제.** T4에서 `ErrorCode.BROKER_WITHDRAWAL_ENABLED`·`BrokerWithdrawalEnabledException`, `DcaSkipReason`의 `BELOW_MIN_ORDER_AMOUNT`·`EXCHANGE_API_ERROR`·`API_KEY_EXPIRED`를 함께 지우고 `constraints.md`의 "`ErrorCode` 상수 이름 변경·삭제 금지" 문장은 그대로 둔다(이번 삭제는 사용자 승인 예외다). ui는 순서 제약이 없다고 회신했다. 배포 뒤 `cross-repo.md` G절에 "ui: `gen:types` + `brokerCredentials.ts:16` 매핑 1줄·테스트 1건 삭제"를 남긴다.
 
 **T6(단계 B) 주의.** `/api/meta`의 최상위 `markets` 키는 가계부 시장 목록이라 남긴다(ui `AssetRecordList.tsx:90` 등이 `meta.markets.map`을 부른다). 지우는 것은 `brokers[].market`·`minOrderAmount`·`amountScale`과 종목의 `markets`·`market`뿐이다. ui는 이 필드들을 읽는 제품 코드가 0건이라고 회신했다(2026-11-16) — T6의 ui 선행 조건은 충족됐다.
 

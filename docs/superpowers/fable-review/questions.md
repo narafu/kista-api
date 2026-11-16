@@ -206,13 +206,14 @@
 - 검토: (Fable, 2026-11-16, F-03) 유지. ②는 하지 않는다. 호출처는 `register`(`AccountService.java:54`)와 `test`(`:199`)이고 MOCK 계좌는 주문 API를 부르지 않는다. ui의 생략 경로는 0건이라(ui 회신, `ConfirmStep.tsx:31,38` — 이 항목이 든 `CreateAccountStepper.tsx:79`보다 이쪽이 근거다) 필수로 바꿔도 얻는 것이 계약이 엄격해지는 것뿐이다. `findings/30` 3절.
 
 ### Q-15 C5에 없던 코인 전용 계약 상수(`ErrorCode`·`DcaSkipReason`)를 T4에서 지울지
-- 상태: 사용자 결정 필요
+- 상태: 답변됨
 - 묶음·태스크: S16 T1(전수표에서 발견) / 15 T4에서 적용
 - 걸린 곳: `constraints.md`는 `ErrorCode` 상수 삭제를 금지한다(kista-ui 계약). C5는 `BROKER_IP_NOT_ALLOWED`만 예외로 허락했다. 전수표(`findings/31` 10절)에서 같은 성격의 상수가 더 나왔다: `ErrorCode.BROKER_WITHDRAWAL_ENABLED`와 `BrokerWithdrawalEnabledException`(바이낸스 전용), `DcaSkipReason`의 `BELOW_MIN_ORDER_AMOUNT`·`EXCHANGE_API_ERROR`·`API_KEY_EXPIRED`(코인 전용, 상수명이 `dca_execution` 값이자 UI 계약). `ApiKeyExpirySource.BROKER_API`는 15의 2-2절이 이미 삭제로 정했다.
 - 선택지: ① C5처럼 T4에서 함께 지운다. C2가 코인 `dca_execution` 행을 완전 삭제하므로 DB에 남는 값이 없고, ui는 G1에서 처리 코드를 걷는다(ui 12에 항목 추가 필요) ② 상수만 남기고 발행 코드만 지운다. 계약은 그대로지만 죽은 상수가 남는다.
 - 권고: ①. 단 T4 배포 직전 `SELECT DISTINCT skip_reason FROM trading.dca_execution`으로 주식 행에 세 값이 없는지 확인한다.
 - 멈춘 범위: 없음(T4 착수 전까지 답이 필요하다. 답이 없으면 ②로 진행해 계약을 깨지 않는다).
 - 검토: (Fable, 2026-11-16) ①을 권고한다. 사용자 확인만 남았다. 근거 셋. (가) 운영 `trading.dca_execution`의 `skip_reason` 분포(2026-11-16 조회): `BELOW_MIN_ORDER_AMOUNT` 4건은 전부 ETH 전략이고 주식 행에는 `CONDITION_NOT_MET`·`INSUFFICIENT_BALANCE`·`NO_HOLDINGS`뿐이다. `EXCHANGE_API_ERROR`·`API_KEY_EXPIRED`는 0건이다. C2가 코인 행을 지우면 세 값은 DB에 남지 않는다. (나) ui 회신(2026-11-16, main `8743fa99`): `BROKER_IP_NOT_ALLOWED` 참조 0건, `BROKER_WITHDRAWAL_ENABLED`는 문구 매핑 1줄과 테스트 1건(`entities/account/model/brokerCredentials.ts:16`, 코드가 안 오면 서버 `detail`로 폴백), DcaSkipReason 셋은 테스트 픽스처뿐이고 화면은 메타 라벨로 읽으며 모르는 값은 코드 문자열로 폴백, `BROKER_API`는 죽은 유니언 멤버다. 서버가 먼저 지워도 런타임은 깨지지 않고 배포 순서 제약이 없다. ui는 다음 타입 재생성 때 매핑 1줄·테스트 1건을 지운다(`cross-repo.md` G절). (다) `constraints.md`의 "`ErrorCode` 상수 삭제 금지"는 ui가 읽는 계약을 지키려는 규칙인데 읽는 쪽이 없어졌다. ②로 남기면 발행처 없는 상수가 메타(`dcaSkipReasons`)와 스펙에 계속 내려간다. 사용자 확인이 필요한 이유는 9-6(ui 계약 상수 삭제) 하나다. T4 배포 직전 확인은 권고 문장 그대로 둔다.
+- 답: 사용자 결정(2026-11-16) ① 함께 삭제. 15의 11절 "Q-15" 항목대로 T4에서 지운다.
 
 ### Q-16 운영 정리 SQL 3건(11 D4 + EPR 완료 행)을 돌릴지
 - 상태: 답함(2026-11-16 사용자 승인, 실행 완료)
@@ -312,7 +313,7 @@
 | F-04 N1 런북 | 순서를 "15 단계 A → M"으로 고치고 런북을 보정했다. 0단계 명령은 운영에서 시험 실행했다. M 목록 전체 재검수는 하지 않았다(15 뒤 M 브랜치 세션의 첫 작업) | 05의 15절 |
 | F-05 | 할 일 없음. 11 D1~D4·12 D0~D5는 2026-11-13에 전부 답을 받았다(`PROGRESS.md` 맨 위 표). 로드맵 7절의 "사용자 결정 대기" 문장이 낡아 있어 고쳤다 | 로드맵 7절 |
 
-아직 열려 있는 항목(2026-11-16): Q-08(사용자가 BITO·EETH 현재가 조회), Q-11(2026-11-16·17 거래일 관찰 — 첫 배치가 11-16 22:00 KST라 아직 닫지 못했다), Q-13(14 T3 전에 토스 시세 1회 호출 — 사용자), Q-15(사용자 확인).
+아직 열려 있는 항목(2026-11-16): Q-08(사용자가 BITO·EETH 현재가 조회), Q-11(2026-11-16·17 거래일 관찰 — 첫 배치가 11-16 22:00 KST라 아직 닫지 못했다), Q-13(14 T3 전에 토스 시세 1회 호출 — 사용자). Q-15는 2026-11-16 답변됨(함께 삭제).
 
 아래는 요청 원문이다.
 
