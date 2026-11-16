@@ -1,14 +1,10 @@
 package com.kista.tradingcore.matching.domain.model;
 
 import com.kista.shared.kernel.OrderDirection;
-import com.kista.shared.kernel.OrderType;
-import com.kista.shared.kernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -17,8 +13,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("AccountBalance.applyExecutions — 평단가 계산")
 class AccountBalanceTest {
 
-    private static final LocalDate DATE = LocalDate.of(2026, 1, 1);
-    private static final StrategyTicker TICKER = StrategyTicker.SOXL;
 
     // matching은 broker를 참조하지 않는다 — Fill을 익명 클래스로 직접 구현(broker Execution 미경유)
     private static AccountBalance.Fill buy(int qty, String price) {
@@ -161,71 +155,5 @@ class AccountBalanceTest {
     void trailingZeroHoldings_normalized() {
         assertThat(new AccountBalance(new BigDecimal("5.00000000"), BigDecimal.ONE, BigDecimal.ZERO).holdings())
                 .isEqualTo(new BigDecimal("5"));
-    }
-
-    @Nested
-    @DisplayName("AccountBalance.hasSufficientDepositFor — 수동 실행 예수금 검증")
-    class HasSufficientDepositForTest {
-
-        // 전략 계산용 PLANNED BUY 주문 헬퍼
-        private PlannedOrder buyOrder(int qty, String price) {
-            return PlannedOrder.of(DATE, TICKER, OrderType.LOC, OrderDirection.BUY,
-                    qty, new BigDecimal(price));
-        }
-
-        // SELL 주문 헬퍼 (BUY 없는 케이스 검증용)
-        private PlannedOrder sellOrder(int qty, String price) {
-            return PlannedOrder.of(DATE, TICKER, OrderType.LOC, OrderDirection.SELL,
-                    qty, new BigDecimal(price));
-        }
-
-        @Test
-        @DisplayName("BUY 주문 없으면 무조건 통과 — SELL만 있는 경우")
-        void noBuyOrders_alwaysTrue() {
-            // SELL만 있어도 newBuyTotal = 0 → 조기 true 반환
-            AccountBalance balance = new AccountBalance(100, new BigDecimal("25.00"), new BigDecimal("1000"));
-            List<PlannedOrder> orders = List.of(sellOrder(50, "30.00"));
-            assertThat(balance.hasSufficientDepositFor(orders, BigDecimal.ZERO)).isTrue();
-        }
-
-        @Test
-        @DisplayName("BUY 합계 = available (정확히 같을 때) — 통과")
-        void buyTotalEqualsAvailable_returnsTrue() {
-            // deposit=1000, otherTotal=200 → available=800
-            // BUY 2주 @ $400 → newBuyTotal=800 = available → true
-            AccountBalance balance = new AccountBalance(0, null, new BigDecimal("1000"));
-            List<PlannedOrder> orders = List.of(buyOrder(2, "400.00"));
-            assertThat(balance.hasSufficientDepositFor(orders, new BigDecimal("200"))).isTrue();
-        }
-
-        @Test
-        @DisplayName("BUY 합계 < available — 통과")
-        void buyTotalBelowAvailable_returnsTrue() {
-            // deposit=1000, otherTotal=0 → available=1000
-            // BUY 2주 @ $300 → newBuyTotal=600 < available=1000 → true
-            AccountBalance balance = new AccountBalance(0, null, new BigDecimal("1000"));
-            List<PlannedOrder> orders = List.of(buyOrder(2, "300.00"));
-            assertThat(balance.hasSufficientDepositFor(orders, BigDecimal.ZERO)).isTrue();
-        }
-
-        @Test
-        @DisplayName("otherTotal 차감 없이도 BUY 합계가 예수금 초과 — false")
-        void buyExceedsDepositWithNoOtherTotal_returnsFalse() {
-            // deposit=500, otherTotal=0 → available=500
-            // BUY 2주 @ $300 → newBuyTotal=600 > available=500 → false
-            AccountBalance balance = new AccountBalance(0, null, new BigDecimal("500"));
-            List<PlannedOrder> orders = List.of(buyOrder(2, "300.00"));
-            assertThat(balance.hasSufficientDepositFor(orders, BigDecimal.ZERO)).isFalse();
-        }
-
-        @Test
-        @DisplayName("BUY 합계 < 예수금이지만 타 전략 차감 후 부족 — false")
-        void buyPassesAloneButFailsAfterOtherTotalDeducted_returnsFalse() {
-            // deposit=1000, otherTotal=500 → available=500
-            // BUY 2주 @ $300 → newBuyTotal=600 < deposit(1000)이지만 > available(500) → false
-            AccountBalance balance = new AccountBalance(0, null, new BigDecimal("1000"));
-            List<PlannedOrder> orders = List.of(buyOrder(2, "300.00"));
-            assertThat(balance.hasSufficientDepositFor(orders, new BigDecimal("500"))).isFalse();
-        }
     }
 }

@@ -48,21 +48,12 @@ public record AccountBalance(
         return new AccountBalance(BigDecimal.ZERO, null, BigDecimal.ZERO);
     }
 
-    // 주문 목록 중 BUY 합계 금액 — hasSufficientDepositFor/원장 상한 판정 공용
+    // 주문 목록 중 BUY 합계 금액 — 원장 상한 판정 공용
     public static BigDecimal buyTotal(List<PlannedOrder> orders) {
         return orders.stream()
                 .filter(o -> o.direction() == OrderDirection.BUY)
                 .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    // 수동 실행용 예수금 검증: 신규 BUY 합계 ≤ (live deposit − 타 전략 당일 PLANNED BUY 합계)
-    // 배치 스케쥴러 경로와 달리 타 전략 점유분 차감 포함 — ManualTradingService 전용
-    public boolean hasSufficientDepositFor(List<PlannedOrder> orders, BigDecimal otherStrategyBuyTotal) {
-        BigDecimal newBuyTotal = buyTotal(orders);
-        if (newBuyTotal.compareTo(BigDecimal.ZERO) <= 0) return true; // BUY 없으면 통과
-        BigDecimal available = deposit().subtract(otherStrategyBuyTotal);
-        return newBuyTotal.compareTo(available) <= 0;
     }
 
     // 예수금만 교체 — 예수금 플로어 클램프·적립/인출 반영·사이클 롤오버 개장잔고 구성에 사용

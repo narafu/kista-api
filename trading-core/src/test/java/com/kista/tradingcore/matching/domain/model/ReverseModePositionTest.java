@@ -80,14 +80,10 @@ class ReverseModePositionTest {
     }
 
     @Test
-    @DisplayName("쿼터매수 금액은 예수금÷4를 USD 센트(소수 2자리)로 HALF_UP 반올림한다")
-    void calcLocBuyAmount_roundsToCents() {
-        // 100.01 ÷ 4 = 25.0025 → 25.00
-        ReverseModePosition position = new ReverseModePosition(
-                10, new BigDecimal("10.00"), new BigDecimal("100.01"),
-                StrategyTicker.SOXL, 20, new BigDecimal("20.00"), false);
-
-        assertThat(position.calcLocBuyAmount()).isEqualTo(new BigDecimal("25.00"));
+    @DisplayName("쿼터 예산은 수량을 내기 전에 센트 HALF_UP으로 반올림한다")
+    void quotaBuyQuantity_roundsBudgetToCentsBeforeDividing() {
+        // 99.99 / 4 = 24.9975 → 25.00, 25.00 / 25.00 = 1 (반올림이 없으면 0)
+        assertThat(ReverseModePosition.quotaBuyQuantity(new BigDecimal("99.99"), new BigDecimal("25.00"))).isEqualTo(1);
     }
 
     @Test

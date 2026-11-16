@@ -38,11 +38,6 @@ public record ReverseModePosition(
         return divisor > 0 ? holdings / divisor : 0;
     }
 
-    // 쿼터매수 금액 — deposit / SELL_QUARTER_DIVISOR(4)
-    public BigDecimal calcLocBuyAmount() {
-        return quotaBuyAmount(deposit);
-    }
-
     // static 헬퍼: 쿼터매수 수량 = 쿼터 예산 ÷ 매수가(FLOOR) — 별지점 매수가와 가격 캡(InfiniteCycleOrderStrategy.capBuyOrders) 재산정 공용
     public static int quotaBuyQuantity(BigDecimal deposit, BigDecimal buyPrice) {
         return quotaBuyAmount(deposit).divide(buyPrice, 0, FLOOR).intValue();
