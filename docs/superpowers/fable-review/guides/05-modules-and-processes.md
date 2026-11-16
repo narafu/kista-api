@@ -663,9 +663,9 @@ ssh kista-server 'docker ps -a --format "{{.Names}}\t{{.Status}}" | grep kista-'
 | 롤백 3번 | 맞다(infra 확인). 워크플로로는 어느 조합으로도 후퇴할 수 없다. 서버에서 `reconcile.sh kista-api <옛 release id>` 실행 뒤 infra `state/kista-api.yml`을 실제 적용 SHA로 수동 커밋한다 |
 | 배포 파일(14-2) | `deploy/server/README.md`의 롤백 절("state를 그 SHA로 수정·커밋 뒤 dispatch")은 동작하지 않는다(`cross-repo.md` I-4 확정). M의 배포 파일 수정에서 위 한 줄로 고친다 |
 
-**kista-infra 준비 상태(2026-11-16).** I-1(state 키 브랜치)은 시작되지 않았다. infra 로드맵에는 있다(infra `guides/03-instance-topology.md` 5-1, T7). bats 픽스처는 실제 state를 읽지 않아 반드시 고칠 것은 없어 보인다(실행 미확인). infra 03 5-1의 순서(옛 scheduler·trading 정지 → state 키 → reconcile → Caddy 확인 뒤 옛 api 정지)는 14-3의 "옛 api를 살려 두는 변형"과 같고, 14-3의 기본안(전체 정지)과는 옛 api를 내리는 시점이 다르다. 사용자가 전체 정지를 고르면 infra 03 5-1을 14-3에 맞춘다(infra 세션 몫, D-7 c와 같은 커밋).
+**kista-infra 준비 상태(2026-11-16).** I-1(state 키 브랜치)은 시작되지 않았다. infra 로드맵에는 있다(infra `guides/03-instance-topology.md` 5-1, T7). bats 픽스처는 실제 state를 읽지 않아 반드시 고칠 것은 없어 보인다(실행 미확인). infra 03 5-1의 순서(옛 scheduler·trading 정지 → state 키 → reconcile → Caddy 확인 뒤 옛 api 정지)는 14-3의 "옛 api를 살려 두는 변형"과 같고, 14-3의 기본안(전체 정지)과는 옛 api를 내리는 시점이 다르다. **사용자 결정(2026-11-16, kista-infra 세션 경유): 전체 정지.** 옛 `kista-api`·`kista-scheduler`·`kista-trading` 셋을 1단계에서 모두 내린다(14-3 기본안 그대로). 14-3 끝의 "옛 api를 살려 두는 변형"은 쓰지 않는다. infra는 03 5-1을 14-3에 맞춘다(1단계 옛 3개 정지, 8단계 옛 3개 삭제, 낡은 줄 번호 정정 — I-1 브랜치와 같은 커밋). 14-3의 단계 번호·문구를 바꾸면 infra 세션에 알린다.
 
-**일정.** 전환 창 후보는 15 단계 A 배포와 1거래일 관찰이 끝난 뒤의 토요일이다. 2026-11-26(목)은 휴장, 11-27(금)은 조기 마감이다. 11-28(토)에 전환하면 0단계의 `trading-close` `finished_at`이 조기 마감 시각대(KST 03시대)로 찍힌다 — 정상이다. 일시와 전체 정지 여부는 여전히 사용자 결정이다.
+**일정.** 전환 창 후보는 15 단계 A 배포와 1거래일 관찰이 끝난 뒤의 토요일이다. 2026-11-26(목)은 휴장, 11-27(금)은 조기 마감이다. 11-28(토)에 전환하면 0단계의 `trading-close` `finished_at`이 조기 마감 시각대(KST 03시대)로 찍힌다 — 정상이다. 일시는 여전히 사용자 결정이다(방식은 위 "전체 정지").
 
 **M 목록 전체의 재검수는 하지 않았다.** `findings/29`의 M 목록은 2026-11-15 판정 그대로 두고, 위 "첫 작업"의 재측정에서 어긋난 것만 M 브랜치 세션이 14-4의 기본값으로 처리한다.
 
