@@ -3,7 +3,7 @@
 # kista-infra Caddyfile의 `(upstream)` snippet이 소유한다 — 여기서는 `import upstream <health_uri>`만 쓴다.
 # 라우팅이 컨트롤러 경로와 어긋나 404가 나던 사고(2026-09-16 2단 경로, 2026-09-17 fida-orders)를 막기 위해
 # CaddyRoutingTest가 아래 @scheduler·@trading regex를 trading-core·root 컨트롤러 경로와 대조한다 — 경로 추가 시 테스트가 알려준다.
-{$API_DOMAIN} {
+{$API_DOMAIN}, http://:8080 {
 	encode zstd gzip
 	# 스케쥴러 수동 트리거 — `/**`는 2단 이상 깊이(kbland-price-index/full-refresh)에서 매치 실패해 kista-api로 새던 것을 path_regexp로 교체(2026-10-01 실측)
 	@scheduler path_regexp ^/api/admin/scheduler/.+$
