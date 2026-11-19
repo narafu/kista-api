@@ -9,6 +9,8 @@ import com.kista.shared.platform.openapi.NullMarkedRecordModelConverter;
 import com.kista.shared.platform.persistence.JpaAuditingConfig;
 import com.kista.shared.platform.persistence.KistaFlywayConfig;
 import com.kista.shared.platform.redis.RedisPubSubConfig;
+import com.kista.shared.platform.role.KistaRole;
+import com.kista.shared.platform.role.RoleRoutingGuard;
 import com.kista.shared.platform.scheduling.SchedulerJobRunner;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.shared.platform.security.InternalTokenAuthFilter;
@@ -22,11 +24,16 @@ import com.kista.shared.platform.telegram.TelegramProperties;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureOrder;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.Ordered;
+import org.springframework.core.env.Environment;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
+
+import java.util.List;
 
 // :shared 인프라 빈 등록 — 앱(root·trading-core)은 com.kista.shared를 컴포넌트 스캔하지 않는다.
 // HIGHEST_PRECEDENCE: Boot 자동구성의 @ConditionalOnMissingBean(기본 SecurityFilterChain·JwtDecoder 등)보다
@@ -49,5 +56,12 @@ public class PlatformAutoConfiguration {
     @ConditionalOnMissingBean(TokenBlacklistPort.class)
     RedisTokenBlacklistReader redisTokenBlacklistReader(StringRedisTemplate redisTemplate) {
         return new RedisTokenBlacklistReader(redisTemplate);
+    }
+
+    // role과 맞지 않는 요청 거절 가드 — MVC 핸들러 매핑이 있는 서블릿 앱에만(보안 체인 앞에서 동작)
+    @Bean
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+    RoleRoutingGuard roleRoutingGuard(Environment env, List<RequestMappingHandlerMapping> mappings) {
+        return new RoleRoutingGuard(KistaRole.parse(env.getProperty(KistaRole.PROPERTY)), mappings);
     }
 }

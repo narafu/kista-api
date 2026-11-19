@@ -14,5 +14,6 @@ public enum ErrorCode {
     MONTH_CLOSED,                // 409 기록 점검 완료(마감)된 달의 가계부 쓰기
     ACCESS_DENIED,               // 403 소유·권한 위반
     COOLDOWN_ACTIVE,             // 429 재신청 대기 시간 미경과
-    TRADING_CORE_UNAVAILABLE     // 503 매매 서버(trading-core) 도달 실패
+    TRADING_CORE_UNAVAILABLE,    // 503 매매 서버(trading-core) 도달 실패
+    WRONG_ROLE                   // 503 이 서버 role이 처리하지 않는 경로로 온 요청
 }
