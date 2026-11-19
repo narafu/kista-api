@@ -37,6 +37,7 @@ dependencies {
 
     // platform.persistence(JPA Auditing) + platform.internalapi(RestClient) — Spring/JPA 바인딩
     implementation(libs.spring.boot.starter.data.jpa)
+    implementation(libs.spring.boot.starter.flyway) // platform.persistence(KistaFlywayConfig) — 스키마별 이력 마이그레이터
     implementation(libs.spring.boot.starter.web)
 
     // platform.security(SecurityConfig/JwtAuthFilter 등) — JWT 인증 스택

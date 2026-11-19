@@ -1,11 +1,11 @@
 package com.kista.api.user.adapter.out.persistence.auth;
 
+import com.kista.shared.support.DataJpaTestBase;
 import com.kista.api.user.application.service.TokenUseCaseTestConfig;
 import com.kista.api.user.domain.auth.InvalidRefreshTokenException;
 import com.kista.api.user.application.service.TokenService;
 import com.kista.api.user.application.port.output.BlacklistPort;
 import com.kista.api.user.application.port.output.UserPort;
-import com.kista.api.web.RootDataJpaTestBase;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Tag("integration")
 @Import({RefreshTokenPortTestConfig.class, TokenUseCaseTestConfig.class})
 @DisplayName("TokenService RT 재사용 공격 감지 — 실제 트랜잭션 커밋 검증 통합 테스트")
-class TokenServiceRotationRollbackIT extends RootDataJpaTestBase {
+class TokenServiceRotationRollbackIT extends DataJpaTestBase {
 
     @Autowired TokenService tokenService;
     @Autowired JdbcTemplate jdbcTemplate;

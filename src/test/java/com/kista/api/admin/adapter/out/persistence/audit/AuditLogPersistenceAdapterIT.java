@@ -1,7 +1,7 @@
 package com.kista.api.admin.adapter.out.persistence.audit;
 
+import com.kista.shared.support.DataJpaTestBase;
 import com.kista.api.admin.domain.model.AuditLog;
-import com.kista.api.web.RootDataJpaTestBase;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Tag("integration")
 @Import(AuditLogPersistenceAdapter.class)
 @DisplayName("AuditLogPersistenceAdapter — PG 통합 테스트")
-class AuditLogPersistenceAdapterIT extends RootDataJpaTestBase {
+class AuditLogPersistenceAdapterIT extends DataJpaTestBase {
 
     @Autowired AuditLogJpaRepository repo;
     @Autowired JdbcTemplate jdbcTemplate;

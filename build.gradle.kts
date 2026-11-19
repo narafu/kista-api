@@ -121,6 +121,7 @@ tasks.named<Test>("test") {
     maxHeapSize = "2g" // Boot 4 테스트 슬라이스 세분화로 캐시되는 ApplicationContext 수 증가 — 기본 힙으로 OOM 발생
     jvmArgs("-XX:+EnableDynamicAgentLoading")
     systemProperty("user.timezone", "Asia/Seoul") // 테스트도 KST로 고정 — host TZ 무관하게 일관성 보장
+    System.getProperty("kista.test-db-name")?.let { systemProperty("kista.test-db-name", it) } // 빈 DB 마이그레이션 검증용 — 지정 시 kistadb_test 대신 사용
     systemProperty("junit.jupiter.execution.parallel.enabled", "true")
     systemProperty("junit.jupiter.execution.parallel.mode.default", "concurrent")
     systemProperty("junit.jupiter.execution.parallel.config.strategy", "dynamic")

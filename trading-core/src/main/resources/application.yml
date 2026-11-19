@@ -29,12 +29,7 @@ spring:
         default_batch_fetch_size: 100
 
   flyway:
-    enabled: true
-    locations: classpath:db/migration-trading
-    table: flyway_schema_history_trading
-    baseline-on-migrate: false          # 운영 첫 기동에만 SPRING_FLYWAY_BASELINE_ON_MIGRATE=true 로 override(RUNBOOK)
-    validate-on-migrate: true
-    default-schema: trading             # 서비스 소유 스키마여야 baseline 판정(비어있음 여부)이 정확하다 — 설계 문서 "실측 근거"
+    enabled: false   # Boot 자동구성 대신 kista.flyway.migrations를 KistaFlywayConfig가 순서대로 실행
 
   modulith:
     detection-strategy: explicitly-annotated   # @ApplicationModule(id) 붙은 패키지만 모듈 — 패키지 깊이와 무관하게 ID 고정
@@ -106,6 +101,11 @@ alpaca: # marketcalendar(휴장일)·stats(백테스트 과거 일봉)·broker(�
   data-base-url: https://data.alpaca.markets
 
 kista:
-  role: ${KISTA_ROLE:all} # web|worker|all — 로컬·테스트 기본 all, 운영은 compose가 지정
+  role: ${KISTA_ROLE:web} # web|worker|all — 로컬 기본 web, 테스트는 application-test.yml이 all, 운영은 compose가 지정
+  flyway:
+    migrations:
+      - locations: classpath:db/migration-trading
+        table: flyway_schema_history_trading
+        schema: trading   # 서비스 소유 스키마여야 baseline 판정(비어있음 여부)이 정확하다
   scheduler-lock:
     table: trading.scheduler_locks # SchedulerLockService 락 테이블 — 스키마 한정 필수

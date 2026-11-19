@@ -1,7 +1,7 @@
 package com.kista.api.benchmark.adapter.out.persistence.marketindex;
 
+import com.kista.shared.support.DataJpaTestBase;
 import com.kista.api.benchmark.domain.model.IndexPrice;
-import com.kista.api.web.RootDataJpaTestBase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Import(MarketIndexPricePersistenceAdapter.class)
 @Execution(ExecutionMode.SAME_THREAD) // @DataJpaTest + parallel execution — 트랜잭션 경합 방지
-class MarketIndexPricePersistenceAdapterTest extends RootDataJpaTestBase {
+class MarketIndexPricePersistenceAdapterTest extends DataJpaTestBase {
 
     @Autowired MarketIndexPricePersistenceAdapter adapter;
 

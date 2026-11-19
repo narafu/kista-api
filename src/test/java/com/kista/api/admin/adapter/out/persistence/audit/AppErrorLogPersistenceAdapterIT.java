@@ -1,8 +1,8 @@
 package com.kista.api.admin.adapter.out.persistence.audit;
 
+import com.kista.shared.support.DataJpaTestBase;
 import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.api.admin.domain.model.AppErrorLog;
-import com.kista.api.web.RootDataJpaTestBase;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -26,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Tag("integration")
 @Import(AppErrorLogPersistenceAdapter.class)
 @DisplayName("AppErrorLogPersistenceAdapter — PG 통합 테스트")
-class AppErrorLogPersistenceAdapterIT extends RootDataJpaTestBase {
+class AppErrorLogPersistenceAdapterIT extends DataJpaTestBase {
 
     @Autowired AppErrorLogJpaRepository repo;
     @Autowired EntityManager entityManager;

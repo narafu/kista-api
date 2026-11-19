@@ -1,3 +1,6 @@
+kista:
+  role: all   # 테스트는 스케줄러·워커 빈까지 전부 로드 — 기본값(web)과 분리
+
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/${kista.test-db-name:kistadb_test} # integration 태스크는 kistadb_it — 행을 커밋하는 *IT가 롤백 기반 test 스위트의 건수 단언을 오염시키지 않게 분리

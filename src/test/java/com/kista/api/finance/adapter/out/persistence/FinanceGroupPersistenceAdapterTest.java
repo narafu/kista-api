@@ -1,8 +1,8 @@
 package com.kista.api.finance.adapter.out.persistence;
 
+import com.kista.shared.support.DataJpaTestBase;
 import com.kista.api.finance.domain.model.FinanceGroup;
 import com.kista.api.finance.domain.model.FinanceGroupInvitation;
-import com.kista.api.web.RootDataJpaTestBase;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 // 그룹은 초대로만 생성된다(1인1그룹) — personal 자동생성 그룹 개념은 V17에서 폐기됐다.
 @Import({FinanceGroupPersistenceAdapter.class})
 @Execution(ExecutionMode.SAME_THREAD)
-class FinanceGroupPersistenceAdapterTest extends RootDataJpaTestBase {
+class FinanceGroupPersistenceAdapterTest extends DataJpaTestBase {
 
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired EntityManager entityManager;

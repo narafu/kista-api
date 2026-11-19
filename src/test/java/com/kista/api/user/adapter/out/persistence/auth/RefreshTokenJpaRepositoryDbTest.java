@@ -1,7 +1,7 @@
 package com.kista.api.user.adapter.out.persistence.auth;
 
+import com.kista.shared.support.DataJpaTestBase;
 import com.kista.api.user.domain.auth.RefreshToken;
-import com.kista.api.web.RootDataJpaTestBase;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 // 벌크 delete JPQL 검증 — 동시 요청이 이미 지운 행을 다시 지워도 예외가 없어야 하고(파생 delete의 낙관적 락 500 회귀 방지),
 // User-Agent null 행도 파생 쿼리와 같은 의미(IS NULL)로 지워져야 한다
 @Execution(ExecutionMode.SAME_THREAD)
-class RefreshTokenJpaRepositoryDbTest extends RootDataJpaTestBase {
+class RefreshTokenJpaRepositoryDbTest extends DataJpaTestBase {
 
     @Autowired RefreshTokenJpaRepository repository;
     @Autowired JdbcTemplate jdbcTemplate;
