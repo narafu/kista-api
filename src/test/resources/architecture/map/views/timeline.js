@@ -1,7 +1,7 @@
 'use strict';
 (() => {
   // 실행 프로세스별 점 색 — 모듈 그래프의 서브프로젝트 색과 맞춘다 (trading-core=주황, root=파랑)
-  const PROC_COLOR = { 'kista-trading': '--tc', 'kista-scheduler': '--api' };
+  const PROC_COLOR = { 'kista-worker': '--tc', 'kista-web': '--api' };
   const procColor = p => `var(${PROC_COLOR[p] ?? '--default'})`;
 
   /* ---------- 3. 하루 타임라인 ---------- */
@@ -15,7 +15,7 @@
       `<span style="left:${pct(h * 60)}">${String(h).padStart(2, '0')}</span>`).join('')}</div></div>`;
     const byProc = Object.groupBy(DATA.jobs.map((j, i) => ({ ...j, i })), j => j.process);
     // 매매 → 배치 → 공용(주기 복구) 순
-    const rank = p => ['kista-trading', 'kista-scheduler'].indexOf(p) >>> 0;
+    const rank = p => ['kista-worker', 'kista-web'].indexOf(p) >>> 0;
     const order = Object.keys(byProc).sort((a, b) => rank(a) - rank(b));
     for (const proc of order) {
       const jobs = byProc[proc];

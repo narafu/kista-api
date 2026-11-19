@@ -1,19 +1,14 @@
 package com.kista.tradingcore;
 
-import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.modulith.Modulithic;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-// kista-trading 프로세스 부팅 진입점 — 루트 패키지 com.kista.tradingcore에 두어 컴포넌트·엔티티·리포지토리 스캔이
-// 기본값(자기 루트)으로 trading-core 전체를 덮는다. :shared 빈은 PlatformAutoConfiguration이 등록하고, Modulith 검증 모델에만 shared를 포함한다
+// trading-core 테스트 전용 기동 클래스 — 운영 진입점은 ApiApplication. 슬라이스·@SpringBootTest가 상향 탐색으로 찾는다
 @SpringBootApplication
 @Modulithic(additionalPackages = "com.kista.shared")
 @ConfigurationPropertiesScan // trading-core 소유 @ConfigurationProperties
 @EnableScheduling
 public class TradingApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(TradingApplication.class, args);
-    }
 }

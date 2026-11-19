@@ -1,7 +1,6 @@
 package com.kista.api.architecture;
 
 import com.kista.api.ApiApplication;
-import com.kista.tradingcore.TradingApplication;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import org.junit.jupiter.api.DisplayName;
@@ -27,20 +26,19 @@ class ArchitectureMapTest {
 
         assertThat(ArchitectureMapExporter.violations(map, classes)).isEmpty();
 
-        // 프로세스 판별·KST 시각 계산 회귀 가드 — 개장 배치는 kista-trading에서 22:00 (마감 배치는 cron이 아니라 실제 마감 기준 1회 예약)
+        // 프로세스 판별·KST 시각 계산 회귀 가드 — 개장 배치는 kista-worker에서 22:00 (마감 배치는 cron이 아니라 실제 마감 기준 1회 예약)
         var jobs = ArchitectureMapExporter.jobs(classes);
         assertThat(jobs).filteredOn(j -> j.name().equals("TradingOpenScheduler#run"))
                 .singleElement()
                 .satisfies(j -> {
-                    assertThat(j.process()).isEqualTo("kista-trading");
+                    assertThat(j.process()).isEqualTo("kista-worker");
                     assertThat(j.times()).containsExactly("22:00");
                 });
 
-        var modules = ModuleGraphExporter.graph(
-                ApplicationModules.of(ApiApplication.class), ApplicationModules.of(TradingApplication.class));
+        var modules = ModuleGraphExporter.graph(ApplicationModules.of(ApiApplication.class));
         // 단계 code: 클래스는 전부 모듈 소속이어야 하고, 오버레이 회귀 가드 — 마감 배치 락 단계는 trading을 거친다
         var moduleNames = modules.stream().map(ModuleGraphExporter.Module::name).collect(Collectors.toSet());
-        assertThat(moduleNames).contains("api.notify", "tradingcore.notify", "shared.kernel"); // 동명 모듈이 프로세스로 구분된다
+        assertThat(moduleNames).contains("api.notify", "tradingcore.notify", "shared.kernel"); // 모듈 키는 패키지 기준이라 api·tradingcore 알림 모듈이 구분된다
         assertThat(ArchitectureMapExporter.moduleViolations(map, classes, moduleNames)).isEmpty();
         var stepModules = ArchitectureMapExporter.stepModules(map, classes);
         assertThat(stepModules.get("close-batch").get("lock")).contains("tradingcore.trading");

@@ -87,7 +87,6 @@
 - 페이지 슬라이싱: `StrategyHistoryQueryService`·`AccountStatisticsService`
 - 평단 필수 규칙: `BootstrapPosition`·`BacktestEngine`
 - "사용자를 찾을 수 없습니다": `BatchContextFactory`
-- `UserEventRepublisher`의 같은 본문 메서드 2개
 - `validateWithdrawalSufficiency` 호출 2곳(인자·시점이 다르다)
 - 평단 가중평균 3곳(`AccountBalance`·`CapitalInjectionService`·`VrReconfigureService`): 체결 대 투입, VR 0주 null로 의미가 다르고 공식에 닿는다
 - MAINTAIN 시드 규칙 2곳

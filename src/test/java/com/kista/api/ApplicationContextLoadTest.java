@@ -1,6 +1,10 @@
 package com.kista.api;
 
+import com.kista.api.notify.adapter.in.redis.PushNotificationStreamConsumer;
+import com.kista.shared.platform.redis.RedisStreamSubscriber;
 import com.kista.shared.platform.security.TokenBlacklistPort;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarRefreshPort;
+import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
 import com.kista.shared.platform.web.ExceptionReporter;
 import com.kista.shared.platform.web.ProblemDetailExceptionHandler;
 import org.junit.jupiter.api.Test;
@@ -9,13 +13,13 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
+import org.springframework.core.env.Environment;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.scheduling.TaskScheduler;
+import org.springframework.scheduling.concurrent.SimpleAsyncTaskScheduler;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.context.ActiveProfiles;
-
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,6 +39,15 @@ class ApplicationContextLoadTest {
     @Autowired
     private ApplicationContext context; // 컨텍스트 로드 성공 여부 자체가 검증 대상
 
+    @Autowired
+    private Environment env; // EPR 완료 행 삭제 설정 확인용
+
+    // role=all 기동 잡(캘린더 초기 적재·배치 재개)이 실제 Alpaca·api.telegram.org를 부르지 않게 외부 호출 포트만 막는다
+    @MockitoBean
+    private MarketCalendarRefreshPort marketCalendarRefreshPort; // Alpaca 캘린더 조회
+    @MockitoBean
+    private TradingErrorReportPort tradingErrorReportPort; // 배치 재개 실패 관리자 텔레그램 알림
+
     @Test
     void 애플리케이션_컨텍스트가_모든_빈을_생성자_주입까지_포함해_정상_로드한다() {
         // 컨텍스트 로드 도중 어떤 빈이라도 생성자 주입을 해석하지 못하면(예: @Autowired 누락으로
@@ -46,26 +59,35 @@ class ApplicationContextLoadTest {
     }
 
     @Test
-    void 루트_컨텍스트는_JPA_리포지토리_전부와_보안_필터체인_하나만_갖고_trading_core_빈은_없다() {
-        // 리포지토리 스캔 범위 회귀 가드 — 기본 스캔(루트 com.kista.api)만으로 root 리포지토리 전부가 잡혀야 한다
-        assertThat(context.getBeanNamesForType(JpaRepository.class)).hasSize(ROOT_JPA_REPOSITORIES);
+    void 합친_컨텍스트는_JPA_리포지토리_전부와_프로세스당_하나인_빈을_하나씩_갖는다() {
+        // 리포지토리 스캔 범위 회귀 가드 — root(com.kista.api)와 매매 엔진(com.kista.tradingcore) 리포지토리가 전부 잡혀야 한다
+        assertThat(context.getBeanNamesForType(JpaRepository.class)).hasSize(JPA_REPOSITORIES);
         // shared 자동구성 순서 회귀 가드 — Boot 기본 필터 체인이 함께 등록되면 2개가 된다
         assertThat(context.getBeanNamesForType(SecurityFilterChain.class)).hasSize(1);
-        // 예외 advice·오류 보고는 프로세스당 하나 — 보고 빈이 없으면 advice가 조용히 보고를 건너뛴다
+        // 예외 advice·오류 보고는 애플리케이션당 하나 — 보고 빈이 없으면 advice가 조용히 보고를 건너뛴다
         assertThat(context.getBeanNamesForType(ProblemDetailExceptionHandler.class)).hasSize(1);
         assertThat(context.getBeanNamesForType(ExceptionReporter.class)).hasSize(1);
-        // JwtAuthFilter가 요구하는 블랙리스트 포트도 하나 — trading-core는 platform 조건부 빈, root는 user 어댑터
+        // JwtAuthFilter가 요구하는 블랙리스트 포트도 하나 — platform 조건부 빈과 user 어댑터가 겹치지 않는다
         assertThat(context.getBeanNamesForType(TokenBlacklistPort.class)).hasSize(1);
-        // root 테스트 classpath에 trading-core가 있어도 컨텍스트에 섞이지 않는다
-        assertThat(Arrays.stream(context.getBeanDefinitionNames())
-                .map(context::getType)
-                .filter(Objects::nonNull)
-                .map(Class::getPackageName)
-                .filter(p -> TRADING_CORE_PACKAGES.stream().anyMatch(p::startsWith)))
-                .isEmpty();
     }
 
-    private static final int ROOT_JPA_REPOSITORIES = 21; // 실측값(grep·테스트 일치)
-    // trading-core 소유 루트 패키지
-    private static final List<String> TRADING_CORE_PACKAGES = List.of("com.kista.tradingcore.");
+    @Test
+    void 스트림_구독자는_푸시_알림_컨슈머_하나뿐이다() {
+        // 프로세스 경계용 user.*·app.error 스트림 경로는 합병으로 지웠다 — 남은 구독자는 체결 푸시(FCM 위임) 하나
+        assertThat(context.getBeansOfType(RedisStreamSubscriber.class).values())
+                .singleElement().isInstanceOf(PushNotificationStreamConsumer.class);
+    }
+
+    @Test
+    void 스케줄러는_가상_스레드_SimpleAsyncTaskScheduler다() {
+        // 매매 배치 예약(TradingCloseScheduler)과 주기 잡이 한 TaskScheduler를 나눠 쓴다 — 가상 스레드라 서로 막지 않는다
+        assertThat(context.getBean(TaskScheduler.class)).isInstanceOf(SimpleAsyncTaskScheduler.class);
+    }
+
+    @Test
+    void EPR_완료_행은_삭제_모드다() {
+        assertThat(env.getProperty("spring.modulith.events.completion-mode")).isEqualTo("delete");
+    }
+
+    private static final int JPA_REPOSITORIES = 41; // 실측값 — root 21 + 매매 엔진 20
 }

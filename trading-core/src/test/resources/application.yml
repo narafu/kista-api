@@ -1,3 +1,5 @@
+# trading-core 테스트 전용 설정 — 운영 설정은 root application.yml 하나(TradingApplication은 테스트 전용 기동 클래스).
+# trading 스키마·이력·EPR·락 테이블만 쓰는 옛 kista-trading 프로세스 설정을 유지해 trading-core 테스트 동작을 보존한다
 spring:
   application:
     name: kista-trading
@@ -42,28 +44,7 @@ spring:
 
   data:
     redis:
-      url: ${REDIS_URL}
-
-# root와 동일 경로 — 공용 SecurityConfig가 /api-docs/**만 permitAll하므로 기본값(/v3/api-docs)은 401. kista-ui fetch:spec이 8081 스펙을 병합
-springdoc:
-  # 서버 간 내부 API(X-Internal-Token 전용)는 UI 타입 생성·공개 문서 대상이 아니다 — contract 타입이 UI DTO와 이름 충돌하는 것도 막는다
-  paths-to-exclude: /api/internal/**
-  api-docs:
-    path: /api-docs
-  swagger-ui:
-    path: /swagger-ui.html
-    operations-sorter: method
-
-server:
-  port: ${SERVER_PORT:8081}
-
-management:
-  endpoint:
-    health:
-      group:
-        readiness:
-          # 배포 헬스 게이트가 readiness로 DB·Redis 연결까지 확인한다(liveness는 연결 불능이어도 UP) — root application.yml과 동일
-          include: readinessState, db, redis
+      url: ${REDIS_URL:redis://localhost:6379}
 
 internal:
   api:

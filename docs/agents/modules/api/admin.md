@@ -2,7 +2,7 @@
 
 Spring Modulith 모듈(CLOSED) — 관리자 조회·정정·재정렬·감사로그·앱오류로그 + 런타임 설정. "domain"·"port" NamedInterface, service·adapter internal.
 
-- 오류 로그(`app_error_logs`) 저장은 두 입구가 같은 `AppErrorLogPort.save`로 수렴한다 — root 발행분 `AppErrorRaisedListener`(동기 `@EventListener`: 발행 지점이 트랜잭션 밖이라 AFTER_COMMIT은 이벤트를 버린다), trading-core 발행분 `AppErrorStreamConsumer`(`stream:app.error`, 그룹 `root`).
+- 오류 로그(`app_error_logs`) 저장 입구는 `AppErrorRaisedListener`(동기 `@EventListener`: 발행 지점이 트랜잭션 밖이라 AFTER_COMMIT은 이벤트를 버린다) 하나다 — trading-core 발행분도 같은 애플리케이션이라 직접 받는다(옛 `stream:app.error` 경로는 합병으로 삭제).
 - trading-core 내부 API 요청·응답은 own-type 복제 없이 `com.kista.shared.contract`를 그대로 쓴다. `AccountSummaryResponse`는 id/userId/accountNo/broker/createdAt 5필드로 의도적으로 좁힌 계약이다(appKey/secretKey 등 평문 비밀 제외). 잠금: `InternalApiContractTest`, 게이트·잔존 own-type → `decisions.md`. 표지 예외(`AdminBrokerCredentialException` 등)는 HTTP 상태코드 복원용 own-type이다.
 - admin은 trading-core `AccountPort`에 직접 의존하지 않는다 — 계좌 조회는 전부 `AccountQueryPort`(내부 API)로 위임한다.
 - `AdminService.changeRole`은 자기 강등과 마지막 ADMIN 강등을 막고(`UserPort.countByRole`) `UserService.changeRole`에 위임하며 감사 로그만 남긴다. 저장·AT 무효화(`BlacklistPort`)는 user가 캡슐화한다.

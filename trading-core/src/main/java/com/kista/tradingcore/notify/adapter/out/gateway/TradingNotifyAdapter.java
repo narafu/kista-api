@@ -23,8 +23,7 @@ class TradingNotifyAdapter implements TradingNotifyPort {
     private final TelegramProperties props; // 관리자 봇 설정 — botToken()/chatId()
     private final ApplicationEventPublisher eventPublisher; // 오류 보고 이벤트 발행 — root app_error_logs 저장 경로
 
-    // root TelegramAdapter.notifyError와 동일하게 AppErrorRaisedEvent를 발행 — root는 admin AppErrorRaisedListener가 로컬로 저장하고,
-    // trading-core는 AppErrorStreamPublisher가 Redis Stream으로 root에 보낸다
+    // root TelegramAdapter.notifyError와 동일하게 AppErrorRaisedEvent를 발행 — 같은 애플리케이션의 admin AppErrorRaisedListener가 저장한다
 
     @Override
     public void notifyError(Exception e) {

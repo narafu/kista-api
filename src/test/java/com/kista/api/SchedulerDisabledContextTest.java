@@ -1,12 +1,15 @@
 package com.kista.api;
 
 import com.kista.api.market.adapter.in.schedule.FearGreedScheduler;
+import com.kista.tradingcore.account.adapter.in.schedule.ApiKeyExpiryScheduler;
 import com.kista.tradingcore.marketcalendar.adapter.in.schedule.MarketCalendarRefreshScheduler;
+import com.kista.tradingcore.trading.adapter.in.schedule.TradingBatchResumer;
 import com.kista.api.benchmark.adapter.in.schedule.KbLandHousingBenchmarkScheduler;
 import com.kista.api.benchmark.adapter.in.schedule.KbLandPriceIndexScheduler;
 import com.kista.api.benchmark.adapter.in.schedule.MarketIndexPriceSyncScheduler;
 import com.kista.tradingcore.trading.adapter.in.schedule.TradingCloseScheduler;
 import com.kista.tradingcore.trading.adapter.in.schedule.TradingOpenScheduler;
+import com.kista.tradingcore.trading.adapter.in.web.TradingSchedulerInternalController;
 import com.kista.api.user.adapter.in.schedule.RefreshTokenCleanupScheduler;
 import com.kista.api.web.AdminSchedulerController;
 import org.junit.jupiter.api.Test;
@@ -22,8 +25,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// API role(kista.role=web) 시 9개 @Scheduled 빈 + AdminSchedulerController(동일 게이트)가
-// 컨텍스트에 전혀 없어야 한다. @ConditionalOnWorkerRole이 실제 컨텍스트 로드에서 작동하는지 end-to-end 검증.
+// web role(kista.role=web) 시 root·매매 엔진 스케줄러 빈과 수동 트리거 컨트롤러(동일 게이트)가
+// 컨텍스트에 전혀 없어야 한다 — 합병 뒤 매매 엔진 빈도 같은 컨텍스트에 올라오므로 함께 검증한다. @ConditionalOnWorkerRole이 실제 컨텍스트 로드에서 작동하는지 end-to-end 검증.
 @SpringBootTest(properties = "kista.role=web")
 @ActiveProfiles("test")
 @Execution(ExecutionMode.SAME_THREAD)
@@ -32,6 +35,9 @@ class SchedulerDisabledContextTest {
     // FinanceRegistrationReminderScheduler는 package-private이라 클래스 리터럴로 못 씀 → FQCN으로 조회
     private static final String FINANCE_SCHEDULER_FQCN =
             "com.kista.api.finance.adapter.in.schedule.FinanceRegistrationReminderScheduler";
+    // 매매 엔진 실패 이벤트 재발행 잡도 package-private
+    private static final String TRADING_RESUBMIT_SCHEDULER_FQCN =
+            "com.kista.tradingcore.trading.adapter.in.schedule.UserEventResubmitScheduler";
 
     @Autowired
     private ApplicationContext context;
@@ -44,6 +50,8 @@ class SchedulerDisabledContextTest {
                 KbLandHousingBenchmarkScheduler.class, KbLandPriceIndexScheduler.class,
                 MarketIndexPriceSyncScheduler.class, RefreshTokenCleanupScheduler.class,
                 Class.forName(FINANCE_SCHEDULER_FQCN), AdminSchedulerController.class,
+                ApiKeyExpiryScheduler.class, TradingBatchResumer.class, TradingSchedulerInternalController.class,
+                Class.forName(TRADING_RESUBMIT_SCHEDULER_FQCN),
         };
         for (Class<?> type : schedulers) {
             assertThat(context.getBeanNamesForType(type))

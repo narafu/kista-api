@@ -1,8 +1,7 @@
 ## com.kista.tradingcore.web (`:trading-core`)
 
 com.kista.tradingcore.web/ ← Spring Modulith 앱셸 모듈. root `com.kista.api.web`과 대칭. `@ApplicationModule(Type.CLOSED)` — NamedInterface **0개**. 아무 모듈도 tradingcore.web을 참조하지 않는 sink라 순환에 참여할 수 없다(`HexagonalArchitectureTest.web_must_stay_pure_inbound_sink`가 `com.kista.api.web..`과 함께 `application.service`/`adapter.out` 의존 금지로 강제). trading-core 프로세스 전체(부팅·전역 web)에 걸치는 관심사만 두고, 특정 모듈 소유 코드는 소유 모듈로 보낼 것
-  TradingApplication ← 이 모듈이 아니라 `com.kista.tradingcore` 루트에 있다(`@SpringBootApplication @ConfigurationPropertiesScan @EnableScheduling @Modulithic(additionalPackages = "com.kista.shared")`). 스캔 목록이 없고 루트 기본 스캔이 trading-core 전체를 덮는다. `bootJar` 매니페스트 `Start-Class`는 `com.kista.tradingcore.TradingApplication`(Dockerfile은 `java -jar trading-core.jar`라 변경 불필요). 테스트는 `@SpringBootConfiguration` 상향 탐색으로 이 클래스를 찾으며 `@ContextConfiguration`을 쓰지 않는다
-  TradingExceptionReporter ← `platform.web.ExceptionReporter` 구현 `@Component` — 공용 advice(`platform.web.ProblemDetailExceptionHandler`)의 미매핑 500과 `BrokerApiException` 503(broker `BrokerProblemDetails`)을 `AppErrorRaisedEvent`(caller=`TradingExceptionReporter`)로 발행하고 `AppErrorStreamPublisher`가 `stream:app.error`로 root에 전달한다. 예외→HTTP 매핑은 각 모듈의 `adapter/in/web/*ProblemDetails`(broker·trading·privacy·account)가 기여한다
-  (유지 판단) TradingExceptionReporter ↔ root `ApiExceptionReporter` ← 동형이지만 합치지 않는다 — 상세는 `docs/agents/modules/api/web.md`
+  모듈 ID는 `trading-web`(api.web의 `web`과 겹치지 않게 — 한 애플리케이션 Modulith 모델). 합병 뒤 클래스가 없다 — 오류 보고는 `api.web` `ApiExceptionReporter` 하나가 맡는다(옛 `TradingExceptionReporter`·`stream:app.error` 경로 삭제)
+  TradingApplication ← 운영 진입점이 아니다. `trading-core/src/test`의 테스트 전용 기동 클래스(`@SpringBootApplication @ConfigurationPropertiesScan @EnableScheduling @Modulithic(additionalPackages = "com.kista.shared")`, `main` 없음)로, trading-core 슬라이스·`@SpringBootTest`가 상향 탐색으로 찾는다. 운영 진입점은 root `ApiApplication`(`scanBasePackages`에 `com.kista.tradingcore` 포함)
 
 예외 매핑 규칙(모듈 기여 SSOT·ProblemDetail 계약·`ErrorCode`)은 `docs/agents/modules/api/web.md` "예외 응답 자동 처리 (공용 advice)"와 동일하게 적용한다.

@@ -22,7 +22,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(TradingSchedulerInternalController.class)
+@WebMvcTest(controllers = TradingSchedulerInternalController.class, properties = "kista.role=all") // worker 전용 컨트롤러 — 슬라이스는 test 프로필이 없어 기본값(web)이면 빈이 없다
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
 @TestPropertySource(properties = "internal.api.token=test-internal-token")
 @Execution(ExecutionMode.SAME_THREAD)

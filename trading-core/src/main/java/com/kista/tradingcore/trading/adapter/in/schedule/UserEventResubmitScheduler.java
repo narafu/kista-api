@@ -16,14 +16,14 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
-// 로컬 재발행된 사용자 이벤트의 리스너(TradingUserCascadeListener·UserNotifyProfileSyncListener)와 계좌 삭제 cascade 리스너(AccountCascadeListener)가 실패해 FAILED로 남은
-// trading.event_publication을 주기적으로 재발행한다 — AFTER_COMMIT 리스너 실패는 스트림 컨슈머까지 전파되지 않아(메시지는 ack)
-// 이 잡이 유일한 재기동 전 재시도 경로다. 처음 실패를 발견한 회차에만 관리자에게 알린다(completionAttempts는 재발행마다 1씩 늘고 첫 실패 시 1).
-// root의 com.kista.api.web.UserEventResubmitScheduler와 대칭(발행 측 실패 담당)
+// 사용자 이벤트 리스너(TradingUserCascadeListener·UserNotifyProfileSyncListener·root finance cascade·FCM 정리·탈퇴 알림)와
+// 계좌 삭제 cascade 리스너(AccountCascadeListener)가 실패해 FAILED로 남은 event_publication을 주기적으로 재발행한다 —
+// Modulith 기본 재발행은 재기동 시 1회뿐이라 이 잡이 유일한 재기동 전 재시도 경로다(각 리스너는 멱등).
+// 처음 실패를 발견한 회차에만 관리자에게 알린다(completionAttempts는 재발행마다 1씩 늘고 첫 실패 시 1).
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnWorkerRole // web role이면 비활성 — 운영 kista-trading 단일 인스턴스만
+@ConditionalOnWorkerRole // web role이면 비활성 — 운영 worker 단일 인스턴스만
 class UserEventResubmitScheduler {
 
     private static final Duration MIN_AGE = Duration.ofMinutes(5); // 상태 NULL 레거시 행만 거른다 — Modulith 2.1.1 SQL은 OR 우선순위상 FAILED 행엔 적용되지 않는다

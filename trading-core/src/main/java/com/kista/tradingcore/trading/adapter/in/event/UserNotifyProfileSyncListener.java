@@ -11,7 +11,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 // trading.user_notify_profile 복제본 동기화 — user 모듈이 발행한 프로필 변경 이벤트를 받아 upsert 한다(탈퇴는 UserTradingDataEraseService가 tombstone 처리).
-// root가 Redis Stream으로 보낸 이벤트를 UserEventStreamBridge가 로컬 재발행한다 — 실패하면 publication이 FAILED로 남아 UserEventResubmitScheduler가 재발행.
+// user 모듈(UserNotifyProfilePublisher)이 같은 애플리케이션에서 발행한다 — 실패하면 publication이 FAILED로 남아 UserEventResubmitScheduler가 재발행.
 // 버전 가드(occurredAt)·upsert는 TradingUserProfilePort.applyChange(UserNotifyProfilePersistenceAdapter)가 맡는다.
 // fallbackExecution=true는 안전망이다 — 현재 발행 지점은 전부 트랜잭션 안이지만(login()의 ADMIN
 // 승격도 AdminSeedPromoter로 분리됨), 누군가 트랜잭션 밖에서 발행을 추가하면 이 플래그가 없을 때

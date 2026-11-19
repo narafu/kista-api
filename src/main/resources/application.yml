@@ -12,11 +12,11 @@ spring:
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 10
+      maximum-pool-size: ${DB_POOL_MAX:5} # 한 애플리케이션(web·worker 각 인스턴스)당 풀 — 옛 2-프로세스 합계를 넘지 않게
       minimum-idle: 2
       connection-timeout: 20000
-      pool-name: HikariPool-KistaApi
-      connection-init-sql: "SET search_path TO finance, kista_ref, public"
+      pool-name: HikariPool-Kista
+      connection-init-sql: "SET search_path TO finance, kista_ref, public"   # trading 엔티티·native SQL은 스키마를 명시하므로 root 값 하나로 충분
 
   jpa:
     open-in-view: false
@@ -36,10 +36,10 @@ spring:
     events:
       completion-mode: delete   # 완료 행을 읽는 코드 없음 — 완료 시 행 삭제, 미완료 행만 남는다
       jdbc:
-        schema: public
+        schema: public   # 한 애플리케이션의 EPR은 public.event_publication 하나
         schema-initialization:
           enabled: false   # event_publication 테이블은 baseline V1이 소유 — Modulith 자동 생성 비활성화
-      republish-outstanding-events-on-restart: true   # 재기동 시 미완료 이벤트 자동 재시도
+      # republish-outstanding-events-on-restart는 두지 않는다(Modulith 기본 false — 로컬·테스트는 재기동 재발행 없음). prod도 false, compose가 worker에만 true로 켠다
 
   task:
     scheduling:
@@ -65,8 +65,11 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
+      role: ${kista.role} # web·worker 인스턴스 구분
 
 springdoc:
+  # 서버 간 내부 API(X-Internal-Token 전용)는 UI 타입 생성·공개 문서 대상이 아니다 — contract 타입이 UI DTO와 이름 충돌하는 것도 막는다
+  paths-to-exclude: /api/internal/**
   api-docs:
     path: /api-docs
   swagger-ui:
@@ -105,12 +108,25 @@ cors:
 internal:
   api:
     token: ${INTERNAL_API_TOKEN:}
-    base-url: ${INTERNAL_API_BASE_URL:http://localhost:8081} # 이 프로세스가 나가는 내부 API 호출 대상(trading-core) — 예전엔 자기 자신(단일 프로세스) 기본값이었으나 4a 분리 이후 trading-core 기본 포트(8081)로 정정
+    base-url: ${INTERNAL_API_BASE_URL:http://localhost:8080} # 내부 API 호출 대상 — 한 애플리케이션이라 기본값은 자기 자신
 
-alpaca:
+alpaca: # marketcalendar(휴장일)·stats(백테스트 과거 일봉)·broker(공용 시세)·benchmark 공용
+  base-url: https://paper-api.alpaca.markets
   api-key: ${ALPACA_API_KEY:}
   api-secret: ${ALPACA_API_SECRET:}
   data-base-url: https://data.alpaca.markets
+
+toss:
+  base-url: https://openapi.tossinvest.com
+  admin-client-id: ${TOSS_ADMIN_CLIENT_ID:}
+  admin-client-secret: ${TOSS_ADMIN_CLIENT_SECRET:}
+
+meritz:
+  base-url: https://openapi.imeritz.com:9443  # 앱키마다 계좌 1개 — 서버 공용 시크릿 없음
+
+heartbeat: # 스케쥴러별 healthchecks.io 핑 — 미설정 시 핑 생략
+  open-url: ${HEARTBEAT_OPEN_URL:}
+  close-url: ${HEARTBEAT_CLOSE_URL:}
 
 kbland:
   base-url: https://data-api.kbland.kr
@@ -130,5 +146,8 @@ kista:
       - locations: classpath:db/migration
         table: flyway_schema_history_api   # 서비스별 이력 테이블 — 옛 공용 이력 테이블은 2026-11-16 운영에서 drop했다
         schema: public   # 서비스 소유 스키마여야 baseline 판정(비어있음 여부)이 정확하다
+      - locations: classpath:db/migration-trading
+        table: flyway_schema_history_trading
+        schema: trading   # 서비스 소유 스키마여야 baseline 판정(비어있음 여부)이 정확하다
   scheduler-lock:
-    table: public.scheduler_locks # SchedulerLockService 락 테이블 — 스키마 한정 필수
+    table: trading.scheduler_locks # SchedulerLockService 락 테이블 — 스키마 한정 필수(매매 배치 락 행이 있는 쪽 하나로)

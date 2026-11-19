@@ -25,7 +25,7 @@ class OpenApiSchemaNameCollisionTest {
         Map<String, Class<?>> seen = new HashMap<>();
         List<String> collisions = new ArrayList<>();
         // 응답에 실리는 contract record도 스캔 대상에 포함한다
-        for (JavaClass jc : new ClassFileImporter().importPackages("com.kista.api", "com.kista.shared.contract")) {
+        for (JavaClass jc : new ClassFileImporter().importPackages("com.kista.api", "com.kista.tradingcore", "com.kista.shared.contract")) {
             String pkg = jc.getPackageName();
             if (!pkg.contains(".adapter.in.web") && !pkg.contains(".web.") && !pkg.endsWith(".dto") && !pkg.startsWith("com.kista.shared.contract")) continue;
             Class<?> c = jc.reflect();

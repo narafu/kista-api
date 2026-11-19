@@ -20,8 +20,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 
-// 프로세스 간 Redis Stream 전달의 공통 기법 — "payload" 단일 필드 봉투(XADD/읽기), 컨슈머 그룹 보장(BUSYGROUP 무시),
-// pending 복구(XCLAIM). root(user.* 발행, app.error 구독)와 trading-core(user.* 구독, app.error 발행) 양쪽이
+// Redis Stream 전달의 공통 기법 — "payload" 단일 필드 봉투(XADD/읽기), 컨슈머 그룹 보장(BUSYGROUP 무시),
+// pending 복구(XCLAIM). 발행 측(trading-core notify)과 구독 측(api.notify push-notification)이
 // 같은 규약을 쓰도록 여기 한 곳에 둔다. 빈이 아니라 순수 정적 유틸 — 스트림 키·그룹명은 RedisStreamConfig.
 @Slf4j
 public final class RedisStreams {

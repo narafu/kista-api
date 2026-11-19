@@ -172,7 +172,7 @@ class HexagonalArchitectureTest {
     @Test
     @DisplayName("main 코드는 시스템 시계를 직접 읽지 않는다 — Clock 빈 주입")
     void main_code_must_not_read_system_clock_directly() {
-        // CQ-17: 정적 now()/Clock.system*() 금지, 앱 루트 ClockConfig 2곳만 예외. now(Clock)은 허용
+        // CQ-17: 정적 now()/Clock.system*() 금지, 앱 루트 ClockConfig 1곳만 예외. now(Clock)은 허용
         // 메서드 호출과 메서드 참조(Instant::now 등)를 모두 검사한다
         Set<String> nowTypes = Set.of(LocalDate.class, LocalDateTime.class, LocalTime.class, Instant.class,
                 ZonedDateTime.class, OffsetDateTime.class, YearMonth.class, Year.class, MonthDay.class, OffsetTime.class)
@@ -204,8 +204,7 @@ class HexagonalArchitectureTest {
             }
         };
         ArchRule rule = noClasses()
-                .that().doNotHaveFullyQualifiedName("com.kista.tradingcore.ClockConfig")
-                .and().doNotHaveFullyQualifiedName("com.kista.api.ClockConfig")
+                .that().doNotHaveFullyQualifiedName("com.kista.api.ClockConfig")
                 .should(readsSystemClock);
         rule.check(mainClasses);
     }

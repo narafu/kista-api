@@ -53,7 +53,7 @@
 
 ## Redis Stream 복구 (cron 아님)
 
-`RedisStreamSubscriber` 서브클래스(root `AppErrorStreamConsumer`·`PushNotificationStreamConsumer`, trading-core `UserDeletedStreamConsumer`·`UserNotifyProfileStreamConsumer`)의 `@Scheduled(fixedDelay = 5분)`이 끊긴 구독 재기동 + pending XCLAIM 복구를 한다. `@ConditionalOnWorkerRole` 게이팅이 없어 각 프로세스(role)마다 동작한다.
+`RedisStreamSubscriber` 서브클래스(`PushNotificationStreamConsumer` 하나)의 `@Scheduled(fixedDelay = 5분)`이 끊긴 구독 재기동 + pending XCLAIM 복구를 한다. `@ConditionalOnWorkerRole` 게이팅이 없어 각 프로세스(role)마다 동작한다.
 
 ## 참고
 

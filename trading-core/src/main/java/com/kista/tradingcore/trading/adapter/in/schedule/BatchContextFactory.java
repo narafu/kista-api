@@ -11,6 +11,7 @@ import com.kista.tradingcore.trading.application.port.output.TradingErrorReportP
 import com.kista.tradingcore.trading.application.port.output.TradingUserProfilePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.kista.shared.platform.role.ConditionalOnWorkerRole;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -23,6 +24,7 @@ import java.util.stream.Collectors;
 // 전략 목록 → BatchContext 목록 변환 — 조회 실패한 전략은 skip + notifyError
 @Slf4j
 @Component
+@ConditionalOnWorkerRole // 소비자(개장·마감 스케줄러)가 worker 전용 — web role에선 등록하지 않는다
 @RequiredArgsConstructor
 class BatchContextFactory {
 

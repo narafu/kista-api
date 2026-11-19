@@ -4,7 +4,7 @@ Spring Modulith 앱셸 모듈, `Type.CLOSED`, NamedInterface 0개. 아무 모듈
 
 - `RootSecurityPolicy`(`SecurityRoutePolicy`): root 고유 라우트 규칙. `SecurityConfig`가 공통 규칙(internal/admin) 뒤에 적용하므로 이 정책이 admin/internal을 permitAll로 열 수 없다. 공개 읽기 4경로(`POST /api/client-errors`·`GET /api/market/**`·`GET /api/meta`·`GET /api/runtime-config`)는 같은 매처 상수를 permitAll 등록과 `anonymousFallbackMatchers()`(무효 토큰 익명 통과)가 공유한다. `/api/auth`는 로그인·갱신·로그아웃 POST만 공개로 적고 공유에서 뺀다.
 - `UserEventResubmitScheduler`: FAILED `UserDeletedEvent`·`UserNotifyProfileChangedEvent` publication을 10분마다 재발행한다. user에 두면 notify→user 의존과 순환이라 앱셸에 둔다. worker role이라 public EPR 재발행 소유자 kista-scheduler에서만 돈다. trading-core `UserEventResubmitScheduler`와 골격이 같아도 `shared.platform`으로 추출하지 않는다(2곳뿐, 필터 이벤트 타입이 `shared.kernel`이라 platform이 참조 불가, 알림 포트·문구가 달라 공통부가 상수 2개뿐).
-- `ApiExceptionReporter`는 trading-core `TradingExceptionReporter`와 동형이지만 합치지 않는다 → `decisions.md`.
+- `ApiExceptionReporter`가 애플리케이션 유일의 `ExceptionReporter`다(옛 trading-core `TradingExceptionReporter`는 합병으로 삭제).
 - `MetaController`(`GET /api/meta`): enum 메타 단일 번들. finance+sharedkernel fan-out이라 단일 모듈로 옮길 수 없다. 내부 API·RestClient 호출이 없어 trading-core 장애와 무관하게 응답한다 (가드: `HexagonalArchitectureTest.inbound_adapters_must_not_perform_outbound_http`).
 - `AdminSchedulerController`(`/kbland-*`)는 worker role 전용이라 kista-api에선 빈이 없다(404).
 

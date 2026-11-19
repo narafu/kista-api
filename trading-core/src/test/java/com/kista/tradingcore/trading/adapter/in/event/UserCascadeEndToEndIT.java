@@ -40,11 +40,11 @@ import static org.mockito.Mockito.verify;
 
 // 탈퇴 cascade 실 컨텍스트·실 DB 검증 — 단위 테스트(mock)로는 못 잡는 세 가지를 잠근다.
 // (1) AFTER_COMMIT 리스너의 쓰기가 실제로 커밋되는지(재발행 트랜잭션 합류 유실 회귀),
-// (2) 정리 실패 시 trading.event_publication이 FAILED로 남고 UserEventResubmitScheduler가 재발행·첫 실패 알림하는지(completionAttempts 실측),
-// (3) tombstone이 늦게 도착한 탈퇴 전 프로필 스냅샷을 막는지. 재발행은 UserEventRepublisher와 같은 "트랜잭션 안 publishEvent"로 재현한다
+// (2) 정리 실패 시 event_publication이 FAILED로 남고 UserEventResubmitScheduler가 재발행·첫 실패 알림하는지(completionAttempts 실측),
+// (3) tombstone이 늦게 도착한 탈퇴 전 프로필 스냅샷을 막는지. 발행은 UserCascadeDeleter와 같은 "트랜잭션 안 publishEvent"로 재현한다
 @Tag("integration")
 @SpringBootTest(properties = "spring.data.redis.url=redis://localhost:6379")
-// 실 Redis 스트림 구독자(user.* 컨슈머 그룹)가 살아 있는 컨텍스트 — 캐시로 남으면 같은 그룹을 쓰는 UserEventStreamBridgeIT의 메시지를 먼저 가져간다
+// 리스너 실패를 주입하는 실 커밋 컨텍스트 — 캐시로 남아 다른 테스트에 재사용되지 않게 폐기한다
 @DirtiesContext
 @ActiveProfiles("test")
 @Execution(ExecutionMode.SAME_THREAD) // 실 DB 커밋
@@ -94,7 +94,7 @@ class UserCascadeEndToEndIT {
         jdbcTemplate.update("DELETE FROM event_publication WHERE serialized_event LIKE ?", "%" + userId + "%");
     }
 
-    // UserEventRepublisher.republishUserDeleted와 같은 경로 — 트랜잭션 안에서 발행하고 커밋 후 리스너가 돈다
+    // UserCascadeDeleter.deleteCascade와 같은 경로 — 트랜잭션 안에서 발행하고 커밋 후 리스너가 돈다
     private void republishInTransaction(Object event) {
         transactionTemplate.executeWithoutResult(status -> eventPublisher.publishEvent(event));
     }

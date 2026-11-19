@@ -5,7 +5,7 @@ import java.io.StringWriter;
 import java.util.Map;
 
 // 애플리케이션 오류 1건의 보고 — root admin이 app_error_logs에 저장한다.
-// root 안에서는 로컬 이벤트로, trading-core에서는 Redis Stream(stream:app.error)으로 전달되는 통합 메시지라
+// root·trading-core 어디서 발행돼도 같은 애플리케이션의 로컬 이벤트로 전달되는 통합 메시지라
 // Exception 객체 대신 저장에 필요한 문자열 필드만 담는다(JDK 타입만 참조 — outbound-zero).
 public record AppErrorRaisedEvent(
         String errorType,            // 예외 클래스 simple name

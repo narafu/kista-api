@@ -1,6 +1,7 @@
 package com.kista.tradingcore.web;
 
 import com.kista.shared.kernel.AppErrorRaisedEvent;
+import com.kista.shared.platform.web.ExceptionReporter;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
 import com.kista.tradingcore.broker.domain.model.BrokerPermissionDeniedException;
@@ -23,6 +24,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.event.ApplicationEvents;
@@ -52,7 +54,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // 오류 보고(AppErrorRaisedEvent)가 나가는지 고정한다. 처리기 클래스를 참조하지 않아 처리기 구조를 바꿔도 같은 표로 검증한다
 @WebMvcTest(controllers = ExceptionResponseTableTest.ThrowingController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import({ExceptionResponseTableTest.ThrowingController.class, TradingExceptionReporter.class})
+@Import({ExceptionResponseTableTest.ThrowingController.class, ExceptionResponseTableTest.RecordingReporter.class})
 @RecordApplicationEvents
 @Execution(ExecutionMode.SAME_THREAD)
 class ExceptionResponseTableTest {
@@ -137,6 +139,21 @@ class ExceptionResponseTableTest {
                 .andExpect(jsonPath("$.title").value(title))
                 .andExpect(detail == null ? jsonPath("$.detail").doesNotExist() : jsonPath("$.detail").value(detail))
                 .andExpect(code == null ? jsonPath("$.code").doesNotExist() : jsonPath("$.code").value(code));
+    }
+
+    // 오류 보고를 이벤트로 기록하는 테스트 전용 보고자 — 운영 보고자(api.web ApiExceptionReporter)는 이 모듈 밖이라 같은 계약(AppErrorRaisedEvent 발행)만 재현한다
+    static class RecordingReporter implements ExceptionReporter {
+
+        private final ApplicationEventPublisher eventPublisher; // 보고 이벤트 발행
+
+        RecordingReporter(ApplicationEventPublisher eventPublisher) {
+            this.eventPublisher = eventPublisher;
+        }
+
+        @Override
+        public void report(Exception ex) {
+            eventPublisher.publishEvent(AppErrorRaisedEvent.of(ex, RecordingReporter.class.getSimpleName()));
+        }
     }
 
     // 표의 예외를 그대로 던지는 테스트 전용 컨트롤러(테스트 클래스 중첩이라 스캔 대상이 아니다 — @Import로만 올린다)

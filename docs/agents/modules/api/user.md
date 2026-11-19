@@ -9,7 +9,7 @@ Spring Modulith 모듈(CLOSED) — 가입·승인·프로필·설정 + JWT/Refre
 - `UserCascadeDeleter`(`deleteMe`/`AdminService.deleteUser` 공통)는 cascade를 전부 `UserDeletedEvent`로 처리한다(직접 포트 호출 0 — user↔trading·finance·account 순환 제거, EPR 재시도 보장). trading-core 쪽 cascade는 Redis Stream 경유 AFTER_COMMIT 비동기라 탈퇴 HTTP 응답 시점엔 계좌 소프트 삭제가 미완료일 수 있다(최종적 일관성).
 - `AdminSeedPromoter`는 별도 빈이다 — `UserService.login()`이 `NOT_SUPPORTED`라 그 안에서 저장·발행하면 복제본 동기화 이벤트가 트랜잭션 없이 나가 리스너 예외가 로그인까지 전파되고 재시도해도 promote가 no-op이라 복제본이 영영 안 생긴다.
 - `UserNotifyProfilePublisher`가 `UserNotifyProfileChangedEvent` 발행 SSOT다(`publishStatusChanged`/`publishSettingsChanged`). 저장 없는 재발행 `resyncNotifyProfile`은 로컬 `DevAuthController`가 이미 ACTIVE인 dev·admin·E2E 유저의 복제본 유실을 복구할 때 쓴다.
-- `UserEventStreamPublisher`(trading-core 복제본 동기화 Redis Stream)는 XADD 실패를 삼키지 않는다 — 예외가 나야 publication이 FAILED로 남아 `web.UserEventResubmitScheduler`가 재발행한다(삼키면 완료로 기록돼 `user.deleted`가 영구 유실). 그래서 발행 지점은 전부 트랜잭션 안이어야 한다. 스냅샷 시각 `occurredAt`은 `UserNotifyProfilePublisher`가 찍는다(trading-core 버전 가드).
+- `UserDeletedEvent`·`UserNotifyProfileChangedEvent`는 같은 애플리케이션의 trading-core 리스너(`TradingUserCascadeListener`·`UserNotifyProfileSyncListener`)가 직접 받는다 — 리스너 실패는 publication FAILED로 남아 trading `UserEventResubmitScheduler`(worker)가 재발행한다. 리스너가 `fallbackExecution=true`라 발행 지점은 전부 트랜잭션 안이어야 한다(밖이면 EPR 행 없이 인라인 실행). 스냅샷 시각 `occurredAt`은 `UserNotifyProfilePublisher`가 찍는다(trading-core 버전 가드).
 - `JwtAuthFilter`/`InternalTokenAuthFilter`/`SecurityConfig`/`JwtDecoderConfig`는 `:shared`의 `platform.security`에 있다 → `modules/shared/platform.md`. `RedisBlacklistAdapter`는 platform `RedisTokenBlacklistReader`를 상속한다(읽기 3종은 베이스, 쓰기 3종만 여기).
 
 ### 상태 종속 민감 필드 마스킹 (rejectReason 사례)

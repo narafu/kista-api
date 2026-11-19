@@ -1,7 +1,6 @@
 spring:
   datasource:
     hikari:
-      maximum-pool-size: 5
       minimum-idle: 1
       connection-timeout: 20000
       idle-timeout: 300000
@@ -9,12 +8,12 @@ spring:
   jpa:
     show-sql: false
   lifecycle:
-    timeout-per-shutdown-phase: 30s  # docker stop_grace_period 35s와 쌍으로 관리
+    timeout-per-shutdown-phase: 30s  # docker stop_grace_period와 쌍으로 관리
   modulith:
     events:
-      # EPR 재발행 소유자 = kista-scheduler 단독. API role은 재발행 안 함
+      # EPR 재발행 소유자 = worker role 단독. web role은 재발행 안 함
       # (양쪽 true면 미완료 event_publication 행을 둘 다 claim → 중복 알림)
-      # kista-scheduler 서비스가 SPRING_MODULITH_EVENTS_REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART=true로 되켬
+      # compose가 worker 서비스에만 SPRING_MODULITH_EVENTS_REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART=true로 되켬
       republish-outstanding-events-on-restart: false
 
 # 운영 role은 compose가 KISTA_ROLE(web|worker)로 지정 — 기본값을 두지 않아 누락 시 기동 실패(web이 worker로 뜨는 중복 배치 방지)

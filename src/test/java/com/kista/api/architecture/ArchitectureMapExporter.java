@@ -337,14 +337,11 @@ final class ArchitectureMapExporter {
         return label.replace("-", "~");
     }
 
-    // 실행 프로세스 판별 — trading-core는 kista-trading, root는 @ConditionalOnWorkerRole 여부로 갈린다
+    // 실행 role 판별 — 매매 엔진(com.kista.tradingcore)과 @ConditionalOnWorkerRole은 kista-worker, 나머지는 kista-web
     private static String process(JavaClass owner) {
-        var uri = owner.getSource().map(s -> s.getUri().toString().replace('\\', '/')).orElse("");
-        if (uri.contains("/trading-core/")) {
-            return "kista-trading";
-        }
-        boolean gated = owner.isAnnotatedWith(ConditionalOnWorkerRole.class);
-        return gated ? "kista-scheduler" : "kista-api · kista-scheduler";
+        boolean worker = owner.getPackageName().startsWith("com.kista.tradingcore.")
+                || owner.isAnnotatedWith(ConditionalOnWorkerRole.class);
+        return worker ? "kista-worker" : "kista-web";
     }
 
     static void write(List<ModuleGraphExporter.Module> modules, FlowMap map,

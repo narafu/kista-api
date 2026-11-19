@@ -86,8 +86,7 @@ class GradleModuleBoundaryTest {
                 .check(importedClasses);
     }
 
-    // trading-core는 root를 호출하지 않는다 — 프로세스 간 런타임 의존은 root→trading-core 단방향(HTTP)이고, 반대 방향은
-    // Redis Stream push(stream:app.error)뿐이다. 과거 BrokerEnabledHttpAdapter/StrategyCreationPolicyHttpAdapter/
+    // trading-core는 root 내부 API를 호출하지 않는다 — 내부 HTTP 의존은 root→trading-core 단방향이다. 과거 BrokerEnabledHttpAdapter/StrategyCreationPolicyHttpAdapter/
     // 옛 TradingExceptionHandler가 root 내부 API를 동기 호출하던 역방향 의존이 재발하지 않도록 내부 API 클라이언트 패키지
     // (platform.internalapi — InternalApiClientConfig/RestClient 빈) 참조 자체를 컴파일 산출물 기준으로 금지한다.
     @Test
@@ -104,8 +103,8 @@ class GradleModuleBoundaryTest {
                 .check(importedClasses);
     }
 
-    // 서브프로젝트마다 고유 루트 패키지를 갖는다 — 스캔 목록 없이 기본 스캔(자기 루트)만으로 프로세스가 분리되는 근거.
-    // 다른 루트에 클래스를 두면 root 테스트 classpath의 trading-core 빈이 root 컨텍스트에 섞이는 경로가 다시 생긴다
+    // 서브프로젝트마다 고유 루트 패키지를 갖는다 — ApiApplication의 스캔 목록(com.kista.api·com.kista.tradingcore)과
+    // PlatformAutoConfiguration(com.kista.shared)이 빈 출처를 서브프로젝트 단위로 가르는 근거
     @ParameterizedTest
     @CsvSource({
             "build/classes/java/main, com.kista.api..",

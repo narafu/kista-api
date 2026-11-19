@@ -187,27 +187,27 @@ flowchart TB
 
 ## L1.5 프로세스 간 통신
 
-root → trading-core는 내부 HTTP와 Redis Stream, trading-core → root는 Redis만 쓴다(trading-core는 root HTTP를 호출하지 않는다).
+한 애플리케이션이라 사용자 이벤트(`UserDeletedEvent`·`UserNotifyProfileChangedEvent`)와 오류 보고(`AppErrorRaisedEvent`)는 모듈 리스너가 직접 받는다(`public.event_publication`). 내부 HTTP(root → trading-core)와 Redis(체결 푸시 Stream·`trade.event` Pub/Sub)는 web·worker 인스턴스 사이 전달용으로 남는다.
 
 ```mermaid
 flowchart LR
     subgraph root["root (kista-api · kista-scheduler)"]
         rOut["*/adapter/out/internal<br/>*HttpAdapter"]
-        rUser["user<br/>UserEventStreamPublisher"]
-        rAdmin["admin<br/>AppErrorStreamConsumer"]
+        rUser["user<br/>UserDeletedEvent·UserNotifyProfileChangedEvent 발행"]
+        rAdmin["admin<br/>AppErrorRaisedListener"]
         rNotify["notify<br/>PushNotificationStreamConsumer<br/>RedisTradeEventSubscriber → SSE"]
     end
 
     subgraph tc["trading-core (kista-trading)"]
         tIn["*InternalController<br/>/api/internal/**"]
-        tUser["trading<br/>UserDeleted·UserNotifyProfile<br/>StreamConsumer"]
-        tErr["trading<br/>AppErrorStreamPublisher"]
+        tUser["trading<br/>TradingUserCascadeListener<br/>UserNotifyProfileSyncListener"]
+        tErr["tradingcore.notify<br/>TradingNotifyAdapter → AppErrorRaisedEvent"]
         tNotify["tradingcore.notify<br/>RedisPushNotificationPublisher<br/>RedisTradeEventPublisher"]
     end
 
     rOut -->|"HTTP · contract.*"| tIn
-    rUser -->|"stream:user.deleted<br/>stream:user.notify-profile.changed"| tUser
-    tErr -->|"stream:app.error"| rAdmin
+    rUser -.->|"이벤트(같은 컨텍스트 · EPR)"| tUser
+    tErr -.->|"이벤트(같은 컨텍스트)"| rAdmin
     tNotify -->|"stream:user.push-notification.requested"| rNotify
     tNotify -->|"Pub/Sub trade.event"| rNotify
 ```

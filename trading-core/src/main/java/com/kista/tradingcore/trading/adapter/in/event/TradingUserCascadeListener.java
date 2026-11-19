@@ -21,7 +21,7 @@ public class TradingUserCascadeListener {
 
     private final UserTradingDataEraseService eraser; // 단계별 트랜잭션 경계를 가진 정리 유스케이스
 
-    // fallbackExecution — 재발행(UserEventRepublisher)은 트랜잭션 안이지만, 트랜잭션 밖 발행이 생겨도 조용히 버려지지 않게 한다
+    // fallbackExecution — 발행(UserCascadeDeleter)은 트랜잭션 안이지만, 트랜잭션 밖 발행이 생겨도 조용히 버려지지 않게 한다
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onUserDeleted(UserDeletedEvent event) {
         eraser.cancelOpenOrders(event.userId());

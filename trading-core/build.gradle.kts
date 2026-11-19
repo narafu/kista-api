@@ -77,7 +77,7 @@ dependencies {
 }
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
-    archiveFileName.set("trading-core.jar")
+    enabled = false // 실행 진입점은 루트 ApiApplication 하나 — 이 서브프로젝트는 라이브러리 jar로만 쓴다
 }
 
 tasks.named<Test>("test") {

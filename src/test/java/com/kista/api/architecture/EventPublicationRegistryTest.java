@@ -24,7 +24,8 @@ import static org.mockito.Mockito.verify;
 // trading-core로 이관되며 root 프로세스에 더 이상 구독자가 없어져 이 테스트가 깨짐 — root에 여전히
 // 남아있는 동일 패턴의 리스너(AlertNotifier.onBenchmarkAlertRaised, @TransactionalEventListener(fallbackExecution=true)
 // + NotifyPort 단일 호출)로 이벤트만 교체, 검증 대상(EPR 메커니즘 자체)은 동일
-@SpringBootTest
+// kista.role=web — worker 기동 잡(캘린더 적재·배치 재개)이 테스트에서 Alpaca·텔레그램을 실제로 부르지 않게 한다(EPR 검증엔 worker 빈 불필요)
+@SpringBootTest(properties = "kista.role=web")
 @ActiveProfiles("test")
 @Execution(ExecutionMode.SAME_THREAD)
 class EventPublicationRegistryTest {

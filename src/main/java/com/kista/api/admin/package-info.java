@@ -6,9 +6,8 @@
 // 스케쥴러 수동 트리거 컨트롤러(옛 AdminSchedulerController)는
 // com.kista.api.web으로 이전됨(2-role 배포에서 kista-scheduler 전용이 되며 admin 소유일 이유가 없어짐) — admin은
 // adapter NamedInterface도 없음.
-// 오류 로그(app_error_logs) 저장 입구는 둘이고 같은 AppErrorLogPort로 수렴한다 — root 프로세스 내부 발행분은
-// adapter/in/event/AppErrorRaisedListener(shared.kernel AppErrorRaisedEvent 구독), trading-core 발행분은
-// adapter/in/redis/AppErrorStreamConsumer. 옛 adapter/out/aop/ErrorLogAspect(NotifyPort.notifyError 문자열 포인트컷 —
+// 오류 로그(app_error_logs) 저장 입구는 adapter/in/event/AppErrorRaisedListener(shared.kernel AppErrorRaisedEvent 구독) 하나다
+// (trading-core 발행분도 같은 애플리케이션이라 직접 받는다). 옛 adapter/out/aop/ErrorLogAspect(NotifyPort.notifyError 문자열 포인트컷 —
 // 정적 분석 사각지대의 admin→notify 런타임 결합)는 2026-09-30 이벤트 경로로 대체돼 삭제됐다(@Aspect는
 // HexagonalArchitectureTest.no_aspects_in_codebase가 저장소 전체에서 금지).
 @org.springframework.modulith.ApplicationModule(id = "admin")
