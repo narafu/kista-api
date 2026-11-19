@@ -107,6 +107,9 @@
 ### 수량 내림 FLOOR 대 DOWN, `InfinitePosition`의 scale 없는 divide 유지
 이유: 양수 입력에서 결과가 같다. 공식 코드라 표기 통일의 이득이 비용보다 작다. 재검토 조건: 공식 변경 때 함께 본다. (2026-11)
 
+### `TradingStatsService` 통화 일반화 유지, KRW 반올림 테스트 미복원
+이유: 서비스에 통화별 분기가 없다. `broker().getCurrency()`와 `Currency.round()`로 일반화돼 있다. 코인 삭제(15 단계 A) 뒤에는 KRW 계좌를 만들 수 없어, 지운 KRW 반올림 테스트 5건(krwSummary_*·krwEquityCurve_pointsScale0·krwCycles_*)의 입력을 만들 수 없다. 재검토 조건: USD가 아닌 통화를 쓰는 증권사가 추가될 때 그 통화로 반올림 테스트를 다시 쓴다. (2026-11-20)
+
 ### 비율 scale 1/4/6 혼재 유지(`TradingStatsService`)
 이유: 용도가 다르다. 중간 계산은 6, 결과는 4, 기간 평균은 1이다. 재검토 조건: 없음. (2026-11)
 
