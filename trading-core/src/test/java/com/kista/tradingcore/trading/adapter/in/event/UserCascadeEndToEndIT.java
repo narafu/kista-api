@@ -120,6 +120,22 @@ class UserCascadeEndToEndIT {
         assertThat(jdbcTemplate.queryForObject("SELECT is_active FROM user_notify_profile WHERE user_id = ?", Boolean.class, userId)).isFalse();
     }
 
+    // 계좌가 0개인 사용자(코인 계좌가 완전 삭제된 사용자 포함)의 탈퇴도 취소·정리가 0행으로 끝나고 publication이 완료된다
+    @Test
+    void 계좌가_없는_사용자의_탈퇴도_정상_종료된다() {
+        UUID noAccountUser = UUID.randomUUID();
+        try {
+            republishInTransaction(new UserDeletedEvent(noAccountUser));
+
+            assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM event_publication WHERE serialized_event LIKE ? AND listener_id LIKE ?",
+                    Long.class, "%" + noAccountUser + "%", "%UserCascadeListener%")).isZero(); // completion-mode: delete — 실패면 FAILED 행이 남는다
+            assertThat(jdbcTemplate.queryForObject("SELECT deleted_at IS NULL FROM accounts WHERE id = ?", Boolean.class, accountId)).isTrue(); // 다른 사용자 계좌는 그대로
+        } finally {
+            jdbcTemplate.update("DELETE FROM user_notify_profile WHERE user_id = ?", noAccountUser);
+            jdbcTemplate.update("DELETE FROM event_publication WHERE serialized_event LIKE ?", "%" + noAccountUser + "%");
+        }
+    }
+
     @Test
     void 정리_실패는_FAILED로_남고_재발행_잡이_첫_실패를_알린_뒤_복구한다() {
         doThrow(new IllegalStateException("주입된 정리 실패")).doCallRealMethod().when(eraser).erase(userId);
