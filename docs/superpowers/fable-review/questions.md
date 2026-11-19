@@ -314,6 +314,43 @@
 - 남는 위험: 전환 전까지 구 경로 결함이 운영에 남는다. 22:00 KST 배치가 쓰는 `prevClose`가 현재가로 바뀌어 있을 수 있다.
 - 멈춘 범위: 없음.
 
+### Q-25 trading-core 테스트의 기동 클래스 — `TradingApplication`을 테스트 소스셋으로 옮긴다
+- 상태: 자체 결정
+- 묶음·태스크: N1 / 05 단계 M(M2·M12)
+- 걸린 곳: 05 4-1 M2 "`TradingApplication` 삭제"와 14-2 M12는 trading-core 테스트가 그 뒤 어떤 `@SpringBootConfiguration`을 쓸지 정하지 않았다. trading-core 테스트 약 54개(`@SpringBootTest` 4·`@DataJpaTest` 11·`@WebMvcTest` 22·`DataJpaTestBase` 상속 27)가 상향 탐색으로 `com.kista.tradingcore.TradingApplication`을 찾는다. `ApiApplication`은 조상 패키지가 아니고 trading-core 테스트 classpath에도 없다.
+- 근거: 재측정(2026-11-20) — findings/10·29, 05 4-1·14-2·15, 07에 해당 계획 없음.
+- 선택지: ① `TradingApplication`을 trading-core test 소스셋으로 옮기고 trading-core main `application.yml`을 테스트 리소스로 옮긴다(참조 4파일·테스트 54개 그대로 컴파일) ② 테스트 54개를 root로 옮기고 테스트 전용 설정 클래스 ③ 54곳에 `@ContextConfiguration`.
+- 답: 자체 결정(2026-11-20) ①. diff가 가장 작고 trading-core 테스트의 search_path·Flyway·EPR 스키마가 지금과 같다. 운영 컨텍스트 전체는 root `ApplicationContextLoadTest`가 검증한다. 계획 `docs/superpowers/plans/2026-11-20-05-m-merge.md`(M 브랜치) D1.
+
+### Q-26 M4(search_path를 `public`으로 단순화)를 하지 않는다
+- 상태: 자체 결정
+- 묶음·태스크: N1 / 05 단계 M(M4)
+- 걸린 곳: 4-1 M4 "`connection-init-sql`은 `SET search_path TO public`으로 단순화". root 테스트 SQL은 `finance, kista_ref, public`에 기대도 된다(`testing.md`), shared `application-test.yml`에 search_path 키가 없어 main 값이 테스트 값이 된다.
+- 근거: main SQL은 P3로 전부 스키마 한정(가드 `NativeSqlSchemaQualifiedTest`), trading-core main에 `@Formula`·`@Subselect`·`@NamedNativeQuery`·`JdbcClient`·미한정 `scheduler_locks`/`event_publication` 0건(2026-11-20 grep), 엔티티 전부 `@Table(schema)`, EPR은 `spring.modulith.events.jdbc.schema`, 락 테이블은 `kista.scheduler-lock.table`.
+- 선택지: ① root 값 유지 ② `public`으로 바꾸고 root 테스트의 미한정 SQL을 고친다.
+- 답: 자체 결정(2026-11-20) ①. 운영 경로가 search_path에 기대지 않아 이득이 없고 테스트 수정만 생긴다. 계획 D2.
+
+### Q-27 Flyway 2벌(M5)을 Flyway 빈 2개가 아니라 마이그레이터 하나로 돌린다
+- 상태: 자체 결정
+- 묶음·태스크: N1 / 05 단계 M(M5)
+- 걸린 곳: 4-1 M5 "`Flyway` 빈을 직접 2개 정의, 각 `initMethod="migrate"`, `DataJpaTestBase`에 `@Import`". `initMethod`로 돌리면 Boot의 DB 초기화 의존 감지기가 JPA를 그 뒤로 미루지 않을 수 있고(감지 대상은 `FlywayMigrationInitializer` 타입), `DataJpaTestBase`(shared testFixtures)는 root·trading-core 클래스를 import할 수 없다.
+- 선택지: ① shared `platform.persistence`에 `FlywayMigrationInitializer` 빈 하나, 전략이 `kista.flyway.migrations` 목록을 순서대로 migrate, `spring.flyway.enabled: false` ② 지침서대로 빈 2개.
+- 답: 자체 결정(2026-11-20) ①. root 앱은 [root, trading], trading-core 테스트는 [trading]만 둔다. 마이그레이션 파일은 바꾸지 않는다. 빈 DB 기동으로 순서를 확인한다(계획 Task 1 Step 6·Task 6 Step 2). 계획 D3.
+
+### Q-28 `RoleRoutes` 경로 표를 따로 만들지 않는다
+- 상태: 자체 결정
+- 묶음·태스크: N1 / 05 단계 M(M10)
+- 걸린 곳: 1-3 "`RoleRoutes`(platform)가 기동 시 `RequestMappingHandlerMapping`에서 모듈별 경로를 모아 가드에 준다".
+- 선택지: ① `RoleRoutingGuard`가 요청마다 핸들러를 찾아 핸들러 클래스가 `com.kista.tradingcore.` 패키지이거나 `@ConditionalOnWorkerRole`이면 엔진으로 본다 ② 기동 시 표를 만든다.
+- 답: 자체 결정(2026-11-20) ①. 클래스가 하나 줄고 판정 기준이 1-2 표("엔진 = 지금의 trading-core")와 같다. Caddy 일치는 기존 `CaddyRoutingTest`가 계속 검증한다. 단계 R에서 모듈이 재편되면 판정 기준을 모듈 목록으로 바꾼다. 계획 D4.
+
+### Q-29 탈퇴 cascade(미체결 주문 취소)가 web 프로세스에서 돈다
+- 상태: 자체 결정(기록만)
+- 묶음·태스크: N1 / 05 단계 M(M9)
+- 걸린 곳: 1-1 "원장을 바꾸거나 브로커를 호출하는 코드는 worker 프로세스에서만" 대 3절 P5·14-2 M9 "스트림 경로를 지우고 T 리스너가 이벤트를 직접 받는다". 탈퇴 요청은 web이 받으므로 `TradingUserCascadeListener`(AFTER_COMMIT, 브로커 취소 호출)도 web에서 돈다.
+- 선택지: ① 지침서대로(web에서 실행) ② worker로 보내는 경로를 새로 만든다.
+- 답: 자체 결정(2026-11-20) ①. 지침서가 정한 설계이고 탈퇴는 드물어(활성 사용자 2명) 메리츠 호출 간격 합산·예산 락 경합이 사실상 생기지 않는다. 계획 D5. 다시 볼 조건: 단계 C(8절) 또는 탈퇴가 잦아질 때.
+
 ## Fable 대기 작업 (2026-11-15 추가) — 2026-11-16 처리
 
 | 항목 | 결과 | 원본 |

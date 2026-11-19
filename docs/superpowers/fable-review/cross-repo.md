@@ -338,3 +338,9 @@ ui 코드 변경은 필요 없다. ui가 부르는 `/api/auth` 경로 6개(`kaka
 - **G8(sops `secrets/kista-api.env`)**: `KIS_*`·`UPBIT_*`·`BINANCE_*` 없음. 남은 제거 대상은 `TOSS_ADMIN_CLIENT_ID`·`TOSS_ADMIN_CLIENT_SECRET`(14 T5 배포 뒤), `CMC_API_KEY`·`HEARTBEAT_CRYPTO_URL`(15 T4 배포 뒤) 넷이다. 각 배포가 끝나면 api가 infra에 알린다.
 - **전환 방식 사용자 결정(2026-11-16, infra 세션 경유): 전체 정지**(api 05 14-3 기본안). infra 근거: 엔진 경로는 어느 안이든 정지 중이고, 무중단안은 옛 web 코드가 정지된 옛 trading 내부 API를 부르는 시험하지 않은 조합이며, 롤백·drift·pre-apply가 단순해진다. 대가는 web의 첫 배포 stop-first 몇 분 중단(토요일 공지로 충분). infra 후속: 03 5-1을 14-3에 맞춤(I-1과 같은 커밋). api는 14-3 단계 번호·문구가 바뀌면 infra에 알린다.
 - 2026-11-16 api 배포 4회(13:47~14:23 KST): reconcile 전부 success, 롤백·경고 0, drift 보고 0, Caddy 5xx 0.
+
+### I-6. 합병 뒤 kista-ui 로컬·스펙 스크립트 (2026-11-20, fable-api N1 — 읽기 전용 확인)
+
+- 운영 ui의 `API_BASE_URL`·`TRADING_API_BASE_URL`은 둘 다 `https://api.kista-app.com`(Caddy 경유)이라 전환에 영향이 없다.
+- 깨지는 것은 로컬·e2e뿐이다: `scripts/fetch-spec.mjs`가 8080·8081 스펙을 병합하는데(경로 중복이면 실패) 합병 뒤에는 한 프로세스가 전체 스펙을 낸다. `docker-compose.yml:19`·`e2e/global.setup.ts:5`·`playwright.config.ts:8`의 8081 기본값도 같다. worker role에서는 `/api-docs`가 503(`WRONG_ROLE`)이다.
+- ui 후속(M 합병이 main에 들어간 뒤): 스펙은 8080 하나만 받고, 로컬 `TRADING_API_BASE_URL`은 8080(`kista.role=all` 한 프로세스)으로.
