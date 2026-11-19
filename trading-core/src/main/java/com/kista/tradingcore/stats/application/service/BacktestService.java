@@ -9,7 +9,6 @@ import com.kista.tradingcore.stats.domain.model.DailyCandle;
 import com.kista.tradingcore.privacy.domain.model.PrivacyDates;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.shared.kernel.ReturnMetrics;
-import com.kista.shared.kernel.Market;
 import com.kista.tradingcore.matching.domain.model.BootstrapPosition;
 import com.kista.tradingcore.trading.application.port.output.StrategyCreationPolicyPort;
 import com.kista.tradingcore.trading.domain.creation.VrRampValidator;

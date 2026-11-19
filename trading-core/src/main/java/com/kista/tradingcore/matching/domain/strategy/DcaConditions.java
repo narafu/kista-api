@@ -2,7 +2,7 @@ package com.kista.tradingcore.matching.domain.strategy;
 
 import com.kista.shared.kernel.DcaOperator;
 import com.kista.shared.kernel.DcaSkipReason;
-import com.kista.shared.kernel.Market;
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.matching.domain.model.DcaCondition;
 import com.kista.tradingcore.matching.domain.model.DcaDecision;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
@@ -29,10 +29,10 @@ public final class DcaConditions {
     private record Holding(BigDecimal quantity, BigDecimal avgPrice) {}
 
     // 전부 통과면 empty. 전일 종가 없음 → 지표 계산 불가 → 미충족 순. AVG_PRICE는 원장(ledger) 평단 기준, referencePrice는 skip 기록용
-    public static Optional<DcaDecision.Skipped> check(DcaRule rule, Market market, List<BigDecimal> closes, AccountBalance ledger,
+    public static Optional<DcaDecision.Skipped> check(DcaRule rule, Currency currency, List<BigDecimal> closes, AccountBalance ledger,
                                                       BigDecimal fearGreed, BigDecimal referencePrice) {
         var holding = ledger == null ? null : new Holding(ledger.holdings(), ledger.avgPrice());
-        return check(rule.conditions(), closes, holding, fearGreed, referencePrice, market.amountScale());
+        return check(rule.conditions(), closes, holding, fearGreed, referencePrice, currency.amountScale());
     }
 
     private static Optional<DcaDecision.Skipped> check(List<DcaCondition> conditions, List<BigDecimal> closes, Holding holding,

@@ -6,9 +6,9 @@
 - 전 전략이 원장만 본다 — 브로커 잔고·판매가능수량은 조회하지 않는다(MOCK 포함). 상한 계산식은 `workflow-ledger-price.md` "전략별 원장 상한"이 SSOT.
 - `CONDITION_NOT_MET`은 정상 대기라 이력(`dca_execution` UNIQUE 전략+규칙+거래일)만 남기고 이벤트를 발행하지 않는다. 그 외 skip은 이력 삽입에 성공했을 때만 `DcaRoundSkippedEvent`를 발행한다.
 - 등록 시 `ruleKey`를 보내면 400. 수정 시 기존 키 재전송 = 유지(같은 날 재발동 방지), 생략 = 신규, 현재 버전에 없는 키 = 400.
-- 주문유형은 MOO|MOC만, 평일만. 계좌 시장 ≠ 종목 시장이면 거부. 런타임 정책(기본 비활성)이 켜져 있어야 등록된다.
+- 주문유형은 MOO|MOC만, 평일만. 런타임 정책(기본 비활성)이 켜져 있어야 등록된다.
 - 중간부터 시작: `initialHoldings`·`initialAvgPrice`·`initialDeposit`(계좌 통화, null=0)을 받고 `start_amount` = 예수금 + 평단×보유(통계 원금의 기초 → stats.md). 일반 수정 PUT은 DCA `newSeed`를 거부하고 DCA 설정 PUT은 예수금을 받지 않는다 — 진행 중 증감은 `capital-injection`/`capital-withdrawal`(예수금만, 주식 수량 지정 시 400 → trading.md).
-- 주식 개장·마감 배치(`BatchContextFactory`)는 US_STOCK 계좌 전략만 담는다. 수동 실행은 DCA를 거부하고, 미리보기는 DCA를 `plan()`으로 포함한다. 미리보기는 쓰기를 하지 않으며 당일 이미 판정·주문된 규칙은 후보에서 빼고 `todayOrders`로만 노출한다(같은 규칙을 같은 날 두 번 판정하지 않기 위함).
+- 주식 개장·마감 배치(`BatchContextFactory`)는 주식 계좌 전략만 담는다. 수동 실행은 DCA를 거부하고, 미리보기는 DCA를 `plan()`으로 포함한다. 미리보기는 쓰기를 하지 않으며 당일 이미 판정·주문된 규칙은 후보에서 빼고 `todayOrders`로만 노출한다(같은 규칙을 같은 날 두 번 판정하지 않기 위함).
 - 개장 배치는 22:00 KST. 주식 DCA AT_OPEN(MOO) 주문도 다른 AT_OPEN처럼 개장 후 접수한다.
 - 수량: `orders.quantity/filled_quantity`·`dca_execution.quantity`·`cycle_position.holdings`는 numeric(20,8), 도메인은 BigDecimal(`Quantities.normalize`). `PlannedOrder`·매칭 공식·privacy 표는 int이고 주식 경로는 `intValueExact()`/`AccountBalance.wholeShares()`(소수면 ArithmeticException)로 정수화한다.
 

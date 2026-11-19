@@ -13,7 +13,7 @@ import com.kista.tradingcore.broker.domain.model.PriceSnapshot;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.shared.kernel.DcaIndicator;
 import com.kista.shared.kernel.DcaOperator;
-import com.kista.shared.kernel.Market;
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.matching.domain.model.DcaCondition;
 import com.kista.tradingcore.matching.domain.model.DcaRule;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
@@ -119,7 +119,7 @@ class TradingCandidatePlannerDcaTest {
         when(balanceLoader.loadBalanceOrThrow(ctx.strategy())).thenReturn(LEDGER);
         when(orderPort.findPlannedOrPlacedByCycleAndDate(ctx.currentCycle().id(), DAY)).thenReturn(List.of());
         List<DcaCycleOrderStrategy.DcaRuleInputs> due = Arrays.stream(rules)
-                .map(r -> new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, List.of(REFERENCE), LEDGER,
+                .map(r -> new DcaCycleOrderStrategy.DcaRuleInputs(r, Currency.USD, List.of(REFERENCE), LEDGER,
                         r.direction() == OrderDirection.SELL ? BigDecimal.TEN : null, null, PREMARKET,
                         r.direction() == OrderDirection.BUY ? new BigDecimal("999999999999") : null))
                 .toList();

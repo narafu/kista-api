@@ -8,23 +8,18 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum Broker {
-    TOSS("토스증권",    "토스", Market.US_STOCK, false, ApiKeyExpirySource.ESTIMATED),  // 토스증권 Open API
-    MOCK("모의계좌",    "모의", Market.US_STOCK, false, ApiKeyExpirySource.NONE),  // 증권사 연동 없는 DB 기반 모의매매
-    MERITZ("메리츠증권", "메리츠", Market.US_STOCK, true, ApiKeyExpirySource.ESTIMATED); // 메리츠증권 Open API (해외주식, 앱키에 계좌 종속)
+    TOSS("토스증권",    "토스", Currency.USD, false, ApiKeyExpirySource.ESTIMATED),  // 토스증권 Open API
+    MOCK("모의계좌",    "모의", Currency.USD, false, ApiKeyExpirySource.NONE),  // 증권사 연동 없는 DB 기반 모의매매
+    MERITZ("메리츠증권", "메리츠", Currency.USD, true, ApiKeyExpirySource.ESTIMATED); // 메리츠증권 Open API (해외주식, 앱키에 계좌 종속)
 
     private final String label;      // 한국어 전체 이름
     private final String shortLabel; // UI 모바일 약칭
-    private final Market market;     // 거래 시장 — 종목 시장과 일치해야 전략 생성 가능
+    private final Currency currency; // 계좌 기준 통화 (주문 금액 단위)
     private final boolean keyOnlyCredentials; // 계좌번호 없이 앱키가 계좌를 식별(중복 판정 키=appKey) — 메리츠
     private final ApiKeyExpirySource apiKeyExpirySource; // API 키 만료일 출처 — 토스·메리츠는 추정(+1년)·사용자 입력
 
     // API 키 만료가 있는 거래소 여부
     public boolean isApiKeyExpiring() {
         return apiKeyExpirySource != ApiKeyExpirySource.NONE;
-    }
-
-    // 계좌 기준 통화 (주문 금액 단위) — 시장의 견적 통화에서 파생
-    public Currency getCurrency() {
-        return market.quoteCurrency();
     }
 }

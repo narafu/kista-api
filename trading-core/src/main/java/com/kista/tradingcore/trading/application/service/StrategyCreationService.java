@@ -1,7 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
 
-import com.kista.shared.kernel.Market;
-
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
@@ -48,14 +46,6 @@ class StrategyCreationService {
 
     private static final String ACTIVE_TICKER_INDEX = "uq_strategy_account_ticker_active"; // V16 부분 유니크 인덱스
 
-    // 계좌 시장에서 종목 거래 가능
-    private void validateMarket(Account account, StrategyTicker ticker) {
-        Market market = account.broker().getMarket();
-        if (!ticker.tradableOn(market)) {
-            throw new IllegalArgumentException("계좌와 종목의 시장이 다릅니다.");
-        }
-    }
-
     private final StrategyPort strategyPort;
     private final AccountPort accountPort;
     private final TradingUserProfilePort tradingUserProfilePort; // 사용자 복제본 존재 확인용
@@ -84,8 +74,6 @@ class StrategyCreationService {
         if (!cmd.type().capability().supportsBroker(account.broker())) {
             throw new IllegalArgumentException("%s 전략은 이 증권사에서 등록할 수 없습니다.".formatted(cmd.type().getDescription()));
         }
-        // 시장 검증이 중간부터 시작(보유 자릿수) 검증보다 먼저 — 시장 불일치가 자릿수 문구에 가려지지 않게 한다
-        validateMarket(account, resolvedTicker);
         // 중간부터 시작 입력 검증 (전 전략 공통) — holdings>0이면 avgPrice>0 필수, 음수 거부, 정수 주
         BigDecimal initialHoldings = BootstrapPosition.validate(cmd.initialHoldings(), cmd.initialAvgPrice());
         boolean bootstrap = initialHoldings.signum() > 0;
@@ -138,7 +126,7 @@ class StrategyCreationService {
         }
 
         log.info("[strategyId={}] [accountId={}] 전략 등록: type={}", strategy.id(), accountId, strategy.type());
-        return detailAssembler.toDetail(strategy, account.broker().getMarket());
+        return detailAssembler.toDetail(strategy, account.broker().getCurrency());
     }
 
     // 시작예정일 — 기본값 오늘(KST), 과거 거부. 상한 없음

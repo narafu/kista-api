@@ -169,8 +169,8 @@ root 스키마는 바꿀 것이 없다. `kista_ref.fear_greed_snapshots`에는 C
 | T3 | **완료(2026-11-16, 로드맵 N18 칸에 결과·승인·덤프)** 단계 P ③의 운영 확인 조회(읽기 전용)와 결과 기록. 덤프와 삭제 SQL 초안을 사용자에게 제시(4절) | Opus | 사용자의 단계 P ①② |
 | T4 | **커밋 완료(2026-11-16 `bc158dc59` 통째 삭제·`1f360bf50` 분기 제거·`5bc4b3632` V23, 2026-11-16 16:19 KST 배포 완료)** 단계 A: 통째 삭제 → 분기 제거 → Flyway(가드·완전 삭제·정책 JSON) → 테스트 기대값. 커밋은 "통째 삭제", "분기 제거", "마이그레이션"으로 나누되 배포는 하나 | Sonnet(통째 삭제·기계적 분기), Opus(DCA 커널·거래일·원장 서비스의 분기, 마이그레이션 검토) | T1~T3, 단계 U 배포 |
 | T5 | **커밋 완료(2026-11-16, T4와 같은 배포 대기. `flows.yml`은 T4-2 커밋)** `flows.yml`(흐름 `crypto-market-indicators`·`crypto-dca` 삭제와 문구 약 20곳), `README.md`, `docs/architecture-map.md`, `CLAUDE.md`, `docs/agents/vendors/binance.md`·`vendors/upbit.md` 삭제, 모듈 문서(`dca.md`·`broker.md`·`stats.md`·`trading.md`·`account.md`·`notify.md`·`modules/api/market.md`·`admin.md`), `scheduler-time-table.md`, `code-quality-backlog.md`의 코인 항목, `scripts/dev-seed/dev-seed.sql`의 코인 시드, `.env.example`·`deploy/server/README.md` | Sonnet | T4와 같은 배포 |
-| T6 | 단계 B: `Market` enum과 메타 필드 삭제, `execution_hour` 컬럼 삭제 마이그레이션 | Opus(범위 확인), Sonnet(적용) | T4 배포 후 1거래일, kista-ui의 메타 필드 제거 확인 |
-| T7 | 단계 D: `cross-repo.md`에 운영 secret 제거 요청 기록, memory `project_broker_strategy`·`project_binance_dca` 갱신 확인 | Sonnet | T4 |
+| T6 | **커밋 완료(2026-11-20, 미배포 — 로드맵 N20 칸)** 단계 B: `Market` enum과 메타 필드 삭제, `execution_hour` 컬럼 삭제 마이그레이션 | Opus(범위 확인), Sonnet(적용) | T4 배포 후 1거래일, kista-ui의 메타 필드 제거 확인 |
+| T7 | **완료(2026-11-20)**: secret은 G8에서 제거됐고 memory를 갱신했다. `project_binance_dca`는 이미 없다. 단계 D: `cross-repo.md`에 운영 secret 제거 요청 기록, memory `project_broker_strategy`·`project_binance_dca` 갱신 확인 | Sonnet | T4 |
 
 배포 후 관찰(T4): 1거래일. 주식 DCA(Mock QLD)의 주문·이력, 개장·마감 배치의 대상 수, 계좌 등록 화면, 관리자 설정 화면, `/api/meta`, `/api/market/fear-greed`.
 

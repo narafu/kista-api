@@ -79,7 +79,7 @@ class AccountServiceTest {
     void register_meritz_ignores_account_no_and_requires_keys() {
         when(brokerEnabledPort.enabled(Broker.MERITZ)).thenReturn(true);
         when(connectionTesters.of(Broker.MERITZ)).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount("ak", "sk", null)).thenReturn(new BrokerAccountVerification(null, null));
+        when(connectionTester.verifyAccount("ak", "sk", null)).thenReturn(new BrokerAccountVerification(null));
         when(accountPort.countByUserId(userId)).thenReturn(0);
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -110,7 +110,7 @@ class AccountServiceTest {
     void register_toss_whenUserAlreadyHasMeritzAccount_doesNotNpe() {
         when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(true);
         when(connectionTesters.of(any())).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount("appKey", "appSecret", "74420614")).thenReturn(new BrokerAccountVerification(null, null));
+        when(connectionTester.verifyAccount("appKey", "appSecret", "74420614")).thenReturn(new BrokerAccountVerification(null));
         when(accountPort.countByUserId(userId)).thenReturn(1);
         when(accountPort.findByUserId(userId)).thenReturn(List.of(meritzAccount(UUID.randomUUID(), userId)));
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -136,7 +136,7 @@ class AccountServiceTest {
     void register_success() {
         when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(true);
         when(connectionTesters.of(any())).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount("appKey", "appSecret", "74420614")).thenReturn(new BrokerAccountVerification(null, null));
+        when(connectionTester.verifyAccount("appKey", "appSecret", "74420614")).thenReturn(new BrokerAccountVerification(null));
         when(accountPort.countByUserId(userId)).thenReturn(0);
         when(accountPort.save(any())).thenAnswer(inv -> {
             Account a = inv.getArgument(0);
@@ -266,7 +266,7 @@ class AccountServiceTest {
         when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(true);
         when(connectionTesters.of(any())).thenReturn(connectionTester);
         // Toss API 연결 성공 → accountSeq "42" 반환
-        when(connectionTester.verifyAccount("cid", "csecret", "12345678901")).thenReturn(new BrokerAccountVerification("42", null));
+        when(connectionTester.verifyAccount("cid", "csecret", "12345678901")).thenReturn(new BrokerAccountVerification("42"));
         when(accountPort.countByUserId(userId)).thenReturn(0);
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -287,7 +287,7 @@ class AccountServiceTest {
     void register_nullBroker_defaultsToMock() {
         when(brokerEnabledPort.enabled(Broker.MOCK)).thenReturn(true);
         when(connectionTesters.of(any())).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null, null));
+        when(connectionTester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null));
         when(accountPort.countByUserId(userId)).thenReturn(0);
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -363,7 +363,7 @@ class AccountServiceTest {
     void register_mockBroker_synthesizesMissingCredentials() {
         when(brokerEnabledPort.enabled(Broker.MOCK)).thenReturn(true);
         when(connectionTesters.of(Broker.MOCK)).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null, null));
+        when(connectionTester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null));
         when(accountPort.countByUserId(userId)).thenReturn(0);
         when(accountPort.existsByDedupeKey(any())).thenReturn(false);
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -414,7 +414,7 @@ class AccountServiceTest {
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(meritzAccount(accountId, userId));
         when(accountPort.existsByDedupeKey("new-ak")).thenReturn(false);
         when(connectionTesters.of(Broker.MERITZ)).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount("new-ak", "new-sk", null)).thenReturn(new BrokerAccountVerification(null, null));
+        when(connectionTester.verifyAccount("new-ak", "new-sk", null)).thenReturn(new BrokerAccountVerification(null));
         when(accountPort.save(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("x", new RuntimeException("value too long for type character varying(512)")));
 
         assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("new-ak", "new-sk", null)))
@@ -428,7 +428,7 @@ class AccountServiceTest {
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(meritzAccount(accountId, userId));
         when(accountPort.existsByDedupeKey("new-ak")).thenReturn(false);
         when(connectionTesters.of(Broker.MERITZ)).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount("new-ak", "new-sk", null)).thenReturn(new BrokerAccountVerification(null, null));
+        when(connectionTester.verifyAccount("new-ak", "new-sk", null)).thenReturn(new BrokerAccountVerification(null));
         when(accountPort.save(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("dup", new RuntimeException("duplicate key value violates unique constraint \"uq_accounts_account_no_hash\"")));
 
         assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("new-ak", "new-sk", null)))
@@ -455,7 +455,7 @@ class AccountServiceTest {
     void updateCredentials_toss_savesAndEvictsTokenCache() {
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.tossAccount(accountId, userId)); // brokerAccountCode "1"
         when(connectionTesters.of(Broker.TOSS)).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount("cid", "cs", "123-45-678901")).thenReturn(new BrokerAccountVerification("1", null));
+        when(connectionTester.verifyAccount("cid", "cs", "123-45-678901")).thenReturn(new BrokerAccountVerification("1"));
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("cid", "cs", null));
@@ -470,7 +470,7 @@ class AccountServiceTest {
     void updateCredentials_toss_differentAccountSeq_rejected() {
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.tossAccount(accountId, userId)); // brokerAccountCode "1"
         when(connectionTesters.of(Broker.TOSS)).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount("cid", "cs", "123-45-678901")).thenReturn(new BrokerAccountVerification("2", null));
+        when(connectionTester.verifyAccount("cid", "cs", "123-45-678901")).thenReturn(new BrokerAccountVerification("2"));
 
         assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("cid", "cs", null)))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("다른 계좌");
@@ -507,7 +507,7 @@ class AccountServiceTest {
     private void stubTossRegister() {
         when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(true);
         when(connectionTesters.of(Broker.TOSS)).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null, null));
+        when(connectionTester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null));
         when(accountPort.countByUserId(userId)).thenReturn(0);
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
@@ -525,7 +525,7 @@ class AccountServiceTest {
     private void stubTossRotation(Account account) {
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
         when(connectionTesters.of(Broker.TOSS)).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null, null));
+        when(connectionTester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null));
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 

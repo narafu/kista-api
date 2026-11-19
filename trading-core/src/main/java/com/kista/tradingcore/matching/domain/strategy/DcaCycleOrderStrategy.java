@@ -3,7 +3,7 @@ package com.kista.tradingcore.matching.domain.strategy;
 import com.kista.shared.kernel.DcaShortfallPolicy;
 import com.kista.shared.kernel.DcaSizingType;
 import com.kista.shared.kernel.DcaSkipReason;
-import com.kista.shared.kernel.Market;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
@@ -31,7 +31,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
     // 규칙 단위 판정 입력 — closes: 전일까지 종가(null=조회 실패), ledger: 원장(AVG_PRICE·보유비율 기준),
     // sellableAfterReserved: SELL 상한 — 원장 보유 − 기존 예약·취소 체결분, null=원장 없음,
     // currentPrice: 현재가(null=조회 실패), availableCash: BUY 상한 = 원장 예수금(계좌 통화) − 체결 전 BUY 약정, null=원장 없음
-    public record DcaRuleInputs(DcaRule rule, Market market, List<BigDecimal> closes, AccountBalance ledger,
+    public record DcaRuleInputs(DcaRule rule, Currency currency, List<BigDecimal> closes, AccountBalance ledger,
                                 BigDecimal sellableAfterReserved, BigDecimal fearGreed, BigDecimal currentPrice,
                                 BigDecimal availableCash) {
     }
@@ -74,7 +74,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
     }
 
     private static DcaRuleInputs withLimits(DcaRuleInputs in, BigDecimal sellable, BigDecimal availableCash) {
-        return new DcaRuleInputs(in.rule(), in.market(), in.closes(), in.ledger(), sellable, in.fearGreed(),
+        return new DcaRuleInputs(in.rule(), in.currency(), in.closes(), in.ledger(), sellable, in.fearGreed(),
                 in.currentPrice(), availableCash);
     }
 
@@ -96,7 +96,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
         if (sell && in.sellableAfterReserved() == null) {
             return new DcaRuleDecision.Skipped(key, DcaSkipReason.DATA_UNAVAILABLE, "원장 조회 실패", basis);
         }
-        Optional<DcaDecision.Skipped> notMet = DcaConditions.check(rule, in.market(), closes, in.ledger(), in.fearGreed(), basis);
+        Optional<DcaDecision.Skipped> notMet = DcaConditions.check(rule, in.currency(), closes, in.ledger(), in.fearGreed(), basis);
         if (notMet.isPresent()) {
             DcaDecision.Skipped s = notMet.get();
             return new DcaRuleDecision.Skipped(key, s.reason(), s.detail(), s.referencePrice());
@@ -129,13 +129,13 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
             if (want.compareTo(affordable) > 0 && (rule.shortfall() == DcaShortfallPolicy.REJECT || affordable.signum() == 0)) {
                 // PARTIAL이어도 1주조차 못 사면 INSUFFICIENT_BALANCE — 회차 금액 부족(BELOW_ONE_SHARE)과 구분
                 return new DcaRuleDecision.Skipped(key, DcaSkipReason.INSUFFICIENT_BALANCE,
-                        "필요 " + DcaConditions.money(want.multiply(limit), in.market().amountScale()) + " > 가용 " + DcaConditions.money(in.availableCash(), in.market().amountScale()), basis);
+                        "필요 " + DcaConditions.money(want.multiply(limit), in.currency().amountScale()) + " > 가용 " + DcaConditions.money(in.availableCash(), in.currency().amountScale()), basis);
             }
             quantity = want.min(affordable);
         }
         if (quantity.signum() == 0) {
             return new DcaRuleDecision.Skipped(key, DcaSkipReason.BELOW_ONE_SHARE,
-                    "회차 금액 < 기준가 " + DcaConditions.money(basis, in.market().amountScale()), basis);
+                    "회차 금액 < 기준가 " + DcaConditions.money(basis, in.currency().amountScale()), basis);
         }
         return new DcaRuleDecision.Planned(key, rule.direction(), quantity, basis, limit);
     }

@@ -117,7 +117,7 @@ class MeritzAuthApiTest {
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR).contentType(MediaType.APPLICATION_JSON)
                         .body("{\"rsp_cd\":\"5766\",\"data\":[{\"crcd\":\"USD\",\"frcr_amt\":\"1.0\"}]}"));
 
-        assertThat(authApi.verifyAccount("key", "sec", null)).isEqualTo(new BrokerAccountVerification(null, null));
+        assertThat(authApi.verifyAccount("key", "sec", null)).isEqualTo(new BrokerAccountVerification(null));
         server.verify();
     }
 

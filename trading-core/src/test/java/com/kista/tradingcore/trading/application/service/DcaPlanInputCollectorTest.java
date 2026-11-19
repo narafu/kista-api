@@ -116,7 +116,7 @@ class DcaPlanInputCollectorTest {
         dca(OrderDirection.BUY, OrderType.MOC);
         collected = collector.collect(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger);
         assertThat(collected.inputs().dueRules()).singleElement().satisfies(in -> {
-            assertThat(in.market()).isEqualTo(com.kista.shared.kernel.Market.US_STOCK);
+            assertThat(in.currency()).isEqualTo(com.kista.shared.kernel.Currency.USD);
         });
     }
 

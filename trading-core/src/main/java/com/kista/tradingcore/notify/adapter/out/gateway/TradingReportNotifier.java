@@ -49,7 +49,7 @@ class TradingReportNotifier {
                     ? TradeEventMessage.sell(e.ticker().name(), BigDecimal.valueOf(e.quantity()), e.price().doubleValue(), e.amountUsd().doubleValue(),
                             event.accountNickname(), event.accountId(), event.strategyId(), Currency.USD, Instant.now(clock))
                     : TradeEventMessage.buy(e.ticker().name(), BigDecimal.valueOf(e.quantity()), e.price().doubleValue(), e.amountUsd().doubleValue(),
-                            event.accountNickname(), event.accountId(), event.strategyId(), Currency.USD, Instant.now(clock)); // 주식 체결 리포트 — US_STOCK 견적 통화
+                            event.accountNickname(), event.accountId(), event.strategyId(), Currency.USD, Instant.now(clock)); // 주식 체결 리포트 — USD
             realtimeNotificationPort.notifyTrade(profile.userId(), tradeEvent);
         }
         log.info("[accountId={}] SSE 매매 알림 {}건 발송 완료", event.accountId(), event.executions().size());

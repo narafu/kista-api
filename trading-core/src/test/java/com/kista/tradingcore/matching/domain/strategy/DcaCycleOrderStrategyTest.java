@@ -6,7 +6,7 @@ import com.kista.shared.kernel.DcaOperator;
 import com.kista.shared.kernel.DcaShortfallPolicy;
 import com.kista.shared.kernel.DcaSizingType;
 import com.kista.shared.kernel.DcaSkipReason;
-import com.kista.shared.kernel.Market;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderType;
@@ -41,7 +41,7 @@ class DcaCycleOrderStrategyTest {
 
     private DcaRuleDecision decide(DcaRule r, List<BigDecimal> closes, Integer sellable, AccountBalance ledger,
                                    BigDecimal fearGreed, String currentPrice) {
-        return strategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, closes, ledger,
+        return strategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(r, Currency.USD, closes, ledger,
                 sellable == null ? null : BigDecimal.valueOf(sellable), fearGreed,
                 currentPrice == null ? null : new BigDecimal(currentPrice),
                 r.direction() == OrderDirection.BUY ? new BigDecimal("999999999999") : null));
@@ -51,7 +51,7 @@ class DcaCycleOrderStrategyTest {
     private DcaRuleDecision decideBuyWithCash(DcaShortfallPolicy policy, String amount, String cash) {
         DcaRule r = new DcaRule(KEY, OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOC,
                 new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal(amount), null), policy, List.of());
-        return strategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, List.of(new BigDecimal("100")), null,
+        return strategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(r, Currency.USD, List.of(new BigDecimal("100")), null,
                 null, null, null, cash == null ? null : new BigDecimal(cash)));
     }
 
@@ -99,7 +99,7 @@ class DcaCycleOrderStrategyTest {
         DcaRule r2 = new DcaRule("22222222-2222-2222-2222-222222222222", OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOC,
                 new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("200"), null), DcaShortfallPolicy.PARTIAL, List.of());
         List<DcaCycleOrderStrategy.DcaRuleInputs> due = List.of(r1, r2).stream()
-                .map(r -> new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, List.of(new BigDecimal("100")), null,
+                .map(r -> new DcaCycleOrderStrategy.DcaRuleInputs(r, Currency.USD, List.of(new BigDecimal("100")), null,
                         null, null, null, cash)).toList();
         var plan = strategy.plan(new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy.PlanContext(
                 new AccountBalance(0, null, BigDecimal.ZERO), StrategyTicker.UPRO, DAY, null, null, null, null,
@@ -345,7 +345,7 @@ class DcaCycleOrderStrategyTest {
         DcaRule mocSell = new DcaRule("33333333-3333-3333-3333-333333333333", OrderDirection.SELL, DcaFrequency.DAILY, null, null, OrderType.MOC,
                 new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("300"), null), DcaShortfallPolicy.PARTIAL, List.of());
         List<DcaCycleOrderStrategy.DcaRuleInputs> due = List.of(moo, mocBuy, mocSell).stream()
-                .map(r -> new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, List.of(new BigDecimal("87.12")), SELL_LEDGER,
+                .map(r -> new DcaCycleOrderStrategy.DcaRuleInputs(r, Currency.USD, List.of(new BigDecimal("87.12")), SELL_LEDGER,
                         r.direction() == OrderDirection.SELL ? BigDecimal.valueOf(10) : null, null, null,
                         r.direction() == OrderDirection.BUY ? new BigDecimal("100000") : null)).toList();
         var plan = strategy.plan(new CycleOrderStrategy.PlanContext(SELL_LEDGER, StrategyTicker.UPRO, DAY, null, null, null, null,

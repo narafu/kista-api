@@ -1,7 +1,7 @@
 package com.kista.tradingcore.trading.application.service;
 
 import java.util.NoSuchElementException;
-import com.kista.shared.kernel.Market;
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.trading.application.service.support.OwnedStrategy;
 import com.kista.tradingcore.trading.application.service.support.StrategyHistoryQueryService;
 
@@ -192,20 +192,20 @@ public class StrategyService {
     public List<StrategyDetail> listByUserId(UUID userId, boolean includeArchived) {
         List<Account> accounts = accountPort.findByUserId(userId);
         List<UUID> accountIds = accounts.stream().map(Account::id).toList();
-        Map<UUID, Market> marketByAccountId = accounts.stream()
-                .collect(Collectors.toMap(Account::id, a -> a.broker().getMarket())); // 이미 조회한 계좌에서 시장 맵 구성
+        Map<UUID, Currency> currencyByAccountId = accounts.stream()
+                .collect(Collectors.toMap(Account::id, a -> a.broker().getCurrency())); // 이미 조회한 계좌에서 통화 맵 구성
         Map<UUID, List<Strategy>> strategiesByAccount = strategyPort.findByAccountIds(accountIds);
         List<Strategy> strategies = accountIds.stream()
                 .flatMap(id -> strategiesByAccount.getOrDefault(id, List.of()).stream())
                 .filter(s -> includeArchived || !s.isArchived()) // 보관 전략은 요청 시에만 포함
                 .toList();
-        return detailAssembler.toDetails(strategies, marketByAccountId);
+        return detailAssembler.toDetails(strategies, currencyByAccountId);
     }
 
     @Transactional(readOnly = true)
     public List<StrategyDetail> listByAccountId(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        return detailAssembler.toDetails(strategyPort.findByAccountId(accountId).stream().filter(s -> !s.isArchived()).toList(), Map.of(accountId, account.broker().getMarket()));
+        return detailAssembler.toDetails(strategyPort.findByAccountId(accountId).stream().filter(s -> !s.isArchived()).toList(), Map.of(accountId, account.broker().getCurrency()));
     }
 
     @Transactional(readOnly = true)
@@ -213,7 +213,7 @@ public class StrategyService {
         OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
         Strategy strategy = owned.strategy();
         Account account = owned.account();
-        return detailAssembler.toDetail(strategy, account.broker().getMarket());
+        return detailAssembler.toDetail(strategy, account.broker().getCurrency());
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // INFINITE 최소 시드 검사의 전일종가 HTTP는 트랜잭션 밖 — 소유권·잠금·쓰기는 StrategyUpdateWriter 트랜잭션

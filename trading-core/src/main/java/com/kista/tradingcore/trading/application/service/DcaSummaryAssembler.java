@@ -1,6 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
-import com.kista.shared.kernel.Market;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.matching.domain.model.DcaRule;
@@ -26,16 +26,16 @@ class DcaSummaryAssembler {
 
     // 전략 요약 — 규칙마다 배치가 판정 가능한 첫 거래일부터 다음 실행 예정일 계산. lastByRule: ruleKey → 최근 회차
     DcaSummary assemble(DcaStrategyConfig config, Map<String, DcaExecution> lastByRule, LocalDate cycleStartDate,
-                        Market market, LocalDateTime nowKst, BigDecimal currentHoldings, BigDecimal avgPrice) {
+                        Currency currency, LocalDateTime nowKst, BigDecimal currentHoldings, BigDecimal avgPrice) {
         return new DcaSummary(config.rules().stream().map(rule -> {
             DcaExecution last = lastByRule.get(rule.ruleKey());
-            return assembleRule(rule, last, firstEligibleDate(cycleStartDate, last, nowKst), market);
+            return assembleRule(rule, last, firstEligibleDate(cycleStartDate, last, nowKst), currency);
         }).toList(), currentHoldings, avgPrice);
     }
 
     // fromKstTradeDate(포함)부터 첫 실행 예정일
-    DcaSummary.RuleSummary assembleRule(DcaRule source, DcaExecution last, LocalDate fromKstTradeDate, Market market) {
-        DcaRule rule = withRoundedAmount(source, market); // 조회 요약 경로 — 계산용 규칙이 아니라 응답에 실리는 사본만 반올림
+    DcaSummary.RuleSummary assembleRule(DcaRule source, DcaExecution last, LocalDate fromKstTradeDate, Currency currency) {
+        DcaRule rule = withRoundedAmount(source, currency); // 조회 요약 경로 — 계산용 규칙이 아니라 응답에 실리는 사본만 반올림
         LocalDate fromUs = marketCalendarPort.usSessionDateOf(fromKstTradeDate);
         return DcaSchedule.nextExecutionDay(fromUs, rule, marketCalendarPort::isUsSessionOpen)
                 .map(us -> new DcaSummary.RuleSummary(rule, us, marketCalendarPort.kstTradeDateOf(us), last))
@@ -43,10 +43,10 @@ class DcaSummaryAssembler {
     }
 
     // 정액 금액을 시장 견적 통화 자릿수로 반올림 — HOLDING_PERCENT(amount null)는 그대로
-    private static DcaRule withRoundedAmount(DcaRule rule, Market market) {
+    private static DcaRule withRoundedAmount(DcaRule rule, Currency currency) {
         DcaSizing sizing = rule.sizing();
         if (sizing.amount() == null) return rule;
-        return rule.withSizing(new DcaSizing(sizing.type(), market.quoteCurrency().round(sizing.amount()), null));
+        return rule.withSizing(new DcaSizing(sizing.type(), currency.round(sizing.amount()), null));
     }
 
     // 배치가 판정 가능한 첫 KST 거래일 (규칙 단위)

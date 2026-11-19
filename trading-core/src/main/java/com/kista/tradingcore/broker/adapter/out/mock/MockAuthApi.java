@@ -23,6 +23,6 @@ class MockAuthApi implements BrokerConnectionTestPort {
     @Override
     public BrokerAccountVerification verifyAccount(String appKey, String secretKey, String accountNo) {
         // brokerAccountCode 없음
-        return new BrokerAccountVerification(null, null);
+        return new BrokerAccountVerification(null);
     }
 }

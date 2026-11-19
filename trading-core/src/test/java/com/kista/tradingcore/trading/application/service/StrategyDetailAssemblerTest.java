@@ -1,6 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
-import com.kista.shared.kernel.Market;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
@@ -52,7 +52,7 @@ class StrategyDetailAssemblerTest {
         when(strategyCyclePort.findLatestByStrategyId(strategy.id())).thenReturn(Optional.empty());
         when(cyclePositionPort.findLatestOneByStrategyId(strategy.id())).thenReturn(Optional.empty());
 
-        StrategyDetail detail = assembler().toDetail(strategy, Market.US_STOCK);
+        StrategyDetail detail = assembler().toDetail(strategy, Currency.USD);
 
         assertThat(detail.initialDeposit()).isNull();
         assertThat(detail.ledgerDeposit()).isNull();

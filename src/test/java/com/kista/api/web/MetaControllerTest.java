@@ -115,13 +115,10 @@ class MetaControllerTest {
     }
 
     @Test
-    void getBundle_exposesMarketAndCurrency() throws Exception {
+    void getBundle_exposesBrokerDescription() throws Exception {
         mockMvc.perform(get("/api/meta").with(authentication(userToken(DEV_USER_UUID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.brokers[?(@.code=='TOSS')].minOrderAmount").value(org.hamcrest.Matchers.contains("0")))
-                .andExpect(jsonPath("$.brokers[?(@.code=='TOSS')].market").value(org.hamcrest.Matchers.contains("US_STOCK")))
                 .andExpect(jsonPath("$.brokers[?(@.code=='TOSS')].description").value(org.hamcrest.Matchers.contains("토스")))
-                .andExpect(jsonPath("$.tickers[0].market").doesNotExist())
-                .andExpect(jsonPath("$.tickers[?(@.code=='SOXL')].markets[*]").value(org.hamcrest.Matchers.contains("US_STOCK")));
+                .andExpect(jsonPath("$.brokers[?(@.code=='TOSS')].currency").value(org.hamcrest.Matchers.contains("USD")));
     }
 }

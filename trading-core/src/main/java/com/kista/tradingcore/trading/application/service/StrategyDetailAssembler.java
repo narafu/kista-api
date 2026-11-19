@@ -1,7 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.Currency;
-import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.StrategyDefaults;
 import com.kista.tradingcore.matching.domain.model.*;
 import com.kista.tradingcore.trading.application.port.output.*;
@@ -37,7 +36,7 @@ class StrategyDetailAssembler {
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 최신 사이클 개장금액을 조립하고, VR pool은 개장 포지션, 리버스모드는 최신 포지션에서 판단한다. (단건 경로 — 단건 port 호출로 입력 구성 후 assemble 위임)
-    StrategyDetail toDetail(Strategy strategy, Market market) {
+    StrategyDetail toDetail(Strategy strategy, Currency currency) {
         var latestCycle = strategyCyclePort.findLatestByStrategyId(strategy.id());
         Optional<CyclePosition> openingPosition = strategy.isVr()
                 ? latestCycle.map(cycle -> cyclePositionPort.findFirstOne(cycle.id())
@@ -70,21 +69,21 @@ class StrategyDetailAssembler {
             Map<String, DcaExecution> last = dcaExecutionPort.findLatestByStrategyIds(List.of(strategy.id()))
                     .getOrDefault(strategy.id(), Map.of());
             dcaSummary = latestCycle.flatMap(c -> dcaDetailPort.findActiveByStrategyId(strategy.id())
-                    .map(config -> buildDcaSummary(config, last, c, market, latestPos))).orElse(null);
+                    .map(config -> buildDcaSummary(config, last, c, currency, latestPos))).orElse(null);
         }
 
-        return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary, market.quoteCurrency());
+        return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary, currency);
     }
 
     // DCA 요약 — 규칙별 배치가 판정 가능한 첫 거래일부터 다음 실행 예정일 계산 + 원장 보유·평단
     private DcaSummary buildDcaSummary(DcaStrategyConfig config, Map<String, DcaExecution> lastByRule, StrategyCycle cycle,
-                                       Market market, Optional<CyclePosition> ledger) {
-        return dcaSummaryAssembler.assemble(config, lastByRule, cycle.startDate(), market, LocalDateTime.now(clock),
+                                       Currency currency, Optional<CyclePosition> ledger) {
+        return dcaSummaryAssembler.assemble(config, lastByRule, cycle.startDate(), currency, LocalDateTime.now(clock),
                 ledger.map(CyclePosition::holdings).orElse(null), ledger.map(CyclePosition::avgPrice).orElse(null));
     }
 
     // 목록 경로 — 배치 메서드로 Map을 구성한 뒤 전략별 assemble 호출 (전략 수와 무관한 상수 쿼리 수)
-    List<StrategyDetail> toDetails(List<Strategy> strategies, Map<UUID, Market> marketByAccountId) {
+    List<StrategyDetail> toDetails(List<Strategy> strategies, Map<UUID, Currency> currencyByAccountId) {
         if (strategies.isEmpty()) return List.of();
         List<UUID> strategyIds = strategies.stream().map(Strategy::id).toList();
 
@@ -151,11 +150,11 @@ class StrategyDetailAssembler {
             DcaSummary dcaSummary = null;
             if (strategy.isDca() && dcaConfigs.containsKey(strategy.id()) && latestCycle.isPresent()) {
                 dcaSummary = buildDcaSummary(dcaConfigs.get(strategy.id()), dcaLast.getOrDefault(strategy.id(), Map.of()),
-                        latestCycle.get(), marketByAccountId.get(strategy.accountId()), latestPos);
+                        latestCycle.get(), currencyByAccountId.get(strategy.accountId()), latestPos);
             }
 
             return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary,
-                    marketByAccountId.get(strategy.accountId()).quoteCurrency());
+                    currencyByAccountId.get(strategy.accountId()));
         }).toList();
     }
 

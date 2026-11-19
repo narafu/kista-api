@@ -52,7 +52,7 @@ class AccountServiceKeyRotationDbTest extends DataJpaTestBase {
             BrokerConnectionTesters testers = mock(BrokerConnectionTesters.class);
             BrokerConnectionTestPort tester = mock(BrokerConnectionTestPort.class);
             when(testers.of(Broker.MERITZ)).thenReturn(tester);
-            when(tester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null, null));
+            when(tester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null));
             AccountService service = new AccountService(racing, testers, mock(BrokerEnabledPort.class),
                     mock(AccountTokenEvictionPort.class), mock(AccountOpenOrderCancelPort.class), mock(AccountDeletionWriter.class),
                     java.time.Clock.systemUTC());

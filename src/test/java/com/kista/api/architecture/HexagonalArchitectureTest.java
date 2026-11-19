@@ -328,7 +328,7 @@ class HexagonalArchitectureTest {
                 "com.kista.tradingcore.trading.application.service.VrReconfigureService",        // 소유권 검증
                 "com.kista.tradingcore.trading.application.service.StrategyCreationService",     // 계좌 소유권·브로커 검증
                 "com.kista.tradingcore.trading.application.service.StrategyService",             // 계좌 소유권 검증
-                "com.kista.tradingcore.trading.application.service.StrategyUpdateWriter",        // StrategyService.update 쓰기 분리분 — 소유권 검증 + 계좌 시장(응답 조립)
+                "com.kista.tradingcore.trading.application.service.StrategyUpdateWriter",        // StrategyService.update 쓰기 분리분 — 소유권 검증 + 계좌 통화(응답 조립)
                 "com.kista.tradingcore.trading.application.service.CapitalWithdrawalService",    // 인출 진입점 — 소유권 검증 + 최소 시드용 브로커 참조
                 "com.kista.tradingcore.trading.application.service.support.StrategyHistoryQueryService", // 소유권 검증
                 "com.kista.tradingcore.trading.application.service.ManualTradeCorrectionService", // 소유권 검증

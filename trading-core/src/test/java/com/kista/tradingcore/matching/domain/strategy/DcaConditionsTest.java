@@ -4,7 +4,7 @@ import com.kista.shared.kernel.DcaFrequency;
 import com.kista.shared.kernel.DcaIndicator;
 import com.kista.shared.kernel.DcaOperator;
 import com.kista.shared.kernel.DcaSkipReason;
-import com.kista.shared.kernel.Market;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
 import com.kista.tradingcore.matching.domain.model.DcaCondition;
@@ -36,7 +36,7 @@ class DcaConditionsTest {
 
     private static Optional<DcaDecision.Skipped> check(DcaRule c, List<BigDecimal> closes, AccountBalance h) {
         BigDecimal ref = closes == null || closes.isEmpty() ? null : closes.getLast();
-        return DcaConditions.check(c, Market.US_STOCK, closes, h, null, ref);
+        return DcaConditions.check(c, Currency.USD, closes, h, null, ref);
     }
 
     @Test
@@ -46,7 +46,7 @@ class DcaConditionsTest {
 
     @Test
     void missingPrevCloseIsDataUnavailableWithNullReference() {
-        Optional<DcaDecision.Skipped> r = DcaConditions.check(config(), Market.US_STOCK, null, null, null, new BigDecimal("1"));
+        Optional<DcaDecision.Skipped> r = DcaConditions.check(config(), Currency.USD, null, null, null, new BigDecimal("1"));
         assertThat(r).hasValueSatisfying(s -> {
             assertThat(s.reason()).isEqualTo(DcaSkipReason.DATA_UNAVAILABLE);
             assertThat(s.detail()).isEqualTo("전일 종가 조회 실패");
@@ -87,22 +87,22 @@ class DcaConditionsTest {
         var holding = new AccountBalance(BigDecimal.ONE, new BigDecimal("1000"), BigDecimal.ZERO);
         BigDecimal ref = new BigDecimal("123.45");
         // 조건 미충족 skip
-        assertThat(DcaConditions.check(c, Market.US_STOCK, closes("951"), holding, null, ref))
+        assertThat(DcaConditions.check(c, Currency.USD, closes("951"), holding, null, ref))
                 .hasValueSatisfying(s -> assertThat(s.referencePrice()).isSameAs(ref));
         // 지표 계산 불가 skip
-        assertThat(DcaConditions.check(c, Market.US_STOCK, closes("951"), null, null, ref))
+        assertThat(DcaConditions.check(c, Currency.USD, closes("951"), null, null, ref))
                 .hasValueSatisfying(s -> assertThat(s.referencePrice()).isSameAs(ref));
     }
 
     @Test
     void fearGreedConditionBoundary() {
         DcaRule c = config(new DcaCondition(DcaIndicator.FEAR_GREED, DcaOperator.LTE, null, new BigDecimal("25")));
-        assertThat(DcaConditions.check(c, Market.US_STOCK, closes("100"), null, new BigDecimal("25"), new BigDecimal("100"))).isEmpty();
-        assertThat(DcaConditions.check(c, Market.US_STOCK, closes("100"), null, new BigDecimal("26"), new BigDecimal("100"))).hasValueSatisfying(s -> {
+        assertThat(DcaConditions.check(c, Currency.USD, closes("100"), null, new BigDecimal("25"), new BigDecimal("100"))).isEmpty();
+        assertThat(DcaConditions.check(c, Currency.USD, closes("100"), null, new BigDecimal("26"), new BigDecimal("100"))).hasValueSatisfying(s -> {
             assertThat(s.reason()).isEqualTo(DcaSkipReason.CONDITION_NOT_MET);
             assertThat(s.detail()).isEqualTo("공포탐욕지수 26.00 > 25");
         });
-        assertThat(DcaConditions.check(c, Market.US_STOCK, closes("100"), null, null, new BigDecimal("100"))).hasValueSatisfying(s -> {
+        assertThat(DcaConditions.check(c, Currency.USD, closes("100"), null, null, new BigDecimal("100"))).hasValueSatisfying(s -> {
             assertThat(s.reason()).isEqualTo(DcaSkipReason.DATA_UNAVAILABLE);
             assertThat(s.detail()).isEqualTo("공포탐욕지수 조회 실패");
         });
@@ -142,7 +142,7 @@ class DcaConditionsTest {
         // 목표가 1000.51 × 0.985 = 985.50235 — USD(2자리)는 985.50이라 전일 종가 986은 미충족
         var holding = new AccountBalance(BigDecimal.ONE, new BigDecimal("1000.51"), BigDecimal.ZERO);
         var prev = new BigDecimal("986");
-        assertThat(DcaConditions.check(c, Market.US_STOCK, List.of(prev), holding, null, prev)).hasValueSatisfying(s ->
+        assertThat(DcaConditions.check(c, Currency.USD, List.of(prev), holding, null, prev)).hasValueSatisfying(s ->
                 assertThat(s.reason()).isEqualTo(DcaSkipReason.CONDITION_NOT_MET));
     }
 }

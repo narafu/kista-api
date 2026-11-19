@@ -6,7 +6,7 @@ import com.kista.shared.kernel.DcaOperator;
 import com.kista.shared.kernel.DcaShortfallPolicy;
 import com.kista.shared.kernel.DcaSizingType;
 import com.kista.shared.kernel.DcaSkipReason;
-import com.kista.shared.kernel.Market;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
@@ -38,13 +38,13 @@ class DcaRuleDecisionTest {
     private static AccountBalance ledger(String holdings, String avg) { return new AccountBalance(bd(holdings), bd(avg), BigDecimal.ZERO); }
 
 
-    private DcaRuleDecision decide(DcaRule r, Market m, AccountBalance ledger, String sellable, String close, String current, String cash) {
+    private DcaRuleDecision decide(DcaRule r, Currency m, AccountBalance ledger, String sellable, String close, String current, String cash) {
         return strategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(r, m, List.of(bd(close)), ledger, bd(sellable), null, bd(current),
                 cash == null && r.direction() == OrderDirection.BUY ? new BigDecimal("999999999999") : bd(cash)));
     }
 
     private DcaRuleDecision stockSell(DcaRule r, String ledgerQty, String sellable) {
-        return decide(r, Market.US_STOCK, ledger(ledgerQty, "10"), sellable, "50", null, null);
+        return decide(r, Currency.USD, ledger(ledgerQty, "10"), sellable, "50", null, null);
     }
 
     private static DcaRuleDecision.Planned planned(DcaRuleDecision d) {
@@ -93,16 +93,16 @@ class DcaRuleDecisionTest {
     void AVG_PRICE_조건은_원장_평단으로_판정() { // 평단 100, 종가 99, LTE 0% → 통과
         DcaCondition c = new DcaCondition(DcaIndicator.AVG_PRICE, DcaOperator.LTE, null, BigDecimal.ZERO);
         DcaRule r = stock(OrderDirection.BUY, amount("1000"), DcaShortfallPolicy.PARTIAL, List.of(c));
-        DcaRuleDecision d = decide(r, Market.US_STOCK, ledger("5", "100"), null, "99", null, null);
+        DcaRuleDecision d = decide(r, Currency.USD, ledger("5", "100"), null, "99", null, null);
         assertThat(d).isInstanceOf(DcaRuleDecision.Planned.class);
-        DcaRuleDecision d2 = decide(r, Market.US_STOCK, ledger("5", "90"), null, "99", null, null);
+        DcaRuleDecision d2 = decide(r, Currency.USD, ledger("5", "90"), null, "99", null, null);
         assertThat(skipped(d2).reason()).isEqualTo(DcaSkipReason.CONDITION_NOT_MET);
     }
 
     @Test
     void 주식_BUY는_max_전일종가_현재가_캡가() {
         DcaRule r = stock(OrderDirection.BUY, amount("1000"), DcaShortfallPolicy.PARTIAL, List.of());
-        DcaRuleDecision.Planned p = planned(decide(r, Market.US_STOCK, ledger("0", null), null, "50", "60", null));
+        DcaRuleDecision.Planned p = planned(decide(r, Currency.USD, ledger("0", null), null, "50", "60", null));
         assertThat(p.referencePrice()).isEqualByComparingTo("60");
         assertThat(p.quantity()).isEqualByComparingTo("16"); // 1000/60
         assertThat(p.limitPrice()).isEqualByComparingTo(PriceCapPolicy.capFor(bd("60")));
@@ -112,13 +112,13 @@ class DcaRuleDecisionTest {
     @Test
     void 주식_BUY_1주_미만은_BELOW_ONE_SHARE() {
         DcaRule r = stock(OrderDirection.BUY, amount("10"), DcaShortfallPolicy.PARTIAL, List.of());
-        assertThat(skipped(decide(r, Market.US_STOCK, ledger("0", null), null, "50", null, null)).reason())
+        assertThat(skipped(decide(r, Currency.USD, ledger("0", null), null, "50", null, null)).reason())
                 .isEqualTo(DcaSkipReason.BELOW_ONE_SHARE);
     }
 
     @Test
     void SELL인데_원장이_null이면_DATA_UNAVAILABLE() {
         DcaRule r = stock(OrderDirection.SELL, amount("1000"), DcaShortfallPolicy.PARTIAL, List.of());
-        assertThat(skipped(decide(r, Market.US_STOCK, null, "5", "50", null, null)).reason()).isEqualTo(DcaSkipReason.DATA_UNAVAILABLE);
+        assertThat(skipped(decide(r, Currency.USD, null, "5", "50", null, null)).reason()).isEqualTo(DcaSkipReason.DATA_UNAVAILABLE);
     }
 }

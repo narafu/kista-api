@@ -2,7 +2,7 @@ package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.TimeZones;
 import com.kista.shared.kernel.DcaFrequency;
-import com.kista.shared.kernel.Market;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
@@ -50,7 +50,7 @@ class DcaSummaryAssemblerTest {
         when(calendar.kstTradeDateOf(LocalDate.of(2026, 10, 30))).thenReturn(LocalDate.of(2026, 10, 31));
         DcaRule monthlyEnd = rule(OrderType.MOC, DcaFrequency.MONTHLY, null, null, "300");
 
-        DcaSummary.RuleSummary summary = assembler.assembleRule(monthlyEnd, null, LocalDate.of(2026, 10, 14), Market.US_STOCK);
+        DcaSummary.RuleSummary summary = assembler.assembleRule(monthlyEnd, null, LocalDate.of(2026, 10, 14), Currency.USD);
 
         assertThat(summary.nextUsSessionDate()).isEqualTo(LocalDate.of(2026, 10, 30));
         assertThat(summary.nextKstTradeDate()).isEqualTo(LocalDate.of(2026, 10, 31));
@@ -63,7 +63,7 @@ class DcaSummaryAssemblerTest {
         when(calendar.isUsSessionOpen(any())).thenReturn(false);
         DcaRule daily = rule(OrderType.MOC, DcaFrequency.DAILY, null, null, "300");
 
-        DcaSummary.RuleSummary summary = assembler.assembleRule(daily, null, LocalDate.of(2026, 10, 14), Market.US_STOCK);
+        DcaSummary.RuleSummary summary = assembler.assembleRule(daily, null, LocalDate.of(2026, 10, 14), Currency.USD);
 
         assertThat(summary.nextUsSessionDate()).isNull();
         assertThat(summary.nextKstTradeDate()).isNull();
@@ -100,7 +100,7 @@ class DcaSummaryAssemblerTest {
         DcaRule rule = new DcaRule("k", OrderDirection.SELL, DcaFrequency.DAILY, null, null, OrderType.MOC,
                 new DcaSizing(DcaSizingType.HOLDING_PERCENT, null, new BigDecimal("50.00")), DcaShortfallPolicy.PARTIAL, java.util.List.of());
 
-        DcaSummary.RuleSummary s = assembler.assembleRule(rule, null, LocalDate.of(2026, 10, 14), Market.US_STOCK);
+        DcaSummary.RuleSummary s = assembler.assembleRule(rule, null, LocalDate.of(2026, 10, 14), Currency.USD);
 
         assertThat(s.rule().sizing().amount()).isNull();
         assertThat(s.rule().sizing().percent()).hasToString("50.00");
@@ -112,7 +112,7 @@ class DcaSummaryAssemblerTest {
         when(calendar.isUsSessionOpen(any())).thenReturn(false);
         DcaRule daily = rule(OrderType.MOC, DcaFrequency.DAILY, null, null, "100.00");
 
-        DcaSummary.RuleSummary s = assembler.assembleRule(daily, null, LocalDate.of(2026, 10, 14), Market.US_STOCK);
+        DcaSummary.RuleSummary s = assembler.assembleRule(daily, null, LocalDate.of(2026, 10, 14), Currency.USD);
 
         assertThat(s.rule().sizing().amount()).hasToString("100.00");
     }

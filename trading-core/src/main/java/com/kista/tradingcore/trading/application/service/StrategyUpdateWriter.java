@@ -83,7 +83,7 @@ class StrategyUpdateWriter {
         }
 
         log.info("[strategyId={}] 전략 수정: cycleSeedType={}", strategyId, seedType);
-        return detailAssembler.toDetail(updated, owned.account().broker().getMarket());
+        return detailAssembler.toDetail(updated, owned.account().broker().getCurrency());
     }
 
     // 시드 입력 검증 — 0 초과, 계좌 통화 자릿수 이하 (HTTP 전 선검증에도 쓴다)

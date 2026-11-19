@@ -99,7 +99,7 @@
 | `TCR/db/migration-trading/V8·V9·V10·V12·V18·V19` (코인 주석·`execution_hour`) | 유지 | 적용된 마이그레이션 수정 금지(checksum). `V10__account_upbit.sql`도 같음 | — |
 | `src/main/resources/db/migration/V5__fear_greed_crypto_snapshots_delete.sql` | 유지 | 적용됨 | — |
 | 신규 `V23` 데이터 정리(가드·완전 삭제·정책 JSON) | 신설 | 지침서 15 4절. 번호는 착수 때 `ls`로 센다 | A |
-| 신규 `V24` `execution_hour` 컬럼 삭제 | 신설 | | B |
+| 신규 `V24` `execution_hour` 컬럼 삭제 | 신설 | `V24__drop_dca_rule_execution_hour.sql`(2026-11-20 커밋) | B |
 | `.env.example:55,58` | 분기 제거 | `HEARTBEAT_CRYPTO_URL=` 삭제, 55행 "코인 DCA 틱" 문구. `CMC_API_KEY`는 이미 없다(09 T3 철회 반영) | D |
 | `deploy/server/README.md:79` | 분기 제거 | `CryptoDcaScheduler`·`HEARTBEAT_CRYPTO_URL`·`CMC_API_KEY`(findings/20은 :91) | D |
 | `deploy/server/caddy/kista-api.caddy:18` | 분기 제거 | 정규식의 `crypto-market-indicators`. `CaddyRoutingTest`가 대조 | A |
@@ -177,7 +177,7 @@
 - 경로: `TradingUserCascadeListener.onUserDeleted`(`TC/trading/adapter/in/event/TradingUserCascadeListener.java:25-29`) → `UserTradingDataEraseService.cancelOpenOrders`(`:41-55`)가 `accountService.listByUser`로 계좌별 `AccountOpenOrderCancelPort.cancelOpenOrders` 호출 → `AccountOpenOrderCanceller`(`:23-33`)가 전략마다 `orderCancelService.requireNoCryptoInFlight`(`OrderCancelService.java:58-67`)·`stateWriter.pause`·`cancelOpenOrders`. 이어서 `erase`(`:60-66`)가 `deleteByUserId`로 cycle_position → strategy_cycle → strategy → accounts(소프트 삭제 `UPDATE ... WHERE user_id`)를 지운다(`AccountJpaRepository.java:28`, `StrategyJpaRepository.java:98`, `StrategyCycleJpaRepository.java:63`, `CyclePositionJpaRepository.java:160`). 어느 쿼리에도 `broker` 조건이 없다.
 - 코인 계좌 차이: 체결 확인 중 주문이 있으면 `OrderCancelException`(`:64`)이 나고, `cancelOpenOrders`의 `catch (RuntimeException)`(`:46-49`)이 `failed=-1`로 흡수해 관리자 알림만 보내고 `erase`는 계속된다. 즉 삭제를 막지 않는다. 코드 삭제 뒤에는 이 분기가 사라진다.
 - 계좌 단건 삭제(`AccountCascadeListener.java:29-38`)도 broker 조건이 없다. 주문(`trading.orders`)은 어느 경로에서도 지우지 않는다(주식과 같음).
-- C2 완전 삭제 뒤: 코인 계좌 행이 없으면 `listByUser`가 그 계좌를 돌려주지 않고 소프트 삭제 UPDATE는 0행이다. 소프트 삭제된 코인 행을 읽는 곳은 `@SQLRestriction`이 가려 읽지 않는다. `Account.broker`의 enum 역직렬화는 삭제 표시가 아닌 행을 읽을 때만 일어나므로, 단계 P ③의 `live=0` 확인이 전제다. 지침서 15 8절 중단 조건 "삭제 표시된 코인 행을 읽어야 하는 기능"에는 해당하지 않는다. 실검증(0행 정상 종료 테스트)은 T4에서 `UserCascadeEndToEndIT`에 케이스를 더해 닫는다.
+- C2 완전 삭제 뒤: 코인 계좌 행이 없으면 `listByUser`가 그 계좌를 돌려주지 않고 소프트 삭제 UPDATE는 0행이다. 소프트 삭제된 코인 행을 읽는 곳은 `@SQLRestriction`이 가려 읽지 않는다. `Account.broker`의 enum 역직렬화는 삭제 표시가 아닌 행을 읽을 때만 일어나므로, 단계 P ③의 `live=0` 확인이 전제다. 지침서 15 8절 중단 조건 "삭제 표시된 코인 행을 읽어야 하는 기능"에는 해당하지 않는다. 실검증(0행 정상 종료 테스트)은 **닫음(2026-11-20)**: `UserCascadeEndToEndIT.계좌가_없는_사용자의_탈퇴도_정상_종료된다`가 계좌 0개 사용자의 `UserDeletedEvent`를 실 컨텍스트·실 DB로 재발행하고, publication이 완료(삭제)되는지와 다른 사용자 계좌가 남는지를 본다. `erase`가 빈 계좌에서 예외를 던지게 바꾸면 실패하는 것을 변이로 확인했다.
 
 ## 9. 주식 경로의 MARKET·executionHour
 

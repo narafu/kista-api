@@ -81,7 +81,7 @@ class TossAuthApi implements BrokerConnectionTestPort {
     public BrokerAccountVerification verifyAccount(String appKey, String secretKey, String accountNo) {
         // Toss는 계좌번호(accountNo) 대신 clientId/secret으로 accountSeq를 조회해 검증
         String token = issueOAuthToken(appKey, secretKey).accessToken();
-        return new BrokerAccountVerification(fetchAccountSeq(token), null);
+        return new BrokerAccountVerification(fetchAccountSeq(token));
     }
 
     @Override

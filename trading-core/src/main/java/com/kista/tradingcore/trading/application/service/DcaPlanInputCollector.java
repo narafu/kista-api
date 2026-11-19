@@ -123,7 +123,7 @@ class DcaPlanInputCollector {
                 buyCash = ledgerBudget.remaining(ctx.currentCycle(), tradeDate).max(BigDecimal.ZERO);
                 buyCashLoaded = true;
             }
-            due.add(new DcaCycleOrderStrategy.DcaRuleInputs(rule, ctx.account().brokerRef().broker().getMarket(),
+            due.add(new DcaCycleOrderStrategy.DcaRuleInputs(rule, ctx.account().brokerRef().broker().getCurrency(),
                     loadCloses(strategy.ticker(), usSession), ledger, sell ? sellable : null,
                     loadFearGreed(rule), currentPrice, sell ? null : buyCash));
         }

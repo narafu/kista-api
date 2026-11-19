@@ -88,7 +88,7 @@ class MeritzAuthApi implements BrokerConnectionTestPort {
             throw MeritzResponse.PERMISSION_DENIED_CODES.contains(res.rspCd())
                     ? new BrokerPermissionDeniedException() : new BrokerCredentialException();
         }
-        return new BrokerAccountVerification(null, null);
+        return new BrokerAccountVerification(null);
     }
 
     // POST /oauth2/token — 실패 코드는 error_code 또는 rsp_cd, HTTP 403/500 어느 쪽이든 본문으로 판정

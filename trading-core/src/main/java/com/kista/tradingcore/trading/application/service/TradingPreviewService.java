@@ -3,7 +3,6 @@ package com.kista.tradingcore.trading.application.service;
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
-import com.kista.shared.kernel.Market;
 import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
 import com.kista.tradingcore.broker.domain.model.SellableQuantity;
@@ -199,7 +198,7 @@ class TradingPreviewService {
                                                                  BigDecimal totalAccountPlannedBuy, Map<UUID, BigDecimal> freshBuyByStrategyId,
                                                                  Map<UUID, BigDecimal> freshCorrectionByStrategyId) {
         Broker broker = account.brokerRef().broker();
-        if (previews.isEmpty() || broker == Broker.MOCK || broker.getMarket() != Market.US_STOCK) return previews;
+        if (previews.isEmpty() || broker == Broker.MOCK) return previews;
         // 미접수 PLANNED·SUBMITTING BUY(증권사 주문가능금액에 아직 미차감) + 전략별 신규 BUY
         BigDecimal required = freshBuyByStrategyId.values().stream().reduce(totalAccountPlannedBuy, BigDecimal::add);
         if (required.signum() <= 0) return previews;
@@ -229,7 +228,7 @@ class TradingPreviewService {
                                                                      TradingAccount account, LocalDate today,
                                                                      Map<UUID, Integer> freshSellByStrategyId) {
         Broker broker = account.brokerRef().broker();
-        if (previews.isEmpty() || broker == Broker.MOCK || broker.getMarket() != Market.US_STOCK) return previews;
+        if (previews.isEmpty() || broker == Broker.MOCK) return previews;
         // 종목별 신규 SELL 수량 합 + 오늘 이미 저장된 SELL 보유 여부(신규가 없어도 PLACED SELL이 보유량을 넘을 수 있다)
         Map<StrategyTicker, Integer> freshSellByTicker = new LinkedHashMap<>();
         for (Strategy strategy : strategies) {
