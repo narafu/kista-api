@@ -1,11 +1,11 @@
 # trading 모듈 테스트 패턴
 
 ### TradingService execute() 가격 주입 패턴
-- `execute(strategy, tradingAccount, userProfile, DstInfo)`는 단건 래퍼로 `executeBatch`에 위임한다 — 현재가는 `TradingPriceFetcher`가 `BrokerPricePort`로 일괄 조회하므로 테스트는 `BrokerPricePort` mock을 stub한다. 배치 경로 테스트의 계좌는 `TradingFixtures.tradingAccount(id, userId)`(=`TradingAccount.from(kisAccount(...))`)·`tossTradingAccount`를 쓰고, 브로커 포트 stub 매처는 `tradingAccount.brokerRef()`를 쓴다. 소유권 검증 경로(`AccountPort.requireOwnedAccount` 등)만 `kisAccount`(Account)를 유지
+- `execute(strategy, tradingAccount, userProfile, DstInfo)`는 단건 래퍼로 `executeBatch`에 위임한다 — 현재가는 `TradingPriceFetcher`가 `BrokerPricePort`로 일괄 조회하므로 테스트는 `BrokerPricePort` mock을 stub한다. 배치 경로 테스트의 계좌는 `TradingFixtures.tradingAccount(id, userId)`·`tossTradingAccount`를 쓰고, 브로커 포트 stub 매처는 `tradingAccount.brokerRef()`를 쓴다. 소유권 검증 경로(`AccountPort.requireOwnedAccount` 등)만 `kisAccount`(Account)를 유지
 - `executeBatch(List, DstInfo)` package-private 오버로드 — DstInfo 직접 주입으로 sleep 우회
 
 ### TradingService·전략 테스트 패턴
-- `TradingServiceTest`는 `when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))` 패턴 사용
+- `TradingServiceTest`는 가격의 계좌 출처를 고정하지 않는다(`TradingPriceFetcherTest`가 검증). `when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))` 패턴 사용
 - `TradingService` 단위 테스트는 실제 `StrategyLedgerBudget(cyclePositionPort, orderPort, cycleOrderStrategies)`를 주입하고 원장은 `cyclePositionPort.findLatestOne(cycleId)`로 stub한다(미stub이면 `StrategyCycle.startAmount()` 폴백이라 의도한 원장이 아닐 수 있다). 계획 단계는 브로커 잔고·판매가능수량을 조회하지 않으므로 `verifyNoInteractions(sellableQuantityPort)`로 잠근다. 계좌별 병렬 실행은 `TradingCandidatePlanner`가 맡는다 — `TradingCandidatePlanner`(마지막 생성자 인자)와 `TradingService` 양쪽에 `new TradingParallelRunner(0)`(순차 인라인 모드)을 주입해 기존 테스트의 결정적 호출 순서를 보존한다 — 병렬 의미론(동시 상한·그룹 격리·순서 보존·인터럽트 승격)은 별도 `TradingParallelRunnerTest`가 검증한다.
 - scheduler leg recovery 테스트는 `Order.withLeg(...)`로 concrete leg를 명시한다. leg 없는 과거(`Order.UNKNOWN_LEG`) 주문은 coarse 슬롯 처리가 없으므로 슬롯·skip 테스트 픽스처로 쓰지 말고, 
 - INFINITE compute skip 테스트는 correction 포함 complete concrete leg와 partial concrete leg를 모두 둔다. complete는 `buildOrders(...)` 미호출, partial은 호출을 검증해 누락 leg 복구가 막히지 않게 한다. 개장 스케쥴러 회귀는 기존 `AT_CLOSE` BUY만 있을 때 `AT_OPEN` SELL 복구가 막히지 않는지도 검증한다. VR/PRIVACY는 variable ladder라 concrete compute skip을 가정하지 않는다.

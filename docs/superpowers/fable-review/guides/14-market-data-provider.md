@@ -340,3 +340,13 @@ T2 실행 결과(2026-11-15, S15, 미배포 — **관찰 대기(배포일부터 
 - S18이 넣은 리버스 별지점 일봉 조회(`CycleOrderComputer.computeStarPointPrice`)는 주문 계획 트랜잭션 안에서 Alpaca를 부른다(전일 종가 조회와 같은 기존 구조). T3이 주문 경로의 시세 조회를 정리할 때 이 호출도 트랜잭션 밖(계획 입력을 모으는 단계)으로 옮긴다.
 - 날짜만 적은 `end`는 그날 봉을 포함한다(2026-11-16 실호출: `end=2026-11-12` → 11-12 봉부터). 뉴욕 00:00~00:15에는 어제 날짜의 `end`가 403일 수 있다 — `lastBefore` 호출이 그 시각에 실패하면 대체 경로로 간다. 배치는 그 시각에 돌지 않는다.
 - T5 배포 뒤 infra에 `TOSS_ADMIN_CLIENT_ID`·`TOSS_ADMIN_CLIENT_SECRET` 제거를 알린다(G8).
+
+T3 실행 결과(2026-11-20, N19):
+
+- **별지점 트랜잭션: 대상 없음.** 배치 계획 경로(`TradingCandidatePlanner` → `CycleOrderComputer`)에는 `@Transactional`·`TransactionOperations`가 없어 `computeStarPointPrice`의 Alpaca 호출은 트랜잭션 밖이다. readOnly 트랜잭션은 `TradingPreviewService`의 미리보기에만 있다. 위 2026-11-16 보정의 이 항목은 옮길 것이 없다.
+- **`closesBefore` 미정산 봉 보정**: 뉴욕 16:16 전에는 그 뉴욕 당일 봉을 전일 종가로 고르지도 캐시하지도 않는다(T2 비교의 22:00 `prevClose` 어긋남 원인, Q-24).
+- **새 메서드**: `latestCloses`(맵, 없는 키는 빠짐)·`requireLatestClose`·`requireConfirmedClose`(없으면 `IllegalStateException`). 등록·롤오버·미리보기·DCA 지표·통계·원장 합산이 `MarketDataClient`로 옮겨 갔다. DCA 지표 일봉은 Toss 조정값에서 Alpaca `adjustment=all`로 바뀌어 값이 조금 다를 수 있다.
+- **차트·백테스트**: 차트는 RAW(개수 1~600), 백테스트는 SPLIT. 내부 캔들 API의 `interval`을 지웠고 stats의 `AlpacaCandleAdapter`·`HistoricalCandlePort`·`AlpacaConfig`를 삭제했다. Alpaca 전송 오류는 `MarketDataApiException`(503)이다.
+- **마감 리포트**: 마감+20분, 확정 종가 없음 → 10분 뒤 1회 재조회 → 보류(Q-30).
+- **토스 대체 경로**: 토스 계좌 현재가는 Alpaca `latestPrices`(Q-13). 주문 경로 현재가 "계좌 증권사" 원칙의 예외이며 토스 전략 등록 전에 재확인한다(`vendors/toss.md`).
+- Mock은 확정 일봉이 없으면 `getExecutions`가 예외를 던진다(현재가 대체 삭제).

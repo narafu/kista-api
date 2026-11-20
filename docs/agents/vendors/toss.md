@@ -10,9 +10,9 @@
 
 - 구성: adapter/out/toss/   ← TossHttpClient/TossConfig/TossAuthApi/TossCandleApi/TossHoldingsApi/TossOrderApi/TossPriceApi/TossResponseParser/TossResult/UsdKrwRateCache
 - TossDistributedTokenCoordinator + TossRedisTokenStore(계좌·관리자 Redis canonical token; TTL owner lease+원자적 generation INCR; generation counter/canonical generation 비교 Lua fencing CAS; owner-safe unlock; SHA-256 최근 발급 fingerprint 2초 TTL) — 관리자 토큰은 Account가 없어 TokenCoordinator 범위 밖 별도 public 메서드(TossTokenStore)
-- TossAdminPriceSource(관리자 시세 1단계 — TossPriceApi의 대체값 없는 package-private 변형 사용)
+- `TossAdminPriceSource`(관리자 시세 — T3로 소비처가 없어졌고 T5에서 삭제 예정. TossPriceApi의 대체값 없는 package-private 변형 사용)
 - TossBrokerAdapter(공통 6개 + 통계 5개 Port 구현 — Toss 응답 record를 벤더 중립 타입으로 변환해 노출)
-- DCA 일봉 조회: `CandlePort.getDailyCandlesBefore(symbol, beforeUsSession, count)`: DCA 지표용 일봉 조회(Toss `TossCandleApi` 구현). 200봉 단위로 페이징하며 다음 페이지 `before`는 직전 페이지 가장 오래된 봉 날짜 00:00 UTC이고, 날짜 기준으로 중복을 제거한다. 이 경로만 `adjusted=true`(분할·배당 조정)를 보낸다.
+- DCA 일봉 조회는 T3로 공용 시세(`MarketDataClient.dailyCandles`, Alpaca `adjustment=all`)로 옮겼다. 옛 Toss `adjusted=true` 값과 조금 다를 수 있다.
 - DCA 주문 가격: Toss: 매수는 캡가(지정가) 기준으로 보정하고, 매도는 0.01 규칙을 적용한다.
 
 ### 계좌번호 포맷
@@ -62,12 +62,12 @@ Toss는 현재가(`/api/v1/prices`)와 전일종가(캔들 API)가 **완전히 �
 
 **소비처 선택 기준**: 실제 주문가 예측/계산(전략 생성 기준가, 다음 주문 미리보기, 매매 실행 시작가)은 `getPrevClose(s)`만 필요 — `getPriceSnapshot`을 쓰면 쓰지도 않는 현재가 API 호출이 낭비된다.
 
-**관리자 시세 1단계(`TossAdminPriceSource`)**: 계좌 브로커와 무관하게 모든 현재가·전일종가·확정 종가 조회의 첫 단계다(`BrokerRouter` 경유)(`workflow-ledger-price.md` "시세 출처"). 위 public 메서드 대신 대체값 없는 package-private 변형을 쓴다 — `fetchPricesPartial`(응답에 있는 종목만, 누락 시 예외 없음), `fetchPrevCloseCached` 성공분만(현재가 폴백 없음), `fetchConfirmedClose` 성공분만(라이브가 폴백 없음). 빠진 종목은 계좌 어댑터로 넘어간다. 기존 public 메서드(MOCK·Toss 어댑터 경로)의 예외·폴백 동작은 그대로다. 캔들 실패(empty)도 `prevCloseCache` 버킷에 캐시되므로 그 버킷 동안은 1단계 전일종가가 계속 누락으로 처리된다
+**관리자 시세 1단계(`TossAdminPriceSource`)는 T3 이후 쓰이지 않는다**(T5 삭제 대기). 주문 경로·배치는 `BrokerPricePort.currentPrices`와 공용 시세를 쓴다(`workflow-ledger-price.md` "시세 출처"). 아래 `TossPriceApi` public 메서드의 폴백 동작은 삭제 전까지 그대로다.
 
 ### 전일종가(prevClose) 조회 상세 — TossPriceApi.fetchPrevCloseCached()
 
 - `/api/v1/prices`에는 전일종가 필드가 없음(현재가만 제공) — 반드시 `TossCandleApi.getCandleBefore(symbol, "1d", before)`(캔들 `count=1`)로 별도 조회
-- `/api/v1/prices`를 **계좌 토큰**으로 부를 수 있는지는 실호출로 확인하지 않았다(스펙은 "액세스 토큰만으로 호출"). 관리자 키를 없앨 때(fable 14 T3) 토스 계좌의 현재가는 Mock처럼 Alpaca에서 읽는다. 토스 전략이 생기면 그때 확인한다.
+- **토스 계좌의 현재가는 공용 시세(Alpaca `latestPrices`)다(Q-13 임시 경로).** `/api/v1/prices`를 **계좌 토큰**으로 부를 수 있는지는 실호출로 확인하지 않았다(스펙은 "액세스 토큰만으로 호출", 운영 토스 전략 0건). 토스 전략을 등록하기 전에 계좌 토큰 시세 호출을 확인하고, 되면 `TossBrokerAdapter.currentPrices`를 계좌 시세로 바꾼다. 그 전까지 이것은 "주문 경로 현재가는 계좌 증권사"의 예외이며 Alpaca 무료 현재가(iex·15분 지연 통합)는 BUY cap 기준으로 약하다.
 - `before` 시각 계산이 핵심: `TossPriceApi.resolveMarketSessionAt(nowKst)`의 `regularSessionActive`가 true(정규장 진행 중)면 그 세션의 봉이 아직 미확정이므로 `lastSessionOpenInstant().minusMillis(1)`을 `before`로 사용해 배제, false면 이미 확정된 봉만 있으므로 캡처한 `now`
 - 개장 시각은 "오늘 날짜" 고정값이 아니라 `lastSessionOpenInstant`(날짜 롤백 처리)를 써야 한다 — 고정값은 자정~개장 전(00:00~22:30 KST) 호출 시 진행 중인 세션(전날 저녁 개장)이 아닌 미래 시각을 가리킨다
 - `TossPriceApi.prevCloseCache` 키에 세션 버킷(`"ACTIVE"`/`"CLOSED"`) 포함 — 정규장 종료로 확정 종가가 바뀌는 순간 같은 KST 날짜 내에서도 캐시를 재사용하지 않고 재조회
