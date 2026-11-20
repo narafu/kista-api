@@ -505,6 +505,8 @@ echo "select name, locked_at, finished_at from trading.scheduler_locks where nam
 | `market-calendar-startup`의 `locked_at`이 방금 시각 | 옛 시각이면 worker 전용 빈이 뜨지 않은 것이다 → no-go |
 | 리허설에서 적어 둔 스케줄 등록·재개 로그 줄(14-2 완료 판정 2) | 없으면 no-go |
 
+**리허설 값(2026-11-20, 로컬 빈 DB·같은 app.jar 2 프로세스)**: worker `Started ApiApplication in 5.658 seconds`, ERROR 0, `WARN.*(Flyway|role)` 0, `c.k.s.p.scheduling.SchedulerJobRunner : 기동 시 캘린더 초기 적재 시작`, `trading.scheduler_locks`의 `market-calendar-startup` `locked_by`=worker. 두 프로세스 모두 `RedisStreamSubscriber : stream:user.push-notification.requested 스트림 컨슈머 시작 — group=root`(push 컨슈머는 role 무관 — 정상). web은 `SchedulerJobRunner`·락 줄 0, `grep -ciE "scheduled|TradingBatchResumer"` 0(worker도 0 — 빈 DB라 재개 대상이 없어 `TradingBatchResumer` 줄이 안 나온다. 운영 worker에서 이 grep은 0이 아닐 수 있고, 판정은 `market-calendar-startup` 락과 `SchedulerJobRunner` 줄로 한다). web ERROR 2줄은 더미 텔레그램 토큰의 401(가입·탈퇴 관리자 알림)이라 운영에서는 나오지 않아야 한다.
+
 **6. web과 Caddy (3~5분).** reconcile이 이어서 web을 올리고 스니펫을 설치·reload한다.
 
 ```bash
