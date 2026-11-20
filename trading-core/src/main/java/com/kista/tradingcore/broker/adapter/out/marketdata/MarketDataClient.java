@@ -88,11 +88,14 @@ public class MarketDataClient {
 
     // usSessionDate 세션 직전 확정 종가(분할 조정). 뉴욕 정산(16:16) 전에는 뉴욕 오늘 봉이 진행 중이라 고르지 않는다
     public Map<StrategyTicker, BigDecimal> closesBefore(Collection<StrategyTicker> tickers, LocalDate usSessionDate) {
-        LocalDate nyToday = LocalDate.now(clock.withZone(TimeZones.NY));
+        Instant now = clock.instant();
+        LocalDate nyToday = LocalDate.ofInstant(now, TimeZones.NY);
+        Instant todaySettledAt = nyToday.atTime(BAR_SETTLED_AT).atZone(TimeZones.NY).toInstant(); // 뉴욕 오늘 봉 정산 시각
         // 뉴욕 오늘 봉이 아직 완결 전인지(오늘 16:16 이전)
-        boolean todayUnsettled = clock.instant().isBefore(nyToday.atTime(BAR_SETTLED_AT).atZone(TimeZones.NY).toInstant());
-        // 정산 전에 세션일이 뉴욕 오늘 뒤면 결과가 정산 뒤에 달라지므로 캐시하지 않는다
-        Duration ttl = todayUnsettled && usSessionDate.isAfter(nyToday) ? Duration.ZERO : SESSION_VALUE_TTL;
+        boolean todayUnsettled = now.isBefore(todaySettledAt);
+        // 정산 전에 세션일이 뉴욕 오늘 뒤면 결과는 정산 시각 전엔 바뀌지 않으므로 그 시각까지만 캐시한다
+        // ponytail: 만료는 저장 시각 기준이라 조회 지연(수 초)만큼 16:16을 넘길 수 있다 — 화면·등록 경로만 해당, 배치는 세션일=뉴욕 오늘이라 이 분기를 안 탄다
+        Duration ttl = todayUnsettled && usSessionDate.isAfter(nyToday) ? Duration.between(now, todaySettledAt) : SESSION_VALUE_TTL;
         return cachedPerTicker("prevClose", usSessionDate, tickers, ttl, missing -> {
             Map<String, List<Bar>> bars = fetchBars(symbols(missing), usSessionDate.minusDays(PREV_CLOSE_LOOKBACK_DAYS), null,
                     DailyCandleQuery.Adjustment.SPLIT, false, null);

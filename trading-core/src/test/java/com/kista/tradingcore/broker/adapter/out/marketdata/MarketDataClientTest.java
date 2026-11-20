@@ -362,19 +362,21 @@ class MarketDataClientTest {
     }
 
     @Test
-    @DisplayName("closesBefore: 정산 전 결과는 캐시하지 않는다")
-    void closesBefore_정산_전_결과는_캐시하지_않는다() {
+    @DisplayName("closesBefore: 정산 전 결과는 정산 시각까지만 캐시한다")
+    void closesBefore_정산_전_결과는_정산_시각까지만_캐시한다() {
         MockRestServiceServer[] srv = new MockRestServiceServer[1];
-        MutableClock clock = new MutableClock("2026-11-20T20:50:00Z"); // 뉴욕 15:50
+        MutableClock clock = new MutableClock("2026-11-20T20:00:00Z"); // 뉴욕 15:00
         MarketDataClient c = clientAt(clock, srv);
         srv[0].expect(ExpectedCount.twice(), requestTo(startsWith(BARS))).andRespond(withSuccess(NOV_BARS, MediaType.APPLICATION_JSON));
         LocalDate monday = LocalDate.of(2026, 11, 23);
 
-        BigDecimal before = c.closesBefore(List.of(SOXL), monday).get(SOXL);
-        clock.set("2026-11-21T01:20:00Z"); // 뉴욕 20:20 — 정산 뒤
+        BigDecimal first = c.closesBefore(List.of(SOXL), monday).get(SOXL);
+        BigDecimal cached = c.closesBefore(List.of(SOXL), monday).get(SOXL); // 같은 정산 전 시각 — 서버 호출 없음
+        clock.set("2026-11-20T21:20:00Z"); // 뉴욕 16:20 — 정산 뒤라 다시 조회
         BigDecimal after = c.closesBefore(List.of(SOXL), monday).get(SOXL);
 
-        assertThat(before).isEqualByComparingTo("58.32");
+        assertThat(first).isEqualByComparingTo("58.32");
+        assertThat(cached).isEqualByComparingTo("58.32");
         assertThat(after).isEqualByComparingTo("49.19");
         srv[0].verify();
     }
