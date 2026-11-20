@@ -1,6 +1,6 @@
 # Server deployment (OCI)
 
-`kista-api`(HTTP)·`kista-scheduler`(배치)·`kista-trading`(trading-core, 같은 이미지 3 role)을 단일 인스턴스(현재 OCI)에서 Docker Compose로 운영한다. 서버 적용은 `kista-infra`의 reconcile이 한다(아래 "배포 흐름"). 리버스 프록시(Caddy)·Postgres·Redis는
+`kista-web`(HTTP)·`kista-worker`(매매 엔진·배치, 같은 이미지 2 role)를 단일 인스턴스(현재 OCI)에서 Docker Compose로 운영한다. 서버 적용은 `kista-infra`의 reconcile이 한다(아래 "배포 흐름"). 리버스 프록시(Caddy)·Postgres·Redis는
 `kista-infra` 레포가 소유하며, 이 레포는 `shared_net`(Caddy 라우팅)·`data_net`(Postgres/Redis 접근) 두 외부
 네트워크에 합류만 한다.
 
@@ -29,7 +29,7 @@ Caddy 라우팅 스니펫(`deploy/server/caddy/kista-api.caddy`)은 이 디렉�
 
 `.env`는 이 레포의 Actions가 아니라 `kista-infra` 레포의 배포 워크플로가 관리한다 — `kista-infra`에 sops + age로 암호화 커밋된 `secrets/kista-api.env`를 복호화해 매 배포마다 `/opt/kista-api/.env`를 렌더링·덮어쓴다. 값을 바꾸려면 `kista-infra`에서 `sops edit secrets/kista-api.env`로 수정 후 커밋·배포해야 하며(절차는 `kista-infra/secrets/README.md`), 서버에서 `.env`를 직접 수정해도 다음 kista-infra 배포 시 되돌아간다.
 
-`.env`가 바뀌면 kista-infra 배포가 `reconcile.sh kista-api current`로 current release를 재적용한다 — compose가 env_file 내용 변경을 감지해 3 role을 재생성하고 헬스 게이트까지 거친다(이 레포 재배포 불필요).
+`.env`가 바뀌면 kista-infra 배포가 `reconcile.sh kista-api current`로 current release를 재적용한다 — compose가 env_file 내용 변경을 감지해 2 role을 재생성하고 헬스 게이트까지 거친다(이 레포 재배포 불필요).
 
 ## .env 내용
 
@@ -43,9 +43,9 @@ Caddy 라우팅 스니펫(`deploy/server/caddy/kista-api.caddy`)은 이 디렉�
 2. `deploy-checks` — 배포 판정 스크립트·hook shellcheck·bats(`compose-invariants.bats` 포함) + Flyway 마이그레이션 검사
 3. `verify`(전체 테스트 + `integration`, ArchUnit·`CaddyRoutingTest` 포함)와 이미지 빌드(role 변경 시만, 3 role 공용 단일 이미지, SHA 태그)가 병렬
 4. `deploy` — kista-infra에 `repository_dispatch(deploy)`로 `{app, config, roles(전 role SHA), sha(이 커밋), force}`를 보내고 끝난다(대기 없음). 서버 적용·헬스 게이트 결과는 kista-infra `reconcile.yml`이 이 커밋의 commit status `deploy/production`(pending → success/failure, `target_url`은 infra run)으로 되돌려 쓴다 — 워크플로 run의 초록불은 "요청 전송 완료"이고 배포 완료는 커밋 status로 본다
-5. kista-infra `Reconcile App` — SHA·이미지 검증 → state와 신선도 병합 → config SHA로 bundle 구성 → `deploy/hooks/pre-apply.sh`(EPR 고아 검사 — kista-trading·kista-scheduler 이미지가 바뀔 때, `docs/agents/docker-infra.md` "배포 직전 EPR 정리 런북") → 서버 `reconcile.sh`:
-   - `deploy/server/roles` 순서(kista-trading → kista-api → kista-scheduler)로 `docker compose up -d --no-deps <role>` — compose config-hash가 같으면 재생성하지 않는다
-   - `deploy/server/bluegreen`에 있는 role(kista-api뿐)은 stop-first가 아니라 blue/green으로 바꾼다: 스케일 1→2로 새 컨테이너를 띄워 헬스 게이트를 통과시키고, 옛 컨테이너는 모든 role·Caddy 통과 뒤에 제거한다. kista-trading·kista-scheduler는 겹쳐 뜨면 이중 실행이라 stop-first다
+5. kista-infra `Reconcile App` — SHA·이미지 검증 → state와 신선도 병합 → config SHA로 bundle 구성 → `deploy/hooks/pre-apply.sh`(EPR 고아 검사 — kista-worker 이미지가 바뀔 때, `docs/agents/docker-infra.md` "배포 직전 EPR 정리 런북") → 서버 `reconcile.sh`:
+   - `deploy/server/roles` 순서(kista-worker → kista-web)로 `docker compose up -d --no-deps <role>` — compose config-hash가 같으면 재생성하지 않는다
+   - `deploy/server/bluegreen`에 있는 role(kista-web뿐)은 stop-first가 아니라 blue/green으로 바꾼다: 스케일 1→2로 새 컨테이너를 띄워 헬스 게이트를 통과시키고, 옛 컨테이너는 모든 role·Caddy 통과 뒤에 제거한다. kista-worker는 겹쳐 뜨면 이중 실행이라 stop-first다
    - 컨테이너가 바뀐 role만 헬스 게이트: Docker 헬스 healthy(compose healthcheck가 `/actuator/health/readiness` — readinessState·db·redis UP), 10초 간격 최대 5분. Caddy `health_uri`는 liveness
    - 모든 role 통과 후 Caddy 스니펫 설치 + reload 1회
    - 실패 시 이번에 바꾼 role을 역순으로 직전 release(이미지·compose·스니펫)로 롤백 — 앱 단위 전부 아니면 전무
@@ -54,13 +54,13 @@ Caddy 라우팅 스니펫(`deploy/server/caddy/kista-api.caddy`)은 이 디렉�
 
 ## 배포 시간 제한
 
-없다 — kista-trading은 재기동 시 진행 중이던 매매 배치를 재개한다(`docs/agents/workflow-batch.md` "재기동 종료·재개"). 전제: kista-trading은 단일 인스턴스·stop-first 교체·`stop_grace_period` ≥ 200s(`.github/tests/compose-invariants.bats`가 잠금). infra compose(postgres·redis) 변경만 kista-infra가 KST 시각 창으로 막는다.
+없다 — kista-worker는 재기동 시 진행 중이던 매매 배치를 재개한다(`docs/agents/workflow-batch.md` "재기동 종료·재개"). 전제: kista-worker는 단일 인스턴스·stop-first 교체·`stop_grace_period` ≥ 200s(`.github/tests/compose-invariants.bats`가 잠금). infra compose(postgres·redis) 변경만 kista-infra가 KST 시각 창으로 막는다.
 
 ## 롤백 Runbook
 
 **자동 롤백**: reconcile 실패 시 그 요청에서 바꾼 role 전부를 직전 release로 되돌린다(exit 1, kista-infra run 실패 + 텔레그램 알림). 롤백한 컨테이너도 헬스 게이트를 거친다 — exit 1은 롤백 뒤 헬스까지 통과했다는 뜻이다. 롤백 불가·롤백 실패·롤백 후 헬스 게이트 실패는 exit 2 — 아래 수동 절차.
 
-**수동 롤백**: 서버에서 직전 release를 재적용한다(GHCR이 public이라 정리된 이미지도 다시 pull). 명령과 state 커밋 절차는 `kista-infra/README.md` "수동 복구 (reconcile exit 2)"가 원본이다(app=`kista-api`). 특정 옛 SHA로 되돌리려면 state를 그 SHA로 수정·커밋한 뒤 kista-infra `Reconcile App`을 workflow_dispatch(app=kista-api, config/roles에 그 SHA)로 실행 — 신선도 병합은 state보다 옛 요청을 무시하므로 state 수정이 먼저다.
+**수동 롤백**: 서버에서 `nohup bash /opt/kista-infra/bin/reconcile.sh kista-api <release id>`를 실행한 뒤 kista-infra `state/kista-api.yml`을 실제 적용 SHA로 수동 커밋한다(GHCR이 public이라 정리된 이미지도 다시 pull). 배경은 `kista-infra/README.md` "수동 복구 (reconcile exit 2)". 특정 옛 SHA로 되돌리려면 state를 그 SHA로 수정·커밋한 뒤 kista-infra `Reconcile App`을 workflow_dispatch(app=kista-api, config/roles에 그 SHA)로 실행 — 신선도 병합은 state보다 옛 요청을 무시하므로 state 수정이 먼저다.
 
 **Flyway 관련 롤백 주의**: 신규 마이그레이션이 포함된 배포는 `validate-on-migrate: true` 때문에 이전 이미지로 롤백 시 기동 실패할 수 있음. 이 경우 DB 마이그레이션 수동 롤백 후 이미지 롤백 필요. Breaking migration 배포는 별도 주의 필요. 스키마 재편 이행은 2026-09 완료, 절차는 git 태그 `archive/docs-2026-11` 참고. Flyway 이력 테이블은 서비스별로 `flyway_schema_history_api`(root)·`flyway_schema_history_trading`(trading)이다.
 
@@ -74,10 +74,10 @@ Caddy 라우팅 스니펫(`deploy/server/caddy/kista-api.caddy`)은 이 디렉�
 ## 모니터링
 
 - **메트릭**: 앱이 `micrometer-registry-otlp`로 Grafana Cloud에 60초 간격 직접 OTLP push (`management.otlp.metrics.export`, `GRAFANA_CLOUD_OTLP_*` 환경변수) — 별도 사이드카 불필요
-- **Redis 영속성**: kista-infra 레포 소유 — 상세 설정(AOF 등)은 kista-infra README 참고. `kista-api`에 `depends_on: redis`는 의도적으로 미사용(Spring Data Redis lazy connection이라 앱 부팅을 막지 않음)
+- **Redis 영속성**: kista-infra 레포 소유 — 상세 설정(AOF 등)은 kista-infra README 참고. 앱 서비스에 `depends_on: redis`는 의도적으로 미사용(Spring Data Redis lazy connection이라 앱 부팅을 막지 않음)
 - **헬스체크**: UptimeRobot → `https://<API 도메인>/actuator/health` 5분 간격 (full health — DB·Redis 포함)
 - **스케줄러 감시**: Healthchecks.io dead-man's-switch — `TradingOpenScheduler`/`TradingCloseScheduler` 실행 완료 시 `HeartbeatPort.pingOpen()`/`pingClose()` GET 핑. `HEARTBEAT_OPEN_URL`/`HEARTBEAT_CLOSE_URL` 미설정 시 핑 생략(배포 안전). healthchecks.io 콘솔에서 각 체크의 예상 주기(개장 ~22:30 KST, 마감 ~04:30 KST + DST 여유)를 등록해야 실제로 미실행이 감지됨
-- **로그**: `docker logs -f $(docker ps -qlf label=com.docker.compose.service=kista-api)` (서버 SSH — kista-api는 blue/green이라 컨테이너 이름 미고정, kista-scheduler·kista-trading은 `docker logs -f <이름>` — 서버 루트엔 compose 파일이 없어 `docker compose logs`는 쓰지 않는다)
+- **로그**: `docker logs -f $(docker ps -qlf label=com.docker.compose.service=kista-web)` (서버 SSH — kista-web은 blue/green이라 컨테이너 이름 미고정, kista-worker는 `docker logs -f <이름>` — 서버 루트엔 compose 파일이 없어 `docker compose logs`는 쓰지 않는다)
 
 ## fida
 

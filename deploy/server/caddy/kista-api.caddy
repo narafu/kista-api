@@ -2,27 +2,27 @@
 # caddy reload한다(kista-infra Caddyfile이 `import /etc/caddy/routes/...`로 읽음). upstream 공용 설정(keepalive off·lb_try·health 주기)은
 # kista-infra Caddyfile의 `(upstream)` snippet이 소유한다 — 여기서는 `import upstream <health_uri>`만 쓴다.
 # 라우팅이 컨트롤러 경로와 어긋나 404가 나던 사고(2026-09-16 2단 경로, 2026-09-17 fida-orders)를 막기 위해
-# CaddyRoutingTest가 아래 @scheduler·@trading regex를 trading-core·root 컨트롤러 경로와 대조한다 — 경로 추가 시 테스트가 알려준다.
+# CaddyRoutingTest가 아래 @scheduler·@trading regex를 엔진(worker)·비엔진(web) 컨트롤러 경로와 대조한다(RoleRoutingGuard와 같은 분류) — 경로 추가 시 테스트가 알려준다.
 {$API_DOMAIN}, http://:8080 {
 	encode zstd gzip
-	# 스케쥴러 수동 트리거 — `/**`는 2단 이상 깊이(kbland-price-index/full-refresh)에서 매치 실패해 kista-api로 새던 것을 path_regexp로 교체(2026-10-01 실측)
+	# 스케쥴러 수동 트리거 — `/**`는 2단 이상 깊이(kbland-price-index/full-refresh)에서 매치 실패해 kista-web으로 새던 것을 path_regexp로 교체(2026-10-01 실측)
 	@scheduler path_regexp ^/api/admin/scheduler/.+$
 	handle @scheduler {
-		reverse_proxy kista-scheduler:8080 {
+		reverse_proxy kista-worker:8080 {
 			import upstream /actuator/health/liveness
 		}
 	}
-	# trading-core(kista-trading) 공개 경로. path matcher의 `**`는 2단 이상 깊이에서 매치 실패(caddy v2.9.1 실측)라 path_regexp 사용.
-	# /api/stats는 kista-api(housing-benchmark)와 kista-trading(summary/equity-curve/cycles)이 prefix를 공유해 하위 경로로만 가른다.
-	# /api/internal/** 중 외부(FIDA)가 공인 도메인으로 호출하는 fida-orders만 여기로 — 나머지 internal은 kista-api가 내부망으로 직접 호출
+	# 엔진 공개 경로(kista-worker) — 여기서 빠지면 kista-web이 RoleRoutingGuard로 503. path matcher의 `**`는 2단 이상 깊이에서 매치 실패(caddy v2.9.1 실측)라 path_regexp 사용.
+	# /api/stats는 kista-web(housing-benchmark)과 kista-worker(summary/equity-curve/cycles)이 prefix를 공유해 하위 경로로만 가른다.
+	# /api/internal/** 중 외부(FIDA)가 공인 도메인으로 호출하는 fida-orders만 여기로 — 나머지 internal은 kista-web이 내부망으로 직접 호출
 	@trading path_regexp ^/api/(trading-cycles(/.*)?|accounts(/.*)?|backtest|daily-trades|orders(/.*)?|stats/(summary|equity-curve|cycles)|internal/fida-orders)$
 	handle @trading {
-		reverse_proxy kista-trading:8080 {
+		reverse_proxy kista-worker:8080 {
 			import upstream /actuator/health/liveness
 		}
 	}
 	handle {
-		reverse_proxy kista-api:8080 {
+		reverse_proxy kista-web:8080 {
 			import upstream /actuator/health/liveness
 		}
 	}

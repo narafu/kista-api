@@ -11,6 +11,7 @@ import com.kista.tradingcore.trading.adapter.in.schedule.TradingCloseScheduler;
 import com.kista.tradingcore.trading.adapter.in.schedule.TradingOpenScheduler;
 import com.kista.tradingcore.trading.adapter.in.web.TradingSchedulerInternalController;
 import com.kista.api.user.adapter.in.schedule.RefreshTokenCleanupScheduler;
+import com.kista.api.admin.adapter.in.web.AdminTradingSchedulerController;
 import com.kista.api.web.AdminSchedulerController;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -49,7 +50,7 @@ class SchedulerDisabledContextTest {
                 FearGreedScheduler.class, MarketCalendarRefreshScheduler.class,
                 KbLandHousingBenchmarkScheduler.class, KbLandPriceIndexScheduler.class,
                 MarketIndexPriceSyncScheduler.class, RefreshTokenCleanupScheduler.class,
-                Class.forName(FINANCE_SCHEDULER_FQCN), AdminSchedulerController.class,
+                Class.forName(FINANCE_SCHEDULER_FQCN), AdminSchedulerController.class, AdminTradingSchedulerController.class,
                 ApiKeyExpiryScheduler.class, TradingBatchResumer.class, TradingSchedulerInternalController.class,
                 Class.forName(TRADING_RESUBMIT_SCHEDULER_FQCN),
         };

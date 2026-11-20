@@ -1,18 +1,20 @@
 package com.kista.api.admin.adapter.in.web;
 
 import com.kista.api.admin.application.port.output.TradingSchedulerCommandPort;
+import com.kista.shared.platform.role.ConditionalOnWorkerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-// 내부 API 호출이라 kista-api role에서도 항상 노출 가능 — 원격 trading-core 스케쥴러 존재 여부와
-// 로컬 빈 게이팅이 무관해짐(web.AdminSchedulerController의 @ConditionalOnWorkerRole과 대비)
+// 개장/마감 수동 트리거 — worker에서만 등록(web.AdminSchedulerController와 같은 @ConditionalOnWorkerRole).
+// Caddy가 /api/admin/scheduler/**를 worker로 보내므로 web에 두면 RoleRoutingGuard가 503으로 거절한다. worker에서는 INTERNAL_API_BASE_URL(localhost:8080)로 자기 내부 API를 호출한다
 @Tag(name = "Admin", description = "관리자 API")
 @RestController
 @RequestMapping("/api/admin/scheduler")
 @RequiredArgsConstructor
+@ConditionalOnWorkerRole
 public class AdminTradingSchedulerController {
 
     private final TradingSchedulerCommandPort schedulerCommandPort;

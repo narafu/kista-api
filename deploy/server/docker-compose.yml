@@ -3,7 +3,7 @@
 # Caddy(리버스 프록시·HTTPS)와 Redis는 kista-infra 레포가 소유 — kista-api는 shared_net/data_net으로 합류만 한다
 
 # Docker healthy = 준비 완료(readinessState·db·redis UP) — 배포 헬스 게이트(kista-infra reconcile.sh gate)가 이 상태만 본다
-# unhealthy여도 restart: unless-stopped라 재기동되지 않는다 — autoheal 등 unhealthy 기반 재기동을 붙이지 말 것(DB 순간 장애가 kista-trading 재기동으로 번진다)
+# unhealthy여도 restart: unless-stopped라 재기동되지 않는다 — autoheal 등 unhealthy 기반 재기동을 붙이지 말 것(DB 순간 장애가 kista-worker 재기동으로 번진다)
 # Caddy health_uri는 liveness 유지(caddy/kista-api.caddy) — readiness로 바꾸면 DB 순간 장애 때 upstream 전체가 빠져 502
 x-healthcheck: &healthcheck
   test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/readiness"]
@@ -19,94 +19,61 @@ x-logging: &logging
     max-file: "5"
 
 services:
-  kista-api:
-    image: ${KISTA_API_IMAGE:?KISTA_API_IMAGE is required}
-    # container_name 없음 — blue/green 교체 때 새 컨테이너가 kista-api-kista-api-N으로 옆에 뜬다(서비스 DNS 이름 kista-api는 불변)
+  # web role — HTTP 전용(@Scheduled·엔진 빈 미등록 요청은 RoleRoutingGuard가 503). blue/green 무중단 교체 대상
+  kista-web:
+    # role별 이미지 — kista-infra reconcile이 images.env로 주입(web·worker는 같은 이미지 한 벌)
+    image: ${KISTA_WEB_IMAGE:?KISTA_WEB_IMAGE is required}
+    # container_name 없음 — blue/green 교체 때 새 컨테이너가 kista-api-kista-web-N으로 옆에 뜬다(서비스 DNS 이름 kista-web은 불변)
     env_file:
       - .env
     environment:
       SPRING_PROFILES_ACTIVE: prod
       KISTA_ROLE: web  # @Scheduled·수동 트리거 빈 미등록(HTTP 전용)
       REDIS_URL: redis://redis:6379  # kista-infra가 소유하는 data_net의 redis alias — depends_on 미사용 (Spring Data Redis lazy connection)
-      INTERNAL_API_BASE_URL: http://kista-trading:8080  # root→trading-core 내부 API(admin/stats/market/notify/web 어댑터) — shared_net 내부 DNS. 프로세스 간 동기 호출은 이 방향뿐(trading-core는 root를 호출하지 않는다)
-      JAVA_OPTS: ${JAVA_OPTS:--Xmx1280m -Xms256m -XX:MaxMetaspaceSize=320m -XX:ReservedCodeCacheSize=96m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom}
+      INTERNAL_API_BASE_URL: http://kista-worker:8080  # web→worker 내부 API(admin/stats/market/notify 어댑터) — shared_net 내부 DNS. 프로세스 간 동기 호출은 이 방향뿐(worker는 web을 호출하지 않는다)
+      JAVA_OPTS: ${JAVA_OPTS:--Xmx1280m -Xms256m -XX:MaxMetaspaceSize=384m -XX:ReservedCodeCacheSize=96m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom}
     expose:
       - "8080"
     networks:
       - shared_net   # kista-infra Caddy 리버스 프록시 라우팅용
       - data_net     # kista-infra postgres/redis 접근용
     stop_grace_period: 35s   # Spring graceful shutdown 30s + 여유 5s
-    mem_limit: 2048m         # 힙1280m + 메타320m + 코드캐시96m + 네이티브 여유. 매매·통계가 kista-trading으로 이관된 뒤 실측 RSS ~530MiB(2026-10-01)라
-                              # 모놀리스 시절 4096m에서 축소 — 앱 3종+인프라+UI limit 합계를 호스트 12GB(11.6GiB) 이하로 유지
+    mem_limit: 2048m         # 힙1280m + 메타384m + 코드캐시96m + 네이티브 여유 — 앱 2종+인프라+UI limit 합계를 호스트 12GB(11.6GiB) 이하로 유지
     restart: unless-stopped
     healthcheck: *healthcheck
     logging: *logging
 
-  # 스케쥴러 role — kista-api와 동일 이미지, KISTA_ROLE=worker 로 @Scheduled 빈 등록
-  # 매매 배치는 4a에서 kista-trading으로 이관됨 — 이 프로세스엔 비-매매 스케쥴러(KbLand/finance/user/market)만 남는다.
-  # HTTP는 /api/admin/scheduler/kbland-* + actuator 용도로만 기동
-  kista-scheduler:
-    # role별 이미지 — kista-infra reconcile이 images.env로 주입
-    image: ${KISTA_SCHEDULER_IMAGE:?KISTA_SCHEDULER_IMAGE is required}
-    container_name: kista-scheduler
-    env_file:
-      - .env
-    environment:
-      SPRING_PROFILES_ACTIVE: prod
-      KISTA_ROLE: worker
-      # root 소유 event_publication(public)의 재발행 소유자 = kista-scheduler 단독(kista-api는 false — 둘 다 true면 이중 claim).
-      # trading 리스너 행은 trading.event_publication으로 분리돼 kista-trading이 자기 것을 재발행한다.
-      # 이 컨테이너엔 root 자체 이벤트(가입·승인·KbLand/finance alert 등)만 남아 매매 시간대와 무관.
-      SPRING_MODULITH_EVENTS_REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART: "true"
-      REDIS_URL: redis://redis:6379
-      INTERNAL_API_BASE_URL: http://kista-trading:8080  # Caddy가 /api/admin/scheduler/**(개장·마감 수동 트리거 포함)를 이 컨테이너로 보낸다 — 개장·마감은 kista-trading 내부 API로 위임
-      # 요청 부하 없는 배치 전용 — 힙 작게. OOM 회피가 중요(OOM-kill 시 scheduler_locks 락 2h 홀드)
-      JAVA_OPTS: "-Xmx896m -Xms128m -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom"
-    expose:
-      - "8080"
-    networks:
-      - shared_net   # Caddy 가 /api/admin/scheduler/* 라우팅 (kista-infra)
-      - data_net     # postgres/redis
-    stop_grace_period: 200s   # 배치(KbLand·finance 등) 인터럽트 → SchedulerJobRunner FAILED 이벤트 발행 + 락 해제 시도 시간 확보. 매매 배치는 kista-trading 소유라 여기엔 없다
-                              # (spring.lifecycle.timeout-per-shutdown-phase=30s가 먼저 종료를 강제할 수 있어 200s 전체가 쓰이지 않을 수 있음)
-    mem_limit: 1536m          # 실측 RSS ~485MiB(2026-10-01) — 힙896m + 메타256m + 코드캐시64m + 네이티브 여유
-    restart: unless-stopped
-    healthcheck: *healthcheck
-    logging: *logging
-
-  # trading-core role — 4a단계로 분리된 매매 실행 프로세스(trading-cycles/accounts/stats/backtest/
-  # dashboard/toss-statistics/statistics/order 8개 엔드포인트 + 매매 배치 스케쥴러 TradingOpen/CloseScheduler·
-  # MarketCalendarRefreshScheduler). kista-api/kista-scheduler처럼 2-role로 더 쪼개지 않는다 —
-  # trading-core HTTP(수동 트리거 TradingSchedulerInternalController 포함)와 매매 배치를 한 프로세스에 두어야 배치 실행 경로가
-  # 하나로 남는다 — HTTP-only role을 따로 두면 수동 트리거와 cron이 두 프로세스로 갈라져 scheduler_locks 경합이 상시화된다.
+  # worker role — 매매 엔진·배치·수동 트리거(/api/admin/scheduler/**)·엔진 HTTP(trading-cycles/accounts/stats/backtest/orders 등)를 한 프로세스에 둔다.
+  # 엔진 HTTP와 배치가 같은 JVM이어야 계좌별 예산 락(AccountBudgetLock, JVM 로컬)이 유효하고 수동 트리거와 cron이 scheduler_locks로 경합하지 않는다.
   # 반드시 단일 인스턴스·stop-first 교체(compose 기본)·stop_grace_period ≥ 200s — 재기동 시 매매 배치 재개(TradingBatchResumer)가
   # 잔여 락을 넘겨받으므로 겹침 기동(blue/green·start-first·scale)은 이중 실행을 만든다(.github/tests/compose-invariants.bats)
-  kista-trading:
+  kista-worker:
     # role별 이미지 — kista-infra reconcile이 images.env로 주입
-    image: ${KISTA_TRADING_IMAGE:?KISTA_TRADING_IMAGE is required}
-    container_name: kista-trading
+    image: ${KISTA_WORKER_IMAGE:?KISTA_WORKER_IMAGE is required}
+    container_name: kista-worker
     env_file:
       - .env
     environment:
-      APP_JAR: trading-core.jar
-      SERVER_PORT: "8080"  # trading-core 기본값은 8081(로컬 2-프로세스 동시 기동용) — 컨테이너 expose/healthcheck는 8080 고정이라 반드시 override 필요
       SPRING_PROFILES_ACTIVE: prod
       KISTA_ROLE: worker
-      # 매매 알림 6종 리스너가 4a에서 이 프로세스로 이관됨 — 재기동 시 자기 미완료 매매 이벤트를 자기가 재발행(진짜 소유자)
+      # event_publication 재발행 소유자 = kista-worker 단독(kista-web은 false — 둘 다 true면 이중 claim)
       SPRING_MODULITH_EVENTS_REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART: "true"
-      REDIS_URL: redis://redis:6379  # user.* 스트림 구독 + app.error 스트림 발행(root app_error_logs 저장 경로) — trading-core는 root 내부 API를 호출하지 않으므로 INTERNAL_API_BASE_URL 없음
-      # 매매 배치(scheduler)+8개 컨트롤러 HTTP 트래픽 겸용 — kista-scheduler보다 약간 크게
-      JAVA_OPTS: "-Xmx2048m -Xms256m -XX:MaxMetaspaceSize=320m -XX:ReservedCodeCacheSize=80m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom"
+      REDIS_URL: redis://redis:6379
+      DB_POOL_MAX: "10"  # 엔진 HTTP·배치 겸용 — web 기본(5)보다 크게
+      INTERNAL_API_BASE_URL: http://localhost:8080  # worker 자신 — 개장·마감 수동 트리거가 같은 프로세스의 내부 API로 위임
+      # 매매 배치 + 엔진 HTTP + 비-매매 스케쥴러(KbLand/finance/user/market) 겸용. OOM 회피가 중요(OOM-kill 시 scheduler_locks 락 2h 홀드)
+      JAVA_OPTS: "-Xmx2048m -Xms256m -XX:MaxMetaspaceSize=384m -XX:ReservedCodeCacheSize=80m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom"
     expose:
       - "8080"
     networks:
-      - shared_net   # Caddy 라우팅(trading-cycles/accounts/stats/backtest 등) + kista-api의 내부 API 호출 대상
+      - shared_net   # Caddy 라우팅(엔진 경로·스케쥴러 트리거) + kista-web의 내부 API 호출 대상
       - data_net
-    stop_grace_period: 200s   # 매매 배치 인터럽트 대응 — kista-scheduler와 동일 근거
-    mem_limit: 2816m         # 백테스트 캔들 적재 피크 대비 유지(실측 RSS ~530MiB, 2026-10-01). limit 합계: 앱 2048+1536+2816=6400m,
-                              # kista-infra(postgres 3072+redis 256+caddy 64)+kista-ui 1536 포함 11328m — 호스트 11.6GiB 이하
-                              # 예외: kista-api blue/green 교체 중 수 분간은 kista-api 2개(+2048m)로 합계가 호스트를 넘는다 — limit은 예약 아닌 상한, 실측 RSS 기준 여유(2026-10-02 결정)
-                              # kista-ui blue/green 교체 중에도 같은 예외 — kista-ui 2개(+1536m), 교체 직후 실측 호스트 used 2.5GB/11.9GB. 전역 reconcile 락으로 두 앱의 교체는 겹치지 않는다
+    stop_grace_period: 200s   # 배치 인터럽트 → SchedulerJobRunner FAILED 이벤트 발행 + 락 해제 시도 시간 확보
+                              # (spring.lifecycle.timeout-per-shutdown-phase=30s가 먼저 종료를 강제할 수 있어 200s 전체가 쓰이지 않을 수 있음)
+    mem_limit: 3072m          # 백테스트 캔들 적재 피크 대비. limit 합계: 앱 2048+3072=5120m,
+                              # kista-infra(postgres 3072+redis 256+caddy 64)+kista-ui 1536 포함 10048m — 호스트 11.6GiB 이하
+                              # 예외: kista-web blue/green 교체 중 수 분간은 kista-web 2개(+2048m)로 합계가 호스트를 넘는다 — limit은 예약 아닌 상한, 실측 RSS 기준 여유(2026-10-02 결정)
+                              # kista-ui blue/green 교체 중에도 같은 예외 — kista-ui 2개(+1536m). 전역 reconcile 락으로 두 앱의 교체는 겹치지 않는다
     restart: unless-stopped
     healthcheck: *healthcheck
     logging: *logging

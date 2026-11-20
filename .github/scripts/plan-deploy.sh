@@ -23,7 +23,7 @@ fi
 verify_file=$(mktemp)
 trap 'rm -f "$verify_file"' EXIT
 echo false > "$verify_file"
-# $1 기준 SHA, $2 판정할 플래그 키(config|api|scheduler|trading) → target 또는 기준 SHA 출력
+# $1 기준 SHA, $2 판정할 플래그 키(config|web|worker) → target 또는 기준 SHA 출력
 pick() {
   local base=$1 key=$2 flags rc=0
   if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then

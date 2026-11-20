@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # 로컬 dev 시드 — dev 유저(00000000-...-0001)에만 적용, 재실행 가능
-# 전제: root(8080)·trading-core(8081) local 프로파일 기동, docker compose postgres 기동,
-#       trading-core application-local.yml에 toss.admin-client-id/secret 설정(MOCK 시세 피드용)
+# 전제: 같은 app.jar 2 프로세스 local 프로파일 기동 — web(8080, KISTA_ROLE=web)·worker(8081, KISTA_ROLE=worker SERVER_PORT=8081),
+#       docker compose postgres 기동, application-local.yml에 toss.admin-client-id/secret 설정(MOCK 시세 피드용)
+#       엔진 API(accounts·trading-cycles)는 worker로만 보낸다(web은 RoleRoutingGuard가 503)
 # 1) MOCK 계좌·ACTIVE 전략은 API로 등록(계좌 컬럼 AES 암호화 때문에 SQL 직접 삽입 불가)
 # 2) 토스 [시드] 계좌(MOCK 암호문 복사)·가계부·equity-curve 스냅샷·관리자 주문 이력·사이클 성과 목록용 사이클은 dev-seed.sql
 # 3) 벤치마크(kista_ref) 전역 데이터는 실제 수집기 트리거(가짜 행 미삽입 — kbland 2종 + ETF 지수 종가)
@@ -11,7 +12,7 @@ set -euo pipefail
 jq() { command jq "$@" | tr -d '\r'; }
 
 API=${API:-http://localhost:8080}
-TRADING=${TRADING:-http://localhost:8081}
+TRADING=${TRADING:-http://localhost:8081} # worker 프로세스(엔진 API)
 # 레포 루트 compose의 postgres 컨테이너 — compose 프로젝트명과 무관하게 해석
 PG_CONTAINER=${PG_CONTAINER:-$(docker compose -f "$(cd "$(dirname "$0")/../.." && pwd)/docker-compose.yml" ps -q postgres)}
 [[ -n "$PG_CONTAINER" ]] || { echo "postgres 컨테이너 미기동: docker compose up -d postgres" >&2; exit 1; }
@@ -31,7 +32,7 @@ for _ in {1..20}; do
   sleep 0.5
 done
 [[ $(psql_val "SELECT count(*) FROM trading.user_notify_profile WHERE user_id = '$DEV_USER'") == 1 ]] \
-  || echo "trading-core 사용자 복제본 미반영 — 전략 등록이 404로 실패할 수 있음(trading-core 기동·Redis 확인)" >&2
+  || echo "worker 사용자 복제본 미반영 — 전략 등록이 404로 실패할 수 있음(worker 기동·Redis 확인)" >&2
 
 # MOCK 계좌 — 닉네임으로 기존 계좌 재사용
 ACCOUNT=$(curl -fsS "${AUTH[@]}" "$TRADING/api/accounts" \
@@ -59,7 +60,7 @@ register INFINITE:SOXL '{"type":"INFINITE","ticker":"SOXL","initialDeposit":5000
 register VR:TQQQ '{"type":"VR","ticker":"TQQQ","initialDeposit":3000,"intervalWeeks":2,"bandWidth":15,"recurringAmount":0,"initialHoldings":30,"initialAvgPrice":70}'
 # MOCK 시세(Toss 관리자 키)의 OAuth 403 "IP address not allowed"도 BROKER_CREDENTIAL_INVALID(422)로 매핑된다 — 키보다 허용 IP 누락이 흔하다
 if (( CREDENTIAL_INVALID )); then
-  echo "힌트: trading-core 로그에 'IP address not allowed'가 있으면 Toss 허용 IP에 현재 공인 IP($(curl -fsS --max-time 3 https://api.ipify.org || echo '조회 실패'))를 추가 — 키 문제가 아님" >&2
+  echo "힌트: worker 로그에 'IP address not allowed'가 있으면 Toss 허용 IP에 현재 공인 IP($(curl -fsS --max-time 3 https://api.ipify.org || echo '조회 실패'))를 추가 — 키 문제가 아님" >&2
 fi
 
 docker exec -i "$PG_CONTAINER" psql -q -U kista -d kistadb < "$DIR/dev-seed.sql"

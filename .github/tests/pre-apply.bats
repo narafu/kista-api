@@ -14,26 +14,27 @@ setup() {
   chmod +x "$BATS_TEST_TMPDIR/bin/remote"
 }
 
-@test "kista-api만 바뀌면 조회 없이 통과" {
-  HOOK_ROLES="kista-api=$SHA" run bash "$HOOK"
+@test "kista-web만 바뀌면 조회 없이 통과" {
+  HOOK_ROLES="kista-web=$SHA" run bash "$HOOK"
   [ "$status" -eq 0 ]
   [ ! -e "$REMOTE_LOG" ]
 }
 
-@test "trading·scheduler는 각자 스키마 조회, 고아 없으면 통과" {
-  HOOK_ROLES="kista-trading=$SHA kista-scheduler=$SHA" STUB_PENDING="com.kista.x.E|" run bash "$HOOK"
+@test "kista-worker는 public·trading 스키마 조회, 고아 없으면 통과(kista-web은 건너뜀)" {
+  HOOK_ROLES="kista-worker=$SHA kista-web=$SHA" STUB_PENDING="com.kista.x.E|" run bash "$HOOK"
   [ "$status" -eq 0 ]
-  grep -q 'FROM trading.event_publication' "$REMOTE_LOG"
   grep -q 'FROM public.event_publication' "$REMOTE_LOG"
+  grep -q 'FROM trading.event_publication' "$REMOTE_LOG"
+  [ "$(wc -l < "$REMOTE_LOG")" -eq 2 ]
 }
 
 @test "고아가 있으면 차단" {
-  HOOK_ROLES="kista-trading=$SHA" STUB_PENDING="com.kista.y.Gone|" run bash "$HOOK"
+  HOOK_ROLES="kista-worker=$SHA" STUB_PENDING="com.kista.y.Gone|" run bash "$HOOK"
   [ "$status" -eq 1 ]
   [[ "$output" == *"런북"* ]]
 }
 
 @test "조회 실패는 fail-closed" {
-  HOOK_ROLES="kista-scheduler=$SHA" STUB_REMOTE_RC=1 run bash "$HOOK"
+  HOOK_ROLES="kista-worker=$SHA" STUB_REMOTE_RC=1 run bash "$HOOK"
   [ "$status" -eq 1 ]
 }

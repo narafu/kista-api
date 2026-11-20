@@ -22,14 +22,15 @@ Java 25 · Spring Boot 4 · Hexagonal Architecture · Spring Modulith · Postgre
 
 ## 구조
 
-Gradle 서브프로젝트 3개, 배포 프로세스 3개.
+Gradle 서브프로젝트 3개, 산출물 `app.jar` 하나, 배포 role 2개(`kista-web`·`kista-worker`).
 
-| 서브프로젝트 | 산출물 | 프로세스 | 담당 |
-|---|---|---|---|
-| `:api` (루트) | `app.jar` | `kista-api` · `kista-scheduler` | 인증·사용자·관리자·가계부·알림·시장 데이터·벤치마크 |
-| `:trading-core` | `trading-core.jar` | `kista-trading` | 매매 실행·주문 계산·증권사 연동·계좌·통계·매매 알림 |
-| `:shared` | (라이브러리) | — | 공용 어휘(sharedkernel)·내부 API wire 계약(contract)·인프라(platform) |
+| 서브프로젝트 | 담당 |
+|---|---|
+| `:api` (루트) | 앱 조립(`ApiApplication`, bootJar)·인증·사용자·관리자·가계부·알림·시장 데이터·벤치마크 |
+| `:trading-core` | 매매 실행·주문 계산·증권사 연동·계좌·통계·매매 알림 (`:api`가 의존해 같은 jar에 들어간다) |
+| `:shared` | 공용 어휘(sharedkernel)·내부 API wire 계약(contract)·인프라(platform) |
 
+- `KISTA_ROLE`(web·worker·all)이 한 jar의 역할을 가른다 — worker는 매매 엔진·배치·스케쥴러 수동 트리거, web은 그 외 HTTP. role과 맞지 않는 요청은 `RoleRoutingGuard`가 503 `WRONG_ROLE`로 거절한다.
 - `:api`와 `:trading-core`는 서로의 main 코드를 참조하지 않는다 — 내부 HTTP API·Redis로만 통신하고, wire 타입은 `:shared`의 `com.kista.shared.contract`를 공유한다.
 - 각 모듈 내부는 Hexagonal(`adapter → application → domain`) 구조다. 레이어 방향은 `HexagonalArchitectureTest`, 모듈 경계는 프로세스별 `ModulithArchitectureTest`(`ApplicationModules.verify()` — api·trading-core 각 1개), Gradle 방향과 서브프로젝트별 루트 패키지(`com.kista.api`/`com.kista.tradingcore`/`com.kista.shared`)는 `GradleModuleBoundaryTest`가 빌드 시 강제한다.
 
@@ -48,9 +49,9 @@ docker compose up -d postgres redis                          # DB·Redis
 
 ## 배포
 
-- 세 앱 프로세스는 **같은 GHCR 이미지**(arm64)를 쓴다 — api/scheduler는 `app.jar`를 `KISTA_ROLE`(web/worker)로 갈라 쓰고, trading은 `APP_JAR=trading-core.jar`.
+- 두 앱 role(`kista-web`·`kista-worker`)은 **같은 GHCR 이미지**(arm64, `app.jar` 하나)를 `KISTA_ROLE`(web/worker)로 갈라 쓴다.
 - `kista-infra`(private)가 Caddy·PostgreSQL·Redis·백업 cron을 소유하고, 앱별 선언(`state/<app>.yml`)대로 서버에 reconcile한다. API 도메인 라우팅 규칙만은 이 레포 `deploy/server/caddy/kista-api.caddy`가 소유하며 `CaddyRoutingTest`가 컨트롤러 경로와 대조한다.
-- 매매 시간대 배포 가드는 없다 — `kista-trading`은 재기동 시 진행 중 매매 배치를 재개한다. API 장애는 매매 배치에 영향을 주지 않는다.
+- 매매 시간대 배포 가드는 없다 — `kista-worker`는 재기동 시 진행 중 매매 배치를 재개한다. web 장애는 매매 배치에 영향을 주지 않는다.
 - 배포 구성도는 [`docs/architecture-map.md`](docs/architecture-map.md) "L0-1 배포 구성".
 
 ## 문서
