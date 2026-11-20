@@ -58,4 +58,20 @@ class MarketHolidayServiceTest {
         target.getDailyCandles("SOXL", to.minusYears(5), to);
         verify(candleQueryPort).dailyCandles("SOXL", to.minusYears(5), to);
     }
+
+    @Test
+    void getDailyCandles_콤마가_든_종목은_포트_호출_없이_거절하고_QQQ_BRK_B는_통과한다() {
+        MarketHolidayService target = new MarketHolidayService(marketCalendarQueryPort, candleQueryPort);
+        LocalDate to = LocalDate.of(2026, 10, 14);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> target.getDailyCandles("SOXL,TQQQ", 200))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("종목 코드 형식이 올바르지 않습니다.");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> target.getDailyCandles("SOXL,TQQQ", to.minusDays(5), to))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.mockito.Mockito.verifyNoInteractions(candleQueryPort);
+        target.getDailyCandles("QQQ", 200);
+        target.getDailyCandles("BRK.B", 200);
+        verify(candleQueryPort).latestDailyCandles("QQQ", 200);
+        verify(candleQueryPort).latestDailyCandles("BRK.B", 200);
+    }
 }

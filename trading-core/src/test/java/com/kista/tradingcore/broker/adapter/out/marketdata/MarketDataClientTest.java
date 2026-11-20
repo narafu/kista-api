@@ -108,6 +108,21 @@ class MarketDataClientTest {
     }
 
     @Test
+    @DisplayName("일봉: 콤마가 든 종목은 서버 호출 없이 거부하고 QQQ·BRK.B 형식은 통과한다")
+    void dailyCandles_콤마가_든_종목은_거부한다() {
+        DailyCandleQuery q = DailyCandleQuery.latest(5, DailyCandleQuery.Adjustment.RAW);
+        assertThatThrownBy(() -> adapter.dailyCandles("AAA,BBB", q))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("종목 코드 형식이 올바르지 않습니다.");
+        assertThatThrownBy(() -> adapter.dailyCandles("soxl", q)).isInstanceOf(IllegalArgumentException.class);
+        server.verify(); // 기대 요청 없음 — HTTP 호출이 있었다면 AssertionError
+
+        server.expect(ExpectedCount.times(2), requestTo(startsWith(BARS))).andRespond(withSuccess("{\"bars\":{}}", org.springframework.http.MediaType.APPLICATION_JSON));
+        adapter.dailyCandles("QQQ", q);
+        adapter.dailyCandles("BRK.B", q);
+        server.verify();
+    }
+
+    @Test
     @DisplayName("현재가: 두 피드가 모두 실패하면 대체값 없이 예외다")
     void latestPrices_bothFeedsFail_throws() {
         server.expect(ExpectedCount.twice(), requestTo(startsWith(SNAPSHOTS))).andRespond(withStatus(HttpStatus.FORBIDDEN));

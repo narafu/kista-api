@@ -34,6 +34,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 // 계좌와 무관한 공용 시세(Alpaca) — 화면의 현재가와 확정된 값(전일 종가·확정 일봉·일봉 이력)의 단일 출처다.
 // 주문 경로의 현재가는 여기가 아니라 계좌 증권사에서 읽는다(decisions.md "공용 시세는 Alpaca").
@@ -50,6 +51,7 @@ public class MarketDataClient {
     private static final LocalTime BAR_SETTLED_AT = LocalTime.of(16, 16);    // 뉴욕 시각 — 이 뒤에 읽은 당일 봉은 완결된 것으로 본다
     private static final int PREV_CLOSE_LOOKBACK_DAYS = 10;                  // 전일 종가를 찾는 달력일 범위(연휴 포함)
     private static final int PAGE_LIMIT = 10_000;                            // Alpaca bars 한 페이지 최대 건수(종목 합산)
+    private static final Pattern SYMBOL_FORMAT = Pattern.compile("^[A-Z][A-Z0-9.]{0,9}$"); // 단일 종목 코드(콤마 등으로 다종목 조회 방지)
     private static final String FEED_IEX = "iex";                            // 실시간, 한 거래소
     private static final String FEED_DELAYED_SIP = "delayed_sip";            // 15분 지연 통합 시세(snapshot 전용)
     private static final String FEED_SIP = "sip";                            // 통합 시세 일봉
@@ -127,6 +129,8 @@ public class MarketDataClient {
 
     // 일봉 이력(오름차순) — 차트·DCA 지표·백테스트. symbol은 전략 종목이 아닌 것(지수 ETF)도 받는다
     public List<BrokerCandle> dailyCandles(String symbol, DailyCandleQuery query) {
+        // 다종목 symbols= 주입 차단 — 캐시·HTTP 전에 거절
+        if (symbol == null || !SYMBOL_FORMAT.matcher(symbol).matches()) throw new IllegalArgumentException("종목 코드 형식이 올바르지 않습니다.");
         List<BrokerCandle> cached = cache.getOrCompute(new CacheKey("candles", query, symbol), CANDLES_TTL, () -> {
             List<BrokerCandle> loaded = loadDailyCandles(symbol, query);
             return loaded.isEmpty() ? null : loaded; // 빈 결과는 캐시하지 않는다
