@@ -12,7 +12,6 @@ import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderTiming;
-import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.domain.model.BatchContext;
@@ -79,7 +78,7 @@ class TradingCandidatePlanner {
     record SaveAllocationResult(Set<BatchContext> savedContexts) {}
 
     // 전략별 후보를 먼저 수집하고 계좌별 예산 배정 후 AT_CLOSE 주문만 저장
-    List<CycleState> planAll(List<BatchContext> contexts, Map<StrategyTicker, PriceSnapshot> startPriceSnapshots,
+    List<CycleState> planAll(List<BatchContext> contexts, Map<PriceKey, PriceSnapshot> startPriceSnapshots,
                               PrivacyTradeBase privacyBase, LocalDate today) throws InterruptedException {
         List<CyclePlanCandidate> candidates = new ArrayList<>();
         for (BatchContext ctx : contexts) {
@@ -101,7 +100,7 @@ class TradingCandidatePlanner {
 
     // 개장 후보 수집 — placeOpenOrders 전용, planAll과 달리 저장까지 이 메서드 밖(TradingService)에서 처리
     List<CyclePlanCandidate> collectOpenCandidates(List<BatchContext> contexts,
-            Map<StrategyTicker, PriceSnapshot> startPriceSnapshots, PrivacyTradeBase privacyBase,
+            Map<PriceKey, PriceSnapshot> startPriceSnapshots, PrivacyTradeBase privacyBase,
             LocalDate tradeDate) throws InterruptedException {
         List<CyclePlanCandidate> candidates = new ArrayList<>();
         for (BatchContext ctx : contexts) {
@@ -132,12 +131,12 @@ class TradingCandidatePlanner {
 
     // 사이클별 후보 수집 — 기존 주문은 보존하고 새 슬롯만 allocator 검증 대상으로 분리한다
     private CyclePlanCandidate collectCycleCandidate(BatchContext ctx,
-            Map<StrategyTicker, PriceSnapshot> startPriceSnapshots, PrivacyTradeBase privacyBase,
+            Map<PriceKey, PriceSnapshot> startPriceSnapshots, PrivacyTradeBase privacyBase,
             LocalDate tradeDate, Set<OrderTiming> creatableTimings) {
         Strategy strategy = ctx.strategy();
         TradingAccount account = ctx.account();
         AccountBalance balance = loadBalance(strategy, account);
-        PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
+        PriceSnapshot priceSnapshot = startPriceSnapshots.get(PriceKey.of(ctx)); // 그 계좌 증권사의 현재가
         BigDecimal price = PriceSnapshot.currentOrNull(priceSnapshot);
         BigDecimal prevClosePrice = PriceSnapshot.prevCloseOrNull(priceSnapshot);
         List<Order> existingOrders = orderPort.findPlannedOrPlacedByCycleAndDate(ctx.currentCycle().id(), tradeDate);

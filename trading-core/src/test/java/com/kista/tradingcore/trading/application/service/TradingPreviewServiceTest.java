@@ -100,7 +100,7 @@ class TradingPreviewServiceTest {
         // 브로커 조회는 경고 전용 포트(MarginPort·SellableQuantityPort)뿐이다 — 매매 판정에는 쓰지 않는다
         service = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, cyclePositionPort, planBuilder, ledgerBudget, priceFetcher, marginPort, sellableQuantityPort, marketCalendarPort, FIXED);
         lenient().when(marketCalendarPort.isMarketOpen(any())).thenReturn(true); // 기본은 개장일
-        lenient().when(priceFetcher.fetchPrevCloses(any(), any())).thenReturn(Map.of());
+        lenient().when(priceFetcher.fetchPrevCloses(any())).thenReturn(Map.of());
         // 원장 상한은 모든 전략에 적용된다 — 기본은 넉넉한 잔여로 주문을 그대로 통과시킨다 (개별 테스트가 재스텁)
         lenient().when(ledgerBudget.remaining(any(), any(), any(), any())).thenReturn(new BigDecimal("1000000"));
         lenient().when(ledgerBudget.fit(any(), any(), any())).thenAnswer(inv -> {
@@ -363,13 +363,13 @@ class TradingPreviewServiceTest {
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY));
         Map<StrategyTicker, BigDecimal> prevCloseCache = Map.of(StrategyTicker.SOXL, new BigDecimal("22.00"));
-        when(priceFetcher.fetchPrevCloses(List.of(StrategyTicker.SOXL), TRADING_ACCOUNT.brokerRef())).thenReturn(prevCloseCache);
+        when(priceFetcher.fetchPrevCloses(List.of(StrategyTicker.SOXL))).thenReturn(prevCloseCache);
         when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any(), eq(prevCloseCache)))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
 
         service.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
 
-        verify(priceFetcher, times(1)).fetchPrevCloses(List.of(StrategyTicker.SOXL), TRADING_ACCOUNT.brokerRef());
+        verify(priceFetcher, times(1)).fetchPrevCloses(List.of(StrategyTicker.SOXL));
         verify(planBuilder).build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any(), eq(prevCloseCache));
     }
 

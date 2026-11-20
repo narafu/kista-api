@@ -117,7 +117,12 @@ class ManualTradingServiceTest {
                 cycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
                 strategyCycleVrPort, strategyVrDetailPort, orderPort, mock(com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient.class));
         orderPlanner = new TradingOrderPlanner(orderPort);
-        priceFetcher = new TradingPriceFetcher(tossPricePort, eventPublisher, privacyTradePort);
+        priceFetcher = new TradingPriceFetcher(tossPricePort,
+                mock(com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient.class),
+                mock(com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort.class),
+                new com.kista.tradingcore.trading.application.service.support.TradingParallelRunner(0), eventPublisher, privacyTradePort);
+        // 계좌 현재가는 default 구현(getPrices 위임)을 그대로 타게 해 기존 getPrices 스텁을 재사용한다
+        lenient().when(tossPricePort.currentPrices(any(), any())).thenCallRealMethod();
         planBuilder = new StrategyOrderPlanBuilder(
                 balanceLoader, tossPricePort, privacyTradePort, orderComputer, cycleStrategies, privacyBaseGuard, orderPort, null);
         priceCapper = new BuyOrderPriceCapper(

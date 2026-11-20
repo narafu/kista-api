@@ -8,6 +8,7 @@ import com.kista.tradingcore.trading.domain.model.*;
 import com.kista.tradingcore.matching.domain.model.*;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
+import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.trading.application.port.output.*;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.trading.application.event.MarketClosedEvent;
@@ -40,7 +41,7 @@ class TradingService {
     private final MarketCalendarPort marketCalendarPort;        // 미국 시장 개장일 확인 (DB 캐시)
     private final ApplicationEventPublisher eventPublisher;    // 관리자·사용자 알림 이벤트 발행 (오류·휴장·잔고부족)
     private final OrderPort orderPort;                         // 계획 주문 저장·조회
-    private final TradingPriceFetcher priceFetcher;            // 가격 일괄 조회 + 단건 fallback
+    private final TradingPriceFetcher priceFetcher;            // 계좌별 현재가 + 공용 시세 전일·확정 종가 조회
     private final TradingOrderExecutor orderExecutor;          // BUY 가격 보정 + 증권사 접수
     private final TradingReporter reporter;                    // 체결 조회 + 이력 저장 + 알림
     private final MarketEventNotifier marketEventNotifier;    // 장 이벤트 알림 (개장·마감 사용자 알림)
@@ -53,7 +54,6 @@ class TradingService {
     private final PrivacyBaseGuard privacyBaseGuard;           // PRIVACY 기준표 장전 점검 — 이슈 시 신규 PRIVACY 주문 생성 차단
     private final CycleOrderStrategies cycleOrderStrategies;   // 리포트 재개 대상 판정 — 주문 0건이어도 롤오버 판정이 필요한 전략(VR)
     private final CyclePositionPort cyclePositionPort;       // 리포트 직전 최신 포지션 재조회 — 계획~리포트 사이 append된 스냅샷 보존
-    private final PriceSourceComparison priceComparison;       // 14 T2 시세 출처 병행 비교 로그(임시, T3에서 삭제)
     private final Clock clock;                                 // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 증권사 접수 결과: 사이클 상태 + 접수된 주문 목록
@@ -115,7 +115,6 @@ class TradingService {
 
         // 시작 시점 현재가 + 전일종가 + 기준 매매표(PRIVACY) 일괄 조회 (0회차 진입 방향 판단에 모두 필요)
         TradingPriceFetcher.PriceContext priceCtx = screenPrivacyBase(priceFetcher.loadPriceContext(started, today), today, "마감 배치");
-        priceComparison.afterLoad(started, priceCtx, usSessionDate(today)); // 병행 비교 로그 — 배치 결과에 쓰지 않는다
 
         // 슬롯별 후보 수집·예산 배정 — 누락된 AT_CLOSE 슬롯만 PLANNED로 저장
         List<TradingCandidatePlanner.CycleState> states = candidatePlanner.planAll(started, priceCtx.startPriceSnapshots(), priceCtx.privacyBase(), today);
@@ -153,20 +152,14 @@ class TradingService {
 
         // 확정 종가 조회 + 리포트 — 임계구역
         runState.critical(() -> {
-            // 장 마감 후 확정 종가 일괄 조회 (라이브 현재가 아님 — Toss/MOCK은 일봉 캔들 기반 확정 종가)
-            Map<StrategyTicker, BigDecimal> closingPrices = priceFetcher.fetchClosingPrices(priceCtx.cycleTickers(), today, priceCtx.priceAccount());
-            priceComparison.closes(priceCtx.cycleTickers(), closingPrices, usSessionDate(today));
+            // 장 마감 후 확정 종가 일괄 조회 (라이브 현재가 아님 — 공용 시세의 그 세션 확정 일봉 종가)
+            Map<StrategyTicker, BigDecimal> closingPrices = priceFetcher.fetchClosingPrices(priceCtx.cycleTickers(), today);
             // recordAndNotifyExecutions — 전략별: 체결 조회 + 이력 저장 + 알림
             reportAll(placedStates, closingPrices, today);
             reportPausedStrategies(paused, today);
             checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
             return null;
         });
-    }
-
-    // UsTradeDates.toUsTradeDate와 같은 규칙 — T3에서 이 클래스와 함께 삭제
-    private static LocalDate usSessionDate(LocalDate kstTradeDate) {
-        return kstTradeDate.minusDays(1);
     }
 
     // 활성 전략이 리포트할 게 없는 날의 마무리 — 정지 리포트 대상이 있으면 마감 후 리포트하고 DONE
@@ -196,11 +189,12 @@ class TradingService {
         reportRebuilt(targets, today);
     }
 
-    // 접수 이후 상태를 재구성해 리포트 — 정지 전략·재개 공용, 가격 컨텍스트·확정 종가는 대상 기준으로 조회(기준표 screen 미적용)
+    // 접수 이후 상태를 재구성해 리포트 — 정지 전략·재개 공용, 기준표·확정 종가는 대상 기준으로 조회(현재가 미조회, 기준표 screen 미적용)
     private void reportRebuilt(List<BatchContext> targets, LocalDate today) throws InterruptedException {
-        TradingPriceFetcher.PriceContext priceCtx = priceFetcher.loadPriceContext(targets, today);
-        Map<StrategyTicker, BigDecimal> closingPrices = priceFetcher.fetchClosingPrices(priceCtx.cycleTickers(), today, priceCtx.priceAccount());
-        reportAll(rebuildPlacedStates(targets, priceCtx, today), closingPrices, today);
+        List<StrategyTicker> tickers = targets.stream().map(ctx -> ctx.strategy().ticker()).distinct().toList();
+        PrivacyTradeBase privacyBase = priceFetcher.privacyBaseFor(targets, today);
+        Map<StrategyTicker, BigDecimal> closingPrices = priceFetcher.fetchClosingPrices(tickers, today);
+        reportAll(rebuildPlacedStates(targets, privacyBase, today), closingPrices, today);
     }
 
     // 당일 접수된 적 있는 주문(externalOrderId 보유) — 수동 체결 보정 행(UNKNOWN_LEG)은 포지션을 직접 기록했으므로 제외
@@ -211,14 +205,14 @@ class TradingService {
     }
 
     // 접수 이후 리포트 단계 상태 재구성 — 사전 잔고는 최신 cycle_position, 전략별 실패는 격리
-    private List<CyclePlacedState> rebuildPlacedStates(List<BatchContext> targets, TradingPriceFetcher.PriceContext priceCtx, LocalDate today) throws InterruptedException {
+    private List<CyclePlacedState> rebuildPlacedStates(List<BatchContext> targets, PrivacyTradeBase privacyBase, LocalDate today) throws InterruptedException {
         List<CyclePlacedState> placedStates = new ArrayList<>();
         for (BatchContext ctx : targets) {
             batchGuard.runSafely("리포트 재개 준비", ctx, () -> placedStates.add(new CyclePlacedState(
                     new TradingCandidatePlanner.CycleState(ctx,
                             balanceLoader.loadBalanceOrThrow(ctx.strategy()),
                             null, null, null,
-                            priceCtx.privacyBase()), // PRIVACY 외 전략은 CycleState가 비운다
+                            privacyBase), // PRIVACY 외 전략은 CycleState가 비운다
                     // PLACED만 보면 체결 기록(markFilledOrders) 후 포지션 저장 전에 중단된 전략의 주문이 빠져
                     // 체결 없는 포지션이 저장된다 — 상태 무관 당일 접수분을 다시 넘긴다(체결 반영은 브로커 체결 내역 기준이라 재기록 무해)
                     reportableOrders(ctx.strategy().id(), today))));
@@ -264,17 +258,17 @@ class TradingService {
 
     // 전략별: BUY 가격 보정 후 PLANNED → 증권사 접수 (실패 사이클은 격리, 계좌별 동시 상한 내 병렬 실행)
     private List<CyclePlacedState> placeAll(List<TradingCandidatePlanner.CycleState> states, LocalDate today) throws InterruptedException {
-        // 주문 시각 대기 직후 접수 대상 ticker의 현재가를 다시 일괄 조회한다.
+        // 주문 시각 대기 직후 접수 대상의 현재가를 계좌별로 다시 조회한다.
         // states 수집 시점(startPrice)은 waitFor("주문 시각") 대기 시간만큼 stale할 수 있어
-        // BUY cap 판단은 여기서 재조회한 최신가를 우선 사용한다 — ticker당 1회 조회(여러 전략 공유 무관)
-        Map<StrategyTicker, BigDecimal> placementPrices = priceFetcher.reloadPlacementPrices(states);
+        // BUY cap 판단은 여기서 재조회한 최신가를 우선 사용한다 — 계좌당 1회 조회(같은 계좌 전략끼리 공유)
+        Map<PriceKey, BigDecimal> placementPrices = priceFetcher.reloadPlacementPrices(states);
         // groupKey=계좌 id — 같은 계좌 내 사이클끼리만 동시 상한 공유, 다른 계좌는 완전 병렬
         List<TradingParallelRunner.Task<CyclePlacedState>> tasks = states.stream()
                 .map(state -> new TradingParallelRunner.Task<CyclePlacedState>(
                         state.ctx().account().id(),
                         () -> batchGuard.runSafely("증권사 접수", state.ctx(), () -> {
-                            // 재조회 실패(해당 ticker 누락 또는 null)일 때만 시작가로 폴백
-                            BigDecimal placementPrice = Optional.ofNullable(placementPrices.get(state.ctx().strategy().ticker()))
+                            // 재조회 실패(그 계좌·종목 키 누락)일 때만 같은 계좌의 시작가로 폴백
+                            BigDecimal placementPrice = Optional.ofNullable(placementPrices.get(PriceKey.of(state.ctx())))
                                     .orElse(state.startPrice());
                             List<Order> mainOrders = orderExecutor.placeOrders(today,
                                     state.ctx().account(), state.ctx().currentCycle(),
@@ -292,10 +286,7 @@ class TradingService {
                             return new CyclePlacedState(state, mainOrders);
                         })))
                 .toList();
-        List<CyclePlacedState> placed = parallelRunner.runAll(tasks);
-        // 접수가 모두 끝난 뒤 병행 비교 — 비교 호출이 주문을 늦추지 않게 한다
-        priceComparison.current(states.stream().map(TradingCandidatePlanner.CycleState::ctx).toList(), placementPrices);
-        return placed;
+        return parallelRunner.runAll(tasks);
     }
 
     // 전략별: 체결 조회 + 이력 저장 + 알림 (실패 사이클은 격리, 계좌별 동시 상한 내 병렬 실행)
@@ -353,7 +344,6 @@ class TradingService {
 
         // 가격 스냅샷 + PRIVACY 기준 매매표 일괄 조회 (개장 전 현시점, 내일 기준 — FIDA가 미리 송신했을 경우)
         TradingPriceFetcher.PriceContext priceCtx = screenPrivacyBase(priceFetcher.loadPriceContext(started, tradeDate), tradeDate, "개장 배치");
-        priceComparison.afterLoad(started, priceCtx, usSessionDate(tradeDate)); // 병행 비교 로그 — 배치 결과에 쓰지 않는다
 
         // 개장 시각까지 대기 — 이 시점 인터럽트 시 contexts 전부가 미처리 — 사용자 알림 대상 (재기동 종료면 재개되므로 제외)
         try {
@@ -391,12 +381,12 @@ class TradingService {
                 .toList();
         if (placeableStates.isEmpty()) return;
 
-        // 개장 시각 대기(waitUntilMarketOpen) 이후 접수 대상 ticker의 현재가를 다시 일괄 조회한다.
-        // AT_CLOSE 접수(placeAll)의 reloadPlacementPrices와 동일한 staleness 우려 — ticker당 1회 조회
-        Map<StrategyTicker, BigDecimal> placementPrices = priceFetcher.reloadPlacementPrices(placeableStates);
+        // 개장 시각 대기(waitUntilMarketOpen) 이후 접수 대상의 현재가를 계좌별로 다시 조회한다.
+        // AT_CLOSE 접수(placeAll)의 reloadPlacementPrices와 동일한 staleness 우려 — 계좌당 1회 조회
+        Map<PriceKey, BigDecimal> placementPrices = priceFetcher.reloadPlacementPrices(placeableStates);
         for (TradingCandidatePlanner.CycleState state : placeableStates) {
             batchGuard.runSafely("개장 주문 접수", state.ctx(), () -> {
-                BigDecimal placementPrice = Optional.ofNullable(placementPrices.get(state.ctx().strategy().ticker()))
+                BigDecimal placementPrice = Optional.ofNullable(placementPrices.get(PriceKey.of(state.ctx())))
                         .orElse(state.startPrice());
                 // 개장 시점에는 AT_OPEN 슬롯의 PLANNED 주문만 즉시 증권사에 접수한다 — BUY cap 보정은 orderExecutor가 AT_OPEN 스코프로 적용
                 orderExecutor.placeAtOpenOrders(tradeDate, state.ctx().account(), state.ctx().currentCycle(),
@@ -404,8 +394,6 @@ class TradingService {
                 return null;
             });
         }
-        // 접수가 모두 끝난 뒤 병행 비교 — 비교 호출이 주문을 늦추지 않게 한다
-        priceComparison.current(placeableStates.stream().map(TradingCandidatePlanner.CycleState::ctx).toList(), placementPrices);
     }
 
     // 지정 시각까지 대기 — DST 정보 로깅 후 sleep(종료 요청 시 즉시 중단), 도달 로그

@@ -128,7 +128,7 @@ class TradingCandidatePlannerDcaTest {
     }
 
     private List<TradingCandidatePlanner.CyclePlanCandidate> collectOpen() throws Exception {
-        return wiredPlanner().collectOpenCandidates(List.of(ctx), Map.of(StrategyTicker.UPRO, new PriceSnapshot(PREMARKET, REFERENCE)), null, DAY);
+        return wiredPlanner().collectOpenCandidates(List.of(ctx), Map.of(PriceKey.of(ctx), new PriceSnapshot(PREMARKET, REFERENCE)), null, DAY);
     }
 
     @Test

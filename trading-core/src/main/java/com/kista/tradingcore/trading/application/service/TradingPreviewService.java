@@ -58,7 +58,7 @@ class TradingPreviewService {
     private final CyclePositionPort cyclePositionPort; // 원장 잔여 계산용 최신 포지션 일괄 조회
     private final StrategyOrderPlanBuilder planBuilder;
     private final StrategyLedgerBudget ledgerBudget; // 배치·수동실행과 같은 전략 원장 상한 판정
-    private final TradingPriceFetcher priceFetcher; // 배치 미리보기 전일종가 일괄 조회(getPrevCloses) + 단건 fallback
+    private final TradingPriceFetcher priceFetcher; // 배치 미리보기 전일종가 일괄 조회(공용 시세)
     private final MarginPort marginPort; // 계좌 실제 주문가능 USD 조회 — 경고 전용, 매매 판정에는 쓰지 않는다
     private final SellableQuantityPort sellableQuantityPort; // 종목 실제 판매 가능 수량 조회 — 경고 전용, 매매 판정에는 쓰지 않는다
     private final MarketCalendarPort marketCalendarPort; // 휴장 거래일 판정 — 미리보기 today 기준 1회
@@ -118,13 +118,13 @@ class TradingPreviewService {
         cyclesByStrategyId.forEach((strategyId, cycle) -> todayOrdersByStrategyId.put(strategyId,
                 ordersByCycleId.getOrDefault(cycle.id(), List.of())));
 
-        // 계좌 내 종목별 전일종가를 1회 일괄 조회(multprice) — 전략마다 개별 시세 왕복을 생략
+        // 계좌 내 종목별 전일종가를 공용 시세에서 1회 일괄 조회 — 전략마다 개별 시세 왕복을 생략
         List<StrategyTicker> tickers = strategies.stream()
                 .filter(s -> cyclesByStrategyId.containsKey(s.id()) && !marketClosed)
                 .map(Strategy::ticker)
                 .distinct()
                 .toList();
-        Map<StrategyTicker, BigDecimal> prevCloseCache = tickers.isEmpty() ? Map.of() : priceFetcher.fetchPrevCloses(tickers, account.brokerRef());
+        Map<StrategyTicker, BigDecimal> prevCloseCache = tickers.isEmpty() ? Map.of() : priceFetcher.fetchPrevCloses(tickers);
 
         // 계좌 내 당일 PLANNED BUY 합계 — accountId+today로만 결정되는 값(전략 무관)이라 1회만 조회해 재사용
         BigDecimal totalAccountPlannedBuy = orderPort.sumPlannedBuyByAccountAndDate(accountId, today);
