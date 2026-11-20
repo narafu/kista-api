@@ -31,8 +31,8 @@ Gradle 서브프로젝트 3개, 산출물 `app.jar` 하나, 배포 role 2개(`ki
 | `:shared` | 공용 어휘(sharedkernel)·내부 API wire 계약(contract)·인프라(platform) |
 
 - `KISTA_ROLE`(web·worker·all)이 한 jar의 역할을 가른다 — worker는 매매 엔진·배치·스케쥴러 수동 트리거, web은 그 외 HTTP. role과 맞지 않는 요청은 `RoleRoutingGuard`가 503 `WRONG_ROLE`로 거절한다.
-- `:api`와 `:trading-core`는 서로의 main 코드를 참조하지 않는다 — 내부 HTTP API·Redis로만 통신하고, wire 타입은 `:shared`의 `com.kista.shared.contract`를 공유한다.
-- 각 모듈 내부는 Hexagonal(`adapter → application → domain`) 구조다. 레이어 방향은 `HexagonalArchitectureTest`, 모듈 경계는 프로세스별 `ModulithArchitectureTest`(`ApplicationModules.verify()` — api·trading-core 각 1개), Gradle 방향과 서브프로젝트별 루트 패키지(`com.kista.api`/`com.kista.tradingcore`/`com.kista.shared`)는 `GradleModuleBoundaryTest`가 빌드 시 강제한다.
+- `:api`는 `:trading-core`에 의존하지만 `:trading-core`는 `:api`를 참조하지 않는다(역방향 금지). 모듈 사이 wire 타입은 `:shared`의 `com.kista.shared.contract`가 선언하고, web→worker 호출은 내부 HTTP API(`/api/internal/**`)를 쓴다.
+- 각 모듈 내부는 Hexagonal(`adapter → application → domain`) 구조다. 레이어 방향은 `HexagonalArchitectureTest`, 모듈 경계는 `ModulithArchitectureTest`(`ApplicationModules.verify()` — 모델 하나), Gradle 방향과 서브프로젝트별 루트 패키지(`com.kista.api`/`com.kista.tradingcore`/`com.kista.shared`)는 `GradleModuleBoundaryTest`가 빌드 시 강제한다.
 
 구조 그림은 [`docs/architecture-map.md`](docs/architecture-map.md), 모듈·흐름·생명주기 인터랙티브 맵은 `./gradlew :test --tests '*ArchitectureMapTest'` 후 `build/architecture-map/index.html`.
 
@@ -45,7 +45,7 @@ docker compose up -d postgres redis                          # DB·Redis
 ```
 
 - 로컬 설정은 `src/main/resources/application-local.yml`(gitignored) — 필수 환경변수·키 목록은 [`CLAUDE.md`](CLAUDE.md) "환경 설정"
-- root + trading-core 2-프로세스 동시 기동, dev 토큰 발급, 시드 데이터 → [`docs/agents/commands.md`](docs/agents/commands.md)
+- 로컬 기동(`KISTA_ROLE`로 web·worker), dev 토큰 발급, 시드 데이터 → [`docs/agents/commands.md`](docs/agents/commands.md)
 
 ## 배포
 

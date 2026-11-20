@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 메리츠증권·토스증권 API 기반 해외주식 자동 분할매매 서비스.
-Java 25 + Spring Boot 4, Hexagonal Architecture + Spring Modulith, Gradle 서브프로젝트 `:api`·`:trading-core`·`:shared`(루트 패키지 `com.kista.api`·`com.kista.tradingcore`·`com.kista.shared`). 모듈 목록은 `docs/agents/architecture.md`가 SSOT. 이 파일은 진입점이고 공통 지식은 `docs/agents/`에 둔다.
+Java 25 + Spring Boot 4, Hexagonal Architecture + Spring Modulith, Gradle 서브프로젝트 `:api`·`:trading-core`·`:shared`(루트 패키지 `com.kista.api`·`com.kista.tradingcore`·`com.kista.shared`). 모듈 목록은 `docs/agents/architecture.md`가 SSOT.
 
 ## 코드 철학
 
@@ -23,7 +23,7 @@ Java 25 + Spring Boot 4, Hexagonal Architecture + Spring Modulith, Gradle 서브
 
 빌드·실행·테스트 명령은 `docs/agents/commands.md`(자동 로드).
 
-필수 환경변수(누락·빈값이면 기동 실패): `JWT_SIGNING_KEY`, `AES_ENCRYPTION_KEY`, `INTERNAL_API_TOKEN`, `TELEGRAM_BOT_TOKEN`·`TELEGRAM_CHAT_ID`(root·trading-core 공통), `KAKAO_CLIENT_ID`(root만), `CORS_ALLOWED_ORIGINS`(쉼표 구분 — root는 항상, trading-core는 prod만). 선택: `ADMIN_KAKAO_IDS`(로그인 시 ADMIN 자동 승격 seed), `INTERNAL_API_BASE_URL`(root→trading-core, 기본 `http://localhost:8081`). 운영 키 목록의 원본은 `.env.example`.
+필수 환경변수(누락·빈값이면 기동 실패): `JWT_SIGNING_KEY`, `AES_ENCRYPTION_KEY`, `INTERNAL_API_TOKEN`, `TELEGRAM_BOT_TOKEN`·`TELEGRAM_CHAT_ID`, `KAKAO_CLIENT_ID`, `CORS_ALLOWED_ORIGINS`(쉼표 구분). 선택: `ADMIN_KAKAO_IDS`(로그인 시 ADMIN 자동 승격 seed), `INTERNAL_API_BASE_URL`(web→worker 내부 API, 기본 `http://localhost:8080`). 운영 키 목록의 원본은 `.env.example`.
 
 로컬: `src/main/resources/application-local.yml`(.gitignored) — `jwt.signing-key` EC JWK, `spring.datasource.*`, `kakao.*` 필수
 

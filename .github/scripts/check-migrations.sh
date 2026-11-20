@@ -4,7 +4,7 @@
 # 사용: check-migrations.sh [base-ref]
 #   1) 적용 이력 불변: base-ref가 주어지면 base-ref..HEAD 사이에 기존 마이그레이션 파일(양 서비스)이 수정·삭제·이름변경됐는지 검사.
 #      이미 적용된 파일이 바뀌면 Flyway 체크섬 불일치로 기동 즉시 크래시한다(운영 사고 이력 — constraints.md "Flyway").
-#   2) root expand/contract: kista-api·kista-scheduler가 독립 배포라 root(db/migration) 마이그레이션은 직전 이미지와 호환돼야 한다.
+#   2) root expand/contract: kista-web·kista-worker가 role별 순차 교체라 root(db/migration) 마이그레이션은 직전 이미지와 호환돼야 한다.
 #      DROP TABLE·DROP COLUMN·RENAME·SET NOT NULL·ALTER COLUMN TYPE·DEFAULT 없는 NOT NULL 컬럼 추가를 금지한다.
 #      두 role을 같은 커밋에서 함께 배포하는 의도적 contract 단계면 파일에 `-- contract-ok: <사유>` 주석으로 예외 표시.
 #      V1__init.sql은 스쿼시 baseline이라 제외. trading-core(db/migration-trading)는 단일 프로세스 소유라 대상 아님.

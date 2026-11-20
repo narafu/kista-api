@@ -3,7 +3,7 @@
 ### 네이밍·구성
 - 단위 `*Test`, 통합 `*IT` + Docker 필요 테스트는 `@Tag("integration")`(`./gradlew integration`)
 - 지원 코드: `:shared` testFixtures(`DataJpaTestBase`/`WebMvcTestSupport`/`application-test.yml`), trading-core `TradingFixtures`·`StubBrokerApiException`, 루트 `DomainFixtures`(User). 루트 테스트는 `:shared` testFixtures에만 의존한다(trading-core testFixtures 금지)
-- 슬라이스 테스트(`@DataJpaTest`/`@WebMvcTest`)는 상향 탐색으로 앱 클래스를 찾으므로 `@ContextConfiguration`을 쓰지 않는다. trading-core 테스트는 테스트 전용 `TradingApplication`(`trading-core/src/test`)과 테스트 yml(`trading-core/src/test/resources/application.yml` — trading 스키마·이력·EPR·락 테이블)로 뜬다. persistence 테스트는 전부 `DataJpaTestBase`를 상속한다(`RootDataJpaTestBase` 없음). 예외: trading-core `SchedulerLockService{Test,DbTest}`(패키지가 `com.kista.shared.platform.scheduling`이라 `@ContextConfiguration(classes = TradingApplication.class)`)
+- 슬라이스 테스트(`@DataJpaTest`/`@WebMvcTest`)는 상향 탐색으로 앱 클래스를 찾으므로 `@ContextConfiguration`을 쓰지 않는다. trading-core 테스트는 테스트 전용 `TradingApplication`·`application.yml`(`trading-core/src/test`, trading 스키마·이력만)로 뜬다. 예외: trading-core `SchedulerLockService{Test,DbTest}`(패키지가 `com.kista.shared.platform.scheduling`이라 `@ContextConfiguration(classes = TradingApplication.class)`)
 - `:shared` 빈은 `PlatformAutoConfiguration`이 올린다. `@WebMvcTest`는 `JwtAuthFilter`/`InternalTokenAuthFilter`가 필요하면 `@Import`하고, 보안이 필요 없는 자체 `@EnableAutoConfiguration` 테스트는 `PlatformAutoConfiguration`을 exclude한다(예: `HousingBenchmarkApiDocsTest`)
 - Clock: `DataJpaTestBase`가 `FixedClockTestConfig`(고정 KST)를 포함한다. `@WebMvcTest`는 필요하면 `@Import(FixedClockTestConfig.class)`
 - ArchUnit `failOnEmptyShould=true` — 규칙 대상이 비면 실패한다
@@ -22,7 +22,7 @@
 - `ArgumentCaptor<Map>`(raw) + `any()`는 concurrent 모드에서 오작동 → `ArgumentCaptor.forClass(Map.class)` + `@SuppressWarnings("unchecked")`
 
 ### 테스트 DB
-docker-compose 로컬 PostgreSQL(`localhost:5432/kistadb_test`)에 직접 연결한다(Testcontainers 아님, `docker compose up -d postgres` 선행). `integration` 태스크(`*IT`, 행을 커밋하고 teardown으로 지움)는 `kistadb_it` 별도 DB — 최초 1회 `docker exec <postgres> psql -U kista -d kistadb -c "CREATE DATABASE kistadb_it OWNER kista;"`. 실제 증권사 API 통합 테스트(`*LiveIT`)는 실전계좌로 돈다. 루트·trading-core persistence 테스트는 모두 `DataJpaTestBase`(Flyway는 `KistaFlywayConfig`가 `kista.flyway.migrations` 순서대로 migrate)를 상속한다. trading-core `test` 태스크의 `workingDir`은 `rootProject.projectDir`.
+docker-compose 로컬 PostgreSQL(`localhost:5432/kistadb_test`)에 직접 연결한다(Testcontainers 아님, `docker compose up -d postgres` 선행). `integration` 태스크(`*IT`, 행을 커밋하고 teardown으로 지움)는 `kistadb_it` 별도 DB — 최초 1회 `docker exec <postgres> psql -U kista -d kistadb -c "CREATE DATABASE kistadb_it OWNER kista;"`. 실제 증권사 API 통합 테스트(`*LiveIT`)는 실전계좌로 돈다. persistence 테스트는 모두 `DataJpaTestBase`를 상속한다(Flyway는 `KistaFlywayConfig`가 `kista.flyway.migrations` 순서로 migrate). trading-core `test` 태스크의 `workingDir`은 `rootProject.projectDir`.
 - `*JpaRepository`는 package-private이라 FK 선행 행은 `@Autowired JdbcTemplate`으로 삽입하고 `@Transactional` 롤백을 쓴다. `users`는 root `public`이라 루트 테스트에서만, trading-core는 `accounts`부터 삽입한다(`accounts.user_id`에 FK 없음). 순서는 `OrderPersistenceAdapterDbTest`·`UserSettingsPersistenceAdapterIT` 참고
 
 ### JPA·record

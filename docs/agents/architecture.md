@@ -1,11 +1,11 @@
 ## 아키텍처
 
 ### Gradle 구조
-서브프로젝트 셋: `:trading-core`(매매 실행 — trading/matching/broker/account/privacy/marketcalendar 등), `:shared`(kernel/contract/platform — outbound-zero 공용 어휘·wire 계약·인프라 leaf), 루트 `:api`(그 외, bootJar 하나). 루트는 `:trading-core`·`:shared`에, `:trading-core`는 `:shared`에 `implementation` 의존한다(`:trading-core`는 bootJar 없음 — 라이브러리 jar).
-- 앱 클래스는 `ApiApplication` 하나다(한 애플리케이션 컨텍스트, `kista.role`로 kista-web·kista-worker). `scanBasePackages`·`@AutoConfigurationPackage`로 `com.kista.api`·`com.kista.tradingcore`를 스캔하고 shared 빈은 `PlatformAutoConfiguration`이 올린다. trading-core → api 컴파일 의존은 금지다. 모듈 간 wire 타입은 `com.kista.shared.contract`가 선언한다. trading-core 테스트는 테스트 전용 `TradingApplication`(`trading-core/src/test`)으로 뜬다
-- 서브프로젝트마다 자기 루트 패키지(`com.kista.api`·`com.kista.tradingcore`·`com.kista.shared`) 아래에만 클래스를 둔다(가드: `GradleModuleBoundaryTest` — 역방향 의존 금지 포함. 컨텍스트 로드는 `ApplicationContextLoadTest`)
+서브프로젝트 셋: `:trading-core`(매매 실행 — trading/matching/broker/account/privacy/marketcalendar 등), `:shared`(kernel/contract/platform — outbound-zero 공용 어휘·wire 계약·인프라 leaf), 루트 `:api`(그 외, bootJar 하나). 루트는 `:trading-core`·`:shared`에, `:trading-core`는 `:shared`에 `implementation` 의존한다(`:trading-core` bootJar 없음).
+- 앱 클래스는 `ApiApplication` 하나다(한 애플리케이션 컨텍스트, `kista.role`로 kista-web·kista-worker). `com.kista.api`·`com.kista.tradingcore`를 스캔하고 shared 빈은 `PlatformAutoConfiguration`이 올린다. trading-core → api 컴파일 의존은 금지다. 모듈 간 wire 타입은 `com.kista.shared.contract`가 선언한다
+- 서브프로젝트는 자기 루트 패키지 아래에만 클래스를 둔다(가드: `GradleModuleBoundaryTest` — 역방향 의존 금지 포함. 컨텍스트 로드는 `ApplicationContextLoadTest`)
 
-Hexagonal Architecture(Port & Adapter) + Spring Modulith 애그리게이트 모듈. 레이어 방향은 `HexagonalArchitectureTest`, 모듈 경계는 `ModulithArchitectureTest`(모델 하나 — `ApplicationModules.of(ApiApplication.class)`)(`ApplicationModules.verify()`)가 빌드에서 강제한다. 클래스·필드 상세는 코드가 SSOT다.
+Hexagonal Architecture(Port & Adapter) + Spring Modulith 애그리게이트 모듈. 레이어 방향은 `HexagonalArchitectureTest`, 모듈 경계는 `ModulithArchitectureTest`(`ApplicationModules.of(ApiApplication.class).verify()`)가 빌드에서 강제한다.
 
 ### DB 스키마 5분리
 소유 서비스별 5개 — root: `public`·`finance`·`kista_ref`, trading-core: `trading`·`trading_ref`. 신규 테이블은 소유 서비스 기준으로 Entity에 `@Table(schema=...)`를 명시한다(public도 — search_path 첫 스키마가 root는 `finance`, trading은 `trading`이라 생략하면 validate 실패). 다른 서비스 소유 스키마 테이블은 FK 포함 참조 금지. 소유 표·search_path → `flyway.md`.
@@ -42,7 +42,7 @@ shared 외 모듈은 전부 CLOSED. 모듈 문서 경로는 `modules/api/<ID>.md
 ### Spring Modulith 모듈 구성
 모듈 모델은 하나다(`ApplicationModules.of(ApiApplication.class)`, `@Modulithic(additionalPackages = {"com.kista.shared", "com.kista.tradingcore"})`). 감지 전략은 `explicitly-annotated`라 **새 모듈은 `package-info`의 `@ApplicationModule(id = ...)`를 반드시 지정**하고 ID는 전체에서 고유해야 한다(trading-core 알림·앱셸은 `trading-notify`·`trading-web`). 문서에서는 패키지 기준 `api.notify`/`tradingcore.notify`처럼 쓴다.
 
-모듈 간 참조는 상대 모듈이 공개한 NamedInterface(도메인 타입 또는 own-type projection)만 거친다. 한 컨텍스트라 EPR 이벤트가 모듈 사이로 그대로 전달된다(`public.event_publication`). 체결 푸시(`stream:user.push-notification.requested`)·`trade.event` Pub/Sub 같은 Redis 경로는 web·worker 인스턴스 사이 전달용으로 남는다.
+모듈 간 참조는 상대 모듈이 공개한 NamedInterface(도메인 타입 또는 own-type projection)만 거친다. 한 컨텍스트라 EPR 이벤트가 모듈 사이로 그대로 전달된다(`public.event_publication`). 체결 푸시(`stream:user.push-notification.requested`)·`trade.event` Pub/Sub 같은 Redis 경로만 web·worker 사이 전달용으로 남는다.
 
 ### 웹 계층 공통
 - 컨트롤러는 `@AuthenticationPrincipal UUID userId`로 주입한다. `SecurityContextHolder` 수동 호출 금지

@@ -41,7 +41,7 @@ Caddy 라우팅 스니펫(`deploy/server/caddy/kista-api.caddy`)은 이 디렉�
 
 1. `plan` 잡 — 기준점은 kista-infra `state/kista-api.yml`(마지막 서버 적용 성공 상태). role별 `state SHA..이 커밋` diff를 `detect-deploy-scope.sh`로 분류해 바뀐 role만 이 커밋 SHA로, `deploy/server/**`·`deploy/hooks/**`가 바뀌면 `config`도 이 커밋으로(이미지 재빌드 없이 compose·Caddy만 재적용). state보다 옛 커밋(옛 run Re-run)이면 아무것도 하지 않는다. 수동 실행은 config·전 role을 이 커밋으로
 2. `deploy-checks` — 배포 판정 스크립트·hook shellcheck·bats(`compose-invariants.bats` 포함) + Flyway 마이그레이션 검사
-3. `verify`(전체 테스트 + `integration`, ArchUnit·`CaddyRoutingTest` 포함)와 이미지 빌드(role 변경 시만, 3 role 공용 단일 이미지, SHA 태그)가 병렬
+3. `verify`(전체 테스트 + `integration`, ArchUnit·`CaddyRoutingTest` 포함)와 이미지 빌드(role 변경 시만, kista-web·kista-worker 공용 단일 이미지, SHA 태그)가 병렬
 4. `deploy` — kista-infra에 `repository_dispatch(deploy)`로 `{app, config, roles(전 role SHA), sha(이 커밋), force}`를 보내고 끝난다(대기 없음). 서버 적용·헬스 게이트 결과는 kista-infra `reconcile.yml`이 이 커밋의 commit status `deploy/production`(pending → success/failure, `target_url`은 infra run)으로 되돌려 쓴다 — 워크플로 run의 초록불은 "요청 전송 완료"이고 배포 완료는 커밋 status로 본다
 5. kista-infra `Reconcile App` — SHA·이미지 검증 → state와 신선도 병합 → config SHA로 bundle 구성 → `deploy/hooks/pre-apply.sh`(EPR 고아 검사 — kista-worker 이미지가 바뀔 때, `docs/agents/docker-infra.md` "배포 직전 EPR 정리 런북") → 서버 `reconcile.sh`:
    - `deploy/server/roles` 순서(kista-worker → kista-web)로 `docker compose up -d --no-deps <role>` — compose config-hash가 같으면 재생성하지 않는다

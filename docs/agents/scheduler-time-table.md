@@ -1,8 +1,8 @@
 # 배치 스케줄러 시간표
 
 이 문서는 각 모듈 `adapter/in/schedule` 패키지의 배치 실행 시점을 정리한다.
-스케쥴러 빈은 `kista.role`이 `worker`·`all`(`@ConditionalOnWorkerRole`, env `KISTA_ROLE`)일 때만 등록되며 프로세스별로 갈린다 — 매매(TradingOpen/Close)·캘린더 스케쥴러는 `:trading-core`라 `kista-trading`에서, 나머지(KB Land·시세·finance·토큰 정리)는 root `app.jar`의 `kista-scheduler`에서 실행된다.
-`kista-api`는 `KISTA_ROLE=web`이라 어느 스케쥴러도 등록하지 않는다(`deploy/server/docker-compose.yml`).
+스케쥴러 빈은 `kista.role`이 `worker`·`all`(`@ConditionalOnWorkerRole`, env `KISTA_ROLE`)일 때만 등록된다 — 운영에서는 매매·캘린더·KB Land·시세·finance·토큰 정리 전부 `kista-worker` 한 컨테이너에서 실행된다.
+`kista-web`은 `KISTA_ROLE=web`이라 어느 스케쥴러도 등록하지 않는다(`deploy/server/docker-compose.yml`).
 모든 시각은 `KST` 기준이다.
 
 ## 거래 관련
@@ -13,7 +13,7 @@
 | 마감 매매 스케쥴러 | 실제 마감 30분 전 1회 예약 (정규장 DST 04:30·비DST 05:30, 조기 마감일 02:30/03:30 등) | 3h | 마감용 주문 생성 및 실행. cron이 아니라 `TaskScheduler` 1회 예약 — 개장 스케쥴러(22:00)가 다음 거래일분을 등록하고 기동 시 `TradingBatchResumer`가 재등록. 마감 시각은 `trading_ref.us_market_sessions`(Alpaca `close`). 휴장일은 22:00 개장 스케쥴러가 개장·마감 heartbeat를 대신 핑 |
 | 마감 예약 보정 (`TradingCloseScheduler#reconcile`) | 매시 05분 KST | — | 오늘·내일 마감 예약 누락 재등록, 캘린더 갱신으로 마감 시각이 바뀐 예약 취소 후 재등록 (지난 예약 시각은 조용히 건너뜀) |
 | 마감 하트비트 슬롯 (`TradingCloseScheduler#pingHeartbeatSlot`) | 화~토 04:30 KST | — | healthchecks.io 마감 체크(cron `30 4 * * 2-6`, grace 2h)용. 오늘이 휴장일(세션 없음)이거나 마감 배치가 이미 `DONE`(조기 마감일 — 02:30대 핑 뒤 04:30을 기대)일 때만 `pingClose`. 정상 거래일은 배치 완료 핑에 맡기고, 세션 조회 실패는 핑을 생략해 알림으로 드러낸다 |
-| API 키 만료 점검 (`kista-trading`) | 매일 10:00 KST | 30m | 만료 30·7·0일 전 알림 이벤트 발행 |
+| API 키 만료 점검 | 매일 10:00 KST | 30m | 만료 30·7·0일 전 알림 이벤트 발행 |
 
 ## 시세 및 지수
 
@@ -53,11 +53,11 @@
 
 ## Redis Stream 복구 (cron 아님)
 
-`RedisStreamSubscriber` 서브클래스(`PushNotificationStreamConsumer` 하나)의 `@Scheduled(fixedDelay = 5분)`이 끊긴 구독 재기동 + pending XCLAIM 복구를 한다. `@ConditionalOnWorkerRole` 게이팅이 없어 각 프로세스(role)마다 동작한다.
+`RedisStreamSubscriber` 서브클래스(`PushNotificationStreamConsumer` 하나)의 `@Scheduled(fixedDelay = 5분)`이 끊긴 구독 재기동 + pending XCLAIM 복구를 한다. `@ConditionalOnWorkerRole` 게이팅이 없어 web·worker 모두에서 동작한다.
 
 ## 참고
 
-- 모든 스케줄러는 `kista.role`이 worker·all일 때만 동작한다 — 운영에서는 `kista-scheduler`·`kista-trading` 컨테이너만 worker다(Stream 복구 제외).
+- 모든 스케줄러는 `kista.role`이 worker·all일 때만 동작한다 — 운영에서는 `kista-worker` 컨테이너만 worker다(Stream 복구 제외).
 - 거래 스케줄러는 cron 시간 외에 내부 대기 로직을 추가로 가질 수 있다.
 - 실제 운영 흐름은 [docs/agents/workflow.md](workflow.md)도 함께 보면 된다.
 

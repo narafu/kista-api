@@ -4,10 +4,10 @@
 
 | 레벨 | 질문 | 위치 |
 |---|---|---|
-| L0 시스템 컨텍스트 | 어떤 프로세스와 외부 시스템이 있나 | 아래 L0 |
+| L0 시스템 컨텍스트 | 어떤 role·외부 시스템이 있나 | 아래 L0 |
 | L0-1 배포 구성 | 어떤 컨테이너·네트워크·볼륨에 어떻게 배포되나 | 아래 L0-1 |
 | L1 빌드·스키마 경계 | 어느 모듈이 어느 jar·DB 스키마 소속인가 | 아래 L1 |
-| L1.5 프로세스 간 통신 | root ↔ trading-core는 무엇으로 대화하나 | 아래 L1.5 |
+| L1.5 role 간 통신 | web ↔ worker는 무엇으로 대화하나 | 아래 L1.5 |
 | L2 모듈 의존 그래프 | 모듈끼리 누가 누구를 참조하나 | **자동 생성** — 아래 L2 |
 | 업무 흐름 맵 | 무엇이 계기가 되어 어떤 순서로 어디까지 가나·하루에 언제 무엇이 도나 | **반자동 생성** — 아래 "아키텍처 맵" |
 
@@ -20,9 +20,8 @@ flowchart TB
 
     subgraph OCI["OCI kista-api-server · docker-compose"]
         CADDY["Caddy<br/>HTTPS 종료 · 경로 라우팅"]
-        API["kista-api<br/>app.jar · blue/green"]
-        SCH["kista-scheduler<br/>app.jar · 비매매 스케쥴러"]
-        TRD["kista-trading<br/>trading-core.jar · 매매 배치 + HTTP"]
+        WEB["kista-web<br/>app.jar · role web · blue/green"]
+        WRK["kista-worker<br/>app.jar · role worker · 매매 배치 + 스케쥴러 + 엔진 HTTP"]
         PG[("PostgreSQL<br/>kistadb")]
         RD[("Redis")]
     end
@@ -39,19 +38,16 @@ flowchart TB
 
     UI --> CADDY
     FIDA -->|"/api/internal/fida-orders"| CADDY
-    CADDY -->|"/api/admin/scheduler/**"| SCH
-    CADDY -->|"@trading 경로<br/>accounts · orders · trading-cycles · stats/summary …"| TRD
-    CADDY -->|"그 외 전부"| API
+    CADDY -->|"@scheduler · @trading 경로<br/>admin/scheduler · accounts · orders · trading-cycles · stats/summary …"| WRK
+    CADDY -->|"그 외 전부"| WEB
 
-    API -->|"/api/internal/** · X-Internal-Token"| TRD
-    API & SCH & TRD <--> RD
-    API & SCH --> PG
-    TRD --> PG
+    WEB -->|"/api/internal/** · X-Internal-Token"| WRK
+    WEB & WRK <--> RD
+    WEB & WRK --> PG
 
-    %% 외부 API를 맨 아래 한 줄에 놓으려고 화살표 길이(-)로 rank를 맞춘다: API·SCH는 rank 2, TRD는 rank 3
-    TRD ---> TOSS & ALPACA & TG
-    API ----> KAKAO & FCM & TG
-    SCH ----> KB & FG & ALPACA & TG
+    %% 외부 API를 맨 아래 한 줄에 놓으려고 화살표 길이(-)로 rank를 맞춘다
+    WRK ---> TOSS & ALPACA & TG & KB & FG
+    WEB ---> KAKAO & FCM & TG
 ```
 
 - 라우팅 SSOT: `deploy/server/caddy/kista-api.caddy` (`CaddyRoutingTest`가 컨트롤러 경로와 대조)
@@ -59,18 +55,18 @@ flowchart TB
 
 ## L0-1 배포 구성
 
-L0을 컨테이너·네트워크·볼륨·배포 경로 수준으로 펼친 그림이다. 소유 레포가 셋으로 갈린다 — `kista-infra`(caddy·postgres·redis·네트워크·시크릿·reconcile), `kista-api`(앱 3 role compose + API 도메인 라우팅 스니펫), `kista-ui`(UI compose).
+L0을 컨테이너·네트워크·볼륨·배포 경로 수준으로 펼친 그림이다. 소유 레포가 셋으로 갈린다 — `kista-infra`(caddy·postgres·redis·네트워크·시크릿·reconcile), `kista-api`(앱 2 role compose + API 도메인 라우팅 스니펫), `kista-ui`(UI compose).
 
 ### 호스트·컨테이너·네트워크 (kista-infra README)
 
 컨테이너·네트워크·Caddy 라우팅 그림은 kista-infra [`README.md` 배포 구성도](https://github.com/narafu/kista-infra/blob/main/README.md#배포-구성도)(private, 손으로 관리)가 원본이다. 여기서 다시 그리지 말고 그쪽을 본다.
 
 그림에 없는 의미 정보:
-- **role 구분**: 같은 `app.jar`라도 `KISTA_ROLE`로 갈린다 — kista-api는 `web`(HTTP 전용), kista-scheduler는 `worker`(비매매 스케쥴러). kista-trading은 `trading-core.jar`(`APP_JAR`)로 매매 배치 + HTTP
-- **EPR 재발행 소유**: kista-scheduler = `public.event_publication`, kista-trading = `trading.event_publication`, kista-api는 재발행 안 함(둘 다 true면 이중 claim)
-- **교체 방식**: blue/green은 bundle `bluegreen` 파일의 kista-api·kista-ui만. kista-trading은 단일 인스턴스·stop-first 고정 — 재기동 시 매매 배치 재개가 잔여 락을 인수하므로 겹침 기동 금지(`.github/tests/compose-invariants.bats`)
-- **외부 호출자**: 별도 OCI 인스턴스의 fida-server가 공인 API 도메인으로 `/api/internal/fida-orders`를 호출 → Caddy `@trading` → kista-trading
-- **DB 연결**: 앱 3 role 모두 data_net으로 postgres에 붙는다(`DB_URL`은 시크릿 `.env`)
+- **role 구분**: 한 `app.jar`(trading-core 포함)를 `KISTA_ROLE`로 가른다 — kista-web은 `web`(엔진 외 HTTP), kista-worker는 `worker`(매매 배치·스케쥴러·엔진 HTTP). role과 맞지 않는 요청은 `RoleRoutingGuard`가 503 `WRONG_ROLE`
+- **EPR 재발행 소유**: `public.event_publication` 하나를 kista-worker만 재발행(kista-web은 안 함 — 둘 다 true면 이중 claim)
+- **교체 방식**: blue/green은 bundle `bluegreen` 파일의 kista-web·kista-ui만. kista-worker는 단일 인스턴스·stop-first 고정 — 재기동 시 매매 배치 재개가 잔여 락을 인수하므로 겹침 기동 금지(`.github/tests/compose-invariants.bats`)
+- **외부 호출자**: 별도 OCI 인스턴스의 fida-server가 공인 API 도메인으로 `/api/internal/fida-orders`를 호출 → Caddy `@trading` → kista-worker
+- **DB 연결**: 앱 2 role 모두 data_net으로 postgres에 붙는다(`DB_URL`은 시크릿 `.env`)
 - **호스트 경로**: `/opt/<app>/releases/<id>`(bundle) · `current`/`previous`(심볼릭 링크) · `/opt/<app>/.env`, `/opt/kista-infra/.env`(시크릿 렌더링 결과)
 - 라우팅 SSOT: `deploy/server/caddy/kista-api.caddy`(API 도메인, 이 레포 소유, `CaddyRoutingTest`) · `kista-infra/Caddyfile`(UI 도메인 + 스니펫 import)
 
@@ -79,9 +75,8 @@ L0을 컨테이너·네트워크·볼륨·배포 경로 수준으로 펼친 그�
 ```mermaid
 flowchart LR
     subgraph APP["kista-api-server"]
-        API["kista-api"]
-        SCH["kista-scheduler"]
-        TRD["kista-trading"]
+        WEB["kista-web"]
+        WRK["kista-worker"]
         PG[("postgres")]
     end
 
@@ -104,12 +99,11 @@ flowchart LR
         OBJ["OCI Object Storage<br/>kista-infra-backups"]
     end
 
-    TRD --> TOSS & ALPACA
-    SCH --> KB & FG & ALPACA
-    API --> KAKAO & FCM
-    API & SCH & TRD --> TG
-    API & SCH & TRD --> GRAF
-    TRD --> HC
+    WRK --> TOSS & ALPACA & KB & FG
+    WEB --> KAKAO & FCM
+    WEB & WRK --> TG
+    WEB & WRK --> GRAF
+    WRK --> HC
     PG -.->|"cron backup.sh<br/>pg_dump → GPG"| OBJ
 ```
 
@@ -166,14 +160,14 @@ flowchart TB
         user; admin; finance; notify; market; benchmark; web
     end
 
-    subgraph tc[":trading-core → trading-core.jar"]
+    subgraph tc[":trading-core → app.jar에 포함"]
         trading; matching; broker; account; privacy
         marketcalendar; stats; notify_t["notify"]; web_t["web"]
     end
 
     api --> shared
     tc --> shared
-    api -. "컴파일 의존 0<br/>HTTP·Redis로만 통신" .- tc
+    api -->|"의존(역방향 금지)"| tc
 
     subgraph db["kistadb 스키마 (다른 서비스 스키마 참조·FK 금지)"]
         s1[("public · finance · kista_ref<br/>Flyway db/migration")]
@@ -185,20 +179,20 @@ flowchart TB
 
 - 경계 검증: `GradleModuleBoundaryTest`(Gradle 방향), `InternalApiContractTest`(wire 타입), `ModulithArchitectureTest`(모듈), `HexagonalArchitectureTest`(레이어)
 
-## L1.5 프로세스 간 통신
+## L1.5 role 간 통신
 
-한 애플리케이션이라 사용자 이벤트(`UserDeletedEvent`·`UserNotifyProfileChangedEvent`)와 오류 보고(`AppErrorRaisedEvent`)는 모듈 리스너가 직접 받는다(`public.event_publication`). 내부 HTTP(root → trading-core)와 Redis(체결 푸시 Stream·`trade.event` Pub/Sub)는 web·worker 인스턴스 사이 전달용으로 남는다.
+한 애플리케이션이라 사용자 이벤트(`UserDeletedEvent`·`UserNotifyProfileChangedEvent`)와 오류 보고(`AppErrorRaisedEvent`)는 모듈 리스너가 직접 받는다(`public.event_publication`). 내부 HTTP(web → worker)와 Redis(체결 푸시 Stream·`trade.event` Pub/Sub)는 web·worker 사이 전달용으로 남는다.
 
 ```mermaid
 flowchart LR
-    subgraph root["root (kista-api · kista-scheduler)"]
+    subgraph root["web 쪽 (kista-web)"]
         rOut["*/adapter/out/internal<br/>*HttpAdapter"]
         rUser["user<br/>UserDeletedEvent·UserNotifyProfileChangedEvent 발행"]
         rAdmin["admin<br/>AppErrorRaisedListener"]
         rNotify["notify<br/>PushNotificationStreamConsumer<br/>RedisTradeEventSubscriber → SSE"]
     end
 
-    subgraph tc["trading-core (kista-trading)"]
+    subgraph tc["worker 쪽 (kista-worker)"]
         tIn["*InternalController<br/>/api/internal/**"]
         tUser["trading<br/>TradingUserCascadeListener<br/>UserNotifyProfileSyncListener"]
         tErr["tradingcore.notify<br/>TradingNotifyAdapter → AppErrorRaisedEvent"]
@@ -217,7 +211,7 @@ flowchart LR
 
 ## L2 모듈 의존 그래프 (자동 생성)
 
-손으로 그리지 않는다. api 프로세스의 `ModulithArchitectureTest`가 `Documenter`로 실제 의존 기준 PlantUML을 생성한다(`ApplicationModules.of(ApiApplication.class)` 모델 — api 7 + shared 3). trading-core 쪽 `ModulithArchitectureTest`는 `verify()`만 하고 Documenter가 없어 trading-core 모듈 그래프는 생성되지 않는다.
+손으로 그리지 않는다. `ModulithArchitectureTest`가 `Documenter`로 실제 의존 기준 PlantUML을 생성한다(`ApplicationModules.of(ApiApplication.class)` 모델 하나 — api 7 + trading-core 9 + shared 3).
 
 ```bash
 ./gradlew :test --tests 'com.kista.api.architecture.ModulithArchitectureTest'
@@ -236,7 +230,7 @@ flowchart LR
 # 출력: build/architecture-map/index.html (file://로 연다 — cytoscape만 CDN이라 인터넷 필요)
 ```
 
-- 탭 5개: 구조(모듈 의존 그래프 — 처음엔 `:api`·`:trading-core`·`:shared` 박스로 접혀 있고 박스 클릭·"모두 펼치기"로 모듈을 편다. 노드 클릭 → 나가는·들어오는 의존을 대상 모듈 → 의존 종류 → `소스클래스 → 타깃클래스`로, 엣지 클릭 → 두 모듈 사이 클래스 단위 의존. 의존 종류 필터·platform/sharedkernel 숨김. "흐름 오버레이"를 고르면 단계별 모듈을 강조하고 연속 단계 사이를 의존 엣지 또는 점선 가상 엣지로 이어 재생한다) / 랜드스케이프(사용자 여정은 노선도, 나머지는 카드 — 카드마다 터치 레인 스파크라인·모듈 수) / 흐름(스윔레인 — 레인 = 사용자·kista-ui·kista-api·kista-scheduler·Redis·kista-trading·DB·증권사·Telegram·외부(fida), 단계 클릭 → 업무 설명·상태 변화·실패 경로·담당 코드, ▶ 재생) / 타임라인(KST 24h 선형, 실행 프로세스별 — cron 시각은 `CronExpression`으로 계산, 프로세스는 trading-core 소속 → `kista-trading`, root는 `@ConditionalOnWorkerRole` 여부로 `kista-scheduler` 또는 공용) / 생명주기(user·strategy·order·매매 배치 체크포인트 — 상태를 한 줄에 놓고 전이를 호로)
+- 탭 5개: 구조(모듈 의존 그래프 — 처음엔 `:api`·`:trading-core`·`:shared` 박스로 접혀 있고 박스 클릭·"모두 펼치기"로 모듈을 편다. 노드 클릭 → 나가는·들어오는 의존을 대상 모듈 → 의존 종류 → `소스클래스 → 타깃클래스`로, 엣지 클릭 → 두 모듈 사이 클래스 단위 의존. 의존 종류 필터·platform/sharedkernel 숨김. "흐름 오버레이"를 고르면 단계별 모듈을 강조하고 연속 단계 사이를 의존 엣지 또는 점선 가상 엣지로 이어 재생한다) / 랜드스케이프(사용자 여정은 노선도, 나머지는 카드 — 카드마다 터치 레인 스파크라인·모듈 수) / 흐름(스윔레인 — 레인 = 사용자·kista-ui·kista-web·Redis·kista-worker·DB·증권사·Telegram·외부(fida), 단계 클릭 → 업무 설명·상태 변화·실패 경로·담당 코드, ▶ 재생) / 타임라인(KST 24h 선형, 실행 role별 — cron 시각은 `CronExpression`으로 계산, `@ConditionalOnWorkerRole` 스케쥴러는 `kista-worker`, 그 외는 공용) / 생명주기(user·strategy·order·매매 배치 체크포인트 — 상태를 한 줄에 놓고 전이를 호로)
 - URL 해시가 전체 상태다 — `#structure/trading?flow=close-batch&step=lock`, `#flow/close-batch/lock`, `#timeline/TradingCloseScheduler%23run`, `#lifecycle/order/3`. 리뷰 메모에 링크로 남길 수 있다. 헤더 통합 검색(`/`)은 모듈·흐름·단계(제목·code)·잡·상태 enum을 한 목록에서 찾는다
 - 상세 패널 하단 "연결"이 뷰를 잇는다 — 모듈 ↔ 거치는 흐름 단계·소속 잡, 단계 ↔ 모듈·생명주기 전이·시작 잡. 단계 → 모듈은 `code:` 클래스 패키지(`com.kista.<module>`)에서 자동 도출(`ArchitectureMapExporter.stepModules`)하므로 flows.yml에 쓰지 않는다. 잡 ↔ 단계는 잡 이름(`Class#method`)이 단계 `code:` 항목과 같으면 연결된다
 - `ArchitectureMapTest`가 flows.yml의 `클래스#메서드` 참조·레인·흐름 연결을 검증하고, `lifecycles:`는 상태 enum 상수 집합이 `states`와 정확히 같은지·전이의 상태·`flow: <flowId>/<stepId>` 링크까지 검증한다 — 메서드 이름이 바뀌거나 enum 상수가 늘면 이 테스트가 깨지니 flows.yml을 같이 고친다. 스키마는 flows.yml 머리 주석이 SSOT

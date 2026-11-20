@@ -6,7 +6,7 @@
 - `git push`는 사용자가 명시적으로 요청할 때만, 요청하면 즉시
 - 커밋 전 author 확인: `narafu <narafu@kakao.com>`
 - 커밋 메시지는 한글, Conventional Commit 접두사(`feat(scope):`·`fix:`·`docs:`·`debug:` 등) + 명령형 제목
-- 배포 불변식: kista-trading은 단일 인스턴스·stop-first·`stop_grace_period` ≥ 200s(재개가 잔여 락을 인수해 겹침 기동은 이중 실행). EPR 재발행 플래그는 kista-trading·kista-scheduler만 true(가드: `compose-invariants.bats`). 파이프라인 → `docker-infra.md`
+- 배포 불변식: kista-worker는 단일 인스턴스·stop-first·`stop_grace_period` ≥ 200s(재개가 잔여 락을 인수해 겹침 기동은 이중 실행). EPR 재발행 플래그는 kista-worker만 true(가드: `compose-invariants.bats`; 전환 전 운영은 3 role — 05 14-3). 파이프라인 → `docker-infra.md`
 
 ### 코드 작성 기본
 - deprecated API 금지. Spring 7/Jackson 3 대체: `HttpStatus.UNPROCESSABLE_CONTENT`, `JsonNode.asString()`, `org.jspecify.annotations.Nullable`(중첩은 `Outer.@Nullable Inner`)
@@ -25,7 +25,7 @@
 
 ### 신규 파일 배치
 모듈(`com.kista.<api|tradingcore|shared>.<module>`) 안에 `domain/model` + `application/{port/output,service}` + `adapter/{in,out}`. 공개 범위는 모듈 문서.
-- 인터페이스는 구현 2개 이상·모듈 간 역전·프로세스 계약만(새 UseCase·단일 구현 포트 금지, 가드: `interfaces_must_earn_their_keep`). 포트는 `application/port/output/`의 `*Port`, 파라미터·반환 타입과 `*Command`(`*Request` 금지)는 `domain/model/`(컨트롤러 DTO와 겹치는 타입도 옮기고 DTO에서 re-import)
+- 인터페이스는 구현 2개 이상·모듈 간 역전·프로세스 계약만(새 UseCase·단일 구현 포트 금지, 가드: `interfaces_must_earn_their_keep`). 포트는 `application/port/output/`의 `*Port`, 파라미터·반환 타입과 `*Command`(`*Request` 금지)는 `domain/model/`(DTO와 겹치면 옮기고 re-import)
 - broker 밖이 쓰는 기능은 `tradingcore.broker.application.port.output`의 `*Port`로(가드: `vendor_models_must_not_leak_outside_broker`)
 - 크로스모듈 컨트롤러는 `api.web`, trading-core 전역 web은 `tradingcore.web`, 그 외 컨트롤러는 모듈 `adapter/in/web`
 - 공용 인프라는 `shared.platform`, 주문생성 커널은 `tradingcore.matching`(가드: `platform_must_not_depend_on_other_modules`·`matching_must_not_depend_on_other_modules`)
