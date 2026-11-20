@@ -60,7 +60,7 @@ class OrderCancelService {
             return new CancelResult(0, 0);
         }
         var currentCycle = latestCycle.get();
-        // 오늘(KST)과 다음 거래일(수동 실행 tradeDate) 둘 다 — 04:00~장마감 리포트 사이 마감 배치가 접수한 오늘 주문도 포함
+        // 오늘(KST)과 다음 거래일(다음 세션 tradeDate) 둘 다 — 04:00~장마감 리포트 사이 마감 배치가 접수한 오늘 주문도 포함
         ZonedDateTime now = ZonedDateTime.now(clock);
         List<LocalDate> tradeDates = SessionTradeDates.tradeDateCandidates(now);
 

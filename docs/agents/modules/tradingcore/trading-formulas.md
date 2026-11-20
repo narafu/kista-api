@@ -136,7 +136,7 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
   - 검증 순서: 램프 파라미터·투자금 추가 형태(수량 음수 금지 등)·인출식 최소자산 재검증까지 모두 통과한 뒤에만 브로커 미체결 주문 취소(`OrderCancelService`, 별도 트랜잭션이라 이후 실패해도 롤백 불가)를 호출 — 검증 실패 시 브로커에 실주문 취소가 나가지 않도록 순서 고정
 
 ## 3. PRIVACY (KISTA 고유 — 문헌 없음)
-- **주문 방식**: PRIVACY 전략은 매수·매도 모두 장마감 30분 전 LIMIT VWAP(메리츠 35)으로 접수한다, 등록은 MERITZ·MOCK만. FIDA 기준표의 LIMIT 주문을 `PrivacyStrategy.executionType`이 `LIMIT_VWAP`(지정가 + 접수부터 장마감까지 VWAP 분할 체결)으로 바꾸고, 토스 등 미지원 증권사는 등록 단계에서 400으로 막는다(`StrategyCapability.supportedBrokers`). 사용자 "바로 주문"도 같은 LIMIT_VWAP이라 장중에 누르면 접수 시점부터 장마감까지 VWAP으로 돈다(의도된 동작).
+- **주문 방식**: PRIVACY 전략은 매수·매도 모두 장마감 30분 전 LIMIT VWAP(메리츠 35)으로 접수한다, 등록은 MERITZ·MOCK만. FIDA 기준표의 LIMIT 주문을 `PrivacyStrategy.executionType`이 `LIMIT_VWAP`(지정가 + 접수부터 장마감까지 VWAP 분할 체결)으로 바꾸고, 토스 등 미지원 증권사는 등록 단계에서 400으로 막는다(`StrategyCapability.supportedBrokers`).
 - **배수(자산비)** (`PrivacyStrategy.multiple` — 운영 주문 계획·미리보기·백테스트 공용): 배수 = `ourAsset ÷ fidaAsset`, 소수 2자리 FLOOR. `ourAsset` = 예수금 + 보유 × P, `fidaAsset` = (FIDA `current_cycle_start` + `current_cycle_realized_pnl` − FIDA 보유 × FIDA 평단) + FIDA 보유 × P. P는 전일 종가(최신 `cycle_position.closing_price`, 없으면 브로커 전일종가)다. FIDA 보유가 0이고 평단이 null이면 보유 항은 0이다. 무효(`PrivacyValuationException`)는 `fidaAsset ≤ 0`, `ourAsset ≤ 0`, FIDA 보유 > 0인데 평단 null, P가 필요한데 null일 때다 — 배치는 해당 전략만 격리하고 관리자에게 알리며, 미리보기는 `PRIVACY_BASE_BLOCKED`, 백테스트는 경고만 남기고 그 세션 주문을 건너뛴다. BUY 가감·SELL cap·버림 보정은 이 배수를 입력으로 쓸 뿐 공식은 그대로다. 추가 투입·인출은 최신 행 예수금을 바꾸므로 다음 계산 배수에 자동 반영된다. 예시(2026-11-11 운영 검증): P 56.20, 우리 자산 33814.11, FIDA 자산 661.13 + 6294.40 = 6955.53 → 배수 4.86, 계획 BUY 11주 기준 가감 후 BUY 45주. 2026-11-11 사용자 승인으로 고정 배수(start_amount ÷ currentCycleStart)에서 자산비 배수로 변경했다.
 
 ## 4. 운영 기본값 (공식 아님 — 운영 판단으로 바뀔 수 있다)

@@ -4,7 +4,6 @@ import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.domain.model.PriceSnapshot;
 import com.kista.tradingcore.trading.domain.model.BatchContext;
 import org.mockito.ArgumentCaptor;
-import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
 import com.kista.shared.kernel.StrategyTicker;
@@ -19,7 +18,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -49,19 +47,6 @@ class TradingPriceFetcherTest {
     }
 
     @Test
-    @DisplayName("bulkFetch 결과에 null 값이 섞여 있으면 해당 ticker만 단건 fallback으로 재조회")
-    void fetchPrices_bulkResultContainsNull_fallsBackToSingleFetch() {
-        Map<StrategyTicker, BigDecimal> bulkResult = new HashMap<>();
-        bulkResult.put(StrategyTicker.SOXL, null); // 정상 계약 위반이지만 방어적으로 처리돼야 함
-        when(pricePort.getPrices(List.of(StrategyTicker.SOXL), account.brokerRef())).thenReturn(bulkResult);
-        when(pricePort.getPrice(StrategyTicker.SOXL, account.brokerRef())).thenReturn(new BigDecimal("25.50"));
-
-        Map<StrategyTicker, BigDecimal> result = priceFetcher.fetchPrices(List.of(StrategyTicker.SOXL), account.brokerRef());
-
-        assertThat(result).containsEntry(StrategyTicker.SOXL, new BigDecimal("25.50"));
-    }
-
-    @Test
     @DisplayName("fetchPrevCloses: 일괄+단건 모두 실패해도 이벤트 미발행 — readOnly 미리보기 트랜잭션에서 EPR insert 500 회귀 방지")
     void fetchPrevCloses_allFailed_noEvent() {
         when(pricePort.getPrevCloses(List.of(StrategyTicker.SOXL), account.brokerRef())).thenThrow(new RuntimeException("토큰 발급 실패"));
@@ -71,17 +56,6 @@ class TradingPriceFetcherTest {
 
         assertThat(result).doesNotContainKey(StrategyTicker.SOXL);
         verify(eventPublisher, never()).publishEvent(any(Object.class));
-    }
-
-    @Test
-    @DisplayName("fetchPrices: 일괄+단건 모두 실패하면 TradingErrorEvent 발행 유지")
-    void fetchPrices_allFailed_publishesEvent() {
-        when(pricePort.getPrices(List.of(StrategyTicker.SOXL), account.brokerRef())).thenThrow(new RuntimeException("토큰 발급 실패"));
-        when(pricePort.getPrice(StrategyTicker.SOXL, account.brokerRef())).thenThrow(new RuntimeException("토큰 발급 실패"));
-
-        priceFetcher.fetchPrices(List.of(StrategyTicker.SOXL), account.brokerRef());
-
-        verify(eventPublisher).publishEvent(any(TradingErrorEvent.class));
     }
 
     // 배치 컨텍스트 — priceAccount 선택(selectPriceAccount)과 티커 추출에 필요한 최소 mock

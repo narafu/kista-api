@@ -38,7 +38,7 @@ import com.kista.shared.kernel.StrategyTicker;
 public class TradingCycleController {
 
     private final StrategyService tradingCycle;                  // CRUD + pause/resume + 이력·주문·시드 미리보기
-    private final TradingExecutionFacade tradingExecution;      // 수동 실행 + 주문 취소
+    private final TradingExecutionFacade tradingExecution;      // 주문 취소
     private final VrReconfigureService vrReconfigure;            // VR 전략 운영 중 재설정
     private final CapitalLedgerService injectCapital;           // PRIVACY·INFINITE·DCA 진행 중 사이클 투자금 추가
     private final CapitalWithdrawalService withdrawCapital;       // PRIVACY·INFINITE·DCA 진행 중 사이클 투자금 인출
@@ -186,17 +186,8 @@ public class TradingCycleController {
         tradingCycle.resume(id, userId);
     }
 
-    // 사이클 수동 실행 — Phase A/B 동기(접수), Phase C 비동기(체결·이력·알림)
-    @Operation(summary = "매매 수동 실행")
-    @PostMapping("/api/trading-cycles/{id}/execute")
-    public ExecuteOrdersResponse executeManually(
-            @PathVariable UUID id,
-            @AuthenticationPrincipal UUID userId) {
-        return ExecuteOrdersResponse.from(tradingExecution.executeManually(id, userId));
-    }
-
     // 오늘 등록된 사이클 주문 전체 취소 — PLANNED 삭제 + PLACED 증권사 취소 (best-effort)
-    @Operation(summary = "수동 실행 주문 취소 (오늘 PLANNED + PLACED 주문 전체)")
+    @Operation(summary = "사이클 주문 전체 취소 (오늘 PLANNED + PLACED 주문 전체)")
     @DeleteMapping("/api/trading-cycles/{id}/execute")
     public CancelOrdersResponse cancelExecute(
             @PathVariable UUID id,

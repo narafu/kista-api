@@ -129,7 +129,7 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
 
-    // AT_OPEN 타이밍 PLANNED 주문 조회 (개장 스케쥴러·수동 실행 시 즉시 선접수용)
+    // AT_OPEN 타이밍 PLANNED 주문 조회 (개장 스케쥴러 즉시 선접수용)
     List<OrderEntity> findByStrategyCycleIdAndTradeDateAndTimingAndStatus(
             UUID strategyCycleId, LocalDate tradeDate, OrderTiming timing, OrderStatus status);
 

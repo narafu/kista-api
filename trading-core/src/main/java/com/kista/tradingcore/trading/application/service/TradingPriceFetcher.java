@@ -122,14 +122,6 @@ class TradingPriceFetcher {
                 .orElseGet(() -> contexts.getFirst().account().brokerRef());
     }
 
-    // 현재가만 필요한 경우 (수동 실행)
-    Map<StrategyTicker, BigDecimal> fetchPrices(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        Set<StrategyTicker> failed = new LinkedHashSet<>();
-        Map<StrategyTicker, BigDecimal> prices = fetchCurrentPrices(tickers, account, failed);
-        alertFailed(failed, "현재가", "관리자·계좌 모두 실패");
-        return prices;
-    }
-
     // 전일종가만 필요한 경우 (매매 미리보기 배치 등) — 종목 수만큼 순차 단건 조회 대신 1회 일괄 조회
     // 관리자 알림 없음: 유일한 호출부인 미리보기는 readOnly 트랜잭션이라 EPR insert가 실패해 500이 되고,
     // 실패는 이후 StrategyOrderPlanBuilder 단건 재조회(BrokerCallGuard)가 사용자 응답(503 등)으로 직접 드러낸다

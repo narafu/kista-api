@@ -50,7 +50,7 @@ class TradingOrderExecutor {
     private final MarketCalendarPort marketCalendarPort;       // 거래일의 실제 마감 시각
     private final Clock clock;                                 // 주문별 접수 마감 확인
 
-    // AT_OPEN PLANNED 주문 접수 — 개장 스케쥴러 선접수 + 개장 후 수동실행 공용
+    // AT_OPEN PLANNED 주문 접수 — 개장 스케쥴러 선접수용
     // BUY cap 보정을 AT_OPEN 스코프(BuyOrderPriceCapper.capIfNeeded(mode, atOpen=true, ...))로 적용한 뒤
     // AT_OPEN PLANNED만 재조회해 접수한다 — 동일 사이클에 공존 가능한 AT_CLOSE PLANNED(미도래)는 건드리지 않는다
     // (findPlannedByCycleAndDate를 그대로 쓰면 접수 전 AT_CLOSE 주문까지 캡 재산정 대상이 되는 버그가 발생함)

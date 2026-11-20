@@ -22,9 +22,7 @@ import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.domain.model.DcaSummary;
 import org.mockito.ArgumentCaptor;
 import static org.assertj.core.api.Assertions.assertThat;
-import com.kista.tradingcore.support.StubBrokerApiException;
 import com.kista.tradingcore.trading.domain.model.CancelResult;
-import com.kista.tradingcore.trading.domain.model.ManualTradingException;
 import com.kista.tradingcore.trading.domain.model.CycleHistoryPage;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyDetail;
@@ -91,73 +89,6 @@ class TradingCycleControllerTest {
     private static final UUID CYCLE_ID   = UUID.fromString("00000000-0000-0000-0000-000000000010");
     private static final UUID USER_ID    = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000020");
-
-    @Test
-    void executeManually_success_returns200WithOrders() throws Exception {
-        when(tradingExecution.executeManually(any(), any())).thenReturn(List.of());
-
-        mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
-                        .with(csrf()).with(authentication(userToken(USER_ID))))
-                .andExpect(status().isOk()) // 200
-                .andExpect(jsonPath("$.orders").isArray());
-    }
-
-    @Test
-    void executeManually_anonymous_returns401() throws Exception {
-        mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
-                        .with(csrf()))
-                .andExpect(status().isUnauthorized()); // 401
-    }
-
-    @Test
-    void executeManually_notOwner_returns403() throws Exception {
-        doThrow(new SecurityException("소유권 불일치"))
-                .when(tradingExecution).executeManually(any(), any());
-
-        mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
-                        .with(csrf()).with(authentication(userToken(USER_ID))))
-                .andExpect(status().isForbidden()); // 403
-    }
-
-    @Test
-    void executeManually_privacyCycle_returns400() throws Exception {
-        doThrow(new IllegalArgumentException("INFINITE 사이클만 수동 실행 가능합니다"))
-                .when(tradingExecution).executeManually(any(), any());
-
-        mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
-                        .with(csrf()).with(authentication(userToken(USER_ID))))
-                .andExpect(status().isBadRequest()); // 400
-    }
-
-    @Test
-    void executeManually_alreadyExecutedToday_returns409() throws Exception {
-        doThrow(new ManualTradingException("오늘 이미 실행된 사이클입니다"))
-                .when(tradingExecution).executeManually(any(), any());
-
-        mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
-                        .with(csrf()).with(authentication(userToken(USER_ID))))
-                .andExpect(status().isConflict()); // 409
-    }
-
-    @Test
-    void executeManually_cycleNotFound_returns404() throws Exception {
-        doThrow(new NoSuchElementException("사이클 없음"))
-                .when(tradingExecution).executeManually(any(), any());
-
-        mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
-                        .with(csrf()).with(authentication(userToken(USER_ID))))
-                .andExpect(status().isNotFound()); // 404 — ProblemDetailExceptionHandler 처리
-    }
-
-    @Test
-    void executeManually_brokerApiError_returns503() throws Exception {
-        doThrow(new StubBrokerApiException("Toss API 연결 오류"))
-                .when(tradingExecution).executeManually(any(), any());
-
-        mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)
-                        .with(csrf()).with(authentication(userToken(USER_ID))))
-                .andExpect(status().isServiceUnavailable()); // 503
-    }
 
     @Test
     void archive_returns_204() throws Exception {

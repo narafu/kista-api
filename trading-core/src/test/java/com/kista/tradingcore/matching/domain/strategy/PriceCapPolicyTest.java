@@ -13,7 +13,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 // PriceCapPolicy.replaceBuysPreservingOrder — 매수 캡 재산정 결과를 원본 순서에 병합하는 순수 계산.
-// 실주문(BuyOrderPriceCapper.prepareForAllocation)·수동실행(Task3 재사용) 양쪽 실주문 경로가 공유하지만
+// 실주문(BuyOrderPriceCapper.prepareForAllocation)이 공유하지만
 // 직접 테스트가 없었다(회귀: 최종 리뷰 Finding 2) — 인덱스 소진 규칙을 직접 검증한다.
 class PriceCapPolicyTest {
 

@@ -10,7 +10,6 @@ import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderDirection;
-import com.kista.tradingcore.trading.domain.model.DcaManualExecutionUnsupportedException;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
@@ -125,7 +124,7 @@ class TradingPreviewServiceTest {
         PlannedOrder sellOrder = PlannedOrder.of(LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LIMIT,
                 OrderDirection.SELL, 3, new BigDecimal("25.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
-        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any(), any()))
+        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
 
         NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
@@ -147,7 +146,7 @@ class TradingPreviewServiceTest {
         when(orderPort.findPlannedOrPlacedByCycleIdsAndDate(any(), any())).thenReturn(Map.of());
 
         CycleOrderStrategy.OrderPlan noOrderPlan = new CycleOrderStrategy.OrderPlan(null, null, List.of());
-        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any(), any()))
+        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any()))
                 .thenThrow(new RuntimeException("일시적 계산 오류"))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(noOrderPlan, null));
 
@@ -155,7 +154,7 @@ class TradingPreviewServiceTest {
 
         assertThat(result).isNotNull();
         assertThat(result.orders()).isEmpty();
-        verify(planBuilder, times(2)).build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any(), any());
+        verify(planBuilder, times(2)).build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any());
     }
 
     // 최종 리뷰 Finding 1 회귀 테스트 — previewBatch()의 사전계산 재시도 실패가 계좌 내 다른(형제)
@@ -178,10 +177,10 @@ class TradingPreviewServiceTest {
         PlannedOrder sellOrder = PlannedOrder.of(LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LIMIT,
                 OrderDirection.SELL, 3, new BigDecimal("25.00"));
         CycleOrderStrategy.OrderPlan targetPlan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
-        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any(), any()))
+        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(targetPlan, null));
         // 형제 전략은 사전계산·재시도 양쪽 모두 지속적으로 실패한다 — thenReturn 없이 항상 throw
-        when(planBuilder.build(eq(sibling), eq(TRADING_ACCOUNT), eq(siblingCycle), any(), any(), any()))
+        when(planBuilder.build(eq(sibling), eq(TRADING_ACCOUNT), eq(siblingCycle), any(), any()))
                 .thenThrow(new RuntimeException("지속적 계산 오류"));
 
         NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
@@ -189,7 +188,7 @@ class TradingPreviewServiceTest {
         assertThat(result).isNotNull();
         assertThat(result.orders()).hasSize(1);
         // 형제 전략은 사전계산 1회 + 최종 루프 재시도 1회, 총 2회 시도된다
-        verify(planBuilder, times(2)).build(eq(sibling), eq(TRADING_ACCOUNT), eq(siblingCycle), any(), any(), any());
+        verify(planBuilder, times(2)).build(eq(sibling), eq(TRADING_ACCOUNT), eq(siblingCycle), any(), any());
     }
 
     // 대상 전략 자체의 계산이 지속 실패하면 404(활성 사이클 없음)로 가리지 않고 원래 예외를 전파해야 한다
@@ -199,7 +198,7 @@ class TradingPreviewServiceTest {
         when(strategyCyclePort.findLatestByStrategyIds(List.of(STRATEGY.id())))
                 .thenReturn(Map.of(STRATEGY.id(), STRATEGY_CYCLE));
         IllegalStateException brokerFailure = new IllegalStateException("증권사 API 조회에 실패했습니다");
-        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any(), any()))
+        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any()))
                 .thenThrow(brokerFailure);
 
         assertThatThrownBy(() -> service.preview(STRATEGY.id(), ACCOUNT.userId()))
@@ -222,7 +221,7 @@ class TradingPreviewServiceTest {
 
         assertThat(result.skipReason()).isEqualTo(NextOrdersPreview.SkipReason.SCHEDULED_START_NOT_REACHED);
         assertThat(result.orders()).isEmpty();
-        verify(planBuilder, never()).build(any(), any(), any(), any(), any(), any());
+        verify(planBuilder, never()).build(any(), any(), any(), any(), any());
     }
 
     // 휴장 거래일 — 계산 skip보다 먼저 MARKET_CLOSED, 브로커·plan 호출 없음, 판정은 1회
@@ -234,7 +233,7 @@ class TradingPreviewServiceTest {
 
         assertThat(result.skipReason()).isEqualTo(SkipReason.MARKET_CLOSED);
         assertThat(result.orders()).isEmpty();
-        verify(planBuilder, never()).build(any(), any(), any(), any(), any(), any());
+        verify(planBuilder, never()).build(any(), any(), any(), any(), any());
         verifyNoInteractions(priceFetcher);
         verify(marketCalendarPort, times(1)).isMarketOpen(any());
     }
@@ -247,7 +246,7 @@ class TradingPreviewServiceTest {
         NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
 
         assertThat(result.skipReason()).isNull();
-        verify(planBuilder).build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any(), any());
+        verify(planBuilder).build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any());
     }
 
     // 다전략 배치에서도 휴장 판정은 1회, 저장된 SELL이 있어도 브로커 경고 조회는 없다
@@ -289,7 +288,7 @@ class TradingPreviewServiceTest {
 
     @Test
     void preview_returnsSkip_whenPlanBuilderSkips() {
-        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any(), any()))
+        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(null, SkipReason.NO_CYCLE_HISTORY));
 
         NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
@@ -324,7 +323,7 @@ class TradingPreviewServiceTest {
                 OrderDirection.SELL, 3, new BigDecimal("25.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY));
-        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any(), any()))
+        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
 
         Map<UUID, NextOrdersPreview> result = service.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
@@ -340,7 +339,7 @@ class TradingPreviewServiceTest {
         PlannedOrder sellOrder = PlannedOrder.of(LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LIMIT,
                 OrderDirection.SELL, 3, new BigDecimal("25.00"));
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY, archived));
-        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any(), any()))
+        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder)), null));
 
         assertThat(service.previewBatch(ACCOUNT.id(), ACCOUNT.userId())).containsOnlyKeys(STRATEGY.id());
@@ -364,13 +363,13 @@ class TradingPreviewServiceTest {
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY));
         Map<StrategyTicker, BigDecimal> prevCloseCache = Map.of(StrategyTicker.SOXL, new BigDecimal("22.00"));
         when(priceFetcher.fetchPrevCloses(List.of(StrategyTicker.SOXL), TRADING_ACCOUNT.brokerRef())).thenReturn(prevCloseCache);
-        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any(), eq(prevCloseCache)))
+        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), eq(prevCloseCache)))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
 
         service.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
 
         verify(priceFetcher, times(1)).fetchPrevCloses(List.of(StrategyTicker.SOXL), TRADING_ACCOUNT.brokerRef());
-        verify(planBuilder).build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any(), eq(prevCloseCache));
+        verify(planBuilder).build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), eq(prevCloseCache));
     }
 
     // 회귀 테스트 — accountId+today로만 결정되는 계좌 전체 당일 PLANNED BUY 합계 조회가
@@ -394,7 +393,7 @@ class TradingPreviewServiceTest {
             PlannedOrder sellOrder = PlannedOrder.of(LocalDate.now(FIXED), s.ticker(), OrderType.LIMIT,
                     OrderDirection.SELL, 3, new BigDecimal("25.00"));
             CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
-            when(planBuilder.build(eq(s), eq(TRADING_ACCOUNT), eq(cycle), any(), any(), any()))
+            when(planBuilder.build(eq(s), eq(TRADING_ACCOUNT), eq(cycle), any(), any()))
                     .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
         }
         when(strategyCyclePort.findLatestByStrategyIds(List.of(s1.id(), s2.id()))).thenReturn(cyclesById);
@@ -435,7 +434,7 @@ class TradingPreviewServiceTest {
             PlannedOrder buy = PlannedOrder.of(LocalDate.now(FIXED), s.ticker(), OrderType.LOC,
                     OrderDirection.BUY, 1, new BigDecimal("10.00"));
             CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(buy));
-            when(planBuilder.build(eq(s), eq(TRADING_ACCOUNT), eq(cycle), any(), any(), any()))
+            when(planBuilder.build(eq(s), eq(TRADING_ACCOUNT), eq(cycle), any(), any()))
                     .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
         }
         when(strategyCyclePort.findLatestByStrategyIds(List.of(s1.id(), s2.id(), s3.id()))).thenReturn(cycles);
@@ -445,7 +444,7 @@ class TradingPreviewServiceTest {
         realService.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
 
         for (Strategy s : strategies) {
-            verify(planBuilder, times(1)).build(eq(s), eq(TRADING_ACCOUNT), eq(cycles.get(s.id())), any(), any(), any());
+            verify(planBuilder, times(1)).build(eq(s), eq(TRADING_ACCOUNT), eq(cycles.get(s.id())), any(), any());
         }
     }
 
@@ -454,7 +453,7 @@ class TradingPreviewServiceTest {
     void privacyOverLedgerShowsInsufficient() {
         PlannedOrder buy = PlannedOrder.of(LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderDirection.BUY, 8, new BigDecimal("38.04"));
-        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any(), any()))
+        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(new CycleOrderStrategy.OrderPlan(null, null, List.of(buy)), null));
         // 배치 조회한 사이클 최신 포지션과 이미 로드한 당일 주문(없음)이 그대로 원장 계산에 넘어가야 한다
         CyclePosition latest = mock(CyclePosition.class);
@@ -480,7 +479,7 @@ class TradingPreviewServiceTest {
                 OrderDirection.BUY, 1, new BigDecimal("10.00"));
         Order existing = Order.fromPlanned(buy, null, null);
         when(orderPort.findPlannedOrPlacedByCycleIdsAndDate(any(), any())).thenReturn(Map.of(STRATEGY_CYCLE.id(), List.of(existing)));
-        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any(), any()))
+        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(new CycleOrderStrategy.OrderPlan(null, null, List.of(buy)), null));
 
         assertThat(service.preview(STRATEGY.id(), ACCOUNT.userId()).ledgerCheck()).isNull();
@@ -504,7 +503,7 @@ class TradingPreviewServiceTest {
         stubDcaAccount();
         PlannedOrder dcaBuy = PlannedOrder.of(LocalDate.now(FIXED), StrategyTicker.UPRO, OrderType.MOC, OrderDirection.BUY, 3,
                 new BigDecimal("91.48"), OrderTiming.AT_CLOSE, "DCA_" + DCA_KEY);
-        when(planBuilder.build(eq(STOCK_DCA), eq(TRADING_ACCOUNT), eq(DCA_CYCLE), any(), any(), any()))
+        when(planBuilder.build(eq(STOCK_DCA), eq(TRADING_ACCOUNT), eq(DCA_CYCLE), any(), any()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(new CycleOrderStrategy.OrderPlan(null, null, List.of(dcaBuy)), null));
 
         NextOrdersPreview result = service.preview(STOCK_DCA.id(), ACCOUNT.userId());
@@ -558,7 +557,7 @@ class TradingPreviewServiceTest {
     }
 
     private void stubPlan(Strategy strategy, StrategyCycle cycle, PlannedOrder... orders) {
-        when(planBuilder.build(eq(strategy), eq(TRADING_ACCOUNT), eq(cycle), any(), any(), any()))
+        when(planBuilder.build(eq(strategy), eq(TRADING_ACCOUNT), eq(cycle), any(), any()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(new CycleOrderStrategy.OrderPlan(null, null, List.of(orders)), null));
     }
 
@@ -631,7 +630,7 @@ class TradingPreviewServiceTest {
         when(accountPort.requireOwnedAccount(mock.id(), mock.userId())).thenReturn(mock);
         when(strategyPort.findByAccountId(mock.id())).thenReturn(List.of(mockStrategy));
         when(strategyCyclePort.findLatestByStrategyIds(List.of(mockStrategy.id()))).thenReturn(Map.of(mockStrategy.id(), mockCycle));
-        when(planBuilder.build(eq(mockStrategy), any(), eq(mockCycle), any(), any(), any()))
+        when(planBuilder.build(eq(mockStrategy), any(), eq(mockCycle), any(), any()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(
                         new CycleOrderStrategy.OrderPlan(null, null, List.of(buyOrder(StrategyTicker.SOXL, 8, "38.04"))), null));
 
@@ -765,7 +764,7 @@ class TradingPreviewServiceTest {
         when(accountPort.requireOwnedAccount(mock.id(), mock.userId())).thenReturn(mock);
         when(strategyPort.findByAccountId(mock.id())).thenReturn(List.of(mockStrategy));
         when(strategyCyclePort.findLatestByStrategyIds(List.of(mockStrategy.id()))).thenReturn(Map.of(mockStrategy.id(), mockCycle));
-        when(planBuilder.build(eq(mockStrategy), any(), eq(mockCycle), any(), any(), any()))
+        when(planBuilder.build(eq(mockStrategy), any(), eq(mockCycle), any(), any()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(
                         new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder(StrategyTicker.SOXL, 5, "40.00"))), null));
 

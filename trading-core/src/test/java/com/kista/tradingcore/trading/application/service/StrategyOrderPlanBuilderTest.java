@@ -1,7 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 import com.kista.tradingcore.trading.application.service.support.TradingBalanceLoader;
 
-import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.trading.domain.model.NextOrdersPreview.SkipReason;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
@@ -69,7 +68,7 @@ class StrategyOrderPlanBuilderTest {
         when(balanceLoader.tryLoadBalance(strategy))
                 .thenReturn(new TradingBalanceLoader.BalanceLoad(null, SkipReason.NO_CYCLE_HISTORY));
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, account.id(), Map.of());
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, Map.of());
 
         assertThat(result.isSkip()).isTrue();
         assertThat(result.skipReason()).isEqualTo(SkipReason.NO_CYCLE_HISTORY);
@@ -87,7 +86,7 @@ class StrategyOrderPlanBuilderTest {
         when(orderComputer.compute(balance, strategy, new BigDecimal("21.00"), today, cycle, null, account.id(), null, null))
                 .thenReturn(Optional.of(plan));
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, account.id(), Map.of());
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, Map.of());
 
         assertThat(result.isSkip()).isFalse();
         assertThat(result.plan()).isSameAs(plan);
@@ -111,7 +110,7 @@ class StrategyOrderPlanBuilderTest {
                 eq(today), eq(vrCycle), eq(null), eq(account.id()), eq(null), eq(null)))
                 .thenReturn(Optional.of(plan));
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(vrStrategy, account, vrCycle, today, account.id(), Map.of());
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(vrStrategy, account, vrCycle, today, Map.of());
 
         assertThat(result.isSkip()).isFalse();
         assertThat(result.plan()).isSameAs(plan);
@@ -130,7 +129,7 @@ class StrategyOrderPlanBuilderTest {
         when(orderComputer.compute(balance, strategy, null, today, cycle, null, account.id(), null, null))
                 .thenReturn(Optional.of(plan));
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, account.id(), Map.of());
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, Map.of());
 
         assertThat(result.isSkip()).isFalse();
         verify(pricePort, never()).getPrevClose(any(), any());
@@ -147,7 +146,7 @@ class StrategyOrderPlanBuilderTest {
                 .thenReturn(Optional.of(plan));
         Map<StrategyTicker, BigDecimal> prevCloseCache = Map.of(StrategyTicker.SOXL, new BigDecimal("22.00"));
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, account.id(), prevCloseCache);
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, prevCloseCache);
 
         assertThat(result.isSkip()).isFalse();
         assertThat(result.plan()).isSameAs(plan);
@@ -165,7 +164,7 @@ class StrategyOrderPlanBuilderTest {
         when(orderComputer.compute(balance, strategy, new BigDecimal("21.00"), today, cycle, null, account.id(), null, null))
                 .thenReturn(Optional.of(plan));
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, account.id(), Map.of());
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, Map.of());
 
         assertThat(result.isSkip()).isFalse();
         verify(pricePort).getPrevClose(StrategyTicker.SOXL, account.brokerRef());
@@ -180,7 +179,7 @@ class StrategyOrderPlanBuilderTest {
         when(orderComputer.compute(balance, strategy, null, today, cycle, null, account.id(), null, null))
                 .thenReturn(Optional.empty());
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, account.id(), Map.of());
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, Map.of());
 
         assertThat(result.isSkip()).isTrue();
         assertThat(result.skipReason()).isEqualTo(SkipReason.NO_PRIVACY_BASE);
@@ -199,7 +198,7 @@ class StrategyOrderPlanBuilderTest {
         when(privacyTradePort.findTodayTrade(today)).thenReturn(Optional.of(base));
         when(privacyBaseGuard.usable(base)).thenReturn(false);
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(privacy, account, cycle, today, account.id(), Map.of());
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(privacy, account, cycle, today, Map.of());
 
         assertThat(result.isSkip()).isTrue();
         assertThat(result.skipReason()).isEqualTo(SkipReason.PRIVACY_BASE_BLOCKED);
@@ -222,7 +221,7 @@ class StrategyOrderPlanBuilderTest {
         when(orderComputer.compute(balance, privacy, null, today, cycle, base, account.id(), null, null))
                 .thenReturn(Optional.of(plan));
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(privacy, account, cycle, today, account.id(), Map.of());
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(privacy, account, cycle, today, Map.of());
 
         assertThat(result.plan()).isSameAs(plan);
     }
@@ -238,7 +237,7 @@ class StrategyOrderPlanBuilderTest {
         when(orderComputer.compute(balance, privacy, null, today, cycle, null, account.id(), null, null))
                 .thenThrow(new com.kista.tradingcore.matching.domain.strategy.PrivacyValuationException("FIDA 자산이 유효하지 않습니다."));
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(privacy, account, cycle, today, account.id(), Map.of());
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(privacy, account, cycle, today, Map.of());
 
         assertThat(result.plan()).isNull();
         assertThat(result.skipReason()).isEqualTo(SkipReason.PRIVACY_BASE_BLOCKED);

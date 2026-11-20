@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE) // OrderJpaRepository가 package-private
 class OrderPersistenceAdapter implements OrderPort {
 
-    // 열린 주문 — 슬롯 점유·재계산 skip·수동 실행 이중 실행 판정 (SUBMITTING은 접수 결과 미확정이라 점유로 본다)
+    // 열린 주문 — 슬롯 점유·재계산 skip·이중 실행 판정 (SUBMITTING은 접수 결과 미확정이라 점유로 본다)
     private static final List<OrderStatus> OPEN_STATUSES =
             List.of(OrderStatus.PLANNED, OrderStatus.SUBMITTING, OrderStatus.PLACED);
 
@@ -76,7 +76,7 @@ class OrderPersistenceAdapter implements OrderPort {
 
     @Override
     public List<Order> findPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
-        // 수동 실행 감지·이중 실행 방지용 — PLACED 주문 조회
+        // 이중 실행 방지용 — PLACED 주문 조회
         return toDomainList(repository.findByStrategyCycleIdAndTradeDateAndStatus(
                 strategyCycleId, tradeDate, OrderStatus.PLACED));
     }

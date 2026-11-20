@@ -33,7 +33,7 @@
 - 외부 원본 참조 데이터(`us_market_holidays` 등 US 달력일)는 원본 기준 유지. KST↔US 변환은 허용 어댑터 내부에서만 `UsTradeDates`로 한다 (가드: `usTradeDates_must_only_be_used_by_allowlisted_adapters`)
 - Instant ↔ KST 일자 경계는 `atStartOfDay(TimeZones.KST)` 단일 관용구 — `ZoneOffset.UTC` 자정 경계 금지. 당일 포함 상한은 `KstDays.endExclusive(day)` — `plusDays(1).atStartOfDay(...)` 인라인 금지
 - `ZoneId.of`는 `TimeZones` 상수(`KST`·`NY`)로만 (가드: `zoneId_of_must_only_be_called_in_TimeZones`)
-- 거래일 경계: preview·수동 실행·DCA 요약·VR 재설정은 `SessionTradeDates.nextTradeDate`(그 거래일 실제 마감 30분 전 경계), 개장 배치만 `DstInfo.nextTradeDate`(`SCHEDULER_RUN_TIME = 04:30 KST` 고정)
+- 거래일 경계: preview·DCA 요약·VR 재설정은 `SessionTradeDates.nextTradeDate`(그 거래일 실제 마감 30분 전 경계), 개장 배치만 `DstInfo.nextTradeDate`(`SCHEDULER_RUN_TIME = 04:30 KST` 고정)
 - 현재 시각은 KST `Clock` 빈을 주입해 `X.now(clock)`으로 읽는다. 도메인·정적 유틸은 시각을 파라미터로 받는다. 테스트는 `Clock.fixed`(`FixedClockTestConfig`) (가드: `main_code_must_not_read_system_clock_directly`)
 - 인라인 `.minusDays(1)`/`.plusDays(1)`로 날짜 기준 변환 금지 — `UsTradeDates`/`PrivacyDates` 경유
 

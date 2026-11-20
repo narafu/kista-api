@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-// TradingService/ManualTradingService/TradingPreviewService가 공유하던 주문 계획 공통부 추출
+// TradingService/TradingPreviewService가 공유하던 주문 계획 공통부 추출
 // '전략 라우팅 → plan(PlanContext) → 잔고 유효성 검증'까지만 수행 — 저장·알림·반환 변환은 호출측 책임
 @Slf4j
 @Component
@@ -50,7 +50,7 @@ class CycleOrderComputer {
 
     // 전략 계산 + 주문 유효성 검증을 묶어 계산만 수행 (부수효과 없음)
     // currentCycle: INFINITE은 리버스모드 판단에 사용
-    // currentPrice: VR 실주문 기준가격(PRIVACY는 소비하지 않음) — preview/수동실행 시 null
+    // currentPrice: VR 실주문 기준가격(PRIVACY는 소비하지 않음) — preview 시 null
     // Optional.empty() = 전략 차원 skip (예: PRIVACY 기준매매표 미수신)
     Optional<CycleOrderStrategy.OrderPlan> compute(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
                                                    LocalDate tradeDate, StrategyCycle currentCycle,
@@ -106,7 +106,7 @@ class CycleOrderComputer {
             CyclePosition openingPosition = cyclePositionPort.findFirstOne(currentCycle.id())
                     .orElseThrow(() -> new IllegalStateException("VR 시작 포지션이 없습니다."));
             BigDecimal poolLimit = StrategyVrDetail.poolLimitOf(openingPosition.deposit(), cycleVr.poolLimitRate());
-            // referencePrice: bootstrap·일반 사다리 캡 판정 공용 기준가 — currentPrice 없으면(preview·수동실행) 전일종가로 대체
+            // referencePrice: bootstrap·일반 사다리 캡 판정 공용 기준가 — currentPrice 없으면(preview) 전일종가로 대체
             BigDecimal vrReferencePrice = currentPrice != null ? currentPrice : prevClosePrice;
             vrInputs = new CycleOrderStrategy.PlanContext.VrInputs(
                     cycleVr.value(), vrDetail.bandWidth(), poolLimit, poolUsed, vrReferencePrice, currentPrice,
