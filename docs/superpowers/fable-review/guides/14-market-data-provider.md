@@ -349,4 +349,5 @@ T3 실행 결과(2026-11-20, N19):
 - **차트·백테스트**: 차트는 RAW(개수 1~600), 백테스트는 SPLIT. 내부 캔들 API의 `interval`을 지웠고 stats의 `AlpacaCandleAdapter`·`HistoricalCandlePort`·`AlpacaConfig`를 삭제했다. Alpaca 전송 오류는 `MarketDataApiException`(503)이다.
 - **마감 리포트**: 마감+20분, 확정 종가 없음 → 10분 뒤 1회 재조회 → 보류(Q-30).
 - **토스 계좌 현재가**: 처음에는 Alpaca `latestPrices`(Q-13 대체 경로)로 갔다가, 2026-11-21 운영 토스 계좌 키로 읽기 전용 1회 호출(토큰 200, `/api/v1/prices` 200 — 계좌 헤더 유무 모두)을 확인하고 계좌 토큰 `/api/v1/prices`로 바꿨다(`TossPriceApi.currentPrices`). 계좌 토큰 경로는 429를 재시도하지 않는다(그 계좌만 빠지고 알림).
+- **T5 주의(2026-11-21)**: 메리츠는 `currentPrices`를 override하지 않고 `BrokerPricePort`의 default(`getPrices` 위임 → `MeritzPriceApi` 종목별 단건)를 탄다. T5에서 옛 메서드를 지울 때 default를 없애고 `MeritzBrokerAdapter.currentPrices`를 명시적으로 둔다. 실패 모양도 맞춘다(토스는 빠진 종목만 키 없음, 메리츠는 한 종목 예외면 계좌 전체 실패).
 - Mock은 확정 일봉이 없으면 `getExecutions`가 예외를 던진다(현재가 대체 삭제).
