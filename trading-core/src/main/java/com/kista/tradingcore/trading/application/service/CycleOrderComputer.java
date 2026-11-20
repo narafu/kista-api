@@ -14,6 +14,7 @@ import com.kista.tradingcore.trading.application.port.output.StrategyVrDetailPor
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.broker.domain.model.BrokerCandle;
 import com.kista.tradingcore.broker.domain.model.DailyCandleQuery;
@@ -47,6 +48,7 @@ class CycleOrderComputer {
     private final StrategyVrDetailPort strategyVrDetailPort; // VR 전략 버전 상세 (bandWidth)
     private final OrderPort orderPort;                       // VR poolUsed 조회용
     private final MarketDataClient alpaca;            // 리버스모드 별지점용 직전 5거래일 종가(공용 시세 일봉)
+    private final MarketCalendarPort marketCalendarPort; // KST 거래일 → 미국 세션일
 
     // 전략 계산 + 주문 유효성 검증을 묶어 계산만 수행 (부수효과 없음)
     // currentCycle: INFINITE은 리버스모드 판단에 사용
@@ -127,7 +129,7 @@ class CycleOrderComputer {
                 .filter(o -> ReverseInfiniteStrategy.LOC_SELL_LEG.equals(o.orderLeg()) && o.price() != null)
                 .map(Order::price).findFirst();
         if (storedSellPrice.isPresent()) return storedSellPrice.get();
-        LocalDate usSessionDate = tradeDate.minusDays(1); // TradingService.usSessionDate와 같은 규칙(KST 거래일 → 미국 세션일)
+        LocalDate usSessionDate = marketCalendarPort.usSessionDateOf(tradeDate); // KST 거래일 → 미국 세션일
         Optional<List<BrokerCandle>> fetched = BrokerCallGuard.tryGet("strategyId=" + strategy.id(), () -> alpaca.dailyCandles(
                 strategy.ticker().name(), DailyCandleQuery.lastBefore(usSessionDate, STAR_POINT_WINDOW, DailyCandleQuery.Adjustment.RAW)));
         List<BrokerCandle> candles = fetched.orElse(List.of());

@@ -40,6 +40,7 @@ class CycleOrderComputerTest {
     @Mock StrategyVrDetailPort strategyVrDetailPort;
     @Mock OrderPort orderPort;
     @Mock com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient alpaca;
+    @Mock com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort marketCalendarPort;
     @Mock InfiniteStrategy infiniteStrategy;
     @Mock VrStrategy vrStrategy;
     @Mock PrivacyStrategy privacyStrategy;
@@ -90,9 +91,10 @@ class CycleOrderComputerTest {
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new VrCycleOrderStrategy(vrStrategy)));
 
+        lenient().when(marketCalendarPort.usSessionDateOf(any())).thenAnswer(inv -> ((java.time.LocalDate) inv.getArgument(0)).minusDays(1)); // KST 거래일 → 미국 세션일
         computer = new CycleOrderComputer(
                 cycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort,
-                strategyInfiniteDetailPort, strategyCycleVrPort, strategyVrDetailPort, orderPort, alpaca);
+                strategyInfiniteDetailPort, strategyCycleVrPort, strategyVrDetailPort, orderPort, alpaca, marketCalendarPort);
     }
 
     @Test
@@ -262,7 +264,7 @@ class CycleOrderComputerTest {
         CycleOrderStrategies realCycleStrategies = new CycleOrderStrategies(List.of(realVrCycleStrategy));
         CycleOrderComputer realComputer = new CycleOrderComputer(
                 realCycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort,
-                strategyInfiniteDetailPort, strategyCycleVrPort, strategyVrDetailPort, orderPort, alpaca);
+                strategyInfiniteDetailPort, strategyCycleVrPort, strategyVrDetailPort, orderPort, alpaca, marketCalendarPort);
 
         // 가격 캡 트리거 픽스처:
         // holdings=1, value=10000, bandWidth=15% → lowerBand=8500, buyPrice(m=1) = 8500/1 = 8500
@@ -353,7 +355,7 @@ class CycleOrderComputerTest {
         CycleOrderComputer reverseComputer = new CycleOrderComputer(
                 new CycleOrderStrategies(List.of(new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy))),
                 cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCycleVrPort, strategyVrDetailPort, orderPort, alpaca);
+                strategyCycleVrPort, strategyVrDetailPort, orderPort, alpaca, marketCalendarPort);
 
         reverseComputer.compute(BALANCE, INFINITE_STRATEGY, new BigDecimal("20.00"),
                 LocalDate.now(), INFINITE_CYCLE, null, null, CURRENT_PRICE);
@@ -386,7 +388,7 @@ class CycleOrderComputerTest {
         CycleOrderComputer reverseComputer = new CycleOrderComputer(
                 new CycleOrderStrategies(List.of(new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy))),
                 cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCycleVrPort, strategyVrDetailPort, orderPort, alpaca);
+                strategyCycleVrPort, strategyVrDetailPort, orderPort, alpaca, marketCalendarPort);
         reverseComputer.compute(BALANCE, INFINITE_STRATEGY, new BigDecimal("20.00"),
                 STAR_TRADE_DATE, INFINITE_CYCLE, null, null, CURRENT_PRICE);
         var captor = org.mockito.ArgumentCaptor.forClass(ReverseModePosition.class);
@@ -402,8 +404,10 @@ class CycleOrderComputerTest {
     @Test
     @DisplayName("리버스 2일차 — 별지점은 직전 5거래일 일봉 종가 평균이고 원장 행 평균이 아니다")
     void starPoint_usesAlpacaDailyCloses() {
+        // 세션일은 usSessionDateOf 결과여야 한다(거래일-1 직접 계산이 아님) — 일부러 다른 날짜를 돌려준다
+        when(marketCalendarPort.usSessionDateOf(STAR_TRADE_DATE)).thenReturn(STAR_TRADE_DATE.minusDays(3));
         var query = com.kista.tradingcore.broker.domain.model.DailyCandleQuery.lastBefore(
-                STAR_TRADE_DATE.minusDays(1), 5, com.kista.tradingcore.broker.domain.model.DailyCandleQuery.Adjustment.RAW);
+                STAR_TRADE_DATE.minusDays(3), 5, com.kista.tradingcore.broker.domain.model.DailyCandleQuery.Adjustment.RAW);
         when(alpaca.dailyCandles("SOXL", query)).thenReturn(candles("20.00", "21.00", "22.00", "23.00", "24.00"));
 
         assertThat(starPointOfReverseDay2(true)).isEqualTo(new BigDecimal("22.00"));
@@ -460,7 +464,7 @@ class CycleOrderComputerTest {
                 new CyclePosition(UUID.randomUUID(), cycle.id(), BigDecimal.ONE, closingPrice, null, BigDecimal.ZERO, null, null)));
         when(mockStrategies.of(StrategyType.PRIVACY)).thenReturn(mockPrivacyOrderStrategy);
         CycleOrderComputer c = new CycleOrderComputer(mockStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort,
-                strategyInfiniteDetailPort, strategyCycleVrPort, strategyVrDetailPort, orderPort, alpaca);
+                strategyInfiniteDetailPort, strategyCycleVrPort, strategyVrDetailPort, orderPort, alpaca, marketCalendarPort);
 
         c.compute(BALANCE, privacy, prevClose, LocalDate.now(), cycle, null, ACCOUNT_ID, null);
 

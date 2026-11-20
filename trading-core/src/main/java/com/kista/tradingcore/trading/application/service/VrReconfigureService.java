@@ -36,6 +36,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
 
 // VR 전략 운영 중 재설정 — 램프 파라미터 교체(새 버전 발급) + 강제 롤오버(현재 사이클 종료→새 사이클) + 선택적 투자금 추가
@@ -94,8 +95,12 @@ public class VrReconfigureService {
         AccountBalance postBalance = applyCapitalAdjustment(cmd, latestPosition);
 
         // 현재가 조회 — 수량 주입 시 V 증분·holdings 승계 스냅샷 종가 기준 (구조적 검증 통과 후에만 호출, 실패 시 불필요한 API 호출 방지)
+        // 주문을 내는 경로라 계좌 증권사 현재가를 쓴다(공용 시세 대체 금지)
         BigDecimal currentPrice = BrokerCallGuard.wrap("현재가 조회",
-                () -> brokerPricePort.getPrice(strategy.ticker(), account.toBrokerRef()));
+                () -> brokerPricePort.currentPrices(account.toBrokerRef(), List.of(strategy.ticker()))).get(strategy.ticker());
+        if (currentPrice == null) {
+            throw new IllegalStateException("현재가를 조회하지 못했습니다.");
+        }
         BigDecimal newValue = computeNewValue(cmd, currentCycleVr, currentPrice);
 
         // 인출식(recurringAmount<0) 최소자산 검증 — 등록 시점(VrRegistration)과 동일 규칙,

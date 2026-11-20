@@ -64,6 +64,7 @@ class ManualTradingServiceTest {
     @Mock OrderPort orderPort;
     @Mock PrivacyTradePort privacyTradePort;
     @Mock BrokerPricePort tossPricePort;      // 시세 포트 mock
+    @Mock com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient marketData; // 전일종가 공용 시세 mock
     @Mock CyclePositionPort cyclePositionPort;
     @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
@@ -115,7 +116,7 @@ class ManualTradingServiceTest {
                 new VrCycleOrderStrategy(vrStrategy))); // VR 수동 실행 테스트용
         CycleOrderComputer orderComputer = new CycleOrderComputer(
                 cycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCycleVrPort, strategyVrDetailPort, orderPort, mock(com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient.class));
+                strategyCycleVrPort, strategyVrDetailPort, orderPort, mock(com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient.class), mock(com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort.class));
         orderPlanner = new TradingOrderPlanner(orderPort);
         priceFetcher = new TradingPriceFetcher(tossPricePort,
                 mock(com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient.class),
@@ -124,7 +125,7 @@ class ManualTradingServiceTest {
         // 계좌 현재가는 default 구현(getPrices 위임)을 그대로 타게 해 기존 getPrices 스텁을 재사용한다
         lenient().when(tossPricePort.currentPrices(any(), any())).thenCallRealMethod();
         planBuilder = new StrategyOrderPlanBuilder(
-                balanceLoader, tossPricePort, privacyTradePort, orderComputer, cycleStrategies, privacyBaseGuard, orderPort, null);
+                balanceLoader, marketData, privacyTradePort, orderComputer, cycleStrategies, privacyBaseGuard, orderPort, null);
         priceCapper = new BuyOrderPriceCapper(
                 orderPort, orderPlanner, cycleStrategies, strategyCyclePort);
         ledgerBudget = new StrategyLedgerBudget(cyclePositionPort, orderPort, mock(TradingBatchRunPort.class), cycleStrategies);
@@ -149,9 +150,9 @@ class ManualTradingServiceTest {
                 .thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 40)));
         lenient().when(strategyInfiniteDetailPort.findActiveByStrategyId(STRATEGY.id()))
                 .thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 40)));
-        // planBuilder는 INFINITE/VR 둘 다 requiresPrevClose()=true라 전일종가를 항상 조회한다(BrokerPricePort.getPrevClose 경유,
+        // planBuilder는 INFINITE/VR 둘 다 requiresPrevClose()=true라 전일종가를 항상 조회한다(MarketDataClient.requireLatestClose 경유,
         // priceFetcher.fetchPriceSnapshots와 별도) — holdings>0인 기존 픽스처는 이 값을 쓰지 않지만 VR referencePrice 폴백에는 필요
-        lenient().when(tossPricePort.getPrevClose(eq(StrategyTicker.SOXL), eq(ACCOUNT_REF)))
+        lenient().when(marketData.requireLatestClose(StrategyTicker.SOXL))
                 .thenReturn(new BigDecimal("20.00"));
         // 캡 판단용 현재가 — 기존 주문 픽스처 가격(22.00)에 캡(×1.05=23.10)이 걸리지 않는 기본값(개별 테스트가 필요 시 override)
         lenient().when(tossPricePort.getPrices(anyList(), eq(ACCOUNT_REF)))

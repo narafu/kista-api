@@ -182,7 +182,7 @@ class TradingServiceTest {
                 new DcaCycleOrderStrategy())); // VR executeBatch 테스트용 · DCA 개장 주문 테스트용
         CycleOrderComputer orderComputer = new CycleOrderComputer(
                 cycleStrategies, cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCycleVrPort, strategyVrDetailPort, orderPort, mock(com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient.class));
+                strategyCycleVrPort, strategyVrDetailPort, orderPort, mock(com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient.class), mock(com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort.class));
         CycleRotationService rotationService = new CycleRotationService(
                 cyclePort, strategyVersionPort, strategyInfiniteDetailPort,
                 cycleHistoryPort, cycleSnapshotCreator, eventPublisher, cycleStrategies);

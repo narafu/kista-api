@@ -3,7 +3,7 @@ package com.kista.tradingcore.trading.application.service;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
-import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.matching.domain.model.BootstrapPosition;
 import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
@@ -49,7 +49,7 @@ class StrategyCreationService {
     private final StrategyPort strategyPort;
     private final AccountPort accountPort;
     private final TradingUserProfilePort tradingUserProfilePort; // 사용자 복제본 존재 확인용
-    private final BrokerPricePort brokerPricePort;
+    private final MarketDataClient marketData; // 전일종가 공용 시세
     private final StrategyCreationPolicyPort strategyCreationPolicyPort;
     private final StrategyCreationResolvers creationResolvers;
     private final StrategyCreationPersister creationPersister; // 저장 5단계 트랜잭션 경계 (self-invocation 회피용 별도 빈)
@@ -108,7 +108,7 @@ class StrategyCreationService {
         // INFINITE 최소 시드 검증 — 폼이 먼저 막지만 API 직접 호출도 0회차 교착 시드를 만들지 못하게 서버에서도 막는다
         if (cmd.type() == StrategyType.INFINITE) {
             InfiniteMinSeedGuard.requireAtLeast(
-                    minSeedGuard.minSeed(account.toBrokerRef(), resolvedTicker, resolved.divisionCount(), marketPrice), openAmount);
+                    minSeedGuard.minSeed(resolvedTicker, resolved.divisionCount(), marketPrice), openAmount);
         }
 
         // 저장 5단계(strategy·version·detail·cycle·position)는 별도 빈의 한 트랜잭션 — 중간 실패 시 부분 저장 없이 롤백
@@ -140,10 +140,10 @@ class StrategyCreationService {
     }
 
     // 중간부터 시작 시 시장가(전일종가) 조회 — startAmount·초기 포지션·VR V값을 동일 기준으로 정합
-    // 조회 실패 시 등록 자체가 실패한다 — 증권사 예외는 BrokerCallGuard가 그대로 전파해 ProblemDetailExceptionHandler가 503/422/429 매핑
+    // 조회 실패 시 등록 자체가 실패한다 — 공용 시세 실패는 BrokerCallGuard가 IllegalStateException으로 감싸 전파한다(증권사 타입 예외면 그대로 전파해 503/422/429 매핑)
     private BigDecimal fetchMarketPrice(Account account, StrategyTicker ticker) {
         return BrokerCallGuard.wrap("전일종가 조회",
-                () -> brokerPricePort.getPrevClose(ticker, account.toBrokerRef()));
+                () -> marketData.requireLatestClose(ticker));
     }
 
     // 등록 시점에만 런타임 생성 정책을 적용해 기존 전략 흐름과 설정 조회를 분리한다.

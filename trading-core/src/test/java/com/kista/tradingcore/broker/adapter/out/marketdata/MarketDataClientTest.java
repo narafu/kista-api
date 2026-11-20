@@ -6,6 +6,7 @@ import com.kista.shared.platform.alpaca.AlpacaProperties;
 import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.broker.domain.model.BrokerCandle;
 import com.kista.tradingcore.broker.domain.model.DailyCandleQuery;
+import com.kista.tradingcore.broker.domain.model.MarketDataApiException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -96,11 +97,22 @@ class MarketDataClientTest {
     }
 
     @Test
+    @DisplayName("일봉: 서버 500이면 재시도 뒤에도 실패해 503 매핑 타입(MarketDataApiException)으로 원인과 함께 던진다")
+    void dailyCandles_server500_throwsBrokerApiException() {
+        server.expect(ExpectedCount.twice(), requestTo(startsWith(BARS))).andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+
+        assertThatThrownBy(() -> adapter.dailyCandles("SOXL", DailyCandleQuery.latest(5, DailyCandleQuery.Adjustment.RAW)))
+                .isInstanceOf(MarketDataApiException.class)
+                .isInstanceOf(com.kista.tradingcore.broker.domain.model.BrokerApiException.class)
+                .hasCauseInstanceOf(RestClientException.class);
+    }
+
+    @Test
     @DisplayName("현재가: 두 피드가 모두 실패하면 대체값 없이 예외다")
     void latestPrices_bothFeedsFail_throws() {
         server.expect(ExpectedCount.twice(), requestTo(startsWith(SNAPSHOTS))).andRespond(withStatus(HttpStatus.FORBIDDEN));
 
-        assertThatThrownBy(() -> adapter.latestPrices(List.of(SOXL))).isInstanceOf(RestClientException.class);
+        assertThatThrownBy(() -> adapter.latestPrices(List.of(SOXL))).isInstanceOf(MarketDataApiException.class).hasCauseInstanceOf(RestClientException.class);
     }
 
     @Test

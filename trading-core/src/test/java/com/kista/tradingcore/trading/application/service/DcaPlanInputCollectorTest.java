@@ -14,7 +14,8 @@ import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
-import com.kista.tradingcore.broker.application.port.output.CandlePort;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
+import com.kista.tradingcore.broker.domain.model.DailyCandleQuery;
 import com.kista.tradingcore.broker.domain.model.BrokerCandle;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.matching.domain.model.DcaCondition;
@@ -68,7 +69,8 @@ class DcaPlanInputCollectorTest {
     static final LocalDate PREV_OPEN = LocalDate.of(2026, 10, 12); // US_SESSION 직전 개장일 (setUp: 모든 날 개장)
 
     MarketCalendarPort calendar = mock(MarketCalendarPort.class);
-    CandlePort candlePort = mock(CandlePort.class);
+    static final DailyCandleQuery DCA_QUERY = DailyCandleQuery.lastBefore(US_SESSION, 250, DailyCandleQuery.Adjustment.ALL); // 조회 US 세션 이전 확정 250봉(지표용 조정가)
+    MarketDataClient marketData = mock(MarketDataClient.class);
     FearGreedIndexPort fearGreedPort = mock(FearGreedIndexPort.class);
     OrderPort orderPort = mock(OrderPort.class);
     StrategyDcaDetailPort dcaDetailPort = mock(StrategyDcaDetailPort.class);
@@ -76,7 +78,7 @@ class DcaPlanInputCollectorTest {
     com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort batchRunPort =
             mock(com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort.class); // isReported 기본 false
     StrategyLedgerBudget ledgerBudget = mock(StrategyLedgerBudget.class); // BUY 가용 = 원장 예수금 잔여
-    DcaPlanInputCollector collector = new DcaPlanInputCollector(calendar, candlePort, fearGreedPort, orderPort,
+    DcaPlanInputCollector collector = new DcaPlanInputCollector(calendar, marketData, fearGreedPort, orderPort,
             dcaDetailPort, executionPort, ledgerBudget, batchRunPort);
     DcaCycleOrderStrategy kernel = new DcaCycleOrderStrategy();
     DcaCollected collected; // 직전 plan() 호출의 수집 결과 — 복구 대상 단언용
@@ -99,7 +101,7 @@ class DcaPlanInputCollectorTest {
         when(calendar.usSessionDateOf(TRADE_DATE)).thenReturn(US_SESSION);
         when(calendar.isUsSessionOpen(any())).thenReturn(true);
         when(executionPort.find(any(), any(), eq(TRADE_DATE))).thenReturn(Optional.empty());
-        when(candlePort.getDailyCandlesBefore("UPRO", US_SESSION, 250)).thenReturn(List.of(
+        when(marketData.dailyCandles("UPRO", DCA_QUERY)).thenReturn(List.of(
                 new BrokerCandle(LocalDate.of(2026, 10, 12), null, null, null, new BigDecimal("87.12"), 0)));
     }
 
@@ -158,7 +160,7 @@ class DcaPlanInputCollectorTest {
     void ignores_other_timing_batch() {
         dca(OrderDirection.BUY, OrderType.MOO);
         assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger)).isEmpty();
-        verifyNoInteractions(candlePort);
+        verifyNoInteractions(marketData);
         assertThat(last.skips()).isEmpty();
     }
 
@@ -167,7 +169,7 @@ class DcaPlanInputCollectorTest {
         config(new DcaRule(KEY, OrderDirection.BUY, DcaFrequency.MONTHLY, null, 1, OrderType.MOC,
                 new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("300"), null), DcaShortfallPolicy.PARTIAL, List.of()));
         assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger)).isEmpty();
-        verifyNoInteractions(candlePort);
+        verifyNoInteractions(marketData);
         assertThat(last.skips()).isEmpty();
     }
 
@@ -177,7 +179,7 @@ class DcaPlanInputCollectorTest {
         when(executionPort.find(ctx.strategy().id(), KEY, TRADE_DATE))
                 .thenReturn(Optional.of(DcaExecution.skipped(ctx.strategy().id(), KEY, OrderDirection.BUY, TRADE_DATE, DcaSkipReason.NO_HOLDINGS, null, null)));
         assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger)).isEmpty();
-        verifyNoInteractions(candlePort);
+        verifyNoInteractions(marketData);
         assertThat(last.skips()).isEmpty();
     }
 
@@ -187,7 +189,7 @@ class DcaPlanInputCollectorTest {
         Order existing = existingOrder(OrderTiming.AT_CLOSE, OrderType.MOC);
         assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(existing), null, ledger)).isEmpty();
         assertThat(collected.recoveries()).containsExactlyEntriesOf(java.util.Map.of(KEY, existing));
-        verifyNoInteractions(candlePort); // 재판정(시세 재조회) 없이 복구만
+        verifyNoInteractions(marketData); // 재판정(시세 재조회) 없이 복구만
     }
 
     @Test
@@ -212,7 +214,7 @@ class DcaPlanInputCollectorTest {
         assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger)).isEmpty();
 
         assertThat(collected.recoveries()).containsExactlyEntriesOf(java.util.Map.of(KEY, filled));
-        verifyNoInteractions(candlePort);
+        verifyNoInteractions(marketData);
     }
 
     @Test
@@ -227,7 +229,7 @@ class DcaPlanInputCollectorTest {
     @Test
     void candle_failure_records_data_unavailable() {
         dca(OrderDirection.BUY, OrderType.MOC);
-        when(candlePort.getDailyCandlesBefore(any(), any(), anyInt())).thenThrow(new RuntimeException("toss down"));
+        when(marketData.dailyCandles(any(), any())).thenThrow(new RuntimeException("toss down"));
         assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger)).isEmpty();
         assertSkipped(DcaSkipReason.DATA_UNAVAILABLE).extracting(DcaRuleDecision.Skipped::referencePrice).isNull();
     }
@@ -311,7 +313,7 @@ class DcaPlanInputCollectorTest {
     @Test
     void stale_feed_is_data_unavailable() {
         // 직전 개장일은 10-12인데 마지막 봉이 10-09 → 피드 지연
-        when(candlePort.getDailyCandlesBefore("UPRO", US_SESSION, 250)).thenReturn(List.of(
+        when(marketData.dailyCandles("UPRO", DCA_QUERY)).thenReturn(List.of(
                 new BrokerCandle(LocalDate.of(2026, 10, 9), null, null, null, new BigDecimal("87.12"), 0)));
         dca(OrderDirection.BUY, OrderType.MOC);
         assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger)).isEmpty();
@@ -322,7 +324,7 @@ class DcaPlanInputCollectorTest {
     void previous_open_session_skips_holidays() {
         // 10-12 휴장·10-10/11 주말 → 직전 개장일 10-09, 마지막 봉 10-09면 정상
         for (int day = 10; day <= 12; day++) when(calendar.isUsSessionOpen(LocalDate.of(2026, 10, day))).thenReturn(false);
-        when(candlePort.getDailyCandlesBefore("UPRO", US_SESSION, 250)).thenReturn(List.of(
+        when(marketData.dailyCandles("UPRO", DCA_QUERY)).thenReturn(List.of(
                 new BrokerCandle(LocalDate.of(2026, 10, 9), null, null, null, new BigDecimal("87.12"), 0)));
         dca(OrderDirection.BUY, OrderType.MOC);
         assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger)).isNotEmpty();
@@ -333,7 +335,7 @@ class DcaPlanInputCollectorTest {
         dca(OrderDirection.BUY, OrderType.MOC);
         plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger);
         plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger);
-        verify(candlePort, times(1)).getDailyCandlesBefore("UPRO", US_SESSION, 250);
+        verify(marketData, times(1)).dailyCandles("UPRO", DCA_QUERY);
     }
 
     @Test
@@ -346,7 +348,7 @@ class DcaPlanInputCollectorTest {
 
     @Test
     void candle_failure_is_not_cached() {
-        when(candlePort.getDailyCandlesBefore("UPRO", US_SESSION, 250))
+        when(marketData.dailyCandles("UPRO", DCA_QUERY))
                 .thenThrow(new RuntimeException("toss down"))
                 .thenReturn(List.of(new BrokerCandle(LocalDate.of(2026, 10, 12), null, null, null, new BigDecimal("87.12"), 0)));
         dca(OrderDirection.BUY, OrderType.MOC);

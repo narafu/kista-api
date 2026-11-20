@@ -224,7 +224,7 @@ public class StrategyService {
             if (owned.strategy().isInfinite()) {
                 // HTTP 전에 싼 입력 검증부터 — 무효 시드로 시세 조회를 낭비하지 않는다
                 StrategyUpdateWriter.requireValidSeed(cmd.newSeed(), owned.currency());
-                minSeed = minSeedGuard.minSeed(owned.strategy(), owned.account().toBrokerRef()); // 조회 실패는 null(검사 건너뜀)
+                minSeed = minSeedGuard.minSeed(owned.strategy()); // 조회 실패는 null(검사 건너뜀)
             }
         }
         return updateWriter.update(strategyId, requesterId, cmd, minSeed);

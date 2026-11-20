@@ -73,7 +73,7 @@ class ManualTradingService {
             throw new AlreadyOrderedTodayException();
 
         // 잔고 로드~전일종가~privacyBase~전략 계산을 배치와 동일한 StrategyOrderPlanBuilder에 위임한다
-        // (전일종가 조회는 내부적으로 BrokerCallGuard.wrap 경유 브로커 호출이라 실패 시 raw 예외가 나올 수 있음 — 아래서 동일 패턴으로 흡수)
+        // (전일종가 조회는 내부적으로 BrokerCallGuard.wrap 경유 공용 시세(MarketDataClient) 호출이라 실패 시 raw 예외가 나올 수 있음 — 아래서 동일 패턴으로 흡수)
         StrategyOrderPlanBuilder.PlanResult result;
         try {
             result = planBuilder.build(strategy, account, currentCycle, today, account.id(), Map.of());

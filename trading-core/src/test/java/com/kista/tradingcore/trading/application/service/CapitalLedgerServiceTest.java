@@ -44,7 +44,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
 import com.kista.tradingcore.trading.application.port.output.StrategyInfiniteDetailPort;
 import com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.tradingcore.trading.domain.model.StrategyInfiniteDetail;
@@ -77,7 +77,7 @@ class CapitalLedgerServiceTest {
     @Mock CycleOrderStrategies cycleOrderStrategies;
     @Mock CycleCapitalEventPort cycleCapitalEventPort;
     @Mock MarketCalendarPort marketCalendarPort;
-    @Mock BrokerPricePort brokerPricePort;
+    @Mock MarketDataClient marketData;
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     final CycleOrderStrategies minSeedStrategies = new CycleOrderStrategies(List.of(new InfiniteCycleOrderStrategy(null, null)));
 
@@ -94,7 +94,7 @@ class CapitalLedgerServiceTest {
     void setUp() {
         service = newService(FixedClockTestConfig.FIXED);
         withdrawal = new CapitalWithdrawalService(strategyPort, accountPort,
-                new InfiniteMinSeedGuard(brokerPricePort, minSeedStrategies, strategyInfiniteDetailPort), service);
+                new InfiniteMinSeedGuard(marketData, minSeedStrategies, strategyInfiniteDetailPort), service);
         stubAccount(TradingFixtures.stockAccount(accountId, userId)); // 기본: 주식(USD) 계좌
     }
 
@@ -422,7 +422,7 @@ class CapitalLedgerServiceTest {
     @Test
     void withdraw_infinite_belowMinSeed_rejected() {
         stubInfiniteWithdrawal();
-        when(brokerPricePort.getPrevClose(eq(StrategyTicker.SOXL), any())).thenReturn(new BigDecimal("60"));
+        when(marketData.requireLatestClose(eq(StrategyTicker.SOXL))).thenReturn(new BigDecimal("60"));
 
         withdrawRejected("600.01", IllegalArgumentException.class, "최소 투자금 $2,400.00 이상이 필요합니다.");
     }
@@ -430,7 +430,7 @@ class CapitalLedgerServiceTest {
     @Test
     void withdraw_infinite_atMinSeed_succeeds() {
         stubInfiniteWithdrawal();
-        when(brokerPricePort.getPrevClose(eq(StrategyTicker.SOXL), any())).thenReturn(new BigDecimal("60"));
+        when(marketData.requireLatestClose(eq(StrategyTicker.SOXL))).thenReturn(new BigDecimal("60"));
 
         withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("600.00")));
 
@@ -440,7 +440,7 @@ class CapitalLedgerServiceTest {
     @Test
     void withdraw_infinite_priceFetchFails_skipsMinCheck() {
         stubInfiniteWithdrawal();
-        when(brokerPricePort.getPrevClose(eq(StrategyTicker.SOXL), any())).thenThrow(new RuntimeException("시세 장애"));
+        when(marketData.requireLatestClose(eq(StrategyTicker.SOXL))).thenThrow(new RuntimeException("시세 장애"));
 
         withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("1000.00")));
 
@@ -453,7 +453,7 @@ class CapitalLedgerServiceTest {
 
         assertThatThrownBy(() -> withdrawal.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("1.234"))))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("금액은 소수 2자리까지 입력할 수 있습니다.");
-        verifyNoInteractions(brokerPricePort); // 싼 검증이 외부 시세 호출보다 먼저
+        verifyNoInteractions(marketData); // 싼 검증이 외부 시세 호출보다 먼저
     }
 
     @Test

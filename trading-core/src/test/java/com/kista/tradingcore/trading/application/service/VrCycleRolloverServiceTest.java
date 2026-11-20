@@ -8,7 +8,7 @@ import com.kista.tradingcore.matching.domain.model.*;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.trading.application.port.output.*;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
-import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.tradingcore.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +46,7 @@ class VrCycleRolloverServiceTest {
     @Mock CycleSnapshotCreator cycleSnapshotCreator;
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock MarketCalendarPort marketCalendarPort;
-    @Mock BrokerPricePort brokerPricePort;
+    @Mock MarketDataClient marketData;
 
     VrCycleRolloverService service;
 
@@ -97,14 +97,15 @@ class VrCycleRolloverServiceTest {
         service = new VrCycleRolloverService(
                 strategyCycleVrPort, strategyVrDetailPort, strategyCyclePort,
                 cycleSnapshotCreator, eventPublisher,
-                marketCalendarPort, brokerPricePort);
+                marketCalendarPort, marketData);
         ctx = new BatchContext(VR_STRATEGY, CYCLE, ACCOUNT, USER);
         // 램프 재계산 기준 — 최초 사이클 시작일 조회 기본 stub (CYCLE 자신이 최초 사이클인 케이스)
         // due 미도래·cycleVr 미존재 등 조기 return 테스트는 호출 자체가 없어 unnecessary stub 문제 없음(lenient)
         lenient().when(strategyCyclePort.findFirstByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
         // due일 확정 종가 조회 — 기본은 항상 거래일(휴장 역탐색 불필요) + CLOSING_PRICE 반환
         lenient().when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        lenient().when(brokerPricePort.getClosingPrice(any(), any(), any())).thenReturn(CLOSING_PRICE);
+        lenient().when(marketCalendarPort.usSessionDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).minusDays(1)); // KST 거래일 → 미국 세션일
+        lenient().when(marketData.requireConfirmedClose(any(), any())).thenReturn(CLOSING_PRICE);
     }
 
     @Test
@@ -182,7 +183,7 @@ class VrCycleRolloverServiceTest {
         when(marketCalendarPort.isMarketOpen(dueDate.minusDays(2))).thenReturn(false);
         when(marketCalendarPort.isMarketOpen(lastTradingDay)).thenReturn(true);
         BigDecimal holidayEvalPrice = new BigDecimal("60.00");
-        when(brokerPricePort.getClosingPrice(StrategyTicker.TQQQ, lastTradingDay, ACCOUNT_REF)).thenReturn(holidayEvalPrice);
+        when(marketData.requireConfirmedClose(StrategyTicker.TQQQ, lastTradingDay.minusDays(1))).thenReturn(holidayEvalPrice); // 세션일로 변환해 조회
         when(cycleSnapshotCreator.rolloverVrCycle(any(), any(), any(), any(CycleSnapshotCreator.VrCycleStart.class)))
                 .thenReturn(new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
                         USD_DEPOSIT, null, lastTradingDay, null, Instant.now(), null));
@@ -190,7 +191,7 @@ class VrCycleRolloverServiceTest {
         service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
 
         // 평가금 = holdings(10) × 직전 거래일 종가(60.00) = 600.00 — due일 자체가 아닌 직전 거래일 종가로 계산됨
-        verify(brokerPricePort).getClosingPrice(StrategyTicker.TQQQ, lastTradingDay, ACCOUNT_REF);
+        verify(marketData).requireConfirmedClose(StrategyTicker.TQQQ, lastTradingDay.minusDays(1));
         verify(cycleSnapshotCreator).rolloverVrCycle(eq(CYCLE_ID), eq(new BigDecimal("1600.00")), eq(lastTradingDay), any());
         CycleSnapshotCreator.VrCycleStart holidayStart = created();
         assertThat(holidayStart.closingPrice()).isEqualTo(holidayEvalPrice);
@@ -365,6 +366,21 @@ class VrCycleRolloverServiceTest {
 
         verify(cycleSnapshotCreator, never()).rolloverVrCycle(any(), any(), any(), any());
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
+                && tee.userId() == null));
+    }
+
+    @Test
+    @DisplayName("due일 확정 종가 없음(requireConfirmedClose ISE) — 롤오버 없음, 관리자 알림 1건")
+    void missingConfirmedClose_skipWithOneNotify() {
+        LocalDate today = CYCLE_START.plusWeeks(4);
+        when(strategyCycleVrPort.findByCycleId(CYCLE_ID)).thenReturn(Optional.of(CYCLE_VR));
+        when(strategyVrDetailPort.findByStrategyVersionId(STRATEGY_VERSION_ID)).thenReturn(Optional.of(DETAIL));
+        when(marketData.requireConfirmedClose(any(), any())).thenThrow(new IllegalStateException("TQQQ 종가를 조회하지 못했습니다."));
+
+        service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
+
+        verify(cycleSnapshotCreator, never()).rolloverVrCycle(any(), any(), any(), any());
+        verify(eventPublisher, times(1)).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
                 && tee.userId() == null));
     }
 

@@ -7,7 +7,7 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
-import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.shared.kernel.Broker;
 import com.kista.tradingcore.support.StubBrokerApiException;
@@ -38,8 +38,8 @@ class AccountLedgerTotalsServiceTest {
 
     AccountPort accountPort = mock(AccountPort.class);
     UnassignedCashCalculator calculator = mock(UnassignedCashCalculator.class);
-    BrokerPricePort brokerPricePort = mock(BrokerPricePort.class);
-    AccountLedgerTotalsService service = new AccountLedgerTotalsService(accountPort, calculator, brokerPricePort);
+    MarketDataClient marketData = mock(MarketDataClient.class);
+    AccountLedgerTotalsService service = new AccountLedgerTotalsService(accountPort, calculator, marketData);
 
     UUID accountId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
@@ -65,7 +65,7 @@ class AccountLedgerTotalsServiceTest {
         toss();
         holders(holder(accountId, StrategyTicker.SOXL, "100", "3"), holder(accountId, StrategyTicker.SOXL, "50", "2"),
                 holder(accountId, StrategyTicker.TQQQ, "10", "0"));
-        when(brokerPricePort.getPrices(any(), any())).thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("10")));
+        when(marketData.latestPrices(any())).thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("10")));
         when(calculator.available(any(BrokerAccountRef.class), any(BigDecimal.class))).thenReturn(new BigDecimal("500"));
 
         AccountLedgerTotals totals = service.get(accountId, userId);
@@ -74,14 +74,14 @@ class AccountLedgerTotalsServiceTest {
         assertThat(totals.deposit()).isEqualByComparingTo("160");
         assertThat(totals.evaluation()).isEqualByComparingTo("50"); // (3+2) × 10
         assertThat(totals.unassignedCash()).isEqualByComparingTo("500");
-        verify(brokerPricePort).getPrices(eq(List.of(StrategyTicker.SOXL)), any()); // 보유 있는 ticker만, 중복 없이
+        verify(marketData).latestPrices(eq(List.of(StrategyTicker.SOXL))); // 보유 있는 ticker만, 중복 없이
     }
 
     @Test
     void evaluation_null_when_priced_ticker_missing() {
         toss();
         holders(holder(accountId, StrategyTicker.SOXL, "100", "3"), holder(accountId, StrategyTicker.TQQQ, "20", "1"));
-        when(brokerPricePort.getPrices(any(), any())).thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("10"))); // TQQQ 가격 누락
+        when(marketData.latestPrices(any())).thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("10"))); // TQQQ 가격 누락
 
         AccountLedgerTotals totals = service.get(accountId, userId);
 
@@ -93,7 +93,7 @@ class AccountLedgerTotalsServiceTest {
     void evaluation_null_when_price_call_fails() {
         toss();
         holders(holder(accountId, StrategyTicker.SOXL, "100", "3"));
-        when(brokerPricePort.getPrices(any(), any())).thenThrow(new StubBrokerApiException("시세 장애"));
+        when(marketData.latestPrices(any())).thenThrow(new StubBrokerApiException("시세 장애"));
 
         assertThat(service.get(accountId, userId).evaluation()).isNull();
     }
@@ -104,7 +104,7 @@ class AccountLedgerTotalsServiceTest {
         holders(holder(accountId, StrategyTicker.SOXL, "100", "0"));
 
         assertThat(service.get(accountId, userId).evaluation()).isEqualByComparingTo("0");
-        verifyNoInteractions(brokerPricePort);
+        verifyNoInteractions(marketData);
     }
 
     @Test

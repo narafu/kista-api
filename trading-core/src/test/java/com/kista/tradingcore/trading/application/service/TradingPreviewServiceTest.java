@@ -52,7 +52,7 @@ import static org.mockito.Mockito.*;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyCycleSeedType;
-import com.kista.tradingcore.broker.application.port.output.CandlePort;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
 import com.kista.tradingcore.broker.domain.model.BrokerCandle;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
@@ -522,8 +522,8 @@ class TradingPreviewServiceTest {
         var calendar = mock(MarketCalendarPort.class);
         when(calendar.usSessionDateOf(any())).thenReturn(usSession);
         when(calendar.isUsSessionOpen(any())).thenReturn(true);
-        var candlePort = mock(CandlePort.class);
-        when(candlePort.getDailyCandlesBefore(eq("UPRO"), eq(usSession), anyInt())).thenReturn(List.of(
+        var marketData = mock(MarketDataClient.class);
+        when(marketData.dailyCandles(eq("UPRO"), any())).thenReturn(List.of(
                 new BrokerCandle(usSession.minusDays(1), null, null, null, new BigDecimal("87.12"), 0)));
         var dcaDetailPort = mock(StrategyDcaDetailPort.class);
         when(dcaDetailPort.findActiveByStrategyId(STOCK_DCA.id())).thenReturn(Optional.of(TradingFixtures.dcaConfig(
@@ -531,7 +531,7 @@ class TradingPreviewServiceTest {
         var executionPort = mock(DcaExecutionPort.class);
         var dcaLedgerBudget = mock(StrategyLedgerBudget.class);
         when(dcaLedgerBudget.remaining(any(), any())).thenReturn(new BigDecimal("100000"));
-        DcaPlanInputCollector collector = new DcaPlanInputCollector(calendar, candlePort,
+        DcaPlanInputCollector collector = new DcaPlanInputCollector(calendar, marketData,
                 mock(FearGreedIndexPort.class), orderPort, dcaDetailPort, executionPort,
                 dcaLedgerBudget,
                 mock(TradingBatchRunPort.class));
@@ -541,7 +541,7 @@ class TradingPreviewServiceTest {
         when(balanceLoader.tryLoadBalance(STOCK_DCA)).thenReturn(new TradingBalanceLoader.BalanceLoad(
                 new AccountBalance(0, null, BigDecimal.ZERO), null));
         StrategyOrderPlanBuilder realBuilder = new StrategyOrderPlanBuilder(balanceLoader, null, null,
-                new CycleOrderComputer(strategies, null, null, null, null, null, orderPort, mock(com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient.class)), strategies, null, orderPort, collector);
+                new CycleOrderComputer(strategies, null, null, null, null, null, orderPort, mock(com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient.class), mock(com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort.class)), strategies, null, orderPort, collector);
         TradingPreviewService wired = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, cyclePositionPort, realBuilder,
                 ledgerBudget, priceFetcher, marginPort, sellableQuantityPort, marketCalendarPort, FIXED);
 

@@ -28,7 +28,7 @@ public class CapitalWithdrawalService {
         OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
         // HTTP 전에 싼 입력 검증부터 — 무효 요청으로 시세 조회를 낭비하지 않는다
         CapitalLedgerService.requireValidWithdrawal(owned.strategy(), cmd.amount(), owned.currency());
-        BigDecimal minSeed = minSeedGuard.minSeed(owned.strategy(), owned.account().toBrokerRef()); // INFINITE 외·조회 실패는 null(검사 건너뜀)
+        BigDecimal minSeed = minSeedGuard.minSeed(owned.strategy()); // INFINITE 외·조회 실패는 null(검사 건너뜀)
         capitalLedger.withdraw(strategyId, requesterId, cmd, minSeed);
     }
 }

@@ -10,7 +10,7 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
-import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
 import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
@@ -48,7 +48,7 @@ import static org.mockito.Mockito.when;
 class StrategySeedPreviewServiceTest {
 
     @Mock AccountPort accountPort;
-    @Mock BrokerPricePort pricePort;
+    @Mock MarketDataClient marketData;
     @Mock PrivacyTradePort privacyTradePort;
     @Mock MarginPort marginPort;
     @Mock StrategyPort strategyPort;
@@ -69,7 +69,7 @@ class StrategySeedPreviewServiceTest {
         ));
         // 시드 미리보기가 쓰는 협력자만 실제 주입, 나머지는 미사용이라 null
         StrategyHistoryQueryService strategyHistoryQueryService = new StrategyHistoryQueryService(
-                accountPort, strategyPort, cyclePositionPort, null, cycleStrategies, privacyTradePort, pricePort,
+                accountPort, strategyPort, cyclePositionPort, null, cycleStrategies, privacyTradePort, marketData,
                 new UnassignedCashCalculator(strategyPort, cyclePositionPort, marginPort), FIXED);
         service = new StrategyService(
                 null, null, null, null,
@@ -82,7 +82,7 @@ class StrategySeedPreviewServiceTest {
     @Test
     void infinite_uses_prev_close_not_current() {
         // given: 전일종가 89.20 — 실제 첫 주문(holdings=0)과 동일하게 전일종가를 기준가로 사용해야 함 (현재가 API 미사용)
-        when(pricePort.getPrevClose(eq(StrategyTicker.SOXL), any(BrokerAccountRef.class)))
+        when(marketData.requireLatestClose(eq(StrategyTicker.SOXL)))
                 .thenReturn(new BigDecimal("89.20"));
 
         var result = service.strategySeedPreview(accountId, userId, StrategyType.INFINITE, StrategyTicker.SOXL, 20);
@@ -92,8 +92,6 @@ class StrategySeedPreviewServiceTest {
         assertThat(result.minSeed()).isEqualByComparingTo("3568.00");
         assertThat(result.skipReason()).isNull();
         assertThat(result.ticker()).isEqualTo("SOXL");
-        verify(pricePort, never()).getPrice(any(), any());
-        verify(pricePort, never()).getPriceSnapshot(any(), any());
     }
 
     @Test
@@ -122,7 +120,7 @@ class StrategySeedPreviewServiceTest {
     }
 
     private void stubInfinitePrice() {
-        when(pricePort.getPrevClose(eq(StrategyTicker.SOXL), any(BrokerAccountRef.class)))
+        when(marketData.requireLatestClose(eq(StrategyTicker.SOXL)))
                 .thenReturn(new BigDecimal("89.20"));
     }
 

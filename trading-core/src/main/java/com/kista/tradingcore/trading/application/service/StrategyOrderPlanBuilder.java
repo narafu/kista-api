@@ -9,7 +9,7 @@ import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
-import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.shared.kernel.OrderTiming;
@@ -36,7 +36,7 @@ import com.kista.shared.kernel.StrategyTicker;
 class StrategyOrderPlanBuilder {
 
     private final TradingBalanceLoader balanceLoader;       // cycle_position 최신 스냅샷 기반 잔고 로드
-    private final BrokerPricePort brokerPricePort; // 전일종가 조회용 브로커 라우팅
+    private final MarketDataClient marketData; // 전일종가 공용 시세
     private final PrivacyTradePort privacyTradePort;         // PRIVACY 기준매매표 조회
     private final CycleOrderComputer orderComputer;          // 전략 계산 + 유효성 검증
     private final CycleOrderStrategies cycleOrderStrategies; // 전략 타입별 capability 조회
@@ -69,7 +69,7 @@ class StrategyOrderPlanBuilder {
             prevClosePrice = prevCloseCache.containsKey(strategy.ticker())
                     ? prevCloseCache.get(strategy.ticker())
                     : BrokerCallGuard.wrap("전일종가 조회",
-                            () -> brokerPricePort.getPrevClose(strategy.ticker(), account.brokerRef()));
+                            () -> marketData.requireLatestClose(strategy.ticker()));
         }
         // 기준 매매표 필요 여부는 전략 capability 기준
         PrivacyTradeBase privacyBase = strategy.requiresPrivacyBase() ? privacyTradePort.findTodayTrade(today).orElse(null) : null;

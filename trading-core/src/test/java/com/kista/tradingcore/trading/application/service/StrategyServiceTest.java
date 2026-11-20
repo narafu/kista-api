@@ -17,7 +17,7 @@ import com.kista.shared.kernel.StrategyFieldSettings;
 import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
 import com.kista.tradingcore.trading.application.port.output.StrategyCreationPolicyPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort; import com.kista.tradingcore.trading.application.port.output.*;
-import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
 import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.shared.kernel.OrderDirection;
@@ -90,7 +90,7 @@ class StrategyServiceTest {
     @Mock AccountPort accountPort;
     @Mock TradingUserProfilePort tradingUserProfilePort;
     @Mock MarginPort marginPort;
-    @Mock BrokerPricePort brokerPricePort;                  // 중간부터 시작 — 등록 시점 시장가(전일종가) 조회
+    @Mock MarketDataClient marketData;                      // 중간부터 시작 — 등록 시점 시장가(전일종가) 조회
     @Mock StrategyCreationPolicyPort strategyCreationPolicyPort; // 신규 전략 생성 설정 조회
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock OrderPort orderPort;                                   // 전략별 주문 내역 조회
@@ -143,7 +143,7 @@ class StrategyServiceTest {
         StrategyDetailAssembler detailAssembler = new StrategyDetailAssembler(
                 strategyVersionPort, strategyInfiniteDetailPort, vrStrategyDetailService, strategyCyclePort,
                 cyclePositionPort, cyclePositionInfiniteDetailPort, dcaDetailPort, dcaExecutionPort, dcaSummaryAssembler, FIXED);
-        InfiniteMinSeedGuard minSeedGuard = new InfiniteMinSeedGuard(brokerPricePort,
+        InfiniteMinSeedGuard minSeedGuard = new InfiniteMinSeedGuard(marketData,
                 new CycleOrderStrategies(List.of(
                         new InfiniteCycleOrderStrategy(null, null))),
                 strategyInfiniteDetailPort);
@@ -151,7 +151,7 @@ class StrategyServiceTest {
                 strategyPort,
                 accountPort,
                 tradingUserProfilePort,
-                brokerPricePort,
+                marketData,
                 strategyCreationPolicyPort,
                 new StrategyCreationResolvers(List.of(
                         new InfiniteCreationResolver(), new PrivacyCreationResolver(), new VrCreationResolver(), new DcaCreationResolver())),
@@ -165,7 +165,7 @@ class StrategyServiceTest {
                 new PrivacyCycleOrderStrategy(null)));
         StrategyHistoryQueryService strategyHistoryQueryService = new StrategyHistoryQueryService(
                 accountPort, strategyPort, cyclePositionPort, orderPort, historyStrategies,
-                privacyTradePort, brokerPricePort,
+                privacyTradePort, marketData,
                 new UnassignedCashCalculator(strategyPort, cyclePositionPort, marginPort), FIXED);
         strategyService = new StrategyService(
                 strategyPort,
@@ -1531,7 +1531,7 @@ class StrategyServiceTest {
         // holdings=0이라 실제 포지션·startAmount는 그대로 0이지만, V값 저장은 override(5000)를 사용한다
         verify(strategyCycleVrPort).save(argThat(cv -> cv.value().compareTo(new BigDecimal("5000")) == 0));
         verify(strategyCyclePort).save(argThat(c -> c.startAmount().signum() == 0));
-        verifyNoInteractions(brokerPricePort);
+        verifyNoInteractions(marketData);
     }
 
     @Test
@@ -1545,7 +1545,7 @@ class StrategyServiceTest {
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
-        when(brokerPricePort.getPrevClose(StrategyTicker.TQQQ, account.toBrokerRef())).thenReturn(new BigDecimal("50.00"));
+        when(marketData.requireLatestClose(StrategyTicker.TQQQ)).thenReturn(new BigDecimal("50.00"));
         when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
         when(strategyCyclePort.save(any(StrategyCycle.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -1638,7 +1638,7 @@ class StrategyServiceTest {
                 cv.poolLimitRate().compareTo(new BigDecimal("0.75")) == 0
                         && cv.gradient() == 10));
         // 등록 시점 중간부터 시작 미입력이면 시장가 조회를 건너뛴다
-        verifyNoInteractions(brokerPricePort);
+        verifyNoInteractions(marketData);
         // 응답 VrSummary 검증
         assertThat(result.vr()).isNotNull();
         assertThat(result.vr().poolLimit()).isEqualByComparingTo("1500.00");
@@ -1673,7 +1673,7 @@ class StrategyServiceTest {
         verify(cyclePositionPort).save(argThat(p ->
                 p.strategyCycleId().equals(vrCycleId) && p.holdings().signum() == 0
                         && p.avgPrice() == null && p.closingPrice() == null));
-        verifyNoInteractions(brokerPricePort);
+        verifyNoInteractions(marketData);
     }
 
     @Test
@@ -2336,7 +2336,7 @@ class StrategyServiceTest {
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
-        when(brokerPricePort.getPrevClose(StrategyTicker.SOXL, account.toBrokerRef())).thenReturn(new BigDecimal("50.00"));
+        when(marketData.requireLatestClose(StrategyTicker.SOXL)).thenReturn(new BigDecimal("50.00"));
         when(strategyPort.save(any())).thenReturn(saved);
         when(strategyCyclePort.save(any())).thenReturn(savedCycle);
         when(cyclePositionPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -2357,6 +2357,21 @@ class StrategyServiceTest {
     }
 
     @Test
+    @DisplayName("PRIVACY register() 중간부터 시작 — 전일종가를 못 읽으면(ISE) 등록을 거부하고 저장하지 않는다")
+    void register_privacy_bootstrap_rejectedWhenCloseMissing() {
+        Account account = accountOn(Broker.MERITZ);
+        StrategyTicker ticker = defaultTicker(StrategyType.PRIVACY);
+        RegisterStrategyCommand cmd = register(StrategyType.PRIVACY).deposit("200").holdings(BigDecimal.valueOf(20)).avgPrice(new BigDecimal("95.00")).build();
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
+        when(marketData.requireLatestClose(ticker)).thenThrow(new IllegalStateException(ticker.name() + " 종가를 조회하지 못했습니다."));
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd)).isInstanceOf(IllegalStateException.class);
+
+        verify(strategyPort, never()).save(any());
+    }
+
+    @Test
     @DisplayName("PRIVACY register() 중간부터 시작 — CyclePositionInfiniteDetail을 저장하지 않는다")
     void register_privacy_bootstrap_savesPositionWithoutInfiniteDetail() {
         Account account = accountOn(Broker.MERITZ);
@@ -2372,7 +2387,7 @@ class StrategyServiceTest {
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
-        when(brokerPricePort.getPrevClose(ticker, account.toBrokerRef())).thenReturn(new BigDecimal("100.00"));
+        when(marketData.requireLatestClose(ticker)).thenReturn(new BigDecimal("100.00"));
         when(strategyPort.save(any())).thenReturn(saved);
         when(strategyCyclePort.save(any())).thenReturn(savedCycle);
         when(cyclePositionPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -2403,7 +2418,7 @@ class StrategyServiceTest {
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
-        when(brokerPricePort.getPrevClose(StrategyTicker.TQQQ, account.toBrokerRef())).thenReturn(new BigDecimal("120"));
+        when(marketData.requireLatestClose(StrategyTicker.TQQQ)).thenReturn(new BigDecimal("120"));
         when(strategyPort.save(any())).thenReturn(savedVrStrategy);
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenAnswer(invocation -> {
             StrategyCycle cycle = invocation.getArgument(0);
@@ -2427,7 +2442,7 @@ class StrategyServiceTest {
         assertThat(result.vr().value()).isEqualByComparingTo("600.00");
         assertThat(result.vr().poolLimit()).isEqualByComparingTo("750.00");
         // VR live 잔고 조회는 완전히 제거됨 — BrokerPricePort 시장가 조회 1회로만 V가 계산된다
-        verify(brokerPricePort, times(1)).getPrevClose(any(), eq(account.toBrokerRef()));
+        verify(marketData, times(1)).requireLatestClose(any());
     }
 
     @Test
@@ -2438,7 +2453,7 @@ class StrategyServiceTest {
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalArgumentException.class);
-        verifyNoInteractions(marginPort, brokerPricePort);
+        verifyNoInteractions(marginPort, marketData);
     }
 
     @Test
@@ -2479,7 +2494,7 @@ class StrategyServiceTest {
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
-        when(brokerPricePort.getPrevClose(StrategyTicker.SOXL, account.toBrokerRef()))
+        when(marketData.requireLatestClose(StrategyTicker.SOXL))
                 .thenThrow(new RuntimeException("증권사 API 조회 실패"));
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
@@ -2512,7 +2527,7 @@ class StrategyServiceTest {
         Account account = ownerAccount(); // 거부 경로는 저장 stub이 불필요해 헬퍼를 쓰지 않는다
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
-        when(brokerPricePort.getPrevClose(eq(StrategyTicker.SOXL), any())).thenReturn(new BigDecimal("60"));
+        when(marketData.requireLatestClose(eq(StrategyTicker.SOXL))).thenReturn(new BigDecimal("60"));
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, infiniteSeedCommand("2000")))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -2526,7 +2541,7 @@ class StrategyServiceTest {
     @DisplayName("INFINITE register() 시작 금액이 최소 시드와 같으면 등록된다")
     void register_infinite_accepts_seed_at_min() {
         stubSuccessfulRegistration(StrategyType.INFINITE, StrategyTicker.SOXL);
-        when(brokerPricePort.getPrevClose(eq(StrategyTicker.SOXL), any())).thenReturn(new BigDecimal("60"));
+        when(marketData.requireLatestClose(eq(StrategyTicker.SOXL))).thenReturn(new BigDecimal("60"));
 
         strategyService.register(USER_ID, ACCOUNT_ID, infiniteSeedCommand("2400"));
 
@@ -2537,7 +2552,7 @@ class StrategyServiceTest {
     @DisplayName("INFINITE register() 전일종가 조회가 실패하면 최소 시드 검증만 건너뛰고 등록된다")
     void register_infinite_skips_min_check_when_price_fetch_fails() {
         stubSuccessfulRegistration(StrategyType.INFINITE, StrategyTicker.SOXL);
-        when(brokerPricePort.getPrevClose(eq(StrategyTicker.SOXL), any())).thenThrow(new RuntimeException("시세 장애"));
+        when(marketData.requireLatestClose(eq(StrategyTicker.SOXL))).thenThrow(new RuntimeException("시세 장애"));
 
         strategyService.register(USER_ID, ACCOUNT_ID, infiniteSeedCommand("100"));
 
@@ -2589,7 +2604,7 @@ class StrategyServiceTest {
     @DisplayName("update() INFINITE 시드가 최소 시드(전일종가×분할×2) 미만이면 거부하고 저장하지 않는다")
     void update_infinite_seedBelowMin_rejected() {
         stubInfiniteSeedUpdate();
-        when(brokerPricePort.getPrevClose(eq(StrategyTicker.SOXL), any())).thenReturn(new BigDecimal("60")); // 최소 2,400
+        when(marketData.requireLatestClose(eq(StrategyTicker.SOXL))).thenReturn(new BigDecimal("60")); // 최소 2,400
 
         assertThatThrownBy(() -> strategyService.update(STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, new BigDecimal("2399.99"))))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("최소 투자금 $2,400.00 이상이 필요합니다.");
@@ -2600,7 +2615,7 @@ class StrategyServiceTest {
     @DisplayName("update() INFINITE 전일종가 조회가 실패하면 최소 시드 검사만 건너뛰고 수정된다")
     void update_infinite_priceFetchFails_skipsMinCheck() {
         stubInfiniteSeedUpdate();
-        when(brokerPricePort.getPrevClose(eq(StrategyTicker.SOXL), any())).thenThrow(new RuntimeException("시세 장애"));
+        when(marketData.requireLatestClose(eq(StrategyTicker.SOXL))).thenThrow(new RuntimeException("시세 장애"));
 
         strategyService.update(STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, new BigDecimal("100")));
 
@@ -2612,13 +2627,13 @@ class StrategyServiceTest {
     void update_seed_beyondCurrencyScale_rejected() {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        lenient().when(brokerPricePort.getPrevClose(any(), any())).thenReturn(new BigDecimal("1"));
+        lenient().when(marketData.requireLatestClose(any())).thenReturn(new BigDecimal("1"));
         lenient().when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(CYCLE);
 
         assertThatThrownBy(() -> strategyService.update(STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, new BigDecimal("5000.123"))))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("금액은 소수 2자리까지 입력할 수 있습니다.");
         verify(strategyCyclePort, never()).updateStartAmount(any(), any());
-        verifyNoInteractions(brokerPricePort); // 싼 검증이 외부 시세 호출보다 먼저
+        verifyNoInteractions(marketData); // 싼 검증이 외부 시세 호출보다 먼저
     }
 
     @Test
@@ -2628,7 +2643,7 @@ class StrategyServiceTest {
 
         strategyService.register(USER_ID, ACCOUNT_ID, vr().deposit("2000").intervalWeeks(4).bandWidth("15.00").recurringAmount(0).build());
 
-        verify(brokerPricePort, never()).getPrevClose(any(), any());
+        verify(marketData, never()).requireLatestClose(any());
     }
 
     // --- register() 시작예정일(scheduledStartDate) ---
@@ -2754,7 +2769,7 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
         });
         assertThat(detail.initialDeposit()).isEqualByComparingTo("0");
         // DCA는 잔고 검증·시세 조회를 하지 않는다
-        verifyNoInteractions(marginPort, brokerPricePort);
+        verifyNoInteractions(marginPort, marketData);
     }
 
     @Test
@@ -2786,7 +2801,7 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
         verify(cyclePositionPort).save(argThat(p -> p.holdings().compareTo(BigDecimal.TEN) == 0
                 && p.deposit().signum() == 0 && p.avgPrice().compareTo(new BigDecimal("40")) == 0));
         verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("400")) == 0));
-        verifyNoInteractions(marginPort, brokerPricePort);
+        verifyNoInteractions(marginPort, marketData);
     }
 
     @Test

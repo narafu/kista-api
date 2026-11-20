@@ -2,9 +2,8 @@ package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
-import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
-import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.trading.application.port.output.StrategyInfiniteDetailPort;
 import com.kista.tradingcore.trading.domain.model.Strategy;
@@ -20,25 +19,25 @@ import java.util.Locale;
 @RequiredArgsConstructor
 class InfiniteMinSeedGuard {
 
-    private final BrokerPricePort brokerPricePort;
+    private final MarketDataClient marketData;                   // 전일종가 공용 시세
     private final CycleOrderStrategies cycleStrategies;               // minRequiredDeposit 산출
     private final StrategyInfiniteDetailPort strategyInfiniteDetailPort; // 기존 전략의 divisionCount
 
     // 최소 시드(전일종가×분할×2) — 전일종가 조회 실패는 null(fail-open: 검사 건너뜀). knownPrice가 있으면 재조회하지 않는다. 트랜잭션 밖에서 호출한다
-    BigDecimal minSeed(BrokerAccountRef broker, StrategyTicker ticker, int divisionCount, BigDecimal knownPrice) {
+    BigDecimal minSeed(StrategyTicker ticker, int divisionCount, BigDecimal knownPrice) {
         BigDecimal price = knownPrice != null ? knownPrice
                 : BrokerCallGuard.tryGet("최소 시드 검증용 전일종가 조회: ticker=" + ticker,
-                        () -> brokerPricePort.getPrevClose(ticker, broker)).orElse(null);
+                        () -> marketData.requireLatestClose(ticker)).orElse(null);
         if (price == null) return null;
         return cycleStrategies.of(StrategyType.INFINITE).minRequiredDeposit(price, null, divisionCount);
     }
 
     // 기존 전략용 — INFINITE가 아니거나 활성 버전 상세가 없으면 null(검사 없음)
-    BigDecimal minSeed(Strategy strategy, BrokerAccountRef broker) {
+    BigDecimal minSeed(Strategy strategy) {
         if (!strategy.isInfinite()) return null;
         return strategyInfiniteDetailPort.findActiveByStrategyId(strategy.id())
                 .map(StrategyInfiniteDetail::divisionCount)
-                .map(division -> minSeed(broker, strategy.ticker(), division, null))
+                .map(division -> minSeed(strategy.ticker(), division, null))
                 .orElse(null);
     }
 

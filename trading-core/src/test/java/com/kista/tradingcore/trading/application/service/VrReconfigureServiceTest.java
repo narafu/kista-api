@@ -40,6 +40,8 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -121,7 +123,7 @@ class VrReconfigureServiceTest {
     private void stubHappyPathChain(LocalDate firstStartDate) {
         lenient().when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(vrStrategy);
         lenient().when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(account);
-        lenient().when(pricePort.getPrice(StrategyTicker.TQQQ, account.toBrokerRef())).thenReturn(currentPrice);
+        lenient().when(pricePort.currentPrices(account.toBrokerRef(), List.of(StrategyTicker.TQQQ))).thenReturn(Map.of(StrategyTicker.TQQQ, currentPrice));
         lenient().when(orderCancelService.cancelByCycle(strategyId, requesterId)).thenReturn(new CancelResult(0, 0));
         lenient().when(strategyCyclePort.requireLatestByStrategyId(strategyId)).thenReturn(currentCycle);
         lenient().when(strategyVrDetailPort.findByStrategyVersionId(strategyVersionId)).thenReturn(Optional.of(currentDetail));
@@ -295,6 +297,18 @@ class VrReconfigureServiceTest {
         assertThat(captured.postBalance().holdings()).isEqualTo(latestPosition.holdings());
         assertThat(captured.postBalance().avgPrice()).isEqualByComparingTo(latestPosition.avgPrice());
         assertThat(captured.newValue()).isEqualByComparingTo(currentCycleVr.value());
+    }
+
+    @Test
+    @DisplayName("계좌 증권사 현재가가 비어 있으면 IllegalStateException, cycleSnapshotCreator 미호출")
+    void reconfigure_emptyCurrentPrices_throws() {
+        stubHappyPathChain();
+        when(pricePort.currentPrices(account.toBrokerRef(), List.of(StrategyTicker.TQQQ))).thenReturn(Map.of());
+
+        assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, reconfigureVr().bandWidth("20.00").build()))
+                .isInstanceOf(IllegalStateException.class).hasMessage("현재가를 조회하지 못했습니다.");
+
+        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(any(CycleSnapshotCreator.VrReconfiguration.class));
     }
 
     @Test

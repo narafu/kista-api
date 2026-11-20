@@ -6,7 +6,7 @@ import com.kista.tradingcore.trading.domain.model.*;
 import com.kista.tradingcore.matching.domain.model.*;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.trading.application.port.output.*;
-import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,7 +35,7 @@ class VrCycleRolloverService {
     private final CycleSnapshotCreator cycleSnapshotCreator;     // 새 사이클 + 초기 포지션 원자 저장
     private final ApplicationEventPublisher eventPublisher;       // 새 사이클 시작 이벤트 발행 + 관리자·사용자 오류 알림 이벤트
     private final MarketCalendarPort marketCalendarPort;          // due일 직전 거래일 탐색
-    private final BrokerPricePort brokerPricePort; // due일 기준 확정 종가 조회
+    private final MarketDataClient marketData;                // due일 기준 확정 종가(공용 시세)
 
     // 마감 리포트(saveCyclePosition) 직후 호출 — due 도래 시 V′ 계산 후 사이클 교체
     void rollIfDue(BatchContext ctx, AccountBalance postBalance, BigDecimal closingPrice, LocalDate today) {
@@ -80,18 +80,13 @@ class VrCycleRolloverService {
         LocalDate evaluationDate = lastTradingDayOnOrBefore(dueDate);
         BigDecimal evaluationClosingPrice;
         try {
-            evaluationClosingPrice = brokerPricePort
-                    .getClosingPrice(strategy.ticker(), evaluationDate, ctx.account().brokerRef());
+            // 확정 종가가 없으면 requireConfirmedClose가 예외 — 아래 catch가 알림 후 다음 매매일 재시도
+            evaluationClosingPrice = marketData.requireConfirmedClose(strategy.ticker(), marketCalendarPort.usSessionDateOf(evaluationDate));
         } catch (Exception e) {
             log.error("[strategyId={}] VR 롤오버 — due일({}) 확정 종가 조회 실패, 다음 매매일 재시도",
                     strategy.id(), evaluationDate, e);
-            eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
-            return;
-        }
-        if (evaluationClosingPrice == null) {
-            log.warn("[strategyId={}] VR 롤오버 — due일({}) 확정 종가 없음, 다음 매매일 재시도", strategy.id(), evaluationDate);
             eventPublisher.publishEvent(new TradingErrorEvent(null,
-                    "VR 롤오버 due일 확정 종가 없음 strategyId=" + strategy.id() + " evaluationDate=" + evaluationDate));
+                    "VR 롤오버 due일 확정 종가 없음 strategyId=" + strategy.id() + " evaluationDate=" + evaluationDate + ": " + e.getMessage()));
             return;
         }
 

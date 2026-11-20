@@ -7,6 +7,7 @@ import com.kista.shared.platform.alpaca.AlpacaProperties;
 import com.kista.shared.platform.cache.TtlResultCache;
 import com.kista.tradingcore.broker.domain.model.BrokerCandle;
 import com.kista.tradingcore.broker.domain.model.DailyCandleQuery;
+import com.kista.tradingcore.broker.domain.model.MarketDataApiException;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
@@ -135,7 +136,7 @@ public class MarketDataClient {
 
     private Map<StrategyTicker, BigDecimal> loadLatestPrices(List<StrategyTicker> tickers) {
         String symbols = symbols(tickers);
-        RestClientException failure = null;
+        MarketDataApiException failure = null;
         Map<String, Trade> latest = new HashMap<>();
         for (String feed : List.of(FEED_IEX, FEED_DELAYED_SIP)) {
             try {
@@ -145,7 +146,7 @@ public class MarketDataClient {
                         latest.merge(symbol, snapshot.latestTrade(), (a, b) -> b.at().isAfter(a.at()) ? b : a);
                     }
                 });
-            } catch (RestClientException e) {
+            } catch (MarketDataApiException e) {
                 // 한쪽 피드 실패는 다른 쪽만으로 답한다 — 거래 적은 종목의 값이 묵을 수 있어 경고로 남긴다
                 log.warn("[시세] Alpaca 현재가 피드 {} 실패, 남은 피드로 답합니다: {}", feed, e.getMessage());
                 if (failure != null) {
@@ -237,12 +238,16 @@ public class MarketDataClient {
         return result;
     }
 
-    // 연결 실패·5xx만 한 번 다시 부른다 — 4xx(권한·인자)는 다시 불러도 같다
+    // 연결 실패·5xx만 한 번 다시 부른다 — 4xx(권한·인자)는 다시 불러도 같다. 끝내 실패하면 503 매핑 타입으로 바꿔 던진다(원인 보존)
     private static <T> T withOneRetry(Supplier<T> call) {
         try {
-            return call.get();
-        } catch (ResourceAccessException | HttpServerErrorException e) {
-            return call.get();
+            try {
+                return call.get();
+            } catch (ResourceAccessException | HttpServerErrorException e) {
+                return call.get();
+            }
+        } catch (RestClientException e) {
+            throw new MarketDataApiException("시세 조회에 실패했습니다.", e);
         }
     }
 

@@ -3,7 +3,7 @@ package com.kista.tradingcore.trading.application.service.support;
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
-import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
@@ -44,12 +44,12 @@ public class StrategyHistoryQueryService {
     private final OrderPort orderPort;
     private final CycleOrderStrategies cycleStrategies;
     private final PrivacyTradePort privacyTradePort;
-    private final BrokerPricePort brokerPricePort;
+    private final MarketDataClient marketData; // 전일종가 공용 시세
     private final UnassignedCashCalculator unassignedCash; // 가용 예수금 경고용 계좌 미배정 현금(계좌 통화)
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 전략 등록/수정 폼용 최소시드·기준가 미리보기 — register()의 minRequiredDeposit 계산과 동일 경로
-    // 브로커 HTTP(getPrevClose) 호출 포함 → 트랜잭션 없이 실행 (register()와 동일 이유)
+    // 시세 HTTP(requireLatestClose) 호출 포함 → 트랜잭션 없이 실행 (register()와 동일 이유)
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public StrategySeedPreview strategySeedPreview(
             UUID accountId, UUID requesterId,
@@ -74,7 +74,7 @@ public class StrategyHistoryQueryService {
         // 3단계: 기준가 결정 후 최소 시드 계산 — 실제 첫 주문(holdings=0)과 동일하게 전일종가 사용
         BigDecimal price = strategy.requiresPrivacyBase()
                 ? null
-                : brokerPricePort.getPrevClose(ticker, account.toBrokerRef());
+                : marketData.requireLatestClose(ticker);
         BigDecimal basePrice = strategy.requiresPrivacyBase()
                 ? privacyPlan.currentCycleStart()
                 : price;

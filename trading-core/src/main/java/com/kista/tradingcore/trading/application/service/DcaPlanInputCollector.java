@@ -7,7 +7,8 @@ import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.StrategyTicker;
-import com.kista.tradingcore.broker.application.port.output.CandlePort;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
+import com.kista.tradingcore.broker.domain.model.DailyCandleQuery;
 import com.kista.tradingcore.broker.domain.model.BrokerCandle;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
@@ -54,7 +55,7 @@ class DcaPlanInputCollector {
     private static final Duration FEAR_GREED_TTL = Duration.ofMinutes(10); // 배치 1회를 덮는 길이 — 10분 안의 재계획(수동 실행 포함)은 같은 값
 
     private final MarketCalendarPort marketCalendarPort;
-    private final CandlePort candlePort;
+    private final MarketDataClient marketData;
     private final FearGreedIndexPort fearGreedIndexPort;    // FEAR_GREED 조건용 CNN 지수
     private final OrderPort orderPort;
     private final StrategyDcaDetailPort dcaDetailPort;
@@ -139,7 +140,8 @@ class DcaPlanInputCollector {
 
     private List<BigDecimal> fetchCloses(StrategyTicker ticker, LocalDate usSession) {
         return BrokerCallGuard.tryGet("DCA 일봉 조회: ticker=" + ticker + ", usSession=" + usSession, () -> {
-            List<BrokerCandle> candles = candlePort.getDailyCandlesBefore(ticker.name(), usSession, CANDLE_COUNT);
+            List<BrokerCandle> candles = marketData.dailyCandles(ticker.name(),
+                    DailyCandleQuery.lastBefore(usSession, CANDLE_COUNT, DailyCandleQuery.Adjustment.ALL));
             LocalDate expected = previousOpenSession(usSession);
             if (candles.isEmpty() || expected == null || !candles.getLast().date().equals(expected)) {
                 log.warn("[DCA] 일봉 피드 지연·부족: ticker={}, usSession={}, 기대={}, 마지막={}",
