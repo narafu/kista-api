@@ -23,6 +23,12 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
+import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
+import com.kista.shared.kernel.StrategyTicker;
+import java.util.Map;
+import java.util.UUID;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -48,8 +54,24 @@ class TossBrokerAdapterTest {
     @Mock
     private TossCandleApi tossCandleApi;
 
+    @Mock
+    private MarketDataClient marketData;
+
     private TossBrokerAdapter adapter() {
-        return new TossBrokerAdapter(tossHoldingsApi, tossOrderApi, tossPriceApi, tossCandleApi);
+        return new TossBrokerAdapter(tossHoldingsApi, tossOrderApi, tossPriceApi, tossCandleApi, marketData);
+    }
+
+    @Test
+    @DisplayName("currentPrices는 공용 현재가이고 토스 시세 API를 부르지 않는다")
+    void currentPrices는_공용_현재가이고_토스_시세_API를_부르지_않는다() {
+        List<StrategyTicker> tickers = List.of(StrategyTicker.SOXL);
+        when(marketData.latestPrices(tickers)).thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("30.10")));
+        BrokerAccountRef account = new BrokerAccountRef(UUID.randomUUID(), "key", "secret", "12345678", null, Broker.TOSS);
+
+        Map<StrategyTicker, BigDecimal> prices = adapter().currentPrices(account, tickers);
+
+        assertThat(prices.get(StrategyTicker.SOXL)).isEqualByComparingTo("30.10");
+        verifyNoInteractions(tossPriceApi);
     }
 
     @Test

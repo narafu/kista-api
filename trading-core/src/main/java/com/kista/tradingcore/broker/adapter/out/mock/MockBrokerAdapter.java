@@ -1,6 +1,7 @@
 package com.kista.tradingcore.broker.adapter.out.mock;
 
-import com.kista.tradingcore.broker.adapter.out.toss.TossPriceApi;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.broker.domain.model.*;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.OrderDirection;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +27,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class MockBrokerAdapter implements BrokerCapabilitiesPort {
 
-    private final TossPriceApi priceFeed;                        // 시세 재사용 — 계좌 자격증명 없는 Toss 관리자 공통 시세 (broker 소유 PriceSnapshot 반환)
+    private final MarketDataClient marketData;                   // 공용 시세(Alpaca) — 모의계좌는 계좌 자격증명이 없다
+    private final MarketCalendarPort marketCalendarPort;         // KST 거래일 → 미국 세션일
     private final MockSimulationDataPort mockSimulationDataPort; // trading 소유 주문·사이클·포지션 조회 (포트 역전 — 클래스 주석 참고)
 
     @Override
@@ -51,50 +54,68 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
                         "모의계좌 포지션 이력이 없습니다: strategyId=" + strategy.id()));
     }
 
-    // --- BrokerPricePort (account 파라미터 무시, priceFeed에 위임 — Toss 패턴과 동일) ---
+    // --- BrokerPricePort (account 파라미터 무시 — 모의계좌는 계좌 시세가 없어 공용 시세(Alpaca) 사용) ---
+    // 단건은 값이 없으면 대체 없이 예외, 다건은 값이 없는 종목의 키가 빠진다(호출부가 키 부재를 처리)
 
     @Override
     public BigDecimal getPrice(StrategyTicker ticker, BrokerAccountRef account) {
-        return priceFeed.getPrice(ticker); // 공통 API — account 불필요
+        BigDecimal price = marketData.latestPrices(List.of(ticker)).get(ticker);
+        if (price == null) throw new IllegalStateException(ticker.name() + " 현재가를 조회하지 못했습니다.");
+        return price;
     }
 
     @Override
     public Map<StrategyTicker, BigDecimal> getPrices(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        return priceFeed.getPrices(tickers); // 공통 API — account 불필요
+        return marketData.latestPrices(tickers);
+    }
+
+    @Override
+    public Map<StrategyTicker, BigDecimal> currentPrices(BrokerAccountRef account, Collection<StrategyTicker> tickers) {
+        return marketData.latestPrices(tickers);
     }
 
     @Override
     public PriceSnapshot getPriceSnapshot(StrategyTicker ticker, BrokerAccountRef account) {
-        return priceFeed.getPriceSnapshot(ticker); // 공통 API — account 불필요, priceFeed가 이미 broker 소유 PriceSnapshot 반환
+        PriceSnapshot snapshot = getPriceSnapshots(List.of(ticker), account).get(ticker);
+        if (snapshot == null) throw new IllegalStateException(ticker.name() + " 시세를 조회하지 못했습니다.");
+        return snapshot;
     }
 
+    // 현재가와 전일 종가가 둘 다 있는 종목만 담는다
     @Override
     public Map<StrategyTicker, PriceSnapshot> getPriceSnapshots(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        return priceFeed.getPriceSnapshots(tickers); // 공통 API — account 불필요
+        Map<StrategyTicker, BigDecimal> prices = marketData.latestPrices(tickers);
+        Map<StrategyTicker, BigDecimal> closes = marketData.latestCloses(tickers);
+        Map<StrategyTicker, PriceSnapshot> result = new LinkedHashMap<>();
+        for (StrategyTicker ticker : tickers) {
+            if (prices.containsKey(ticker) && closes.containsKey(ticker)) {
+                result.put(ticker, new PriceSnapshot(prices.get(ticker), closes.get(ticker)));
+            }
+        }
+        return result;
     }
 
     @Override
     public BigDecimal getPrevClose(StrategyTicker ticker, BrokerAccountRef account) {
-        return priceFeed.getPrevClose(ticker); // 공통 API — account 불필요
+        return marketData.requireLatestClose(ticker);
     }
 
     @Override
     public Map<StrategyTicker, BigDecimal> getPrevCloses(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        return priceFeed.getPrevCloses(tickers); // 공통 API — account 불필요
+        return marketData.latestCloses(tickers);
     }
 
-    // tradeDate 일봉 확정 종가 — 시세는 Toss 공용 피드 재사용(TossPriceApi.getClosingPrice)
+    // tradeDate(KST 거래일)의 확정 종가 — 확정 일봉이 없으면 현재가로 대신하지 않고 예외
     @Override
     public BigDecimal getClosingPrice(StrategyTicker ticker, LocalDate tradeDate, BrokerAccountRef account) {
-        return priceFeed.getClosingPrice(ticker, tradeDate);
+        return marketData.requireConfirmedClose(ticker, marketCalendarPort.usSessionDateOf(tradeDate));
     }
 
     @Override
     public Map<StrategyTicker, BigDecimal> getClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
         Map<StrategyTicker, BigDecimal> result = new LinkedHashMap<>();
-        for (StrategyTicker ticker : tickers) {
-            result.put(ticker, priceFeed.getClosingPrice(ticker, tradeDate));
-        }
+        marketData.confirmedBars(tickers, marketCalendarPort.usSessionDateOf(tradeDate))
+                .forEach((ticker, bar) -> result.put(ticker, bar.close()));
         return result;
     }
 
@@ -135,11 +156,11 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
         List<PlacedOrderView> placed = mockSimulationDataPort.findPlacedOrders(cycleId, to);
         if (placed.isEmpty()) return List.of();
 
-        // 일봉은 호출당 1회 조회 — 확정 봉이 없으면 현재가 단일값 봉(시가=고가=저가=종가)으로 대체
-        BrokerCandle candle = priceFeed.fetchConfirmedCandle(ticker, to).orElseGet(() -> {
-            BigDecimal current = priceFeed.getPrice(ticker);
-            return new BrokerCandle(to, current, current, current, current, 0L);
-        });
+        // 일봉은 호출당 1회 조회 — 확정 봉이 없으면 현재가로 대신하지 않고 예외(주문 상태를 바꾸지 않는다)
+        BrokerCandle candle = marketData.confirmedBars(List.of(ticker), marketCalendarPort.usSessionDateOf(to)).get(ticker);
+        if (candle == null) {
+            throw new IllegalStateException("확정 일봉이 없습니다.");
+        }
         List<Execution> executions = new ArrayList<>();
         for (PlacedOrderView order : placed) {
             if (!fills(order, candle)) continue; // 미체결 — TradingReporter.markFilledOrders가 CANCELLED로 기록
@@ -197,7 +218,7 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
             PositionView position = latest.get();
             totalDeposit = totalDeposit.add(position.deposit());
             if (position.holdings() > 0 && position.avgPrice() != null) {
-                BigDecimal currentPrice = priceFeed.getPrice(strategy.ticker());
+                BigDecimal currentPrice = getPrice(strategy.ticker(), account);
                 holdings.add(new PresentBalanceResult.TossHolding(strategy.ticker(), position.holdings(), position.avgPrice(), currentPrice));
             }
         }

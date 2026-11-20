@@ -1,6 +1,7 @@
 package com.kista.tradingcore.broker.adapter.out.mock;
 
-import com.kista.tradingcore.broker.adapter.out.toss.TossPriceApi;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.BrokerCandle;
 import com.kista.tradingcore.broker.domain.model.SellableQuantity;
@@ -27,13 +28,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -43,13 +46,16 @@ import static org.mockito.Mockito.when;
 class MockBrokerAdapterTest {
 
     @Mock
-    private TossPriceApi priceFeed;
+    private MarketDataClient marketData;
+
+    @Mock
+    private MarketCalendarPort marketCalendarPort;
 
     @Mock
     private MockSimulationDataPort mockSimulationDataPort;
 
     private MockBrokerAdapter adapter() {
-        return new MockBrokerAdapter(priceFeed, mockSimulationDataPort);
+        return new MockBrokerAdapter(marketData, marketCalendarPort, mockSimulationDataPort);
     }
 
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
@@ -58,6 +64,7 @@ class MockBrokerAdapterTest {
     private static final BrokerAccountRef ACCOUNT = new BrokerAccountRef(ACCOUNT_ID, "key", "secret",
             "12345678", null, Broker.MOCK);
     private static final LocalDate TRADE_DATE = LocalDate.of(2026, 7, 25);
+    private static final LocalDate US_SESSION = LocalDate.of(2026, 7, 24); // KST 거래일의 미국 세션일
     private static final StrategyRefLite TQQQ_STRATEGY = new StrategyRefLite(STRATEGY_ID, StrategyTicker.TQQQ);
 
     // getExecutions()가 strategy→cycle을 해석할 수 있도록 공통 stub — 개별 테스트는 findPlacedOrders만 stub하면 된다
@@ -68,8 +75,9 @@ class MockBrokerAdapterTest {
 
     // 거래일 일봉 stub — 인자 순서: open, high, low, close
     private void stubCandle(String open, String high, String low, String close) {
-        when(priceFeed.fetchConfirmedCandle(eq(StrategyTicker.TQQQ), any())).thenReturn(Optional.of(new BrokerCandle(
-                TRADE_DATE, new BigDecimal(open), new BigDecimal(high), new BigDecimal(low), new BigDecimal(close), 1L)));
+        when(marketCalendarPort.usSessionDateOf(TRADE_DATE)).thenReturn(US_SESSION);
+        when(marketData.confirmedBars(List.of(StrategyTicker.TQQQ), US_SESSION)).thenReturn(Map.of(StrategyTicker.TQQQ,
+                new BrokerCandle(US_SESSION, new BigDecimal(open), new BigDecimal(high), new BigDecimal(low), new BigDecimal(close), 1L)));
     }
 
     // 테스트용 PLACED 주문 뷰 생성 헬퍼
@@ -297,18 +305,18 @@ class MockBrokerAdapterTest {
     }
 
     @Test
-    @DisplayName("일봉이 없으면 현재가 단일값 봉으로 판정한다 — LIMIT 매수는 현재가<=지정가면 현재가에 체결")
-    void noCandleFallsBackToCurrentPrice() {
+    @DisplayName("확정 일봉이 없으면 현재가로 대신하지 않고 예외다")
+    void 확정_일봉이_없으면_체결_조회가_예외() {
         stubTqqqCycle();
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(
                 placedOrder(OrderType.LIMIT, OrderDirection.BUY, 5, new BigDecimal("100.00"), "MOCK-L5")));
-        when(priceFeed.fetchConfirmedCandle(eq(StrategyTicker.TQQQ), any())).thenReturn(Optional.empty());
-        when(priceFeed.getPrice(StrategyTicker.TQQQ)).thenReturn(new BigDecimal("97.00"));
+        when(marketCalendarPort.usSessionDateOf(TRADE_DATE)).thenReturn(US_SESSION);
+        when(marketData.confirmedBars(List.of(StrategyTicker.TQQQ), US_SESSION)).thenReturn(Map.of());
 
-        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
-
-        assertThat(executions).hasSize(1);
-        assertThat(executions.getFirst().price()).isEqualByComparingTo("97.00");
+        assertThatThrownBy(() -> adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("확정 일봉이 없습니다.");
+        verify(marketData, never()).latestPrices(any());
     }
 
     @Test
@@ -373,7 +381,7 @@ class MockBrokerAdapterTest {
 
         adapter().cancel(instruction, ACCOUNT);
 
-        verifyNoInteractions(mockSimulationDataPort, priceFeed);
+        verifyNoInteractions(mockSimulationDataPort, marketData);
     }
 
     // --- getSellableQuantity() ---
@@ -404,9 +412,9 @@ class MockBrokerAdapterTest {
     // --- BrokerPricePort 위임 ---
 
     @Test
-    @DisplayName("getPrice는 account와 무관하게 TossPriceApi 공통 시세로 위임한다")
+    @DisplayName("getPrice는 account와 무관하게 공용 현재가로 위임한다")
     void getPriceDelegatesToPriceFeed() {
-        when(priceFeed.getPrice(StrategyTicker.TQQQ)).thenReturn(new BigDecimal("123.45"));
+        when(marketData.latestPrices(List.of(StrategyTicker.TQQQ))).thenReturn(Map.of(StrategyTicker.TQQQ, new BigDecimal("123.45")));
 
         BigDecimal price = adapter().getPrice(StrategyTicker.TQQQ, ACCOUNT);
 
@@ -414,9 +422,17 @@ class MockBrokerAdapterTest {
     }
 
     @Test
-    @DisplayName("getPrevClose는 account와 무관하게 TossPriceApi 공통 시세로 위임한다")
+    @DisplayName("currentPrices는 공용 현재가다")
+    void currentPrices는_공용_현재가() {
+        when(marketData.latestPrices(List.of(StrategyTicker.TQQQ))).thenReturn(Map.of(StrategyTicker.TQQQ, new BigDecimal("77.00")));
+
+        assertThat(adapter().currentPrices(ACCOUNT, List.of(StrategyTicker.TQQQ)).get(StrategyTicker.TQQQ)).isEqualByComparingTo("77.00");
+    }
+
+    @Test
+    @DisplayName("getPrevClose는 account와 무관하게 공용 전일 종가로 위임한다")
     void getPrevCloseDelegatesToPriceFeed() {
-        when(priceFeed.getPrevClose(StrategyTicker.TQQQ)).thenReturn(new BigDecimal("120.00"));
+        when(marketData.requireLatestClose(StrategyTicker.TQQQ)).thenReturn(new BigDecimal("120.00"));
 
         BigDecimal prevClose = adapter().getPrevClose(StrategyTicker.TQQQ, ACCOUNT);
 
@@ -431,7 +447,7 @@ class MockBrokerAdapterTest {
         when(mockSimulationDataPort.findStrategiesByAccountId(ACCOUNT_ID)).thenReturn(List.of(TQQQ_STRATEGY));
         PositionView position = new PositionView(7, new BigDecimal("48.00"), new BigDecimal("500.00"));
         when(mockSimulationDataPort.findLatestPosition(STRATEGY_ID)).thenReturn(Optional.of(position));
-        when(priceFeed.getPrice(StrategyTicker.TQQQ)).thenReturn(new BigDecimal("55.00"));
+        when(marketData.latestPrices(List.of(StrategyTicker.TQQQ))).thenReturn(Map.of(StrategyTicker.TQQQ, new BigDecimal("55.00")));
 
         PresentBalanceResult result = adapter().getPresentBalance(ACCOUNT);
 

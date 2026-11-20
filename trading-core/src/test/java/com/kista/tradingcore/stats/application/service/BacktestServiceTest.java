@@ -3,7 +3,6 @@ package com.kista.tradingcore.stats.application.service;
 import com.kista.tradingcore.trading.domain.creation.VrRampInput;
 import com.kista.tradingcore.stats.domain.backtest.BacktestCommand;
 import com.kista.tradingcore.stats.domain.backtest.BacktestResult;
-import com.kista.tradingcore.stats.domain.model.DailyCandle;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.OrderTiming;
@@ -11,7 +10,9 @@ import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.matching.domain.model.PrivacyPlan;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.trading.domain.model.Strategy;
-import com.kista.tradingcore.stats.application.port.output.HistoricalCandlePort;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
+import com.kista.tradingcore.broker.domain.model.BrokerCandle;
+import com.kista.tradingcore.broker.domain.model.DailyCandleQuery;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
@@ -23,7 +24,7 @@ import com.kista.shared.kernel.StrategyCreationSettings;
 import com.kista.shared.kernel.StrategyFieldSettings;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
+import com.kista.shared.support.FixedClockTestConfig;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -49,13 +50,13 @@ import com.kista.shared.kernel.StrategyTicker;
 @ExtendWith(MockitoExtension.class)
 class BacktestServiceTest {
 
-    @Mock HistoricalCandlePort candlePort;
+    @Mock MarketDataClient candlePort;
     @Mock PrivacyTradePort privacyTradePort;
     @Mock CycleOrderStrategies cycleOrderStrategies;
     @Mock CycleOrderStrategy planner;
     @Mock StrategyCreationPolicyPort strategyCreationPolicyPort;
 
-    @InjectMocks BacktestService service;
+    private BacktestService service;
 
     private static final LocalDate FROM = LocalDate.of(2024, 1, 1);
     private static final LocalDate TO = LocalDate.of(2024, 1, 5);
@@ -70,6 +71,8 @@ class BacktestServiceTest {
 
     @BeforeEach
     void stubVrPolicy() {
+        service = new BacktestService(candlePort, FixedClockTestConfig.FIXED, privacyTradePort, cycleOrderStrategies,
+                strategyCreationPolicyPort);
         lenient().when(strategyCreationPolicyPort.find(StrategyType.VR)).thenReturn(Optional.of(VR_SETTINGS));
     }
 
@@ -105,9 +108,9 @@ class BacktestServiceTest {
                 initialValue == null ? null : new BigDecimal(initialValue), holdings, avgPrice, null, null);
     }
 
-    private static DailyCandle candle(int day, String close) {
-        return new DailyCandle(LocalDate.of(2024, 1, day), new BigDecimal(close), new BigDecimal(close),
-                new BigDecimal(close), new BigDecimal(close));
+    private static BrokerCandle candle(int day, String close) {
+        return new BrokerCandle(LocalDate.of(2024, 1, day), new BigDecimal(close), new BigDecimal(close),
+                new BigDecimal(close), new BigDecimal(close), 0L);
     }
 
     // --- 검증 ---
@@ -120,7 +123,7 @@ class BacktestServiceTest {
         assertThatThrownBy(() -> service.run(command))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("지원하지 않는 종목");
-        verify(candlePort, never()).fetchDailyCandles(anyString(), any(), any());
+        verify(candlePort, never()).dailyCandles(anyString(), any());
     }
 
     @Test
@@ -140,14 +143,14 @@ class BacktestServiceTest {
         assertThatThrownBy(() -> service.run(command))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("예수금");
-        verify(candlePort, never()).fetchDailyCandles(anyString(), any(), any());
+        verify(candlePort, never()).dailyCandles(anyString(), any());
     }
 
     @Test
     void 예수금_없이_기존_보유만으로_시작할_수_있다() {
         when(cycleOrderStrategies.of(StrategyType.INFINITE)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
-        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+        when(candlePort.dailyCandles(anyString(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
 
         BacktestCommand command = infiniteWithPosition(BigDecimal.ZERO, 10, new BigDecimal("50"));
@@ -162,7 +165,7 @@ class BacktestServiceTest {
         assertThatThrownBy(() -> service.run(command))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("평단가");
-        verify(candlePort, never()).fetchDailyCandles(anyString(), any(), any());
+        verify(candlePort, never()).dailyCandles(anyString(), any());
     }
 
     @Test
@@ -213,7 +216,7 @@ class BacktestServiceTest {
 
     @Test
     void VR_인출식_최소자산에_미달하면_거부한다() {
-        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+        when(candlePort.dailyCandles(anyString(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
         // required = 30 × 100 × 4 / 4주 = 3000.00 > 시장가 평가금 0 + 시드 1000 (초기 V 1000은 필요자산 비교에 쓰지 않는다)
         assertThatThrownBy(() -> service.run(vr(new BigDecimal("15"), 4, -30, "1000")))
@@ -225,7 +228,7 @@ class BacktestServiceTest {
     void VR_인출식_최소자산_검증은_보유분_시장가_평가금을_합산한다() {
         when(cycleOrderStrategies.of(StrategyType.VR)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
-        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+        when(candlePort.dailyCandles(anyString(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
 
         // required = 3000.00, seed=0이지만 보유 50주 × 첫 캔들 종가 100 = 5000 ≥ 3000 → 통과(평단가 60 기준 취득원가는 무관)
@@ -236,7 +239,7 @@ class BacktestServiceTest {
 
     @Test
     void VR_인출식_최소자산_검증은_초기V_직접입력으로_우회할_수_없다() {
-        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+        when(candlePort.dailyCandles(anyString(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
 
         // 보유 10주 × 100 = 1000 + 시드 0 < 3000 — 초기 V를 10000으로 부풀려도 필요자산 비교는 시장가 기준
@@ -258,7 +261,7 @@ class BacktestServiceTest {
     void VR_초기V값_미입력이면_보유분_없이_bootstrap으로_시작한다() {
         when(cycleOrderStrategies.of(StrategyType.VR)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
-        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+        when(candlePort.dailyCandles(anyString(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
 
         assertThatCode(() -> service.run(vr(new BigDecimal("15"), 4, 0, null))).doesNotThrowAnyException();
@@ -273,7 +276,7 @@ class BacktestServiceTest {
         assertThatThrownBy(() -> service.run(vr(new BigDecimal("15"), 3, 0, "1000")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("리밸런싱 주기");
-        verify(candlePort, never()).fetchDailyCandles(anyString(), any(), any());
+        verify(candlePort, never()).dailyCandles(anyString(), any());
     }
 
     @Test
@@ -293,7 +296,7 @@ class BacktestServiceTest {
     void VR_밴드폭은_scale이_달라도_허용값과_같으면_통과한다() {
         when(cycleOrderStrategies.of(StrategyType.VR)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
-        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+        when(candlePort.dailyCandles(anyString(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
 
         assertThatCode(() -> service.run(vr(new BigDecimal("15.00"), 4, 0, "1000"))).doesNotThrowAnyException();
@@ -318,37 +321,63 @@ class BacktestServiceTest {
         // 주문 기준가가 오늘 종가(= 다음 세션의 전일종가)라 첫날부터 계획할 수 있다 — 워밍업 프리픽스 불필요
         when(cycleOrderStrategies.of(StrategyType.INFINITE)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
-        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+        when(candlePort.dailyCandles(anyString(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
 
         service.run(infinite(null));
 
-        verify(candlePort).fetchDailyCandles("TQQQ", FROM, TO);
+        verify(candlePort).dailyCandles("TQQQ", DailyCandleQuery.range(FROM, TO, DailyCandleQuery.Adjustment.SPLIT));
+    }
+
+    @Test
+    void 종료일이_미래면_뉴욕_어제로_클램프하고_분할수정으로_조회한다() {
+        when(cycleOrderStrategies.of(StrategyType.INFINITE)).thenReturn(planner);
+        when(planner.plan(any())).thenReturn(Optional.empty());
+        when(candlePort.dailyCandles(anyString(), any()))
+                .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
+        BacktestCommand future = new BacktestCommand(StrategyType.INFINITE, StrategyTicker.TQQQ, FROM, LocalDate.of(2030, 1, 1), SEED,
+                null, null, null, 0, null, null, null, null, null);
+
+        service.run(future);
+
+        // 고정 시계 2026-01-06 03:00Z = 뉴욕 2026-01-05 → 어제 2026-01-04
+        verify(candlePort).dailyCandles("TQQQ", DailyCandleQuery.range(FROM, LocalDate.of(2026, 1, 4), DailyCandleQuery.Adjustment.SPLIT));
+    }
+
+    @Test
+    void 시작일이_클램프된_종료일보다_늦으면_조회_없이_거절한다() {
+        BacktestCommand future = new BacktestCommand(StrategyType.INFINITE, StrategyTicker.TQQQ, LocalDate.of(2030, 1, 1),
+                LocalDate.of(2030, 2, 1), SEED, null, null, null, 0, null, null, null, null, null);
+
+        assertThatThrownBy(() -> service.run(future))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("해당 기간의 과거 일봉 데이터가 없습니다.");
+        verify(candlePort, never()).dailyCandles(anyString(), any());
     }
 
     @Test
     void VR은_요청_구간_그대로_조회한다() {
         when(cycleOrderStrategies.of(StrategyType.VR)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
-        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+        when(candlePort.dailyCandles(anyString(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
 
         service.run(vr(new BigDecimal("15"), 4, 0, "1000"));
 
-        verify(candlePort).fetchDailyCandles("TQQQ", FROM, TO);
+        verify(candlePort).dailyCandles("TQQQ", DailyCandleQuery.range(FROM, TO, DailyCandleQuery.Adjustment.SPLIT));
     }
 
     @Test
     void PRIVACY도_요청_구간_그대로_조회한다() {
         when(cycleOrderStrategies.of(StrategyType.PRIVACY)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
-        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+        when(candlePort.dailyCandles(anyString(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.empty());
 
         service.run(privacy());
 
-        verify(candlePort).fetchDailyCandles("SOXL", FROM, TO);
+        verify(candlePort).dailyCandles("SOXL", DailyCandleQuery.range(FROM, TO, DailyCandleQuery.Adjustment.SPLIT));
     }
 
     @Test
@@ -359,7 +388,7 @@ class BacktestServiceTest {
         assertThatThrownBy(() -> service.run(command))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("이 전략은 백테스트를 지원하지 않습니다.");
-        verify(candlePort, never()).fetchDailyCandles(anyString(), any(), any());
+        verify(candlePort, never()).dailyCandles(anyString(), any());
     }
 
     // --- PRIVACY 기준 매매표 ---
@@ -368,7 +397,7 @@ class BacktestServiceTest {
     void PRIVACY_기준표_시작일_이전_구간은_실측_시작일로_경고한다() {
         when(cycleOrderStrategies.of(StrategyType.PRIVACY)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
-        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+        when(candlePort.dailyCandles(anyString(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(3, "100"), candle(5, "100")));
         // 1/5 세션 적용분(적용 거래일 1/6)만 존재 — 그 이전 거래일 조회는 정확 일치 실패로 empty
         PrivacyTradeBase base = baseFor(LocalDate.of(2024, 1, 6));
@@ -385,7 +414,7 @@ class BacktestServiceTest {
     void PRIVACY_기준표가_매매_가능한_첫_세션부터_있으면_시작일_경고가_없다() {
         when(cycleOrderStrategies.of(StrategyType.PRIVACY)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
-        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+        when(candlePort.dailyCandles(anyString(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(3, "100"), candle(5, "100")));
         // 1/3 세션 적용분(적용 거래일 1/4) — 첫 캔들(1/1) 세션은 계획일이 없어 원래 매매 불가라 건너뛴 구간이 없다
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(baseFor(LocalDate.of(2024, 1, 4))));
@@ -401,7 +430,7 @@ class BacktestServiceTest {
         when(planner.plan(any())).thenReturn(Optional.empty());
         // 캔들 날짜는 US 세션일 — 목(1/4)·금(1/5)·월(1/8). 직전 달력일이 일요일이라 월요일엔 "전날 발행분"이 존재하지 않는다
         // 세션 1/5 주문은 1/4 캔들에서, 세션 1/8 주문은 1/5 캔들에서 계획된다
-        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+        when(candlePort.dailyCandles(anyString(), any()))
                 .thenReturn(List.of(candle(4, "100"), candle(5, "100"), candle(8, "100")));
         // 실제 어댑터 재현 — release_date == (조회일 − 1일) 발행분을 적용 거래일(발행일 + 1일)로 변환해 반환
         List<LocalDate> releaseDates = List.of(
@@ -430,12 +459,12 @@ class BacktestServiceTest {
     @Test
     void 요약은_시작끝_두_지점만으로_수익률을_계산한다() {
         when(cycleOrderStrategies.of(StrategyType.INFINITE)).thenReturn(planner);
-        when(candlePort.fetchDailyCandles(anyString(), any(), any())).thenReturn(List.of(
-                new DailyCandle(LocalDate.of(2024, 1, 1), bd("100"), bd("100"), bd("100"), bd("100")),
-                new DailyCandle(LocalDate.of(2024, 1, 2), bd("100"), bd("110"), bd("90"), bd("100")),
-                new DailyCandle(LocalDate.of(2024, 1, 3), bd("80"), bd("80"), bd("80"), bd("80")),
-                new DailyCandle(LocalDate.of(2024, 1, 4), bd("120"), bd("120"), bd("120"), bd("120")),
-                new DailyCandle(LocalDate.of(2024, 1, 5), bd("110"), bd("110"), bd("110"), bd("110"))));
+        when(candlePort.dailyCandles(anyString(), any())).thenReturn(List.of(
+                new BrokerCandle(LocalDate.of(2024, 1, 1), bd("100"), bd("100"), bd("100"), bd("100"), 0L),
+                new BrokerCandle(LocalDate.of(2024, 1, 2), bd("100"), bd("110"), bd("90"), bd("100"), 0L),
+                new BrokerCandle(LocalDate.of(2024, 1, 3), bd("80"), bd("80"), bd("80"), bd("80"), 0L),
+                new BrokerCandle(LocalDate.of(2024, 1, 4), bd("120"), bd("120"), bd("120"), bd("120"), 0L),
+                new BrokerCandle(LocalDate.of(2024, 1, 5), bd("110"), bd("110"), bd("110"), bd("110"), 0L)));
         // 1/1에 계획한 지정가 100 매수 1주가 1/2 저가 90에 체결(시가 100 = 지정가라 체결가 100) → 예수금 900 + 1주
         // 1/2 = 900 + 100, 1/3 = 900 + 80, 1/4 = 900 + 120, 1/5 = 900 + 110
         when(planner.plan(any())).thenReturn(Optional.of(buyOnePlan()), Optional.empty());
@@ -456,10 +485,10 @@ class BacktestServiceTest {
     @Test
     void 구간이_365일_이상이면_cagr을_연환산한다() {
         when(cycleOrderStrategies.of(StrategyType.INFINITE)).thenReturn(planner);
-        when(candlePort.fetchDailyCandles(anyString(), any(), any())).thenReturn(List.of(
-                new DailyCandle(LocalDate.of(2024, 1, 1), bd("100"), bd("100"), bd("100"), bd("100")),
-                new DailyCandle(LocalDate.of(2024, 1, 2), bd("100"), bd("100"), bd("100"), bd("100")),
-                new DailyCandle(LocalDate.of(2025, 1, 2), bd("121"), bd("121"), bd("121"), bd("121"))));
+        when(candlePort.dailyCandles(anyString(), any())).thenReturn(List.of(
+                new BrokerCandle(LocalDate.of(2024, 1, 1), bd("100"), bd("100"), bd("100"), bd("100"), 0L),
+                new BrokerCandle(LocalDate.of(2024, 1, 2), bd("100"), bd("100"), bd("100"), bd("100"), 0L),
+                new BrokerCandle(LocalDate.of(2025, 1, 2), bd("121"), bd("121"), bd("121"), bd("121"), 0L)));
         // 1/1 계획 매수 1주 @100이 1/2 체결 → 마지막 자산 900 + 121 = 1,021
         when(planner.plan(any())).thenReturn(Optional.of(buyOnePlan()), Optional.empty());
 
@@ -474,7 +503,7 @@ class BacktestServiceTest {
         // 캔들이 하루뿐이면 그날 만든 주문은 체결 기회가 없다 — 자산 곡선은 시작점 하나뿐
         when(cycleOrderStrategies.of(StrategyType.INFINITE)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
-        when(candlePort.fetchDailyCandles(anyString(), any(), any())).thenReturn(List.of(candle(1, "100")));
+        when(candlePort.dailyCandles(anyString(), any())).thenReturn(List.of(candle(1, "100")));
 
         BacktestResult result = service.run(infinite(null));
 
@@ -486,7 +515,7 @@ class BacktestServiceTest {
     void 항상_체결모델과_주문타이밍_안내를_덧붙인다() {
         when(cycleOrderStrategies.of(StrategyType.INFINITE)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
-        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+        when(candlePort.dailyCandles(anyString(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
 
         BacktestResult result = service.run(infinite(null));
@@ -504,7 +533,7 @@ class BacktestServiceTest {
         when(cycleOrderStrategies.of(StrategyType.VR)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
         // 1/29 = 시작일 + 4주 롤오버 → 그날 포인트 기록 뒤 +100 적립 → 1/30 포인트부터 반영
-        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+        when(candlePort.dailyCandles(anyString(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(29, "100"), candle(30, "100")));
 
         BacktestResult result = service.run(vr(new BigDecimal("15"), 4, 100, "1000"));
@@ -523,7 +552,7 @@ class BacktestServiceTest {
     void VR_인출은_최대낙폭으로_잡히지_않는다() {
         when(cycleOrderStrategies.of(StrategyType.VR)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
-        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+        when(candlePort.dailyCandles(anyString(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(29, "100"), candle(30, "100")));
 
         // 인출 10 → 필요자산 10 × 100 × 4 ÷ 4 = 1000 = 시드 → 검증 통과
@@ -540,7 +569,7 @@ class BacktestServiceTest {
     void VR_적립_다음날_수익률은_적립_직후_자산을_기준으로_계산한다() {
         when(cycleOrderStrategies.of(StrategyType.VR)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
-        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+        when(candlePort.dailyCandles(anyString(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(29, "110"), candle(30, "121")));
 
         // 시드 1000 + 10주: 1/1 = 1000 + 1000, 1/29 = 1000 + 1100, +100 적립, 1/30 = 1100 + 1210

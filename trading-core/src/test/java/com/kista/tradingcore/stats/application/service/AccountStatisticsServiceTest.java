@@ -2,7 +2,6 @@ package com.kista.tradingcore.stats.application.service;
 
 import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.account.domain.model.Account;
-import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.OrderDirection;
@@ -13,7 +12,7 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
-import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
 import com.kista.tradingcore.broker.application.port.output.PortfolioPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,7 +40,7 @@ class AccountStatisticsServiceTest {
     @Mock AccountPort accountPort;
     @Mock CyclePositionPort cyclePositionPort;
     @Mock OrderPort orderPort;
-    @Mock BrokerPricePort pricePort;
+    @Mock MarketDataClient marketData;
     @Mock PortfolioPort portfolioPort;
 
     private AccountStatisticsService service;
@@ -51,7 +50,7 @@ class AccountStatisticsServiceTest {
     @BeforeEach
     void setUp() {
         service = new AccountStatisticsService(
-                accountPort, cyclePositionPort, orderPort, portfolioPort, pricePort, FixedClockTestConfig.FIXED);
+                accountPort, cyclePositionPort, orderPort, portfolioPort, marketData, FixedClockTestConfig.FIXED);
         // 실제 Account record — account.toBrokerRef()가 인스턴스 메서드
         Account account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Broker.TOSS, null, null);
         lenient().when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
@@ -60,14 +59,13 @@ class AccountStatisticsServiceTest {
     @Test
     void getPrices_returns_prev_close_not_current() {
         // 전략 생성 화면 티커 목록 가격도 basePrice와 동일 소스(전일종가)를 써야 함 (현재가 API 미사용)
-        when(pricePort.getPrevCloses(eq(List.of(StrategyTicker.SOXL)), any(BrokerAccountRef.class)))
+        when(marketData.latestCloses(List.of(StrategyTicker.SOXL)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("89.20")));
 
         var result = service.getPrices(accountId, userId, List.of(StrategyTicker.SOXL));
 
         assertThat(result.get(StrategyTicker.SOXL)).isEqualByComparingTo("89.20");
-        verify(pricePort, never()).getPrices(any(), any());
-        verify(pricePort, never()).getPriceSnapshots(any(), any());
+        verify(marketData, never()).latestPrices(any());
     }
 
     @Test

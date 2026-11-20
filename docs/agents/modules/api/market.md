@@ -10,5 +10,5 @@ com.kista.api.market/    ← Spring Modulith 모듈(CLOSED, root 전용) — 공
   adapter/in/web/     ← internal — FearGreedController/MarketHolidayController + dto/(FearGreedResponse/MarketSessionResponse(tradeDateKst·tradingDay)/TossCandleResponse)
   adapter/in/schedule/ ← FearGreedScheduler
   adapter/out/feargreed/ ← CnnFearGreedAdapter/FearGreedConfig
-  adapter/out/internal/ ← MarketCalendarQueryHttpAdapter(`/api/internal/marketcalendar/**`)/CandleQueryHttpAdapter(`/api/internal/broker/candles/latest`, interval="1d" 고정)
+  adapter/out/internal/ ← MarketCalendarQueryHttpAdapter(`/api/internal/marketcalendar/**`)/CandleQueryHttpAdapter(`/api/internal/broker/candles/latest`, 일봉만)
   adapter/out/persistence/feargreed/ ← FearGreedSnapshotEntity + JpaRepository + PersistenceAdapter

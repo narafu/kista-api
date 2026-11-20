@@ -54,7 +54,6 @@ com.kista.tradingcore.notify.application.port.output.TradingNotifyPort
 com.kista.tradingcore.notify.application.port.output.TradingRealtimeNotificationPort
 com.kista.tradingcore.notify.application.port.output.TradingUserNotificationPort
 com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort
-com.kista.tradingcore.stats.application.port.output.HistoricalCandlePort
 com.kista.tradingcore.trading.application.port.output.CycleCapitalEventPort
 com.kista.tradingcore.trading.application.port.output.CyclePositionInfiniteDetailPort
 com.kista.tradingcore.trading.application.port.output.CyclePositionPort

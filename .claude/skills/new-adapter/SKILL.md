@@ -5,7 +5,7 @@ description: kista-api에 신규 외부 서비스 어댑터(REST 클라이언트
 
 # 신규 외부 서비스 어댑터 구조 패턴
 
-소유 모듈의 `adapter/out/<서비스명>/` 아래 3파일로 구성 (`user/adapter/out/kakao`의 KakaoConfig, `benchmark`·`marketcalendar`·`tradingcore.stats`의 AlpacaConfig 동일 패턴):
+소유 모듈의 `adapter/out/<서비스명>/` 아래 3파일로 구성 (`user/adapter/out/kakao`의 KakaoConfig, `benchmark`·`marketcalendar`의 AlpacaConfig 동일 패턴):
 
 - `*Properties.java` — `@ConfigurationProperties(prefix="...")` record
 - `*Config.java` — `@Configuration` + `@EnableConfigurationProperties(*Properties.class)` + `RestClient` `@Bean` (`RestTemplate` 아님). 타임아웃·baseUrl은 `com.kista.shared.platform.http.RestClients.withTimeouts(...)` 재사용

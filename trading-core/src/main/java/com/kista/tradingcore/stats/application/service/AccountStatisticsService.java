@@ -16,7 +16,7 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
-import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
 import com.kista.tradingcore.broker.application.port.output.PortfolioPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -38,7 +38,7 @@ public class AccountStatisticsService {
     private final CyclePositionPort cyclePositionPort;
     private final OrderPort orderPort;
     private final PortfolioPort portfolioPort;
-    private final BrokerPricePort brokerPricePort;
+    private final MarketDataClient marketData;   // 공용 시세 — 전일 종가
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 체결기준현재잔고 — Toss: 보유종목+예수금 직접 산출
@@ -82,9 +82,8 @@ public class AccountStatisticsService {
     // 전략 생성 화면 티커 목록 가격 — 최소 시드 산정 기준(전일종가)과 동일 소스로 통일
     // (currentPrice로 보여주면 등록 시점마다 미묘하게 다른 값이 최소 시드 기준으로 오인될 수 있음)
     public Map<StrategyTicker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<StrategyTicker> tickers) {
-        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        return BrokerCallGuard.wrap("전일종가 조회",
-                () -> brokerPricePort.getPrevCloses(tickers, account.toBrokerRef()));
+        accountPort.requireOwnedAccount(accountId, requesterId); // 소유권 검증만 — 시세는 계좌와 무관
+        return BrokerCallGuard.wrap("전일종가 조회", () -> marketData.latestCloses(tickers));
     }
 
     public CycleHistoryPage getByAccount(UUID accountId, UUID requesterId,

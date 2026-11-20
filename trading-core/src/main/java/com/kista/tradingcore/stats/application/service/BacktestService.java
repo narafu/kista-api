@@ -15,7 +15,9 @@ import com.kista.tradingcore.trading.domain.creation.VrRampValidator;
 import com.kista.tradingcore.trading.domain.creation.StrategyCreationResolver;
 import com.kista.shared.kernel.RecurringMode;
 import com.kista.shared.kernel.StrategyCreationSettings;
-import com.kista.tradingcore.stats.application.port.output.HistoricalCandlePort;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
+import com.kista.tradingcore.broker.domain.model.DailyCandleQuery;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -50,7 +53,8 @@ public class BacktestService {
             "적립식/인출식 설정 시 누적 수익률·연평균 수익률·최대 낙폭은 적립·인출 금액을 뺀 시간가중수익률이라 "
                     + "최종 자산을 원금과 비교한 비율과 다를 수 있습니다.";
 
-    private final HistoricalCandlePort candlePort;         // 과거 일봉 조달 (Alpaca)
+    private final MarketDataClient marketData;            // 과거 일봉 조달 (공용 시세)
+    private final Clock clock;                             // 미정산 당일 봉을 빼는 to 클램프 기준
     private final PrivacyTradePort privacyTradePort;       // PRIVACY 기준 매매표 조회
     private final CycleOrderStrategies cycleOrderStrategies; // 전략 capability 라우터 (엔진에 그대로 위임)
     private final StrategyCreationPolicyPort strategyCreationPolicyPort; // VR bandWidth/intervalWeeks 허용값 — 운영 등록과 동일 정책
@@ -58,7 +62,7 @@ public class BacktestService {
     public BacktestResult run(BacktestCommand command) {
         validate(command);
 
-        List<DailyCandle> candles = fetchCandles(command); // 비어 있으면 어댑터가 이미 IllegalArgumentException
+        List<DailyCandle> candles = fetchCandles(command); // 비어 있으면 fetchCandles가 IllegalArgumentException
         // VR 인출식 최소자산은 시작 시점 시장가가 필요해 캔들 조달 뒤에 검증한다
         if (command.type() == StrategyType.VR) validateVrWithdrawal(command, candles.getFirst().close());
         List<String> warnings = new ArrayList<>();
@@ -161,7 +165,20 @@ public class BacktestService {
     // --- 캔들 조달 ---
 
     private List<DailyCandle> fetchCandles(BacktestCommand command) {
-        return candlePort.fetchDailyCandles(command.ticker().name(), command.from(), command.to());
+        // to는 뉴욕 어제까지로 클램프 — 진행 중인 당일 봉 배제. 분할만 수정(배당 수정은 FIDA 기준표·평단가 입력의 원가격과 어긋난다)
+        LocalDate latestAllowed = LocalDate.now(clock.withZone(TimeZones.NY)).minusDays(1);
+        LocalDate to = command.to().isAfter(latestAllowed) ? latestAllowed : command.to();
+        if (command.from().isAfter(to)) { // 시작일이 조회 가능한 마지막 날보다 늦으면 외부 호출 없이 거절
+            throw new IllegalArgumentException("해당 기간의 과거 일봉 데이터가 없습니다.");
+        }
+        List<DailyCandle> candles = marketData.dailyCandles(command.ticker().name(),
+                        DailyCandleQuery.range(command.from(), to, DailyCandleQuery.Adjustment.SPLIT)).stream()
+                .map(bar -> new DailyCandle(bar.date(), bar.open(), bar.high(), bar.low(), bar.close()))
+                .toList();
+        if (candles.isEmpty()) {
+            throw new IllegalArgumentException("해당 기간의 과거 일봉 데이터가 없습니다.");
+        }
+        return candles;
     }
 
     // --- PRIVACY 기준 매매표 조달 ---

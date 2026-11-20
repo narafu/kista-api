@@ -55,7 +55,7 @@ class CandleQueryHttpAdapterTest {
         RecordedRequest recorded = server.takeRequest();
         assertThat(recorded.getTarget()).contains("/api/internal/broker/candles/latest");
         assertThat(recorded.getTarget()).contains("symbol=QQQ");
-        assertThat(recorded.getTarget()).contains("interval=1d");
+        assertThat(recorded.getTarget()).doesNotContain("interval=");
         assertThat(recorded.getTarget()).contains("count=1");
     }
 
