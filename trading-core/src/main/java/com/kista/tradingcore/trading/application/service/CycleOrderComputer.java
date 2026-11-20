@@ -13,7 +13,7 @@ import com.kista.tradingcore.trading.application.port.output.StrategyInfiniteDet
 import com.kista.tradingcore.trading.application.port.output.StrategyVrDetailPort;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
-import com.kista.tradingcore.broker.adapter.out.marketdata.AlpacaMarketDataAdapter;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.broker.domain.model.BrokerCandle;
 import com.kista.tradingcore.broker.domain.model.DailyCandleQuery;
@@ -46,7 +46,7 @@ class CycleOrderComputer {
     private final StrategyCycleVrPort strategyCycleVrPort;  // VR 사이클 상세 (value·poolLimitRate)
     private final StrategyVrDetailPort strategyVrDetailPort; // VR 전략 버전 상세 (bandWidth)
     private final OrderPort orderPort;                       // VR poolUsed 조회용
-    private final AlpacaMarketDataAdapter alpaca;            // 리버스모드 별지점용 직전 5거래일 종가(공용 시세 일봉)
+    private final MarketDataClient alpaca;            // 리버스모드 별지점용 직전 5거래일 종가(공용 시세 일봉)
 
     // 전략 계산 + 주문 유효성 검증을 묶어 계산만 수행 (부수효과 없음)
     // currentCycle: INFINITE은 리버스모드 판단에 사용

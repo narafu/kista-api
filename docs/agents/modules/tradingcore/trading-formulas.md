@@ -78,7 +78,7 @@ BUY 가격이 cap(currentPrice × 1.05, PriceCapPolicy)을 넘으면 cap 기준�
 
 ### 1-7. 리버스모드 별지점
 ```
-starPointPrice = 직전 5거래일 종가 평균 — 공용 시세 일봉(`AlpacaMarketDataAdapter.dailyCandles`, `lastBefore(거래일−1, 5, RAW)`)  (scale=2, HALF_UP)
+starPointPrice = 직전 5거래일 종가 평균 — 공용 시세 일봉(`MarketDataClient.dailyCandles`, `lastBefore(거래일−1, 5, RAW)`)  (scale=2, HALF_UP)
 대체 경로: 조회 실패·5개 미만이면 현재 사이클에서 INFINITE 상세(cycle_position_infinite)가 있는 최신 cycle_position 5건(STAR_POINT_WINDOW — 마감 리포트·등록 개장 행. 수동 체결 보정 행은 체결가가 종가 자리에 들어가므로 제외)의 closingPrice 평균(null·0 이하 제외, 남는 값이 없으면 null) + warn
 LOC 매도 가격 = starPointPrice, 쿼터매수 LOC 가격 = starPointPrice − 0.01(TICK_SIZE)
 ```

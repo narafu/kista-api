@@ -5,7 +5,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.StrategyTicker;
-import com.kista.tradingcore.broker.adapter.out.marketdata.AlpacaMarketDataAdapter;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.BrokerCandle;
@@ -36,7 +36,7 @@ import static org.mockito.Mockito.when;
 @DisplayName("PriceSourceComparison 단위 테스트")
 class PriceSourceComparisonTest {
 
-    AlpacaMarketDataAdapter alpaca = mock(AlpacaMarketDataAdapter.class);
+    MarketDataClient alpaca = mock(MarketDataClient.class);
     BrokerPricePort port = mock(BrokerPricePort.class);
     PriceSourceComparison comparison = new PriceSourceComparison(alpaca, port, Duration.ZERO);
     ListAppender<ILoggingEvent> appender = new ListAppender<>();

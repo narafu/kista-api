@@ -115,7 +115,7 @@ class ManualTradingServiceTest {
                 new VrCycleOrderStrategy(vrStrategy))); // VR 수동 실행 테스트용
         CycleOrderComputer orderComputer = new CycleOrderComputer(
                 cycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCycleVrPort, strategyVrDetailPort, orderPort, mock(com.kista.tradingcore.broker.adapter.out.marketdata.AlpacaMarketDataAdapter.class));
+                strategyCycleVrPort, strategyVrDetailPort, orderPort, mock(com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient.class));
         orderPlanner = new TradingOrderPlanner(orderPort);
         priceFetcher = new TradingPriceFetcher(tossPricePort, eventPublisher, privacyTradePort);
         planBuilder = new StrategyOrderPlanBuilder(

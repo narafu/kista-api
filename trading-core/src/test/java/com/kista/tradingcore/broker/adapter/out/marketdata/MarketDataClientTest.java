@@ -36,7 +36,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 // 응답 JSON은 findings/21 8절 실호출(2026-11-13)의 형태다. 고정 시계는 뉴욕 2026-01-05(월) 22:00
-class AlpacaMarketDataAdapterTest {
+class MarketDataClientTest {
 
     private static final String SNAPSHOTS = "https://data.test/v2/stocks/snapshots";
     private static final String BARS = "https://data.test/v2/stocks/bars";
@@ -44,7 +44,7 @@ class AlpacaMarketDataAdapterTest {
 
     private final RestClient.Builder builder = RestClient.builder().baseUrl("https://data.test");
     private final MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-    private final AlpacaMarketDataAdapter adapter = new AlpacaMarketDataAdapter(builder.build(),
+    private final MarketDataClient adapter = new MarketDataClient(builder.build(),
             new AlpacaProperties(null, "test-key", "test-secret", "https://data.test"), FixedClockTestConfig.FIXED);
 
     private static RequestMatcher noQueryParam(String name) {
@@ -168,7 +168,7 @@ class AlpacaMarketDataAdapterTest {
         // 뉴욕 2026-01-05 16:10 — 정규 마감 뒤지만 통합 시세 지연 15분이 지나지 않았다
         RestClient.Builder earlyBuilder = RestClient.builder().baseUrl("https://data.test");
         MockRestServiceServer earlyServer = MockRestServiceServer.bindTo(earlyBuilder).build();
-        AlpacaMarketDataAdapter early = new AlpacaMarketDataAdapter(earlyBuilder.build(),
+        MarketDataClient early = new MarketDataClient(earlyBuilder.build(),
                 new AlpacaProperties(null, "test-key", "test-secret", "https://data.test"),
                 Clock.fixed(Instant.parse("2026-01-05T21:10:00Z"), TimeZones.KST));
         earlyServer.expect(ExpectedCount.twice(), requestTo(startsWith(BARS)))
@@ -258,7 +258,7 @@ class AlpacaMarketDataAdapterTest {
     void dailyCandles_lastBefore_dropsUnsettledTodayBar() {
         RestClient.Builder b = RestClient.builder().baseUrl("https://data.test");
         MockRestServiceServer srv = MockRestServiceServer.bindTo(b).build();
-        AlpacaMarketDataAdapter a = new AlpacaMarketDataAdapter(b.build(),
+        MarketDataClient a = new MarketDataClient(b.build(),
                 new AlpacaProperties(null, "test-key", "test-secret", "https://data.test"),
                 Clock.fixed(Instant.parse("2026-01-05T20:40:00Z"), TimeZones.KST));
         srv.expect(ExpectedCount.once(), requestTo(startsWith(BARS)))
@@ -279,7 +279,7 @@ class AlpacaMarketDataAdapterTest {
     void dailyCandles_lastBefore_keepsSettledTodayBar() {
         RestClient.Builder b = RestClient.builder().baseUrl("https://data.test");
         MockRestServiceServer srv = MockRestServiceServer.bindTo(b).build();
-        AlpacaMarketDataAdapter a = new AlpacaMarketDataAdapter(b.build(),
+        MarketDataClient a = new MarketDataClient(b.build(),
                 new AlpacaProperties(null, "test-key", "test-secret", "https://data.test"),
                 Clock.fixed(Instant.parse("2026-01-06T01:20:00Z"), TimeZones.KST));
         srv.expect(ExpectedCount.once(), requestTo(startsWith(BARS)))
@@ -293,5 +293,101 @@ class AlpacaMarketDataAdapterTest {
 
         assertThat(candles).extracting(BrokerCandle::date).containsExactly(LocalDate.of(2026, 1, 2), LocalDate.of(2026, 1, 5));
         srv.verify();
+    }
+
+    // 뉴욕 시각을 임의로 옮길 수 있는 시계
+    private static final class MutableClock extends Clock {
+        private Instant now;
+
+        MutableClock(String instant) {
+            this.now = Instant.parse(instant);
+        }
+
+        void set(String instant) {
+            this.now = Instant.parse(instant);
+        }
+
+        @Override public java.time.ZoneId getZone() { return TimeZones.KST; }
+        @Override public Clock withZone(java.time.ZoneId zone) { return Clock.fixed(now, zone); }
+        @Override public Instant instant() { return now; }
+    }
+
+    private static final String NOV_BARS = """
+            {"bars":{"SOXL":[{"t":"2026-11-19T05:00:00Z","o":1,"h":1,"l":1,"c":58.32,"v":1,"n":1,"vw":1},
+                             {"t":"2026-11-20T05:00:00Z","o":1,"h":1,"l":1,"c":49.19,"v":1,"n":1,"vw":1}]},"next_page_token":null}
+            """;
+
+    private MarketDataClient clientAt(Clock clock, MockRestServiceServer[] serverOut) {
+        RestClient.Builder b = RestClient.builder().baseUrl("https://data.test");
+        serverOut[0] = MockRestServiceServer.bindTo(b).build();
+        return new MarketDataClient(b.build(), new AlpacaProperties(null, "test-key", "test-secret", "https://data.test"), clock);
+    }
+
+    @Test
+    @DisplayName("closesBefore: 뉴욕 마감 정산 전에는 당일 봉을 전일 종가로 쓰지 않는다")
+    void closesBefore_뉴욕_마감_정산_전에는_당일_봉을_전일_종가로_쓰지_않는다() {
+        MockRestServiceServer[] srv = new MockRestServiceServer[1];
+        MarketDataClient c = clientAt(Clock.fixed(Instant.parse("2026-11-20T20:50:00Z"), TimeZones.KST), srv); // 뉴욕 15:50
+        srv[0].expect(ExpectedCount.once(), requestTo(startsWith(BARS))).andRespond(withSuccess(NOV_BARS, MediaType.APPLICATION_JSON));
+
+        assertThat(c.closesBefore(List.of(SOXL), LocalDate.of(2026, 11, 23))).containsOnly(Map.entry(SOXL, new BigDecimal("58.32")));
+        srv[0].verify();
+    }
+
+    @Test
+    @DisplayName("closesBefore: 정산 전 결과는 캐시하지 않는다")
+    void closesBefore_정산_전_결과는_캐시하지_않는다() {
+        MockRestServiceServer[] srv = new MockRestServiceServer[1];
+        MutableClock clock = new MutableClock("2026-11-20T20:50:00Z"); // 뉴욕 15:50
+        MarketDataClient c = clientAt(clock, srv);
+        srv[0].expect(ExpectedCount.twice(), requestTo(startsWith(BARS))).andRespond(withSuccess(NOV_BARS, MediaType.APPLICATION_JSON));
+        LocalDate monday = LocalDate.of(2026, 11, 23);
+
+        BigDecimal before = c.closesBefore(List.of(SOXL), monday).get(SOXL);
+        clock.set("2026-11-21T01:20:00Z"); // 뉴욕 20:20 — 정산 뒤
+        BigDecimal after = c.closesBefore(List.of(SOXL), monday).get(SOXL);
+
+        assertThat(before).isEqualByComparingTo("58.32");
+        assertThat(after).isEqualByComparingTo("49.19");
+        srv[0].verify();
+    }
+
+    @Test
+    @DisplayName("latestCloses: 뉴욕 다음날을 세션일로 쓴다")
+    void latestCloses_뉴욕_다음날을_세션일로_쓴다() {
+        MockRestServiceServer[] srv = new MockRestServiceServer[1];
+        MarketDataClient c = clientAt(Clock.fixed(Instant.parse("2026-11-20T22:00:00Z"), TimeZones.KST), srv); // 뉴욕 17:00
+        srv[0].expect(ExpectedCount.once(), requestTo(startsWith(BARS))).andRespond(withSuccess(NOV_BARS, MediaType.APPLICATION_JSON));
+
+        assertThat(c.latestCloses(List.of(SOXL))).containsOnly(Map.entry(SOXL, new BigDecimal("49.19")));
+        srv[0].verify();
+    }
+
+    @Test
+    @DisplayName("requireLatestClose: 키가 없으면 예외")
+    void requireLatestClose_키가_없으면_예외() {
+        server.expect(requestTo(startsWith(BARS))).andRespond(withSuccess("{\"bars\":{},\"next_page_token\":null}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> adapter.requireLatestClose(SOXL))
+                .isInstanceOf(IllegalStateException.class).hasMessage("SOXL 종가를 조회하지 못했습니다.");
+    }
+
+    @Test
+    @DisplayName("requireConfirmedClose: 봉이 없으면 예외, 있으면 종가")
+    void requireConfirmedClose_봉이_없으면_예외() {
+        server.expect(requestTo(startsWith(BARS))).andRespond(withSuccess("{\"bars\":{},\"next_page_token\":null}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> adapter.requireConfirmedClose(SOXL, SESSION))
+                .isInstanceOf(IllegalStateException.class).hasMessage("SOXL 종가를 조회하지 못했습니다.");
+    }
+
+    @Test
+    @DisplayName("requireConfirmedClose: 확정 봉의 종가를 준다")
+    void requireConfirmedClose_봉이_있으면_종가() {
+        server.expect(requestTo(startsWith(BARS))).andRespond(withSuccess("""
+                {"bars":{"SOXL":[{"t":"2026-01-05T05:00:00Z","o":1,"h":1,"l":1,"c":53.81,"v":1,"n":1,"vw":1}]},"next_page_token":null}
+                """, MediaType.APPLICATION_JSON));
+
+        assertThat(adapter.requireConfirmedClose(SOXL, SESSION)).isEqualByComparingTo("53.81");
     }
 }

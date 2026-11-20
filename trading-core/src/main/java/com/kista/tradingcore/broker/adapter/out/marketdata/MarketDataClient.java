@@ -41,7 +41,7 @@ import java.util.function.Supplier;
 @Slf4j
 @Component
 @NamedInterface("marketdata")
-public class AlpacaMarketDataAdapter {
+public class MarketDataClient {
 
     private static final Duration LATEST_PRICE_TTL = Duration.ofSeconds(60); // 현재가 캐시
     private static final Duration SESSION_VALUE_TTL = Duration.ofHours(24);  // 세션일이 키에 든 확정 값 — 그날 내내
@@ -58,7 +58,7 @@ public class AlpacaMarketDataAdapter {
     private final Clock clock;                           // 오늘 세션 판정·캐시 만료
     private final TtlResultCache cache;                  // 종목별 인메모리 캐시(시세를 읽는 프로세스는 하나)
 
-    AlpacaMarketDataAdapter(RestClient marketDataAlpacaRestClient, AlpacaProperties alpacaProperties, Clock clock) {
+    MarketDataClient(RestClient marketDataAlpacaRestClient, AlpacaProperties alpacaProperties, Clock clock) {
         this.marketDataAlpacaRestClient = marketDataAlpacaRestClient;
         this.alpacaProperties = alpacaProperties;
         this.clock = clock;
@@ -83,15 +83,45 @@ public class AlpacaMarketDataAdapter {
         });
     }
 
-    // usSessionDate 세션 직전 확정 종가(분할 조정)
+    // usSessionDate 세션 직전 확정 종가(분할 조정). 뉴욕 정산(16:16) 전에는 뉴욕 오늘 봉이 진행 중이라 고르지 않는다
     public Map<StrategyTicker, BigDecimal> closesBefore(Collection<StrategyTicker> tickers, LocalDate usSessionDate) {
-        return cachedPerTicker("prevClose", usSessionDate, tickers, SESSION_VALUE_TTL, missing -> {
+        LocalDate nyToday = LocalDate.now(clock.withZone(TimeZones.NY));
+        // 뉴욕 오늘 봉이 아직 완결 전인지(오늘 16:16 이전)
+        boolean todayUnsettled = clock.instant().isBefore(nyToday.atTime(BAR_SETTLED_AT).atZone(TimeZones.NY).toInstant());
+        // 정산 전에 세션일이 뉴욕 오늘 뒤면 결과가 정산 뒤에 달라지므로 캐시하지 않는다
+        Duration ttl = todayUnsettled && usSessionDate.isAfter(nyToday) ? Duration.ZERO : SESSION_VALUE_TTL;
+        return cachedPerTicker("prevClose", usSessionDate, tickers, ttl, missing -> {
             Map<String, List<Bar>> bars = fetchBars(symbols(missing), usSessionDate.minusDays(PREV_CLOSE_LOOKBACK_DAYS), null,
                     DailyCandleQuery.Adjustment.SPLIT, false, null);
-            // 응답에 세션일 봉(진행 중)이 섞여 와도 세션일보다 앞인 마지막 봉만 쓴다
+            // 응답에 세션일 봉(진행 중)이 섞여 와도 세션일보다 앞인 마지막 봉만 쓰고, 정산 전 뉴욕 오늘 봉도 뺀다
             return pickPerTicker(missing, bars, list -> list.stream()
-                    .filter(bar -> bar.date().isBefore(usSessionDate)).max(Comparator.comparing(Bar::date)).map(Bar::c).orElse(null));
+                    .filter(bar -> bar.date().isBefore(usSessionDate))
+                    .filter(bar -> !(todayUnsettled && bar.date().equals(nyToday)))
+                    .max(Comparator.comparing(Bar::date)).map(Bar::c).orElse(null));
         });
+    }
+
+    // 지금 기준 마지막 확정 종가 — 배치 밖 호출부(등록·미리보기·이력·통계)의 공용 규칙
+    public Map<StrategyTicker, BigDecimal> latestCloses(Collection<StrategyTicker> tickers) {
+        return closesBefore(tickers, LocalDate.now(clock.withZone(TimeZones.NY)).plusDays(1));
+    }
+
+    // latestCloses의 단건 — 없으면 대체값 없이 예외
+    public BigDecimal requireLatestClose(StrategyTicker ticker) {
+        BigDecimal close = latestCloses(List.of(ticker)).get(ticker);
+        if (close == null) {
+            throw new IllegalStateException(ticker.name() + " 종가를 조회하지 못했습니다.");
+        }
+        return close;
+    }
+
+    // usSessionDate 세션의 확정 종가 — 없으면 예외
+    public BigDecimal requireConfirmedClose(StrategyTicker ticker, LocalDate usSessionDate) {
+        BrokerCandle bar = confirmedBars(List.of(ticker), usSessionDate).get(ticker);
+        if (bar == null) {
+            throw new IllegalStateException(ticker.name() + " 종가를 조회하지 못했습니다.");
+        }
+        return bar.close();
     }
 
     // 일봉 이력(오름차순) — 차트·DCA 지표·백테스트. symbol은 전략 종목이 아닌 것(지수 ETF)도 받는다

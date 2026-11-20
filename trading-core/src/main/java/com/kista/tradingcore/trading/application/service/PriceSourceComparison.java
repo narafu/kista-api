@@ -2,7 +2,7 @@ package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.StrategyTicker;
-import com.kista.tradingcore.broker.adapter.out.marketdata.AlpacaMarketDataAdapter;
+import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.broker.domain.model.BrokerCandle;
@@ -27,16 +27,16 @@ import java.util.Map;
 @Component
 class PriceSourceComparison {
 
-    private final AlpacaMarketDataAdapter alpaca;       // 전일 종가·확정 종가의 새 출처
+    private final MarketDataClient alpaca;       // 전일 종가·확정 종가의 새 출처
     private final BrokerPricePort brokerPricePort;      // 현재가의 새 출처(계좌 증권사 직접 조회)
     private final Duration closeRecheckDelay;           // close+10 조회 뒤 close+20 조회까지 대기(운영 10분, 테스트 ZERO)
 
     @Autowired
-    PriceSourceComparison(AlpacaMarketDataAdapter alpaca, BrokerPricePort brokerPricePort) {
+    PriceSourceComparison(MarketDataClient alpaca, BrokerPricePort brokerPricePort) {
         this(alpaca, brokerPricePort, Duration.ofMinutes(10));
     }
 
-    PriceSourceComparison(AlpacaMarketDataAdapter alpaca, BrokerPricePort brokerPricePort, Duration closeRecheckDelay) {
+    PriceSourceComparison(MarketDataClient alpaca, BrokerPricePort brokerPricePort, Duration closeRecheckDelay) {
         this.alpaca = alpaca;
         this.brokerPricePort = brokerPricePort;
         this.closeRecheckDelay = closeRecheckDelay;

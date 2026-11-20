@@ -109,7 +109,7 @@ class TradingCandidatePlannerDcaTest {
 
     // 실제 CycleOrderComputer·DCA 커널로 plan() 정규 경로를 태우고 수집기만 스텁한다
     private TradingCandidatePlanner wiredPlanner() {
-        CycleOrderComputer computer = new CycleOrderComputer(STRATEGIES, null, null, null, null, null, orderPort, mock(com.kista.tradingcore.broker.adapter.out.marketdata.AlpacaMarketDataAdapter.class));
+        CycleOrderComputer computer = new CycleOrderComputer(STRATEGIES, null, null, null, null, null, orderPort, mock(com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient.class));
         return new TradingCandidatePlanner(orderPort, computer, orderPlanner, null, STRATEGIES, ledgerBudget,
                 balanceLoader, publisher, new TradingBatchGuard(publisher), new AccountBudgetLock(), collector, recorder,
                 new TradingParallelRunner(0));

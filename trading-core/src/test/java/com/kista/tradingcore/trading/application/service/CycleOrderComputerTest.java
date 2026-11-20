@@ -39,7 +39,7 @@ class CycleOrderComputerTest {
     @Mock StrategyCycleVrPort strategyCycleVrPort;
     @Mock StrategyVrDetailPort strategyVrDetailPort;
     @Mock OrderPort orderPort;
-    @Mock com.kista.tradingcore.broker.adapter.out.marketdata.AlpacaMarketDataAdapter alpaca;
+    @Mock com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient alpaca;
     @Mock InfiniteStrategy infiniteStrategy;
     @Mock VrStrategy vrStrategy;
     @Mock PrivacyStrategy privacyStrategy;
