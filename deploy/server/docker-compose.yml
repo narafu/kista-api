@@ -71,7 +71,7 @@ services:
     stop_grace_period: 200s   # 배치 인터럽트 → SchedulerJobRunner FAILED 이벤트 발행 + 락 해제 시도 시간 확보
                               # (spring.lifecycle.timeout-per-shutdown-phase=30s가 먼저 종료를 강제할 수 있어 200s 전체가 쓰이지 않을 수 있음)
     mem_limit: 3072m          # 백테스트 캔들 적재 피크 대비. limit 합계: 앱 2048+3072=5120m,
-                              # kista-infra(postgres 3072+redis 256+caddy 64)+kista-ui 1536 포함 10048m — 호스트 11.6GiB 이하
+                              # kista-infra(postgres 3072+redis 256+caddy 256)+kista-ui 1536 포함 10240m — 호스트 11.6GiB 이하
                               # 예외: kista-web blue/green 교체 중 수 분간은 kista-web 2개(+2048m)로 합계가 호스트를 넘는다 — limit은 예약 아닌 상한, 실측 RSS 기준 여유(2026-10-02 결정)
                               # kista-ui blue/green 교체 중에도 같은 예외 — kista-ui 2개(+1536m). 전역 reconcile 락으로 두 앱의 교체는 겹치지 않는다
     restart: unless-stopped
