@@ -15,6 +15,7 @@
 | A5 | 문서 SSOT 정리: 서버 초기 설정·백업 복구는 infra, 운영 `.env` 키 목록은 각 앱 레포 `.env.example` | `deploy/server/README.md:19-51,68-103,166-179`, `docs/agents/docker-infra.md:157-178` 삭제·링크화. `CMC_API_KEY`가 `.env.example`에 없다(코드는 trading-core `application.yml:118`에서 읽음) | 해당 구간 정리 | 후보. api 문서 정리 지침서와 묶는다 |
 | A6 | 낡은 서술 수정 | `docker-infra.md:18` "data_net은 kista-api만"(실제 3 role), `:12` config 판정 파일 목록 누락, README·docker-infra.md의 `SERVER_HOST` secret 언급 | 없음 | 문서 정리 지침서에서 처리 |
 | A7 | ui CI: 변경 경로 판정 없음(문서만 바꿔도 배포), typecheck 이중 실행, PR 단계 shellcheck·bats 없음 | 없음 | `server-deploy.yml`·`ci.yml` | fable-ui에 전달됨 |
+| A8 | 매매 시각 창 계약(fable-review 04 T7, infra 2026-11-20 전달): infra 배포와 서버 작업은 매매 시각 창(KST 월~금 22:20~23:40, 화~토 04:20~06:20)을 피한다. 판정 기준은 kista-infra `.github/scripts/trading-guard.sh <요일 1~7> <HHMM KST>`(exit 1이면 창 안) | 매매 스케줄(`scheduler-time-table.md`)을 바꾸면 이 스크립트도 함께 바꾼다 | 없음 | 계약 |
 
 infra 재심 결과 유지: role별 SHA 선언, 앱 단위 전부 아니면 전무, compose 스케일 blue/green, kista-trading stop-first·`stop_grace_period` 200s, 앱 레포가 SSH 키를 갖지 않는 구조. Swarm·Kamal 전환은 기각.
 

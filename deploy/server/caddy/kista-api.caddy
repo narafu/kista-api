@@ -4,6 +4,8 @@
 # 라우팅이 컨트롤러 경로와 어긋나 404가 나던 사고(2026-09-16 2단 경로, 2026-09-17 fida-orders)를 막기 위해
 # CaddyRoutingTest가 아래 @scheduler·@trading regex를 엔진(worker)·비엔진(web) 컨트롤러 경로와 대조한다(RoleRoutingGuard와 같은 분류) — 경로 추가 시 테스트가 알려준다.
 {$API_DOMAIN}, http://:8080 {
+	# 공용 보안 헤더·접근 로그(/data/access/kista-api.log) — kista-infra Caddyfile의 (site) snippet 소유. 상태 코드 없는 handle_errors를 여기 두면 (site)와 겹친다
+	import site kista-api
 	encode zstd gzip
 	# 스케쥴러 수동 트리거 — `/**`는 2단 이상 깊이(kbland-price-index/full-refresh)에서 매치 실패해 kista-web으로 새던 것을 path_regexp로 교체(2026-10-01 실측)
 	@scheduler path_regexp ^/api/admin/scheduler/.+$
