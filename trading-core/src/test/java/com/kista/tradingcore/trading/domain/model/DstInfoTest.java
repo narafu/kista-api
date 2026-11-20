@@ -25,7 +25,15 @@ class DstInfoTest {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     @Test
-    void 조기_마감_세션의_주문과_리포트_시각을_사용한다() {
+    void forCloseSession_리포트는_마감_20분_뒤() {
+        // 공용 시세 SIP 일봉은 마감 16분 뒤 정산 — 리포트는 마감 20분 뒤
+        DstInfo info = DstInfo.forCloseSession(Instant.parse("2026-11-24T14:30:00Z"), Instant.parse("2026-11-24T21:00:00Z"));
+
+        assertThat(info.postClose()).isEqualTo(Instant.parse("2026-11-24T21:20:00Z"));
+    }
+
+    @Test
+    void 조기_마감일도_마감_20분_뒤() {
         Instant open = Instant.parse("2026-11-27T14:30:00Z");
         Instant close = Instant.parse("2026-11-27T18:00:00Z");
 
@@ -33,13 +41,13 @@ class DstInfoTest {
 
         assertThat(info.isDst()).isFalse();
         assertThat(info.orderAt()).isEqualTo(Instant.parse("2026-11-27T17:30:00Z"));
-        assertThat(info.postClose()).isEqualTo(Instant.parse("2026-11-27T18:10:00Z"));
+        assertThat(info.postClose()).isEqualTo(Instant.parse("2026-11-27T18:20:00Z"));
         assertThat(info.marketOpen()).isEqualTo(open);
         assertThat(info.withImmediateOrder(open).postClose()).isEqualTo(info.postClose());
     }
 
     @Test
-    @DisplayName("EDT(서머타임): orderAt=04:30 KST, postClose=05:10 KST, marketOpen=22:30 KST")
+    @DisplayName("EDT(서머타임): orderAt=04:30 KST, postClose=05:20 KST, marketOpen=22:30 KST")
     void summer_dst() {
         // 2024-06-15 04:00 KST = 2024-06-14 19:00 UTC → NY=EDT(UTC-4) → isDst=true
         ZonedDateTime summer = ZonedDateTime.of(2024, 6, 15, 4, 0, 0, 0, KST);
@@ -51,7 +59,7 @@ class DstInfoTest {
         assertThat(deadline.toLocalDate()).isEqualTo(LocalDate.of(2024, 6, 15));
         assertThat(deadline.toLocalTime()).isEqualTo(LocalTime.of(4, 30));
         ZonedDateTime post = info.postClose().atZone(KST);
-        assertThat(post.toLocalTime()).isEqualTo(LocalTime.of(5, 10));
+        assertThat(post.toLocalTime()).isEqualTo(LocalTime.of(5, 20));
         // 개장 시각: NY 09:30 EDT = KST 22:30
         ZonedDateTime open = info.marketOpen().atZone(KST);
         assertThat(open.toLocalDate()).isEqualTo(LocalDate.of(2024, 6, 15));
@@ -59,7 +67,7 @@ class DstInfoTest {
     }
 
     @Test
-    @DisplayName("EST(동절기): orderAt=05:30 KST, postClose=06:10 KST, marketOpen=23:30 KST")
+    @DisplayName("EST(동절기): orderAt=05:30 KST, postClose=06:20 KST, marketOpen=23:30 KST")
     void winter_nondst() {
         // 2024-01-15 04:00 KST = 2024-01-14 19:00 UTC → NY=EST(UTC-5) → isDst=false
         ZonedDateTime winter = ZonedDateTime.of(2024, 1, 15, 4, 0, 0, 0, KST);
@@ -71,7 +79,7 @@ class DstInfoTest {
         assertThat(deadline.toLocalDate()).isEqualTo(LocalDate.of(2024, 1, 15));
         assertThat(deadline.toLocalTime()).isEqualTo(LocalTime.of(5, 30));
         ZonedDateTime post = info.postClose().atZone(KST);
-        assertThat(post.toLocalTime()).isEqualTo(LocalTime.of(6, 10));
+        assertThat(post.toLocalTime()).isEqualTo(LocalTime.of(6, 20));
         // 개장 시각: NY 09:30 EST = KST 23:30
         ZonedDateTime open = info.marketOpen().atZone(KST);
         assertThat(open.toLocalDate()).isEqualTo(LocalDate.of(2024, 1, 15));

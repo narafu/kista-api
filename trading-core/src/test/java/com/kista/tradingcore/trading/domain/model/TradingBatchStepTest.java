@@ -80,7 +80,7 @@ class TradingBatchStepTest {
                 row("runNow_windowBoundaries_dstAndNonDst(비DST 05:50)", CLOSE_PLACE, DEC, nonDst(DEC), null, kst(12, 2, 5, 50), MANUAL, missed("[마감 접수 불가]", false)),
                 row("runNow_eveningBeforeCron_rejects(23:00)", CLOSE_PLACE, WED, dst(WED), null, kst(10, 7, 23, 0), MANUAL, missed("[마감 접수 불가]", false)),
                 row("runNow_eveningBeforeCron_rejects(03:20)", CLOSE_PLACE, WED, dst(WED), null, kst(10, 7, 3, 20), MANUAL, missed("[마감 접수 불가]", false)),
-                row("resumeReport_takesOverCloseLock_runsReportOnly", CLOSE_REPORT, WED, dst(WED), PLACED, kst(10, 7, 5, 10), AUTOMATIC, run(false)),
+                row("resumeReport_takesOverCloseLock_runsReportOnly", CLOSE_REPORT, WED, dst(WED), PLACED, kst(10, 7, 5, 20), AUTOMATIC, run(false)),
                 row("schedule_usesActualEarlyCloseAndSuppressesDuplicates", CLOSE_PLACE, WED, early(WED), null, kst(10, 6, 22, 0), AUTOMATIC, reserve(kst(10, 7, 1, 30))),
                 row("reconcile_changedCloseReschedulesAndPastTodayIsSilent(변경 전)", CLOSE_PLACE, WED, dst(WED), null, kst(10, 6, 22, 0), AUTOMATIC, reserve(kst(10, 7, 4, 30))),
                 row("reconcile_changedCloseReschedulesAndPastTodayIsSilent(변경 뒤)", CLOSE_PLACE, WED, early(WED), null, kst(10, 6, 22, 0), AUTOMATIC, reserve(kst(10, 7, 1, 30))),
@@ -122,13 +122,14 @@ class TradingBatchStepTest {
                 row("경계: 조기 마감일 수동 창(00:30~01:50)", CLOSE_PLACE, WED, early(WED), null, kst(10, 7, 0, 30), MANUAL, run(false)),
 
                 // 경계 — 마감 리포트
-                row("경계: 리포트 시각 전(접수 완료)", CLOSE_REPORT, WED, dst(WED), PLACED, kst(10, 7, 4, 55), AUTOMATIC, reserve(kst(10, 7, 5, 10))),
-                row("경계: 리포트 시각 전(접수 전)", CLOSE_REPORT, WED, dst(WED), null, kst(10, 7, 0, 30), AUTOMATIC, reserve(kst(10, 7, 5, 10))),
+                row("경계: 리포트 시각 전(접수 완료)", CLOSE_REPORT, WED, dst(WED), PLACED, kst(10, 7, 4, 55), AUTOMATIC, reserve(kst(10, 7, 5, 20))),
+                row("경계: 마감 15분 뒤는 아직 리포트 전", CLOSE_REPORT, WED, dst(WED), PLACED, kst(10, 7, 5, 15), AUTOMATIC, reserve(kst(10, 7, 5, 20))),
+                row("경계: 리포트 시각 전(접수 전)", CLOSE_REPORT, WED, dst(WED), null, kst(10, 7, 0, 30), AUTOMATIC, reserve(kst(10, 7, 5, 20))),
                 row("경계: 접수가 끝나지 않은 날은 리포트 없음", CLOSE_REPORT, WED, dst(WED), PLANNED, kst(10, 7, 5, 30), AUTOMATIC, skip()),
                 row("경계: 접수 도중 끊긴 날은 리포트 없음", CLOSE_REPORT, WED, dst(WED), PLACING, kst(10, 7, 5, 30), AUTOMATIC, skip()),
                 row("경계: 거래일 KST 자정 직전", CLOSE_REPORT, WED, dst(WED), PLACED, kst(10, 7, 23, 59), AUTOMATIC, run(false)),
                 row("경계: 거래일 경과(다음 날 00:00)", CLOSE_REPORT, WED, dst(WED), PLACED, kst(10, 8, 0, 0), AUTOMATIC, missed("[마감 리포트 누락]", false)),
-                row("경계: 조기 마감일 리포트(02:10)", CLOSE_REPORT, WED, early(WED), PLACED, kst(10, 7, 2, 10), AUTOMATIC, run(false)),
+                row("경계: 조기 마감일 리포트(02:20)", CLOSE_REPORT, WED, early(WED), PLACED, kst(10, 7, 2, 20), AUTOMATIC, run(false)),
                 row("경계: 휴장일 리포트", CLOSE_REPORT, WED, holiday(), PLACED, kst(10, 7, 5, 30), AUTOMATIC, skip()));
     }
 

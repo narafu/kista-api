@@ -18,13 +18,13 @@ public record TradingBatchStep(Kind kind, LocalDate tradeDate) {
     static final Duration PLACEMENT_MARGIN = Duration.ofMinutes(10);    // 마감 10분 전까지만 접수
     static final Duration EARLY_FIRE_TOLERANCE = Duration.ofMinutes(1); // 예약이 벽시계보다 조금 일찍 발화해도 실행
     static final Duration MANUAL_WINDOW = Duration.ofMinutes(90);       // 수동 마감 접수 허용 시작
-    static final Duration REPORT_DELAY = Duration.ofMinutes(10);        // 마감 10분 뒤 체결 리포트
+    static final Duration REPORT_DELAY = Duration.ofMinutes(20);        // 마감 20분 뒤 체결 리포트(공용 시세 SIP 일봉 정산 대기)
     static final LocalTime OPEN_TRADE_DATE_CUTOFF = KstTradeDates.SCHEDULER_RUN_TIME; // 개장 배치의 거래일 경계(04:30 KST) — 세션 기반 통일 때 KstTradeDates와 함께 없앤다
 
     public enum Kind {
         OPEN_PLACE(TradingBatchJob.OPEN),    // 개장 시각에 AT_OPEN 주문 접수
         CLOSE_PLACE(TradingBatchJob.CLOSE),  // 마감 30분 전 AT_CLOSE 주문 접수
-        CLOSE_REPORT(TradingBatchJob.CLOSE); // 마감 10분 뒤 체결 조회·원장 기록
+        CLOSE_REPORT(TradingBatchJob.CLOSE); // 마감 20분 뒤 체결 조회·원장 기록
 
         private final TradingBatchJob job; // 체크포인트·락 키
 
@@ -103,7 +103,7 @@ public record TradingBatchStep(Kind kind, LocalDate tradeDate) {
         return new Decision.Run(false);
     }
 
-    // 창: 마감 10분 뒤 ~ 거래일 KST 자정, 접수가 끝난(PLACED) 날만
+    // 창: 마감 20분 뒤 ~ 거래일 KST 자정, 접수가 끝난(PLACED) 날만
     private Decision closeReport(Instant closeAt, TradingBatchPhase phase, Instant now) {
         if (phase == TradingBatchPhase.DONE) return new Decision.Skip("마감 리포트 완료");
         Instant reportAt = closeAt.plus(REPORT_DELAY);

@@ -25,10 +25,12 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -55,6 +57,9 @@ class TradingService {
     private final CycleOrderStrategies cycleOrderStrategies;   // 리포트 재개 대상 판정 — 주문 0건이어도 롤오버 판정이 필요한 전략(VR)
     private final CyclePositionPort cyclePositionPort;       // 리포트 직전 최신 포지션 재조회 — 계획~리포트 사이 append된 스냅샷 보존
     private final Clock clock;                                 // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
+
+    static final Duration CLOSE_RETRY_DELAY = Duration.ofMinutes(10); // 확정 종가 누락 시 1회 재조회까지 대기
+    Duration closeRetryDelay = CLOSE_RETRY_DELAY;                     // package-private: 테스트가 ZERO로 바꿔 대기를 생략한다
 
     // 증권사 접수 결과: 사이클 상태 + 접수된 주문 목록
     private record CyclePlacedState(TradingCandidatePlanner.CycleState state, List<Order> mainOrders) {}
@@ -150,16 +155,44 @@ class TradingService {
         waitFor("마감 시각", dst.waitUntilPostClose(Instant.now(clock)), dst);
         marketEventNotifier.notifyMarketClose();
 
-        // 확정 종가 조회 + 리포트 — 임계구역
+        // 장 마감 후 확정 종가 일괄 조회 (라이브 현재가 아님 — 공용 시세의 그 세션 확정 일봉 종가)
+        // 임계구역 밖 — 재조회 대기(10분)가 재기동 종료를 막지 않게 한다. 대기 중 종료되면 PLACED로 남아 매시 보정·재기동 리포트 재개가 이어받는다
+        Map<StrategyTicker, BigDecimal> closingPrices = fetchClosingPricesWithRetry(placedStates, priceCtx.cycleTickers(), today, dst);
+
+        // 리포트 — 임계구역
         runState.critical(() -> {
-            // 장 마감 후 확정 종가 일괄 조회 (라이브 현재가 아님 — 공용 시세의 그 세션 확정 일봉 종가)
-            Map<StrategyTicker, BigDecimal> closingPrices = priceFetcher.fetchClosingPrices(priceCtx.cycleTickers(), today);
             // recordAndNotifyExecutions — 전략별: 체결 조회 + 이력 저장 + 알림
-            reportAll(placedStates, closingPrices, today);
-            reportPausedStrategies(paused, today);
-            checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
+            Set<StrategyTicker> deferred = new TreeSet<>(reportAll(placedStates, closingPrices, today));
+            deferred.addAll(reportPausedStrategies(paused, today));
+            finishCloseReport(deferred, today);
             return null;
         });
+    }
+
+    // 정상 마감 경로 전용 — 접수 대상 종목의 확정 봉이 빠졌으면 대기 후 빠진 종목만 1회 재조회해 합친다
+    private Map<StrategyTicker, BigDecimal> fetchClosingPricesWithRetry(List<CyclePlacedState> placedStates, List<StrategyTicker> tickers,
+                                                                      LocalDate today, DstInfo dst) throws InterruptedException {
+        Map<StrategyTicker, BigDecimal> closingPrices = new HashMap<>(priceFetcher.fetchClosingPrices(tickers, today));
+        List<StrategyTicker> missing = placedStates.stream()
+                .map(ps -> ps.state().ctx().strategy().ticker())
+                .distinct()
+                .filter(ticker -> !closingPrices.containsKey(ticker))
+                .toList();
+        if (missing.isEmpty()) return closingPrices;
+        log.info("확정 종가 없음 {} — {}분 뒤 재조회", missing, closeRetryDelay.toMinutes());
+        waitFor("확정 종가 재조회", closeRetryDelay, dst);
+        closingPrices.putAll(priceFetcher.fetchClosingPrices(missing, today));
+        return closingPrices;
+    }
+
+    // 마감 리포트 마무리 — 확정 종가가 없어 보류된 종목이 있으면 DONE을 남기지 않아(PLACED 유지) 매시 보정(TradingCloseScheduler.reconcile)·재기동 리포트 재개가 이어받게 한다
+    private void finishCloseReport(Set<StrategyTicker> deferred, LocalDate today) {
+        if (deferred.isEmpty()) {
+            checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
+            return;
+        }
+        eventPublisher.publishEvent(new TradingErrorEvent(null,
+                "[마감 리포트 보류] " + deferred + " 확정 종가 없음 — 매시 정각 5분에 리포트를 다시 시도합니다"));
     }
 
     // 활성 전략이 리포트할 게 없는 날의 마무리 — 정지 리포트 대상이 있으면 마감 후 리포트하고 DONE
@@ -172,29 +205,28 @@ class TradingService {
         checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.PLACED);
         waitFor("마감 시각", dst.waitUntilPostClose(Instant.now(clock)), dst);
         runState.critical(() -> {
-            reportPausedStrategies(paused, today);
-            checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
+            finishCloseReport(reportPausedStrategies(paused, today), today);
             return null;
         });
     }
 
-    // 정지 전략의 당일 접수 주문 체결을 원장에 반영 — 종가·가격 컨텍스트는 정지 대상 기준으로 따로 조회
-    private void reportPausedStrategies(List<BatchContext> paused, LocalDate today) throws InterruptedException {
+    // 정지 전략의 당일 접수 주문 체결을 원장에 반영 — 종가·가격 컨텍스트는 정지 대상 기준으로 따로 조회, 반환은 확정 종가가 없어 보류한 종목
+    private Set<StrategyTicker> reportPausedStrategies(List<BatchContext> paused, LocalDate today) throws InterruptedException {
         List<BatchContext> targets = paused.stream()
                 .filter(ctx -> !batchRunPort.isReported(today, ctx.strategy().id()))
                 .filter(ctx -> !reportableOrders(ctx.strategy().id(), today).isEmpty())
                 .toList();
-        if (targets.isEmpty()) return;
+        if (targets.isEmpty()) return Set.of();
         log.info("정지 전략 마감 리포트 — 대상 {}건", targets.size());
-        reportRebuilt(targets, today);
+        return reportRebuilt(targets, today);
     }
 
-    // 접수 이후 상태를 재구성해 리포트 — 정지 전략·재개 공용, 기준표·확정 종가는 대상 기준으로 조회(현재가 미조회, 기준표 screen 미적용)
-    private void reportRebuilt(List<BatchContext> targets, LocalDate today) throws InterruptedException {
+    // 접수 이후 상태를 재구성해 리포트 — 정지 전략·재개 공용, 기준표·확정 종가는 대상 기준으로 조회(현재가 미조회, 기준표 screen 미적용, 재조회 없음)
+    private Set<StrategyTicker> reportRebuilt(List<BatchContext> targets, LocalDate today) throws InterruptedException {
         List<StrategyTicker> tickers = targets.stream().map(ctx -> ctx.strategy().ticker()).distinct().toList();
         PrivacyTradeBase privacyBase = priceFetcher.privacyBaseFor(targets, today);
         Map<StrategyTicker, BigDecimal> closingPrices = priceFetcher.fetchClosingPrices(tickers, today);
-        reportAll(rebuildPlacedStates(targets, privacyBase, today), closingPrices, today);
+        return reportAll(rebuildPlacedStates(targets, privacyBase, today), closingPrices, today);
     }
 
     // 당일 접수된 적 있는 주문(externalOrderId 보유) — 수동 체결 보정 행(UNKNOWN_LEG)은 포지션을 직접 기록했으므로 제외
@@ -249,8 +281,7 @@ class TradingService {
 
             runState.critical(() -> {
                 // 기준표 미점검(screen 미적용)은 의도 — 정보성 로테이션 최소금액 알림만 일반 마감 경로와 다르고 매매 영향 없음
-                reportRebuilt(targets, today);
-                checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
+                finishCloseReport(reportRebuilt(targets, today), today);
                 return null;
             });
         });
@@ -290,8 +321,16 @@ class TradingService {
     }
 
     // 전략별: 체결 조회 + 이력 저장 + 알림 (실패 사이클은 격리, 계좌별 동시 상한 내 병렬 실행)
-    private void reportAll(List<CyclePlacedState> placedStates, Map<StrategyTicker, BigDecimal> closingPrices, LocalDate today) throws InterruptedException {
-        List<TradingParallelRunner.Task<Void>> tasks = placedStates.stream()
+    // 확정 종가가 없는 종목의 전략은 리포터에 넘기지 않는다(종가 없는 스냅샷·리포트 마커 방지) — 반환은 보류한 종목
+    private Set<StrategyTicker> reportAll(List<CyclePlacedState> placedStates, Map<StrategyTicker, BigDecimal> closingPrices, LocalDate today) throws InterruptedException {
+        Map<Boolean, List<CyclePlacedState>> byClose = placedStates.stream()
+                .collect(Collectors.partitioningBy(ps -> closingPrices.containsKey(ps.state().ctx().strategy().ticker())));
+        Set<StrategyTicker> deferred = new TreeSet<>();
+        for (CyclePlacedState ps : byClose.get(false)) {
+            log.warn("[strategyId={}] 확정 종가 없음 — 마감 리포트를 미룹니다", ps.state().ctx().strategy().id());
+            deferred.add(ps.state().ctx().strategy().ticker());
+        }
+        List<TradingParallelRunner.Task<Void>> tasks = byClose.get(true).stream()
                 .map(ps -> new TradingParallelRunner.Task<Void>(
                         ps.state().ctx().account().id(),
                         () -> batchGuard.runSafely("체결 리포트", ps.state().ctx(), () -> {
@@ -306,6 +345,7 @@ class TradingService {
                         })))
                 .toList();
         parallelRunner.runAll(tasks);
+        return deferred;
     }
 
     // 개장 시각은 거래일 기준 산출 — 자정 이후 재개돼도 이미 지난 개장을 기다리지 않는다

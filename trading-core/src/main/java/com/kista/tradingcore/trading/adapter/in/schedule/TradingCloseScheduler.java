@@ -51,6 +51,7 @@ public class TradingCloseScheduler {
     private final TaskScheduler taskScheduler;
     private final TradingBatchSerialExecutor serialExecutor;
     private final Map<LocalDate, Reservation> reservations = new HashMap<>(); // 거래일별 메모리 예약 — 재기동 시 TradingBatchResumer·reconcile이 재등록
+    private ScheduledFuture<?> reportRetry; // 보류된 마감 리포트 재시도 1회분 — 끝나기 전 매시 보정이 겹쳐 예약하지 않게
 
     private static final Duration LOCK_TTL = Duration.ofHours(3); // 마감 배치 락 보유시간
     static final Duration ORDER_MARGIN = Duration.ofMinutes(30);     // 실제 마감 30분 전 접수
@@ -58,6 +59,7 @@ public class TradingCloseScheduler {
     private static final Duration EARLY_FIRE_TOLERANCE = Duration.ofMinutes(1); // 예약 지연은 단조 시계라 벽시계보다 조금 일찍 발화할 수 있음
     private static final Duration AUTOMATIC_WINDOW = ORDER_MARGIN.plus(EARLY_FIRE_TOLERANCE); // 자동 실행 접수 창 시작
     private static final Duration MANUAL_WINDOW = Duration.ofMinutes(90);       // 수동 마감 허용 시작 — 기존 비DST 04:30(마감 90분 전)과 같은 폭
+    static final Duration REPORT_RETRY_AFTER = Duration.ofMinutes(40); // 리포트(마감 +20분)와 확정 종가 재조회(+10분)가 끝난 뒤에만 보류 리포트를 재시도
 
     private record Reservation(Instant orderAt, ScheduledFuture<?> future) {}
 
@@ -72,6 +74,34 @@ public class TradingCloseScheduler {
         LocalDate today = LocalDate.now(clock.withZone(TimeZones.KST));
         register(today, false);
         register(today.plusDays(1), false);
+        retryDeferredReport(today);
+    }
+
+    // 확정 종가가 없어 보류된 마감 리포트(DONE 없이 PLACED) 재시도 — 같은 날 개장 배치 전에 체결을 원장에 반영하려고 매시 한 번 예약한다
+    private synchronized void retryDeferredReport(LocalDate today) {
+        try {
+            var session = marketCalendarPort.findSession(today);
+            if (session.isEmpty() || clock.instant().isBefore(session.get().closeAt().plus(REPORT_RETRY_AFTER))) return;
+            if (batchRunPort.findPhase(TradingBatchJob.CLOSE, today).orElse(null) != TradingBatchPhase.PLACED) return;
+            if (reportRetry != null && !reportRetry.isDone()) return;
+            log.info("보류된 마감 리포트 재시도 예약 — 거래일 {}", today);
+            reportRetry = taskScheduler.schedule(() -> reportRetryCallback(today), clock.instant());
+        } catch (Exception e) {
+            report("마감 리포트 재시도 예약 실패 (거래일 " + today + ")", e);
+        }
+    }
+
+    // 재시도는 락을 인수하지 않는다(takeOver 금지) — 다른 실행이 락을 쥐고 있으면 다음 매시 보정이 다시 시도하므로 알림 없이 넘긴다
+    private void reportRetryCallback(LocalDate tradeDate) {
+        try {
+            serialExecutor.run(() -> schedulerLockService.tryRun(TradingBatchJob.CLOSE.lockName(), LOCK_TTL,
+                    () -> runReportIfPlaced(tradeDate)));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            report("마감 리포트 재시도 인터럽트 (거래일 " + tradeDate + ")", e);
+        } catch (Exception e) {
+            report("마감 리포트 재시도 실패 (거래일 " + tradeDate + ")", e);
+        }
     }
 
     // healthchecks.io 마감 체크는 cron(화~토 04:30 KST)이라 그 시각에 배치가 없는 날 핑이 끊긴다 — 휴장일(예약 없음)과 조기 마감일(02:30대 핑 뒤에도 04:30을 기대)에 대신 보낸다

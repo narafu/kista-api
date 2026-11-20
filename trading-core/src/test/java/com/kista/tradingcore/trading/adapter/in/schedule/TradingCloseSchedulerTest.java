@@ -334,6 +334,70 @@ class TradingCloseSchedulerTest {
         verifyNoInteractions(errorReportPort);
     }
 
+    // --- 보류된 마감 리포트 매시 재시도 — DATE 세션 마감 05:00 KST(= 10-06T20:00Z), 재시도는 05:40 KST부터 ---
+
+    private static final Instant RETRY_FROM = Instant.parse("2026-10-06T20:40:00Z");
+
+    private void reconcileAt(Instant at, TradingBatchPhase phase) {
+        now = at;
+        lenient().when(batchRunPort.findPhase(any(), any())).thenReturn(Optional.empty());
+        lenient().when(batchRunPort.findPhase(any(), eq(DATE))).thenReturn(Optional.ofNullable(phase));
+        lenient().doReturn(future).when(taskScheduler).schedule(any(Runnable.class), any(Instant.class));
+        scheduler.reconcile();
+    }
+
+    @Test
+    void reconcile_deferredReportAfterRetryWindow_runsReportResume() throws InterruptedException {
+        when(strategyPort.findAllActive()).thenReturn(List.of());
+        when(contextFactory.buildAll(any())).thenReturn(List.of());
+
+        reconcileAt(RETRY_FROM, TradingBatchPhase.PLACED);
+
+        ArgumentCaptor<Runnable> callback = ArgumentCaptor.forClass(Runnable.class);
+        verify(taskScheduler).schedule(callback.capture(), eq(RETRY_FROM));
+        callback.getValue().run();
+        verify(schedulerLockService).tryRun(eq("trading-close"), eq(Duration.ofHours(3)), any());
+        verify(useCase).resumeCloseReport(List.of());
+        verify(useCase, never()).executeBatchNow(any());
+        verify(schedulerLockService, never()).takeOver(any(), any(), any());
+    }
+
+    @Test
+    void reconcile_deferredReportPending_doesNotScheduleTwice() {
+        reconcileAt(RETRY_FROM, TradingBatchPhase.PLACED);
+        scheduler.reconcile(); // 앞 예약(future.isDone()=false)이 아직 대기 중
+
+        verify(taskScheduler, times(1)).schedule(any(Runnable.class), eq(RETRY_FROM));
+    }
+
+    @Test
+    void reconcile_placedBeforeRetryWindow_schedulesNothing() {
+        reconcileAt(RETRY_FROM.minusSeconds(1), TradingBatchPhase.PLACED);
+
+        // 내일 마감 예약만 있고 지금 시각 1회 예약(재시도)은 없다
+        verify(taskScheduler, never()).schedule(any(Runnable.class), eq(RETRY_FROM.minusSeconds(1)));
+    }
+
+    @Test
+    void reconcile_reportDone_schedulesNothing() {
+        reconcileAt(RETRY_FROM, TradingBatchPhase.DONE);
+
+        verify(taskScheduler, never()).schedule(any(Runnable.class), eq(RETRY_FROM));
+    }
+
+    @Test
+    void reconcile_deferredReportLockHeld_skipsSilentlyWithoutTakeOver() throws InterruptedException {
+        doReturn(false).when(schedulerLockService).tryRun(any(), any(), any());
+
+        reconcileAt(RETRY_FROM, TradingBatchPhase.PLACED);
+        ArgumentCaptor<Runnable> callback = ArgumentCaptor.forClass(Runnable.class);
+        verify(taskScheduler).schedule(callback.capture(), eq(RETRY_FROM));
+        callback.getValue().run();
+
+        verify(schedulerLockService, never()).takeOver(any(), any(), any());
+        verifyNoInteractions(useCase, errorReportPort);
+    }
+
     @Test
     void callback_firesSlightlyEarly_stillRuns() throws InterruptedException {
         now = Instant.parse("2026-10-06T19:00:00Z");

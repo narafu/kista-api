@@ -251,6 +251,7 @@ class TradingServiceTest {
                 new TradingParallelRunner(0), // 순차 모드 — 기존 테스트 결정성 보존
                 batchGuard, candidatePlanner, batchRunPort, runState, balanceLoader,
                 new PrivacyBaseGuard(privacyValidation, eventPublisher), cycleStrategies, cycleHistoryPort, FIXED);
+        service.closeRetryDelay = Duration.ZERO; // 확정 종가 재조회 대기(10분) 생략
         // 기준표 장전 점검 기본값: 이슈 없음 — 가드 발동 시나리오만 개별 stub
         lenient().when(privacyValidation.inspect(any(PrivacyTradeBase.class)))
                 .thenReturn(new com.kista.tradingcore.privacy.domain.model.PrivacyTradeValidationReport(List.of()));
@@ -2124,6 +2125,112 @@ class TradingServiceTest {
         verify(cycleHistoryPort, never()).findLatestOneByStrategyId(STRATEGY.id());
         verify(cycleHistoryPort, never()).save(argThat(p -> p.strategyCycleId().equals(idleCycle.id())));
         verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
+    }
+
+    // --- 확정 종가 없음 → 마감 리포트 보류 ---
+
+    private static final Strategy TQQQ_STRATEGY = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+            StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+    private static final StrategyCycle TQQQ_CYCLE = new StrategyCycle(UUID.randomUUID(), TQQQ_STRATEGY.id(), STRATEGY_VERSION_ID,
+            new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
+    private static final String DEFER_ALERT = "[마감 리포트 보류] [TQQQ] 확정 종가 없음 — 매시 정각 5분에 리포트를 다시 시도합니다";
+
+    // SOXL(STRATEGY)·TQQQ 활성 전략 모두 기존 PLANNED 주문이 있는 정상 마감 흐름 — 종가 stub은 테스트가 정한다
+    private List<BatchContext> stubSoxlAndTqqqPlannedFlow() {
+        stubExistingPlannedFlow();
+        Order tqqqPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), TQQQ_CYCLE.id(), LocalDate.now(FIXED), StrategyTicker.TQQQ,
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), PRICE, OrderStatus.PLANNED, null, null, null);
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE),
+                StrategyTicker.TQQQ, new PriceSnapshot(PRICE, PRICE)));
+        when(cycleHistoryPort.findLatestOneByStrategyId(TQQQ_STRATEGY.id())).thenReturn(Optional.of(new CyclePosition(
+                null, TQQQ_CYCLE.id(), new BigDecimal("1000.00"), PRICE, PRICE, BigDecimal.valueOf(10), null, null)));
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(TQQQ_CYCLE.id()), any())).thenReturn(List.of(tqqqPlanned));
+        when(orderPort.findPlannedByCycleAndDate(eq(TQQQ_CYCLE.id()), any())).thenReturn(List.of(tqqqPlanned));
+        when(orderPort.findPlacedByCycleAndDate(eq(TQQQ_CYCLE.id()), any())).thenReturn(List.of());
+        return List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER),
+                new BatchContext(TQQQ_STRATEGY, TQQQ_CYCLE, ACCOUNT, USER));
+    }
+
+    @Test
+    void 확정_종가가_없는_종목의_전략은_리포트하지_않고_DONE을_남기지_않는다() throws InterruptedException {
+        LocalDate today = LocalDate.now(FIXED);
+        List<BatchContext> contexts = stubSoxlAndTqqqPlannedFlow();
+        // 1차·재조회 모두 TQQQ 확정 봉 없음
+        when(marketData.confirmedBars(anyCollection(), any(LocalDate.class))).thenReturn(bars(Map.of(StrategyTicker.SOXL, PRICE)));
+
+        service.executeBatch(contexts, PAST_DST);
+
+        verify(batchRunPort).markReported(today, STRATEGY.id());
+        verify(batchRunPort, never()).markReported(today, TQQQ_STRATEGY.id());
+        verify(cycleHistoryPort, never()).save(argThat(p -> p.strategyCycleId().equals(TQQQ_CYCLE.id())));
+        verify(batchRunPort, never()).recordPhase(any(), any(), eq(TradingBatchPhase.DONE));
+        // 재조회는 빠진 종목만
+        verify(marketData, times(2)).confirmedBars(anyCollection(), any(LocalDate.class));
+        verify(marketData).confirmedBars(eq(List.of(StrategyTicker.TQQQ)), any(LocalDate.class));
+        verify(eventPublisher, times(1)).publishEvent(argThat((Object e) -> e instanceof TradingErrorEvent t
+                && t.message().startsWith("[마감 리포트 보류]")));
+        verify(eventPublisher).publishEvent(new TradingErrorEvent(null, DEFER_ALERT));
+    }
+
+    @Test
+    void 재조회에서_종가가_오면_리포트하고_DONE을_남긴다() throws InterruptedException {
+        LocalDate today = LocalDate.now(FIXED);
+        List<BatchContext> contexts = stubSoxlAndTqqqPlannedFlow();
+        when(marketData.confirmedBars(anyCollection(), any(LocalDate.class)))
+                .thenReturn(bars(Map.of(StrategyTicker.SOXL, PRICE)), bars(Map.of(StrategyTicker.TQQQ, PRICE)));
+
+        service.executeBatch(contexts, PAST_DST);
+
+        verify(batchRunPort).markReported(today, STRATEGY.id());
+        verify(batchRunPort).markReported(today, TQQQ_STRATEGY.id());
+        verify(batchRunPort, times(1)).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
+        verify(eventPublisher, never()).publishEvent(argThat((Object e) -> e instanceof TradingErrorEvent t
+                && t.message().startsWith("[마감 리포트 보류]")));
+    }
+
+    // 리포트 재개 공통 — SOXL(STRATEGY)은 이미 리포트, TQQQ는 미리포트·당일 접수 주문 보유
+    private List<BatchContext> stubResumeWithTqqqPending() {
+        LocalDate today = LocalDate.now(FIXED);
+        when(batchRunPort.isReported(today, STRATEGY.id())).thenReturn(true);
+        when(batchRunPort.isReported(today, TQQQ_STRATEGY.id())).thenReturn(false);
+        Order tqqqPlaced = new Order(UUID.randomUUID(), ACCOUNT.id(), TQQQ_CYCLE.id(), today, StrategyTicker.TQQQ,
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, "BUY_LOC", BigDecimal.valueOf(1), PRICE, OrderStatus.PLACED, "ORD-T", null, null);
+        when(orderPort.findByStrategyId(TQQQ_STRATEGY.id(), today, today)).thenReturn(List.of(tqqqPlaced));
+        lenient().when(cycleHistoryPort.findLatestOneByStrategyId(TQQQ_STRATEGY.id())).thenReturn(Optional.of(new CyclePosition(
+                null, TQQQ_CYCLE.id(), new BigDecimal("1000.00"), PRICE, PRICE, BigDecimal.valueOf(10), null, null)));
+        lenient().when(tossExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of());
+        return List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER),
+                new BatchContext(TQQQ_STRATEGY, TQQQ_CYCLE, ACCOUNT, USER));
+    }
+
+    @Test
+    void 보류된_전략은_리포트_재개에서_그_전략만_리포트한다() throws InterruptedException {
+        LocalDate today = LocalDate.now(FIXED);
+        List<BatchContext> contexts = stubResumeWithTqqqPending();
+        when(marketData.confirmedBars(anyCollection(), any(LocalDate.class))).thenReturn(bars(Map.of(StrategyTicker.TQQQ, PRICE)));
+
+        service.resumeCloseReport(contexts, PAST_DST);
+
+        verify(batchRunPort).markReported(today, TQQQ_STRATEGY.id());
+        verify(batchRunPort, never()).markReported(today, STRATEGY.id());
+        verify(cycleHistoryPort, never()).save(argThat(p -> p.strategyCycleId().equals(STRATEGY_CYCLE.id())));
+        verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
+    }
+
+    @Test
+    void 리포트_재개에서도_종가가_없으면_DONE을_남기지_않는다() throws InterruptedException {
+        LocalDate today = LocalDate.now(FIXED);
+        List<BatchContext> contexts = stubResumeWithTqqqPending();
+        when(marketData.confirmedBars(anyCollection(), any(LocalDate.class))).thenReturn(Map.of());
+
+        service.resumeCloseReport(contexts, PAST_DST);
+
+        verify(batchRunPort, never()).markReported(any(), any());
+        verify(cycleHistoryPort, never()).save(any());
+        verify(batchRunPort, never()).recordPhase(any(), any(), eq(TradingBatchPhase.DONE));
+        // 재개 경로는 재조회 없이 1회
+        verify(marketData, times(1)).confirmedBars(anyCollection(), any(LocalDate.class));
+        verify(eventPublisher).publishEvent(new TradingErrorEvent(null, DEFER_ALERT));
     }
 
     // 계획 시점 잔고(X)가 아니라 리포트 시점 최신 포지션(Y, 사이에 append된 투자금 추가·수동 보정)이 스냅샷 기준이어야 한다

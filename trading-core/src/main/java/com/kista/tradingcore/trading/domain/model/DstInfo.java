@@ -11,7 +11,7 @@ import java.util.stream.Stream;
 public record DstInfo(
         boolean isDst,      // 미국 뉴욕 기준 일광절약시간(DST) 적용 여부
         Instant orderAt,    // 주문 시각 (KST): DST=04:30, 비DST=05:30
-        Instant postClose,  // 시장 마감 후 체결 확인 시각 (KST): DST=05:10, 비DST=06:10
+        Instant postClose,  // 시장 마감 20분 뒤 체결 확인 시각 (KST): DST=05:20, 비DST=06:20 — 공용 시세 SIP 일봉이 마감 16분 뒤 정산
         Instant marketOpen  // 미 정규장 개장 시각 (KST): DST=22:30, 비DST=23:30
 ) {
 
@@ -22,7 +22,7 @@ public record DstInfo(
     // 마감 배치 주문 시각
     private static LocalTime orderTime(boolean isDst)      { return isDst ? LocalTime.of(4, 30)  : LocalTime.of(5, 30); }
     // 장마감 후 체결 확인 시각
-    private static LocalTime postCloseTime(boolean isDst)  { return isDst ? LocalTime.of(5, 10)  : LocalTime.of(6, 10); }
+    private static LocalTime postCloseTime(boolean isDst)  { return isDst ? LocalTime.of(5, 20)  : LocalTime.of(6, 20); }
     // 미 정규장 개장 시각 (NY 09:30)
     private static LocalTime marketOpenTime(boolean isDst) { return isDst ? LocalTime.of(22, 30) : LocalTime.of(23, 30); }
     // 장마감 시각 — 수동 실행 BLOCKED 구간 시작
@@ -91,10 +91,10 @@ public record DstInfo(
                 atKst(date, marketOpenTime(isDst)));
     }
 
-    // 실제 거래 세션의 마감 30분 전 주문과 마감 10분 후 리포트 시각
+    // 실제 거래 세션의 마감 30분 전 주문과 마감 20분 후 리포트 시각
     public static DstInfo forCloseSession(Instant marketOpen, Instant marketClose) {
         return new DstInfo(resolveDst(marketOpen), marketClose.minus(Duration.ofMinutes(30)),
-                marketClose.plus(Duration.ofMinutes(10)), marketOpen);
+                marketClose.plus(Duration.ofMinutes(20)), marketOpen);
     }
 
     // 수동 마감은 주문 대기만 생략하고 실제 세션의 리포트 시각을 유지한다
