@@ -348,5 +348,5 @@ T3 실행 결과(2026-11-20, N19):
 - **새 메서드**: `latestCloses`(맵, 없는 키는 빠짐)·`requireLatestClose`·`requireConfirmedClose`(없으면 `IllegalStateException`). 등록·롤오버·미리보기·DCA 지표·통계·원장 합산이 `MarketDataClient`로 옮겨 갔다. DCA 지표 일봉은 Toss 조정값에서 Alpaca `adjustment=all`로 바뀌어 값이 조금 다를 수 있다.
 - **차트·백테스트**: 차트는 RAW(개수 1~600), 백테스트는 SPLIT. 내부 캔들 API의 `interval`을 지웠고 stats의 `AlpacaCandleAdapter`·`HistoricalCandlePort`·`AlpacaConfig`를 삭제했다. Alpaca 전송 오류는 `MarketDataApiException`(503)이다.
 - **마감 리포트**: 마감+20분, 확정 종가 없음 → 10분 뒤 1회 재조회 → 보류(Q-30).
-- **토스 대체 경로**: 토스 계좌 현재가는 Alpaca `latestPrices`(Q-13). 주문 경로 현재가 "계좌 증권사" 원칙의 예외이며 토스 전략 등록 전에 재확인한다(`vendors/toss.md`).
+- **토스 계좌 현재가**: 처음에는 Alpaca `latestPrices`(Q-13 대체 경로)로 갔다가, 2026-11-21 운영 토스 계좌 키로 읽기 전용 1회 호출(토큰 200, `/api/v1/prices` 200 — 계좌 헤더 유무 모두)을 확인하고 계좌 토큰 `/api/v1/prices`로 바꿨다(`TossPriceApi.currentPrices`). 계좌 토큰 경로는 429를 재시도하지 않는다(그 계좌만 빠지고 알림).
 - Mock은 확정 일봉이 없으면 `getExecutions`가 예외를 던진다(현재가 대체 삭제).

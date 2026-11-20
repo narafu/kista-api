@@ -3,7 +3,6 @@ package com.kista.tradingcore.broker.adapter.out.toss;
 import com.kista.tradingcore.broker.domain.model.*;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.StrategyTicker;
-import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
 import com.kista.tradingcore.broker.domain.model.toss.*;
 import com.kista.tradingcore.broker.application.port.output.*;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +24,6 @@ public class TossBrokerAdapter implements BrokerCapabilitiesPort, BrokerStatisti
     private final TossOrderApi tossOrderApi;          // cancel/place/execution
     private final TossPriceApi tossPriceApi;          // price/snapshot
     private final TossCandleApi tossCandleApi;         // candle
-    private final MarketDataClient marketData;         // 공용 시세 — currentPrices(주문 현재가는 계좌 토큰 시세로 바꾸는 후속 전까지 대체 경로)
 
     @Override
     public Broker supports() {
@@ -98,10 +96,10 @@ public class TossBrokerAdapter implements BrokerCapabilitiesPort, BrokerStatisti
         return tossPriceApi.getPrices(tickers); // 공통 API — account 불필요
     }
 
-    // 토스 계좌 토큰 시세 확인 전까지 공용 시세로 읽는다 — 운영에 토스 전략이 없다(Q-13). 확인되면 이 줄만 계좌 토큰 호출로 바꾼다
+    // 주문 경로 현재가 — 계좌 토큰 /api/v1/prices (Q-13 운영 확인 2026-11-21)
     @Override
     public Map<StrategyTicker, BigDecimal> currentPrices(BrokerAccountRef account, Collection<StrategyTicker> tickers) {
-        return marketData.latestPrices(tickers);
+        return tossPriceApi.currentPrices(account, tickers);
     }
 
     @Override

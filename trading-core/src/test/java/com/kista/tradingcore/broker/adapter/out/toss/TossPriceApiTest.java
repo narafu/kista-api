@@ -62,6 +62,22 @@ class TossPriceApiTest {
     }
 
     @Test
+    @DisplayName("계좌 토큰 현재가는 get(계좌)으로 호출하고 getCommon을 쓰지 않으며 누락 종목은 키가 없다")
+    void currentPrices_usesAccountTokenAndOmitsMissing() {
+        var account = new com.kista.tradingcore.broker.domain.model.BrokerAccountRef(
+                java.util.UUID.randomUUID(), "key", "secret", "12345678", null, com.kista.shared.kernel.Broker.TOSS);
+        when(tossHttpClient.get(eq("/api/v1/prices"), eq(account), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(wrap(new TossPriceApi.PriceItem("SOXL", "33.14")));
+
+        Map<StrategyTicker, BigDecimal> result =
+                tossPriceApi.currentPrices(account, List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ));
+
+        assertThat(result).containsOnlyKeys(StrategyTicker.SOXL);
+        assertThat(result.get(StrategyTicker.SOXL)).isEqualByComparingTo("33.14");
+        verify(tossHttpClient, never()).getCommon(any(), any(), any(ParameterizedTypeReference.class));
+    }
+
+    @Test
     @DisplayName("요청 티커가 응답에 없으면 예외 (미등록 종목만 응답 — 부분 실패)")
     void getPrices_requestedTickerMissingFromResponse_throws() {
         var item = new TossPriceApi.PriceItem("AAPL", "180.00");

@@ -23,12 +23,12 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.shared.kernel.StrategyTicker;
 import java.util.Map;
 import java.util.UUID;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -54,24 +54,22 @@ class TossBrokerAdapterTest {
     @Mock
     private TossCandleApi tossCandleApi;
 
-    @Mock
-    private MarketDataClient marketData;
-
     private TossBrokerAdapter adapter() {
-        return new TossBrokerAdapter(tossHoldingsApi, tossOrderApi, tossPriceApi, tossCandleApi, marketData);
+        return new TossBrokerAdapter(tossHoldingsApi, tossOrderApi, tossPriceApi, tossCandleApi);
     }
 
     @Test
-    @DisplayName("currentPrices는 공용 현재가이고 토스 시세 API를 부르지 않는다")
-    void currentPrices는_공용_현재가이고_토스_시세_API를_부르지_않는다() {
+    @DisplayName("currentPrices는 계좌 토큰 시세 변형에 위임한다")
+    void currentPrices는_계좌_토큰_시세에_위임한다() {
         List<StrategyTicker> tickers = List.of(StrategyTicker.SOXL);
-        when(marketData.latestPrices(tickers)).thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("30.10")));
         BrokerAccountRef account = new BrokerAccountRef(UUID.randomUUID(), "key", "secret", "12345678", null, Broker.TOSS);
+        when(tossPriceApi.currentPrices(account, tickers)).thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("30.10")));
 
         Map<StrategyTicker, BigDecimal> prices = adapter().currentPrices(account, tickers);
 
         assertThat(prices.get(StrategyTicker.SOXL)).isEqualByComparingTo("30.10");
-        verifyNoInteractions(tossPriceApi);
+        verify(tossPriceApi).currentPrices(account, tickers);
+        verifyNoMoreInteractions(tossPriceApi);
     }
 
     @Test

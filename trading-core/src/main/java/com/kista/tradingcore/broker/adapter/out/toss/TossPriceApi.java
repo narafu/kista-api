@@ -3,6 +3,7 @@ package com.kista.tradingcore.broker.adapter.out.toss;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.shared.platform.time.UsTradeDates;
+import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.BrokerCandle;
 import com.kista.tradingcore.broker.domain.model.PriceSnapshot;
 import com.kista.shared.kernel.StrategyTicker;
@@ -23,6 +24,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +40,9 @@ public class TossPriceApi {
 
     // Toss 가격 API: GET /api/v1/prices?symbols=SOXL,TQQQ (콤마 구분, 최대 200개)
     private static final String PRICES_PATH = "/api/v1/prices";
+
+    private static final ParameterizedTypeReference<TossResult<List<PriceItem>>> PRICES_TYPE =
+            new ParameterizedTypeReference<>() {};
 
     private final TossHttpClient tossHttpClient;
     private final TossCandleApi tossCandleApi; // 전일종가 캔들 조회
@@ -66,13 +71,25 @@ public class TossPriceApi {
     Map<StrategyTicker, BigDecimal> fetchPricesPartial(List<StrategyTicker> tickers) {
         if (tickers.isEmpty()) return Map.of();
 
-        // symbols 쿼리 파라미터: 콤마 구분 종목 코드 목록
+        // 공통 API — 관리자 토큰 사용
+        return parsePrices(tossHttpClient.getCommon(PRICES_PATH, symbolsParam(tickers), PRICES_TYPE), tickers);
+    }
+
+    // 계좌 토큰 현재가 — 계좌별 값이라 캐시하지 않는다. 응답에 없는 종목은 키 부재(= 그 종목 실패), 응답 자체가 없으면 예외
+    public Map<StrategyTicker, BigDecimal> currentPrices(BrokerAccountRef account, Collection<StrategyTicker> tickers) {
+        if (tickers.isEmpty()) return Map.of();
+        return parsePrices(tossHttpClient.get(PRICES_PATH, account, symbolsParam(tickers), PRICES_TYPE), tickers);
+    }
+
+    // symbols 쿼리 파라미터: 콤마 구분 종목 코드 목록
+    private static MultiValueMap<String, String> symbolsParam(Collection<StrategyTicker> tickers) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("symbols", tickers.stream().map(StrategyTicker::name).collect(Collectors.joining(",")));
+        return params;
+    }
 
-        // 공통 API — 관리자 토큰 사용
-        TossResult<List<PriceItem>> wrapper = tossHttpClient.getCommon(PRICES_PATH, params,
-                new ParameterizedTypeReference<TossResult<List<PriceItem>>>() {});
+    // 응답 파싱 — 관리자·계좌 경로 공용
+    private static Map<StrategyTicker, BigDecimal> parsePrices(TossResult<List<PriceItem>> wrapper, Collection<StrategyTicker> tickers) {
         List<PriceItem> items = wrapper != null ? wrapper.result() : null;
 
         // 응답 자체가 없는 전체 실패 — 조용히 빈 Map을 반환하면 호출부가 가격 0으로 오인
