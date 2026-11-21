@@ -352,4 +352,4 @@ ui 코드 변경은 필요 없다. ui가 부르는 `/api/auth` 경로 6개(`kaka
 
 | # | 변경 | api | ui | 상태 |
 |---|---|---|---|---|
-| J1 | `POST /api/trading-cycles/{id}/execute`(바로 주문) 삭제. 전체 취소 `DELETE` 같은 경로·미리보기는 유지. `ErrorCode` `ALREADY_ORDERED_TODAY`·`DCA_MANUAL_EXECUTION_UNSUPPORTED`는 발행처 없이 보존(decisions.md) | 브랜치 `remove-manual-trading`(`cccd6c1d8`), 미머지 | 버튼·호출·문구 제거, `api-types.ts` 재생성은 api 배포 뒤 | ui 제거 완료(kista-ui 01782862, 미배포) |
+| J1 | `POST /api/trading-cycles/{id}/execute`(바로 주문) 삭제. 전체 취소 `DELETE` 같은 경로·미리보기는 유지. `ErrorCode` `ALREADY_ORDERED_TODAY`·`DCA_MANUAL_EXECUTION_UNSUPPORTED`는 발행처 없이 보존(decisions.md) | main `cccd6c1d8` | 버튼·호출·문구 제거, `api-types.ts` 재생성은 api 배포 뒤 | ui 제거 완료(kista-ui 01782862), ui 배포 완료(8b0fb645, 2026-11-21). api main push로 배포 |
