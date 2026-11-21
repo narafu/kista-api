@@ -87,7 +87,7 @@ class TradingService {
         List<BatchContext> paused = split.get(true);
         List<BatchContext> contexts = split.get(false);
         LocalDate today = LocalDate.now(clock);
-        // 시작 기록 — 같은 날짜 수동 실행이 남긴 DONE을 덮어써, 이 배치가 중단되면 재개 대상이 되게 한다
+        // 시작 기록 — 같은 날짜 이전 실행(관리자 runNow 등)이 남긴 DONE을 덮어써, 이 배치가 중단되면 재개 대상이 되게 한다
         checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.STARTED);
         // 아래 각 조기 반환은 정상 흐름(휴장·시작 전·계산 skip 등)이라 예외/오류 알림 대상이 아니지만,
         // "리포트가 안 왔는데 원인이 안 보이는" 재발 시 로그만으로 중단 지점을 특정하기 위해 사유를 남긴다.
@@ -304,7 +304,7 @@ class TradingService {
                             List<Order> mainOrders = orderExecutor.placeOrders(today,
                                     state.ctx().account(), state.ctx().currentCycle(),
                                     placementPrice, state.position(), state.vrPosition(), state.ctx().strategy());
-                            // 선접수된 주문도 포함 — AT_OPEN(개장 스케쥴러) + AT_CLOSE(이전 세션/수동 접수) 모두
+                            // 선접수된 주문도 포함 — AT_OPEN(개장 스케쥴러) + AT_CLOSE(이전 세션 접수) 모두
                             // 이미 placeOrders()로 접수된 주문과 중복 방지: ID 기준 dedup
                             Set<UUID> mainOrderIds = mainOrders.stream()
                                     .map(Order::id).collect(Collectors.toSet());
@@ -361,7 +361,7 @@ class TradingService {
 
     private void runOpenBatch(List<BatchContext> contexts, DstInfo dst) throws InterruptedException {
         LocalDate tradeDate = DstInfo.nextTradeDate(ZonedDateTime.now(clock)); // 장 개시 스케쥴러 전날 저녁 실행 — 내일이 KST 거래일 (자정 이후 재개면 당일)
-        // 시작 기록 — 같은 날짜 수동 실행이 남긴 DONE을 덮어써, 이 배치가 중단되면 재개 대상이 되게 한다
+        // 시작 기록 — 같은 날짜 이전 실행(관리자 runNow 등)이 남긴 DONE을 덮어써, 이 배치가 중단되면 재개 대상이 되게 한다
         checkpoint(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.STARTED);
         // 조기 반환도 DONE 기록 — "체크포인트 행 없음 = 미실행"이 성립해야 재개 판정이 cron 누락을 구분한다
         if (contexts.isEmpty()) {

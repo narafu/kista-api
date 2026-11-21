@@ -2,7 +2,6 @@ package com.kista.tradingcore.trading.application.service;
 
 import com.kista.tradingcore.trading.domain.model.CancelResult;
 import com.kista.tradingcore.trading.domain.model.NextOrdersPreview;
-import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.BatchContext;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
 import lombok.RequiredArgsConstructor;
@@ -14,14 +13,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-// 매매 관련 서비스 4개를 TradingExecutionFacade 단일 진입점으로 위임하는 Facade
+// 매매 관련 서비스 3개를 TradingExecutionFacade 단일 진입점으로 위임하는 Facade
 // 트랜잭션 경계는 각 서비스(TradingService/OrderCancelService/TradingPreviewService)에 있으므로 이 클래스에 @Transactional 금지
 @Service
 @RequiredArgsConstructor
 public class TradingExecutionFacade {
 
     private final TradingService tradingService;
-    private final ManualTradingService manualTradingService;
     private final OrderCancelService orderCancelService;
     private final TradingPreviewService tradingPreviewService;
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
@@ -49,11 +47,6 @@ public class TradingExecutionFacade {
     // 재기동 재개 — 마감 배치 접수 완료 이후 중단분 리포트
     public void resumeCloseReport(List<BatchContext> contexts) throws InterruptedException {
         tradingService.resumeCloseReport(contexts, tradingService.closeSession());
-    }
-
-    // 수동 실행 (DCA는 배치 전용이라 거부)
-    public List<Order> executeManually(UUID strategyId, UUID requesterId) {
-        return manualTradingService.execute(strategyId, requesterId);
     }
 
     // 전략 주문 전체 취소 (오늘 PLANNED + PLACED, best-effort)

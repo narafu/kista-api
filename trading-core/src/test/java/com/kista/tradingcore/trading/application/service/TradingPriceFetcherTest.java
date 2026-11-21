@@ -214,18 +214,4 @@ class TradingPriceFetcherTest {
         assertThat(priceFetcher.fetchPrevCloses(List.of(StrategyTicker.SOXL))).isEmpty();
         verify(eventPublisher, never()).publishEvent(any());
     }
-
-    @Test
-    @DisplayName("fetchPrices: 그 계좌 currentPrices 1회, 누락은 알림")
-    void fetchPrices_missing_alerts() {
-        when(pricePort.currentPrices(accountA.brokerRef(), List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, P_A));
-
-        Map<StrategyTicker, BigDecimal> prices = priceFetcher.fetchPrices(
-                List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ), accountA.brokerRef());
-
-        assertThat(prices).containsOnlyKeys(StrategyTicker.SOXL);
-        verify(pricePort, times(1)).currentPrices(any(), any());
-        assertThat(singleAlertMessage()).contains("현재가 조회 실패: 계좌 1개 [TQQQ]");
-    }
 }

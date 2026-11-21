@@ -14,7 +14,7 @@ import java.time.LocalDate;
 // 개장·마감 배치 공용 PRIVACY 기준표 장전 점검 — "저장 시 경고, 장전 시 차단".
 // 저장 때 경고로 통과한 기준표(예: 보유 중인데 매도 없음)도 배치 계획 직전 재점검에서 이슈가 있으면 기준표를 쓰지 않는다(null).
 // 전략을 배치에서 빼지 않고 기준표만 비우는 이유: "기준표 미수신"과 같은 경로를 타 신규 PRIVACY 주문은 만들지 않되,
-// 그날 이미 PLANNED·PLACED된 주문(바로 주문·재개 등)은 그대로 접수·체결 기록·리포트까지 이어지게 하기 위해서다.
+// 그날 이미 PLANNED·PLACED된 주문(재개 등)은 그대로 접수·체결 기록·리포트까지 이어지게 하기 위해서다.
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -41,7 +41,7 @@ class PrivacyBaseGuard {
         return null;
     }
 
-    // 알림 없는 조용한 판정 — 미리보기·수동 실행처럼 반복 호출되는 경로용. base 없음·이슈·점검 실패는 모두 false
+    // 알림 없는 조용한 판정 — 미리보기처럼 반복 호출되는 경로용. base 없음·이슈·점검 실패는 모두 false
     boolean usable(PrivacyTradeBase base) {
         if (base == null) return false;
         try {

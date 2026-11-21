@@ -42,7 +42,7 @@ class TradingCandidatePlanner {
     private final TradingBalanceLoader balanceLoader;
     private final ApplicationEventPublisher eventPublisher; // 예수금 부족 알림(InsufficientBalanceEvent)
     private final TradingBatchGuard batchGuard;
-    private final AccountBudgetLock budgetLock;                 // 계좌별 원장 판정~저장 직렬화 — 수동 실행·재캡과 같은 락
+    private final AccountBudgetLock budgetLock;                 // 계좌별 원장 판정~저장 직렬화 — 재캡과 같은 락
     private final DcaPlanInputCollector dcaInputCollector;      // 회차 판정 전략(DCA) plan 입력 수집 — 부작용 없음
     private final DcaExecutionRecorder dcaExecutionRecorder;    // DCA 회차 이력·skip 알림 기록
     private final TradingParallelRunner parallelRunner;         // 계좌별 원장 판정+저장 병렬 실행
@@ -248,7 +248,7 @@ class TradingCandidatePlanner {
         Set<BatchContext> savedContexts = new LinkedHashSet<>();
 
         // 계좌 간 병렬 태스크로 원장 판정+PLANNED 저장을 묶는다. 판정~저장 커밋은 계좌 락 안 —
-        // 같은 계좌의 수동 실행·접수 직전 재캡과 저장 슬롯을 이중으로 세지 않게 한다
+        // 같은 계좌의 접수 직전 재캡과 저장 슬롯을 이중으로 세지 않게 한다
         List<TradingParallelRunner.Task<AccountAllocation>> tasks = slotsByAccount.values().stream()
                 .map(accountSlots -> {
                     BatchContext firstContext = accountSlots.getFirst().ctx();
@@ -300,7 +300,7 @@ class TradingCandidatePlanner {
         List<BatchContext> rejected = new ArrayList<>();
         for (Slot slot : accountSlots) {
             BatchContext ctx = slot.ctx();
-            // 후보 수집(락 밖) 이후 같은 사이클에 수동 실행이 저장한 슬롯은 제외 — 중복 주문 방지.
+            // 후보 수집(락 밖) 이후 같은 사이클에 다른 경로가 저장한 슬롯은 제외 — 중복 주문 방지.
             // 전부 겹친 사이클은 이미 PLANNED가 있으므로 판정 없이 접수 대상(saved)에 넣는다
             Optional<List<PlannedOrder>> fresh = batchGuard.runSafely("기존 주문 재확인", ctx, () -> TradingOrderSlots.excludeExisting(
                     slot.orders(), orderPort.findPlannedOrPlacedByCycleAndDate(ctx.currentCycle().id(), tradeDate)));

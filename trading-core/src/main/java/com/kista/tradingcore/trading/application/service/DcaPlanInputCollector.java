@@ -52,7 +52,7 @@ class DcaPlanInputCollector {
 
     private static final int CANDLE_COUNT = 250;            // SMA 최대 200 + RSI 안정화
     private static final int PREVIOUS_SESSION_SCAN_DAYS = 10; // 직전 개장일 역탐색 상한 (연휴 여유)
-    private static final Duration FEAR_GREED_TTL = Duration.ofMinutes(10); // 배치 1회를 덮는 길이 — 10분 안의 재계획(수동 실행 포함)은 같은 값
+    private static final Duration FEAR_GREED_TTL = Duration.ofMinutes(10); // 배치 1회를 덮는 길이 — 10분 안의 재계획은 같은 값
 
     private final MarketCalendarPort marketCalendarPort;
     private final MarketDataClient marketData;

@@ -57,7 +57,7 @@ class TradingPreviewService {
     private final OrderPort orderPort;
     private final CyclePositionPort cyclePositionPort; // 원장 잔여 계산용 최신 포지션 일괄 조회
     private final StrategyOrderPlanBuilder planBuilder;
-    private final StrategyLedgerBudget ledgerBudget; // 배치·수동실행과 같은 전략 원장 상한 판정
+    private final StrategyLedgerBudget ledgerBudget; // 배치와 같은 전략 원장 상한 판정
     private final TradingPriceFetcher priceFetcher; // 배치 미리보기 전일종가 일괄 조회(공용 시세)
     private final MarginPort marginPort; // 계좌 실제 주문가능 USD 조회 — 경고 전용, 매매 판정에는 쓰지 않는다
     private final SellableQuantityPort sellableQuantityPort; // 종목 실제 판매 가능 수량 조회 — 경고 전용, 매매 판정에는 쓰지 않는다
@@ -155,7 +155,7 @@ class TradingPreviewService {
             }
             try {
                 planResultsByStrategyId.put(strategy.id(),
-                        planBuilder.build(strategy, account, cycle, today, account.id(), prevCloseCache));
+                        planBuilder.build(strategy, account, cycle, today, prevCloseCache));
             } catch (RuntimeException e) {
                 // 아래 최종 루프가 캐시 누락을 감지해 동일 계산을 재시도하며, 그때 실패하면 그대로 전파된다
                 log.warn("[strategyId={}] 배치 미리보기 사전 계산 실패, 재시도 예정: error={}",
@@ -177,7 +177,7 @@ class TradingPreviewService {
                 // 생략" 처리와 동일한 부분 실패 허용 정책이다. 한 전략의 지속적 계산 실패가 preview(단건)
                 // 호출 시 계좌 내 다른(건강한) 전략까지 실패시키는 회귀를 막는다.
                 try {
-                    planResult = planBuilder.build(strategy, account, cycle, today, account.id(), prevCloseCache);
+                    planResult = planBuilder.build(strategy, account, cycle, today, prevCloseCache);
                 } catch (RuntimeException e) {
                     log.warn("[strategyId={}] 배치 미리보기 재시도도 실패 — 이 전략만 생략: error={}", strategy.id(), e.getMessage());
                     failures.put(strategy.id(), e);

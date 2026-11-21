@@ -257,7 +257,7 @@ class TradingServiceTest {
                 .thenReturn(new com.kista.tradingcore.privacy.domain.model.PrivacyTradeValidationReport(List.of()));
     }
 
-    // 후보 수집(락 밖) 이후 같은 사이클에 수동 실행이 같은 슬롯을 저장했으면 배치는 다시 저장하지 않고 그 주문을 접수한다
+    // 후보 수집(락 밖) 이후 같은 사이클에 다른 경로가 같은 슬롯을 저장했으면 배치는 다시 저장하지 않고 그 주문을 접수한다
     @Test
     void execute_slotSavedByManualAfterCandidateCollection_skipsDuplicateSaveButPlaces() throws InterruptedException {
         BigDecimal startPrice = new BigDecimal("20.00");
@@ -324,7 +324,7 @@ class TradingServiceTest {
                 .thenReturn(List.of(planned));
         when(brokerOrderPort.place(any(), eq(ACCOUNT_REF))).thenReturn(brokerResult(placedOrder.externalOrderId()));
         when(tossExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of());
-        // 배정~PLANNED 저장이 계좌 예산 락 안에서 끝나야 한다 — 수동 실행·재캡과 live 여유분 이중 사용 방지
+        // 배정~PLANNED 저장이 계좌 예산 락 안에서 끝나야 한다 — 재캡과 live 여유분 이중 사용 방지
         AtomicBoolean held = trackLockHeld(budgetLock);
         AtomicBoolean savedInLock = new AtomicBoolean();
         doAnswer(invocation -> {
@@ -357,7 +357,7 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_todayOrdersExist_skipsPlanningAndProceedsToToss() throws InterruptedException {
-        // 수동 실행으로 이미 PLANNED 주문이 존재 → 재계산 skip, Toss 접수만 수행
+        // 이전 실행(재개 등)으로 이미 PLANNED 주문이 존재 → 재계산 skip, Toss 접수만 수행
         Order alreadyPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), PRICE, OrderStatus.PLANNED, null, null, null);
         Order placedOrder = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
@@ -2041,7 +2041,7 @@ class TradingServiceTest {
 
         service.executeBatch(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
 
-        // 시작 기록이 이전 수동 실행의 DONE을 덮어써야 중단 시 재개 판정이 가려지지 않는다
+        // 시작 기록이 이전 관리자 수동 실행(runNow)의 DONE을 덮어써야 중단 시 재개 판정이 가려지지 않는다
         InOrder inOrder = inOrder(batchRunPort);
         inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, LocalDate.now(FIXED), TradingBatchPhase.STARTED);
         inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, LocalDate.now(FIXED), TradingBatchPhase.DONE);

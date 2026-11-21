@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
 // 계좌 BUY 예산 소비 구간 직렬화 — "예약 합계 → live 조회 → PLANNED 커밋"을 같은 계좌끼리 겹치지 않게 한다
-// 사용처: 배치 allocator 승인+저장(TradingCandidatePlanner), 수동 실행 승인+저장(ManualTradingService), 접수 직전 재캡(TradingOrderExecutor)
+// 사용처: 배치 allocator 승인+저장(TradingCandidatePlanner), 접수 직전 재캡(TradingOrderExecutor)
 // 접수(placeEach)는 락 밖 — 다른 계좌는 병렬 유지
 // ponytail: JVM 내 락 — kista-trading 단일 인스턴스 전제, 다중 인스턴스가 되면 DB 락(계좌 row FOR UPDATE)으로 승격
 @Component

@@ -312,7 +312,7 @@ class CycleOrderComputerTest {
         when(vrStrategy.buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), any(), any()))
                 .thenReturn(List.of());
 
-        // currentPrice=null (수동 실행·preview 경로)
+        // currentPrice=null (preview 경로)
         computer.compute(BALANCE, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, null, null);
 
         // buildOrders에 currentPrice=null 전달 확인

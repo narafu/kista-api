@@ -112,13 +112,6 @@ class TradingPriceFetcher {
         return prices;
     }
 
-    // 한 계좌의 현재가만 필요한 경우 (수동 실행) — currentPrices 1회, 누락은 알림
-    Map<StrategyTicker, BigDecimal> fetchPrices(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        AccountPrices result = fetchAccount(account.id(), account, tickers);
-        currentFailureMessage(List.of(result)).ifPresent(message -> publishAlert(List.of(message)));
-        return result.prices();
-    }
-
     // 전일종가만 필요한 경우 (매매 미리보기 배치) — 공용 시세의 지금 기준 마지막 확정 종가
     // 관리자 알림 없음: 유일한 호출부인 미리보기는 readOnly 트랜잭션이라 EPR insert가 실패해 500이 되고,
     // 실패는 이후 StrategyOrderPlanBuilder 단건 재조회(BrokerCallGuard)가 사용자 응답(503 등)으로 직접 드러낸다

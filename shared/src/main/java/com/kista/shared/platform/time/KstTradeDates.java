@@ -8,7 +8,7 @@ import java.time.ZonedDateTime;
 // US 거래일 변환은 UsTradeDates(어댑터 전용)와 무관하다.
 public final class KstTradeDates {
 
-    // 매매일 경계 기준 시각 — 04:30 이후면 당일 배치는 이미 계획 완료 → 다음 세션(익일)이 preview/수동 실행 대상
+    // 매매일 경계 기준 시각 — 04:30 이후면 당일 배치는 이미 계획 완료 → 다음 세션(익일)이 preview 대상
     public static final LocalTime SCHEDULER_RUN_TIME = LocalTime.of(4, 30);
 
     // 주어진 KST 시각 기준 거래일

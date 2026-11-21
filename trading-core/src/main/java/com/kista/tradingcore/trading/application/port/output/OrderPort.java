@@ -23,7 +23,7 @@ public interface OrderPort {
     // 특정 사이클·날짜의 PLANNED 주문 조회 (waitForOrderTime 이후 실행 단계에서 호출)
     List<Order> findPlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
-    // 특정 사이클·날짜의 PLACED 주문 조회 (수동 실행 감지 및 이중 실행 방지용)
+    // 특정 사이클·날짜의 PLACED 주문 조회 (이중 실행 방지용)
     List<Order> findPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
     // 특정 사이클·거래일의 CANCELLED 주문 조회 (당일 취소 전 부분 체결분의 원장 반영용 — 체결 필터의 자기 주문 판정)
@@ -59,7 +59,7 @@ public interface OrderPort {
     // 사이클·거래일의 PLANNED 주문 일괄 삭제 — 접수 중 PLACED로 바뀐 행은 지우지 않음, 실제 삭제 건수 반환
     int deletePlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
-    // 오늘 열린 주문(PLANNED·SUBMITTING·PLACED) 조회 (스케쥴러 재계산 skip·슬롯 점유·수동 실행 이중 실행 판정용)
+    // 오늘 열린 주문(PLANNED·SUBMITTING·PLACED) 조회 (스케쥴러 재계산 skip·슬롯 점유·이중 실행 판정용)
     List<Order> findPlannedOrPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
     // 여러 사이클의 오늘 열린 주문(PLANNED·SUBMITTING·PLACED) 배치 조회 (미리보기 N+1 방지) — strategyCycleId 기준 그룹핑
@@ -86,7 +86,7 @@ public interface OrderPort {
     // 전략 기준 기간 내 주문 전체 조회 (사용자 주문내역 탭용) — strategy_cycle을 통한 JOIN 필요
     List<Order> findByStrategyId(UUID strategyId, LocalDate from, LocalDate to);
 
-    // AT_OPEN + PLANNED 주문 조회 (개장 스케쥴러·수동 실행 선접수용)
+    // AT_OPEN + PLANNED 주문 조회 (개장 스케쥴러 선접수용)
     List<Order> findAtOpenPlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
     // 사이클 기준 BUY 체결금액 합계(취소 전 부분 체결된 CANCELLED 포함) (VR 전략 누적 매수금 계산용)

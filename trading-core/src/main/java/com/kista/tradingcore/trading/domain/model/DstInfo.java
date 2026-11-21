@@ -25,9 +25,9 @@ public record DstInfo(
     private static LocalTime postCloseTime(boolean isDst)  { return isDst ? LocalTime.of(5, 20)  : LocalTime.of(6, 20); }
     // 미 정규장 개장 시각 (NY 09:30)
     private static LocalTime marketOpenTime(boolean isDst) { return isDst ? LocalTime.of(22, 30) : LocalTime.of(23, 30); }
-    // 장마감 시각 — 수동 실행 BLOCKED 구간 시작
+    // 장마감 시각 — BLOCKED 구간 시작
     private static LocalTime marketCloseTime(boolean isDst)    { return isDst ? LocalTime.of(5, 0)  : LocalTime.of(6, 0); }
-    // 프리마켓 시작 시각 — 수동 실행 BLOCKED 구간 끝
+    // 프리마켓 시작 시각 — BLOCKED 구간 끝
     private static LocalTime premarketStartTime(boolean isDst) { return isDst ? LocalTime.of(17, 0) : LocalTime.of(18, 0); }
 
     private static boolean resolveDst(Instant instant) {

@@ -8,11 +8,7 @@ import com.kista.tradingcore.broker.domain.model.BrokerPermissionDeniedException
 import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeConflictException;
 import com.kista.tradingcore.support.StubBrokerApiException;
-import com.kista.tradingcore.trading.domain.model.AlreadyOrderedTodayException;
-import com.kista.tradingcore.trading.domain.model.DcaManualExecutionUnsupportedException;
 import com.kista.tradingcore.trading.domain.model.DuplicateStrategyTickerException;
-import com.kista.tradingcore.trading.domain.model.ManualTradingException;
-import com.kista.tradingcore.trading.domain.model.ManualTradingFailedException;
 import com.kista.tradingcore.trading.domain.model.OrderCancelException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -76,12 +72,6 @@ class ExceptionResponseTableTest {
             new Row("BrokerApi", () -> new StubBrokerApiException("Toss", "원본 응답 바디"), 503, "Toss API Error", "BROKER_UNAVAILABLE",
                     "증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요.", true),
             // 매매·전략 409
-            new Row("AlreadyOrderedToday", AlreadyOrderedTodayException::new, 409, "Conflict", "ALREADY_ORDERED_TODAY", new AlreadyOrderedTodayException().getMessage(), false),
-            new Row("DcaManualExecutionUnsupported", DcaManualExecutionUnsupportedException::new, 409, "Conflict", "DCA_MANUAL_EXECUTION_UNSUPPORTED", new DcaManualExecutionUnsupportedException().getMessage(), false),
-            new Row("ManualTrading", () -> new ManualTradingException("주문 불가 상태입니다."), 409, "Conflict", null, "주문 불가 상태입니다.", false),
-            // 바로주문 비증권사 실패 — 500이지만 보고는 ManualTradingService가 따로 하므로 처리기는 보고하지 않는다
-            new Row("ManualTradingFailed", () -> new ManualTradingFailedException("주문", new RuntimeException("x")), 500, "Manual Trading Failed", null,
-                    "주문 계산 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.", false),
             new Row("OrderCancel", () -> new OrderCancelException("취소 가능한 상태가 아닙니다."), 409, "Conflict", "ORDER_NOT_CANCELLABLE", "취소 가능한 상태가 아닙니다.", false),
             new Row("PrivacyTradeConflict", () -> new PrivacyTradeConflictException("이미 있습니다."), 409, "Conflict", null, "이미 있습니다.", false),
             new Row("DuplicateStrategyTicker", DuplicateStrategyTickerException::new, 409, "Conflict", null, new DuplicateStrategyTickerException().getMessage(), false),

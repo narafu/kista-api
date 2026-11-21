@@ -26,7 +26,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-// 잔류 SUBMITTING 대사 — 접수 경로(배치·재개·수동 실행) 진입 시 호출. 취소 경로에서는 호출하지 않는다(취소할 주문을 새로 접수할 수 있어서)
+// 잔류 SUBMITTING 대사 — 접수 경로(배치·재개) 진입 시 호출. 취소 경로에서는 호출하지 않는다(취소할 주문을 새로 접수할 수 있어서)
 // Toss만 선점 후 2~9분 창에서 같은 멱등키(clientOrderId)로 재요청해 원 결과를 회수한다 — 창 밖은 관리자 알림 후 런북 정정
 @Component
 @Slf4j

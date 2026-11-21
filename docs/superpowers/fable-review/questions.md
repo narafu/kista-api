@@ -290,7 +290,7 @@
 ### Q-22 테스트만 쓰는 도메인 메서드 2개를 테스트째 지울지
 - 상태: 답함(2026-11-16)
 - 묶음·태스크: S13 / 13 U2
-- 걸린 곳: `AccountBalance.hasSufficientDepositFor`(`AccountBalance.java:61`, 테스트 6곳, 주석 "ManualTradingService 전용"은 낡음)와 `ReverseModePosition.calcLocBuyAmount`(`ReverseModePosition.java:42`, 테스트 1곳)는 main 호출처가 0이다. 13 9절은 "그 테스트가 공개 동작으로 같은 것을 확인할 수 있으면 삭제"라 했는데 옮길 공개 동작이 없다. 판정 로직(`BUY 합계`, `quotaBuyAmount`)은 다른 공개 경로가 이미 쓰고 테스트한다.
+- 걸린 곳: `AccountBalance.hasSufficientDepositFor`(`AccountBalance.java:61`, 테스트 6곳, 주석 "ManualTradingService 전용"은 낡음 — Q-22(`0ffaea0d0`)에서 이미 삭제돼 해소)와 `ReverseModePosition.calcLocBuyAmount`(`ReverseModePosition.java:42`, 테스트 1곳)는 main 호출처가 0이다. 13 9절은 "그 테스트가 공개 동작으로 같은 것을 확인할 수 있으면 삭제"라 했는데 옮길 공개 동작이 없다. 판정 로직(`BUY 합계`, `quotaBuyAmount`)은 다른 공개 경로가 이미 쓰고 테스트한다.
 - 선택지: ① 메서드와 그 테스트를 함께 지운다. 동작 변화 없음, 약 40줄 감소 ② 지금처럼 둔다. 죽은 메서드가 남고 낡은 주석만 고친다.
 - 권고: ①. 매매 공식은 `trading-formulas.md`와 실제 호출 경로 테스트가 SSOT라 죽은 메서드의 테스트가 공식을 지키지 않는다.
 - 멈춘 범위: 이 두 메서드만. 답이 없으면 ②로 둔다.
