@@ -16,6 +16,7 @@ TRADING=${TRADING:-http://localhost:8081} # worker 프로세스(엔진 API)
 # 레포 루트 compose의 postgres 컨테이너 — compose 프로젝트명과 무관하게 해석
 PG_CONTAINER=${PG_CONTAINER:-$(docker compose -f "$(cd "$(dirname "$0")/../.." && pwd)/docker-compose.yml" ps -q postgres)}
 [[ -n "$PG_CONTAINER" ]] || { echo "postgres 컨테이너 미기동: docker compose up -d postgres" >&2; exit 1; }
+PG_DB=${PG_DB:-kistadb} # 시드 대상 DB — 별도 DB로 리허설할 때 덮어쓴다
 MOCK_NICKNAME='[시드] 모의계좌'
 DIR=$(cd "$(dirname "$0")" && pwd)
 
@@ -24,9 +25,9 @@ ADMIN_TOKEN=$(curl -fsS -X POST "$API/api/auth/dev-admin-token" | jq -r .accessT
 AUTH=(-H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json')
 
 # dev-token이 trading-core 사용자 복제본(trading.user_notify_profile) 동기화 이벤트를 발행한다 — 복제본이 없으면
-# 전략 등록이 404("사용자를 찾을 수 없습니다"). Redis Stream 경유 비동기 반영이라 최대 10초 대기
+# 전략 등록이 404("사용자를 찾을 수 없습니다"). AFTER_COMMIT 리스너가 반영하므로 최대 10초 안에 확인
 DEV_USER=00000000-0000-0000-0000-000000000001
-psql_val() { docker exec "$PG_CONTAINER" psql -Atq -U kista -d kistadb -c "$1"; }
+psql_val() { docker exec "$PG_CONTAINER" psql -Atq -U kista -d "$PG_DB" -c "$1"; }
 for _ in {1..20}; do
   [[ $(psql_val "SELECT count(*) FROM trading.user_notify_profile WHERE user_id = '$DEV_USER'") == 1 ]] && break
   sleep 0.5
@@ -63,7 +64,7 @@ if (( CREDENTIAL_INVALID )); then
   echo "힌트: worker 로그에 'IP address not allowed'가 있으면 Toss 허용 IP에 현재 공인 IP($(curl -fsS --max-time 3 https://api.ipify.org || echo '조회 실패'))를 추가 — 키 문제가 아님" >&2
 fi
 
-docker exec -i "$PG_CONTAINER" psql -q -U kista -d kistadb < "$DIR/dev-seed.sql"
+docker exec -i "$PG_CONTAINER" psql -q -U kista -d "$PG_DB" < "$DIR/dev-seed.sql"
 echo "SQL 시드 적용"
 
 # 벤치마크 수집기 트리거 — 202 후 백그라운드 실행(root 로그 확인)

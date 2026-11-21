@@ -4,14 +4,16 @@
 # 사용: check-migrations.sh [base-ref]
 #   1) 적용 이력 불변: base-ref가 주어지면 base-ref..HEAD 사이에 기존 마이그레이션 파일(양 서비스)이 수정·삭제·이름변경됐는지 검사.
 #      이미 적용된 파일이 바뀌면 Flyway 체크섬 불일치로 기동 즉시 크래시한다(운영 사고 이력 — constraints.md "Flyway").
-#   2) root expand/contract: kista-web·kista-worker가 role별 순차 교체라 root(db/migration) 마이그레이션은 직전 이미지와 호환돼야 한다.
+#   2) expand/contract: kista-web·kista-worker가 role별 순차 교체라 양 서비스 마이그레이션은 직전 이미지와 호환돼야 한다.
 #      DROP TABLE·DROP COLUMN·RENAME·SET NOT NULL·ALTER COLUMN TYPE·DEFAULT 없는 NOT NULL 컬럼 추가를 금지한다.
 #      두 role을 같은 커밋에서 함께 배포하는 의도적 contract 단계면 파일에 `-- contract-ok: <사유>` 주석으로 예외 표시.
-#      V1__init.sql은 스쿼시 baseline이라 제외. trading-core(db/migration-trading)는 단일 프로세스 소유라 대상 아님.
+#      root는 V1__init.sql(스쿼시 baseline)을, trading은 TRADING_CHECK_AFTER 이하(단일 프로세스 시절 적용분, 수정 불가)를 제외한다.
 set -euo pipefail
 
 ROOT_DIR=${ROOT_MIGRATIONS:-src/main/resources/db/migration}
-ALL_DIRS=("$ROOT_DIR" "${TRADING_MIGRATIONS:-trading-core/src/main/resources/db/migration-trading}")
+TRADING_DIR=${TRADING_MIGRATIONS:-trading-core/src/main/resources/db/migration-trading}
+TRADING_CHECK_AFTER=${TRADING_CHECK_AFTER:-24} # 이 버전까지는 expand/contract 도입 전 적용분
+ALL_DIRS=("$ROOT_DIR" "$TRADING_DIR")
 base=${1:-}
 failed=0
 
@@ -50,19 +52,30 @@ violation() {
   done
 }
 
-for file in "$ROOT_DIR"/V*.sql; do
-  [ -e "$file" ] || continue
-  if [[ $(basename "$file") == V1__* ]]; then continue; fi
-  if grep -q -- '-- contract-ok:' "$file"; then
-    echo "::notice file=$file::contract-ok 표시 — expand/contract 검사 생략(두 role 동시 배포 전제)"
-    continue
-  fi
-  while IFS= read -r stmt; do
-    v=$(violation "$stmt")
-    if [ -n "$v" ]; then fail "$file" "root 마이그레이션 backward-compat 위반: ${v} — 직전 이미지와 호환되도록 expand/contract로 나누거나, 두 role 동시 배포가 의도면 '-- contract-ok: <사유>' 표시"; fi
-  # 괄호 안(NUMERIC(10,2)·CHECK(...))은 지운다 — 남겨두면 절을 쉼표로 나눌 때 정의가 쪼개져 위반을 놓친다
-  done < <(sed 's/--.*$//' "$file" | tr '\n\t' '  ' | sed -E ':a;s/\([^()]*\)//g;ta' \
-           | tr ';' '\n' | tr '[:lower:]' '[:upper:]' | tr -s ' ')
-done
+# 디렉토리의 버전 > after 파일만 검사한다
+check_dir() {
+  local dir=$1 after=$2 file version v stmt
+  for file in "$dir"/V*.sql; do
+    [ -e "$file" ] || continue
+    version=$(basename "$file"); version=${version#V}; version=${version%%__*}
+    # 정수가 아니면 산술 오류가 || continue에 삼켜져 검사를 건너뛴다 — 실패로 막는다
+    [[ $version =~ ^[0-9]+$ ]] || { fail "$file" "버전이 정수가 아님 — V<정수>__<설명>.sql 형식으로 작성할 것"; continue; }
+    (( 10#$version > after )) || continue
+    if grep -q -- '-- contract-ok:' "$file"; then
+      echo "::notice file=$file::contract-ok 표시 — expand/contract 검사 생략(두 role 동시 배포 전제)"
+      continue
+    fi
+    while IFS= read -r stmt; do
+      v=$(violation "$stmt")
+      if [ -n "$v" ]; then fail "$file" "마이그레이션 backward-compat 위반: ${v} — 직전 이미지와 호환되도록 expand/contract로 나누거나, 두 role 동시 배포가 의도면 '-- contract-ok: <사유>' 표시"; fi
+    # 괄호 안(NUMERIC(10,2)·CHECK(...))은 지운다 — 남겨두면 절을 쉼표로 나눌 때 정의가 쪼개져 위반을 놓친다
+    # sed 라벨은 -e로 분리한다 — BSD sed는 ':a;...'를 통째로 라벨로 읽는다
+    done < <(sed 's/--.*$//' "$file" | tr '\n\t' '  ' | sed -E -e ':a' -e 's/\([^()]*\)//g' -e 'ta' \
+             | tr ';' '\n' | tr '[:lower:]' '[:upper:]' | tr -s ' ')
+  done
+}
+
+check_dir "$ROOT_DIR" 1
+check_dir "$TRADING_DIR" "$TRADING_CHECK_AFTER"
 
 exit "$failed"

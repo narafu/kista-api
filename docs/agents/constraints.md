@@ -45,7 +45,7 @@
 ### 영속성
 - 스키마 소유 5분리, 남의 스키마 참조(FK 포함) 금지 → `architecture.md`
 - native SQL·JdbcTemplate SQL의 테이블은 스키마 한정(`trading.orders`), 스케줄러 락 테이블은 `kista.scheduler-lock.table`(가드: `NativeSqlSchemaQualifiedTest`)
-- 적용된 마이그레이션은 주석 포함 수정 금지(checksum 크래시). root expand/contract, enum은 `VARCHAR(20)` + `@Enumerated(STRING)` → `flyway.md`
+- 적용된 마이그레이션은 주석 포함 수정 금지(checksum 크래시). expand/contract(root·trading), enum은 `VARCHAR(20)` + `@Enumerated(STRING)` → `flyway.md`
 - AES 컬럼은 `@Convert(AesStringConverter)`·`length≥512`·조건은 `*_hash`, raw INSERT는 암호문 → `modules/shared/platform.md`
 - 소프트 삭제 테이블(`users`·`accounts`·`strategy`·`strategy_cycle`·`cycle_position`)은 `@SQLRestriction("deleted_at IS NULL")`. `nativeQuery`엔 적용 안 돼 수동으로 쓴다. Cascade는 서비스가 사이클 → 계좌 → 사용자 순(DB FK CASCADE 미작동)
 - `application-local.yml` datasource는 `${DB_URL:...}` 형식 유지
