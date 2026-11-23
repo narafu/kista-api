@@ -23,6 +23,7 @@ import java.util.UUID;
 
 import static com.kista.shared.support.WebMvcTestSupport.*;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -76,8 +77,19 @@ class FearGreedControllerTest {
         mockMvc.perform(get("/api/market/fear-greed").param("days", "90"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cnn.current.value").value(72))
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("max-age=600")))) // 장애 응답은 공개 캐시하지 않는다(Spring Security 기본 no-cache는 남음)
                 .andExpect(jsonPath("$.crypto.current").doesNotExist())
                 .andExpect(jsonPath("$.crypto.history.length()").value(0));
+    }
+
+    @Test
+    void getFearGreed_days_out_of_range_returns_400() throws Exception {
+        // 서비스가 범위 밖 days에 IAE를 던진다 — ProblemDetailExceptionHandler가 400으로 매핑
+        when(fearGreedQueryService.getRecent(anyString(), eq(-1))).thenThrow(new IllegalArgumentException("조회 기간은 0(전체) 또는 1~365일이어야 합니다."));
+        when(fearGreedQueryService.getRecent(anyString(), eq(366))).thenThrow(new IllegalArgumentException("조회 기간은 0(전체) 또는 1~365일이어야 합니다."));
+
+        mockMvc.perform(get("/api/market/fear-greed").param("days", "-1")).andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/market/fear-greed").param("days", "366")).andExpect(status().isBadRequest());
     }
 
     @Test

@@ -4,7 +4,7 @@ import com.kista.shared.kernel.TimeZones;
 import com.kista.shared.platform.cache.TtlResultCache;
 import com.kista.api.market.domain.model.CryptoFearGreedHistory;
 import com.kista.api.market.domain.model.FearGreedSnapshot;
-import com.kista.api.market.application.port.output.CryptoFearGreedPort;
+import com.kista.api.market.adapter.out.feargreed.CryptoFearGreedAdapter;
 import com.kista.api.market.application.port.output.FearGreedSnapshotPort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -37,11 +37,11 @@ public class FearGreedQueryService {
     private static final String CRYPTO_FAILED_CACHE_KEY = CRYPTO_CACHE_KEY + ":failed"; // 실패 표식 — 정상 결과와 TTL이 달라 키 분리
 
     private final FearGreedSnapshotPort fearGreedSnapshotPort;
-    private final CryptoFearGreedPort cryptoFearGreedPort;
+    private final CryptoFearGreedAdapter cryptoFearGreedPort;
     private final Clock clock; // since 기준일·캐시 만료 판정 — 테스트에서 고정
     private final TtlResultCache cache; // CRYPTO 이력 캐시 (single-flight)
 
-    FearGreedQueryService(FearGreedSnapshotPort fearGreedSnapshotPort, CryptoFearGreedPort cryptoFearGreedPort, Clock clock) {
+    FearGreedQueryService(FearGreedSnapshotPort fearGreedSnapshotPort, CryptoFearGreedAdapter cryptoFearGreedPort, Clock clock) {
         this.fearGreedSnapshotPort = fearGreedSnapshotPort;
         this.cryptoFearGreedPort = cryptoFearGreedPort;
         this.clock = clock;

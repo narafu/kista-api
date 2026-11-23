@@ -1,6 +1,6 @@
 package com.kista.api.market.application.service;
 
-import com.kista.api.market.application.port.output.CryptoFearGreedPort;
+import com.kista.api.market.adapter.out.feargreed.CryptoFearGreedAdapter;
 import com.kista.api.market.domain.model.CryptoFearGreedHistory;
 import com.kista.api.market.domain.model.FearGreedRating;
 import com.kista.api.market.domain.model.FearGreedSnapshot;
@@ -38,7 +38,7 @@ class FearGreedQueryServiceTest {
     private static final Instant NOW = Instant.parse("2026-10-20T03:00:00Z"); // KST 2026-10-20 12:00
 
     @Mock FearGreedSnapshotPort port;
-    @Mock CryptoFearGreedPort cryptoPort;
+    @Mock CryptoFearGreedAdapter cryptoPort;
     @Mock Clock clock;
     FearGreedQueryService service;
 

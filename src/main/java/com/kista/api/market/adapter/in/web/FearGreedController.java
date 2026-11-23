@@ -37,6 +37,11 @@ public class FearGreedController {
         FearGreedResponse response = FearGreedResponse.from(
                 fearGreedQueryService.getRecent(SOURCE_CNN, days),
                 fearGreedQueryService.getRecent(SOURCE_CRYPTO, days));
-        return ResponseEntity.ok().cacheControl(FEAR_GREED_CACHE).body(response);
+        // crypto 조회 실패로 빈 응답이면 공개 캐시하지 않는다(오래된 최신값 경우는 대상 아님)
+        ResponseEntity.BodyBuilder ok = ResponseEntity.ok();
+        if (response.crypto().current() != null) {
+            ok.cacheControl(FEAR_GREED_CACHE);
+        }
+        return ok.body(response);
     }
 }

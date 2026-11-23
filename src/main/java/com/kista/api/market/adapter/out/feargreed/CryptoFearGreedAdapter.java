@@ -1,7 +1,6 @@
 package com.kista.api.market.adapter.out.feargreed;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.api.market.application.port.output.CryptoFearGreedPort;
 import com.kista.api.market.domain.model.CryptoFearGreedHistory;
 import com.kista.api.market.domain.model.FearGreedRating;
 import com.kista.api.market.domain.model.FearGreedSnapshot;
@@ -18,14 +17,14 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-class CryptoFearGreedAdapter implements CryptoFearGreedPort {
+public class CryptoFearGreedAdapter { // 구현 하나뿐이라 포트 없이 서비스가 직접 쓴다(constraints.md)
 
     private static final String URL = "https://api.alternative.me/fng/?limit={limit}"; // limit=N이면 최신 N건(최신순)
     private static final String SOURCE = "CRYPTO";
 
     private final RestClient fearGreedRestClient;
 
-    @Override
+    // 최신 limit일(0=전체) 일별 이력(시각 오름차순, snapshotDate는 지수 기준일 UTC 00:00) + 다음 갱신까지 남은 시간
     public CryptoFearGreedHistory fetchHistory(int limit) {
         FngResponse response = fearGreedRestClient.get().uri(URL, limit).retrieve().body(FngResponse.class);
         if (response == null || response.data() == null || response.data().isEmpty()) {

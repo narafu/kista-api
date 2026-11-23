@@ -28,7 +28,6 @@ com.kista.api.finance.application.port.output.FinanceTransactionPort
 com.kista.api.finance.application.port.output.MonthlyClosingPort
 com.kista.api.market.application.port.output.CandleQueryPort
 com.kista.api.market.application.port.output.CnnFearGreedPort
-com.kista.api.market.application.port.output.CryptoFearGreedPort
 com.kista.api.market.application.port.output.FearGreedSnapshotPort
 com.kista.api.market.application.port.output.MarketCalendarQueryPort
 com.kista.api.notify.application.port.output.FcmDeviceTokenPort
