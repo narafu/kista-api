@@ -1,45 +1,107 @@
 package com.kista.api.market.application.service;
 
 import com.kista.shared.kernel.TimeZones;
+import com.kista.shared.platform.cache.TtlResultCache;
+import com.kista.api.market.domain.model.CryptoFearGreedHistory;
 import com.kista.api.market.domain.model.FearGreedSnapshot;
+import com.kista.api.market.application.port.output.CryptoFearGreedPort;
 import com.kista.api.market.application.port.output.FearGreedSnapshotPort;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
+import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 
-// CNN은 스케쥴러가 쌓은 DB 스냅샷을 조회한다(리포지토리 기본 트랜잭션).
+// CNN은 스케쥴러가 쌓은 DB 스냅샷, CRYPTO는 alternative.me 이력 API 직접 조회(인메모리 캐시, 만료는 응답의 time_until_update 기준).
+// 클래스 레벨 @Transactional 없음 — CRYPTO 외부 HTTP 동안 DB 커넥션을 잡지 않도록(CNN 조회는 리포지토리 기본 트랜잭션)
+@Slf4j
 @Service
 public class FearGreedQueryService {
 
-    static final int MAX_DAYS = 365; // 조회 기간 상한 — kista-ui 최대 옵션
+    static final int MAX_DAYS = 365; // 조회 기간 상한 — kista-ui 최대 옵션, CRYPTO 외부 limit 상한
+    static final Duration CRYPTO_TTL = Duration.ofHours(1); // 정상 이력 캐시 fallback — time_until_update가 없을 때
+    static final Duration CRYPTO_MIN_TTL = Duration.ofMinutes(1); // time_until_update 하한 — 갱신 직전 값으로 재호출 폭주 방지
+    static final Duration CRYPTO_MAX_TTL = Duration.ofHours(24); // time_until_update 상한 — 갱신 주기(일 1회)
+    static final Duration CRYPTO_NOT_PUBLISHED_TTL = Duration.ofMinutes(1); // 최신값이 24시간 넘게 오래됨 — 새 일자 값 미발행이라 짧게 재조회
+    static final Duration CRYPTO_FAILURE_TTL = Duration.ofMinutes(1); // 실패 캐시 — 비인증 공개라 장애 중 요청마다 외부 재호출되는 것을 막는다
+    private static final String SOURCE_CRYPTO = "CRYPTO";
+    private static final String CRYPTO_CACHE_KEY = "fear-greed:crypto"; // days와 무관하게 전체 이력 단일 결과를 잘라 쓴다
+    private static final String CRYPTO_FAILED_CACHE_KEY = CRYPTO_CACHE_KEY + ":failed"; // 실패 표식 — 정상 결과와 TTL이 달라 키 분리
 
     private final FearGreedSnapshotPort fearGreedSnapshotPort;
-    private final Clock clock; // since 기준일 — 테스트에서 고정
+    private final CryptoFearGreedPort cryptoFearGreedPort;
+    private final Clock clock; // since 기준일·캐시 만료 판정 — 테스트에서 고정
+    private final TtlResultCache cache; // CRYPTO 이력 캐시 (single-flight)
 
-    FearGreedQueryService(FearGreedSnapshotPort fearGreedSnapshotPort, Clock clock) {
+    FearGreedQueryService(FearGreedSnapshotPort fearGreedSnapshotPort, CryptoFearGreedPort cryptoFearGreedPort, Clock clock) {
         this.fearGreedSnapshotPort = fearGreedSnapshotPort;
+        this.cryptoFearGreedPort = cryptoFearGreedPort;
         this.clock = clock;
+        this.cache = new TtlResultCache(clock);
     }
 
-    // 지정 source의 최근 days일(1~365) 일별 값을 날짜 오름차순으로 조회
+    // 지정 source의 최근 days일(1~365) 일별 값을 날짜 오름차순으로 조회 — CRYPTO 외부 조회 실패는 빈 목록.
+    // days=0이면 전체 기간을 KST ISO 주(월~일)별 마지막 값 1건으로 축약한다(이번 주는 최신값 1건)
     public List<FearGreedSnapshot> getRecent(String source, int days) {
-        if (days < 1 || days > MAX_DAYS) throw new IllegalArgumentException("조회 기간은 1~" + MAX_DAYS + "일이어야 합니다.");
-        // days일 전 KST 00:00부터 현재까지 시각 범위로 조회
-        Instant since = LocalDate.ofInstant(clock.instant(), TimeZones.KST).minusDays(days).atStartOfDay(TimeZones.KST).toInstant();
-        List<FearGreedSnapshot> snapshots = fearGreedSnapshotPort.findBySourceSince(source, since);
+        if (days < 0 || days > MAX_DAYS) throw new IllegalArgumentException("조회 기간은 0(전체) 또는 1~" + MAX_DAYS + "일이어야 합니다.");
+        boolean all = days == 0;
+        // days일 전 KST 00:00부터 현재까지 시각 범위로 조회 — 전체는 하한 없음
+        Instant since = all ? Instant.EPOCH
+                : LocalDate.ofInstant(clock.instant(), TimeZones.KST).minusDays(days).atStartOfDay(TimeZones.KST).toInstant();
+        List<FearGreedSnapshot> snapshots = SOURCE_CRYPTO.equals(source)
+                ? cryptoHistory().stream().filter(s -> !s.snapshotDate().isBefore(since)).toList()
+                : fearGreedSnapshotPort.findBySourceSince(source, since);
 
-        // KST 일자별 최신 1건만 남겨 일봉 기준으로 응답
-        return List.copyOf(snapshots.stream()
+        // 같은 시각 중복은 createdAt이 늦은 값이 뒤로 가도록 정렬 — 아래 "마지막 값이 이긴다"의 전제
+        List<FearGreedSnapshot> sorted = snapshots.stream()
+                .sorted(Comparator.comparing(FearGreedSnapshot::snapshotDate)
+                        .thenComparing(FearGreedSnapshot::createdAt, Comparator.nullsFirst(Comparator.naturalOrder())))
+                .toList();
+        // KST 일자별(전체는 ISO 주 월요일별) 마지막 1건만 남긴다 — CRYPTO UTC 00:00은 KST 같은 날 09:00이라 일자가 변하지 않는다
+        return List.copyOf(sorted.stream()
                 .collect(Collectors.toMap(
-                        s -> s.snapshotDate().atZone(TimeZones.KST).toLocalDate(),
+                        s -> bucket(s, all),
                         s -> s,
                         (existing, latest) -> latest,
                         LinkedHashMap::new))
                 .values());
+    }
+
+    private static LocalDate bucket(FearGreedSnapshot s, boolean weekly) {
+        LocalDate day = s.snapshotDate().atZone(TimeZones.KST).toLocalDate();
+        return weekly ? day.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) : day;
+    }
+
+    // 실패는 빈 이력으로 흡수 — CRYPTO 장애가 CNN까지 묶어 500이 되지 않도록. 실패 표식이 살아있는 동안은 외부 재호출 없음
+    private List<FearGreedSnapshot> cryptoHistory() {
+        CryptoFearGreedHistory history = cache.getOrCompute(CRYPTO_CACHE_KEY, this::cryptoTtl, () -> {
+            if (cache.peek(CRYPTO_FAILED_CACHE_KEY) != null) return null;
+            try {
+                return cryptoFearGreedPort.fetchHistory(0); // 0=전체(days=0 지원) — 단일 캐시를 days별로 잘라 쓴다
+            } catch (RuntimeException e) {
+                log.warn("[CryptoFearGreed] 이력 조회 실패: {}", e.getMessage());
+                cache.getOrCompute(CRYPTO_FAILED_CACHE_KEY, CRYPTO_FAILURE_TTL, () -> Boolean.TRUE);
+                return null; // null은 정상 키에 캐시되지 않는다
+            }
+        });
+        return history != null ? history.snapshots() : List.of();
+    }
+
+    // 캐시 만료 정책 — 새 일자 값이 아직 없으면 짧게, 있으면 다음 갱신 시각까지
+    private Duration cryptoTtl(CryptoFearGreedHistory history) {
+        if (history.snapshots().isEmpty()) return CRYPTO_NOT_PUBLISHED_TTL; // 이력이 비면 발행 전과 같게 짧게
+        Instant newest = history.snapshots().getLast().snapshotDate();
+        if (newest.isBefore(clock.instant().minus(CRYPTO_MAX_TTL))) return CRYPTO_NOT_PUBLISHED_TTL;
+        Duration until = history.untilNextUpdate();
+        if (until == null) return CRYPTO_TTL;
+        return until.compareTo(CRYPTO_MIN_TTL) < 0 ? CRYPTO_MIN_TTL : until.compareTo(CRYPTO_MAX_TTL) > 0 ? CRYPTO_MAX_TTL : until;
     }
 }
