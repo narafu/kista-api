@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# .github/scripts/check-migrations.sh — root expand/contract 규칙과 적용 이력 불변 검사
+# .github/scripts/check-migrations.sh — expand/contract 규칙과 적용 이력 불변 검사
 
 SCRIPT="$BATS_TEST_DIRNAME/../scripts/check-migrations.sh"
 
@@ -45,6 +45,28 @@ ALTER TABLE a ADD COLUMN y INT;"
 ALTER TABLE a DROP COLUMN y;"
   run bash "$SCRIPT"
   [ "$status" -eq 0 ]
+}
+
+@test "trading expand/contract: 컷오프 이하는 제외, 초과는 금지, contract-ok는 예외" {
+  export TRADING_CHECK_AFTER=24
+  echo "ALTER TABLE t DROP COLUMN x;" > trading/V24__old.sql
+  run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  echo "ALTER TABLE t DROP COLUMN y;" > trading/V25__bad.sql
+  run bash "$SCRIPT"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"trading/V25__bad.sql"* ]]
+  [[ "$output" != *"trading/V24__old.sql"* ]]
+  printf '%s\n' "-- contract-ok: 두 role 동시 배포" "ALTER TABLE t DROP COLUMN y;" > trading/V25__bad.sql
+  run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+}
+
+@test "정수가 아닌 버전은 검사를 건너뛰지 않고 실패" {
+  echo "ALTER TABLE t ADD COLUMN y INT;" > trading/V25_1__dotted.sql
+  run bash "$SCRIPT"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"trading/V25_1__dotted.sql"* ]]
 }
 
 @test "적용 이력 불변: base 이후 기존 파일 수정·삭제는 양 서비스 모두 실패, 신규 추가는 통과" {

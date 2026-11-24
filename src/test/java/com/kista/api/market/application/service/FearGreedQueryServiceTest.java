@@ -1,5 +1,7 @@
 package com.kista.api.market.application.service;
 
+import com.kista.api.market.adapter.out.feargreed.CryptoFearGreedAdapter;
+import com.kista.api.market.domain.model.CryptoFearGreedHistory;
 import com.kista.api.market.domain.model.FearGreedRating;
 import com.kista.api.market.domain.model.FearGreedSnapshot;
 import com.kista.api.market.application.port.output.FearGreedSnapshotPort;
@@ -13,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -21,7 +24,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -33,13 +38,22 @@ class FearGreedQueryServiceTest {
     private static final Instant NOW = Instant.parse("2026-10-20T03:00:00Z"); // KST 2026-10-20 12:00
 
     @Mock FearGreedSnapshotPort port;
+    @Mock CryptoFearGreedAdapter cryptoPort;
     @Mock Clock clock;
     FearGreedQueryService service;
 
     @BeforeEach
     void setUp() {
         when(clock.instant()).thenReturn(NOW);
-        service = new FearGreedQueryService(port, clock);
+        service = new FearGreedQueryService(port, cryptoPort, clock);
+    }
+
+    private static FearGreedSnapshot crypto(String utcMidnight, int value) {
+        return FearGreedSnapshot.of("CRYPTO", Instant.parse(utcMidnight), value, FearGreedRating.NEUTRAL);
+    }
+
+    private static CryptoFearGreedHistory history(FearGreedSnapshot... snapshots) {
+        return new CryptoFearGreedHistory(List.of(snapshots), null);
     }
 
     @Test
@@ -58,6 +72,7 @@ class FearGreedQueryServiceTest {
                 .atStartOfDay(ZoneId.of("Asia/Seoul"))
                 .toInstant();
         assertThat(since.getValue()).isEqualTo(expected);
+        verifyNoInteractions(cryptoPort);
     }
 
     @Test
@@ -76,8 +91,197 @@ class FearGreedQueryServiceTest {
 
     @Test
     void getRecent_rejects_days_out_of_range() {
-        assertThatThrownBy(() -> service.getRecent("CNN", 0)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> service.getRecent("CNN", 366)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.getRecent("CNN", -1)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.getRecent("CRYPTO", 366)).isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(port, cryptoPort);
+    }
+
+    @Test
+    void crypto_reads_history_from_api_not_db_and_cuts_by_kst_since() {
+        // since = 2026-10-18 KST 00:00 = 2026-10-17T15:00Z → 10-17 UTC 자정 항목은 제외
+        var oct17 = crypto("2026-10-17T00:00:00Z", 30);
+        var oct18 = crypto("2026-10-18T00:00:00Z", 40);
+        var oct19 = crypto("2026-10-19T00:00:00Z", 50);
+        var oct20 = crypto("2026-10-20T00:00:00Z", 60);
+        when(cryptoPort.fetchHistory(0)).thenReturn(history(oct17, oct18, oct19, oct20));
+
+        List<FearGreedSnapshot> result = service.getRecent("CRYPTO", 2);
+
+        assertThat(result).containsExactly(oct18, oct19, oct20);
         verifyNoInteractions(port);
+    }
+
+    @Test
+    void crypto_history_is_cached_across_days_options() {
+        when(cryptoPort.fetchHistory(anyInt())).thenReturn(history(crypto("2026-10-20T00:00:00Z", 60)));
+
+        service.getRecent("CRYPTO", 30);
+        service.getRecent("CRYPTO", 365);
+
+        verify(cryptoPort, times(1)).fetchHistory(anyInt());
+    }
+
+    @Test
+    void crypto_failure_returns_empty_and_is_cached_briefly() {
+        var oct20 = crypto("2026-10-20T00:00:00Z", 60);
+        when(cryptoPort.fetchHistory(anyInt()))
+                .thenThrow(new IllegalStateException("alternative.me down"))
+                .thenReturn(history(oct20));
+
+        // 실패 → 빈 결과, 실패 TTL 안에서는 외부 재호출 없음
+        assertThat(service.getRecent("CRYPTO", 30)).isEmpty();
+        assertThat(service.getRecent("CRYPTO", 30)).isEmpty();
+        verify(cryptoPort, times(1)).fetchHistory(anyInt());
+
+        // 실패 TTL 경과 후 재조회
+        when(clock.instant()).thenReturn(NOW.plus(FearGreedQueryService.CRYPTO_FAILURE_TTL));
+        assertThat(service.getRecent("CRYPTO", 30)).containsExactly(oct20);
+        verify(cryptoPort, times(2)).fetchHistory(anyInt());
+    }
+
+    @Test
+    void crypto_cache_expires_at_untilNextUpdate() {
+        var oct20 = crypto("2026-10-20T00:00:00Z", 60);
+        when(cryptoPort.fetchHistory(anyInt())).thenReturn(new CryptoFearGreedHistory(List.of(oct20), Duration.ofMinutes(30)));
+
+        service.getRecent("CRYPTO", 30);
+        when(clock.instant()).thenReturn(NOW.plus(Duration.ofMinutes(29)));
+        service.getRecent("CRYPTO", 30);
+        verify(cryptoPort, times(1)).fetchHistory(anyInt()); // 30분 이내라 재호출 없음
+
+        when(clock.instant()).thenReturn(NOW.plus(Duration.ofMinutes(31)));
+        service.getRecent("CRYPTO", 30);
+        verify(cryptoPort, times(2)).fetchHistory(anyInt());
+    }
+
+    @Test
+    void crypto_cache_is_short_when_newest_snapshot_is_stale() {
+        // 최신값이 25시간 전 — 새 일자 값 미발행이라 untilNextUpdate(6시간)를 무시하고 1분만 캐시
+        var stale = crypto("2026-10-19T02:00:00Z", 60);
+        when(cryptoPort.fetchHistory(anyInt())).thenReturn(new CryptoFearGreedHistory(List.of(stale), Duration.ofHours(6)));
+
+        service.getRecent("CRYPTO", 30);
+        when(clock.instant()).thenReturn(NOW.plus(Duration.ofMinutes(2)));
+        service.getRecent("CRYPTO", 30);
+
+        verify(cryptoPort, times(2)).fetchHistory(anyInt());
+    }
+
+    @Test
+    void crypto_cache_falls_back_to_one_hour_when_untilNextUpdate_is_null() {
+        when(cryptoPort.fetchHistory(anyInt())).thenReturn(history(crypto("2026-10-20T00:00:00Z", 60)));
+
+        service.getRecent("CRYPTO", 30);
+        when(clock.instant()).thenReturn(NOW.plus(Duration.ofMinutes(59)));
+        service.getRecent("CRYPTO", 30);
+        verify(cryptoPort, times(1)).fetchHistory(anyInt());
+
+        when(clock.instant()).thenReturn(NOW.plus(Duration.ofMinutes(61)));
+        service.getRecent("CRYPTO", 30);
+        verify(cryptoPort, times(2)).fetchHistory(anyInt());
+    }
+
+    @Test
+    void crypto_cache_clamps_non_positive_untilNextUpdate_to_one_minute() {
+        for (Duration until : List.of(Duration.ZERO, Duration.ofSeconds(-30))) {
+            org.mockito.Mockito.reset(cryptoPort);
+            service = new FearGreedQueryService(port, cryptoPort, clock);
+            when(clock.instant()).thenReturn(NOW);
+            when(cryptoPort.fetchHistory(anyInt()))
+                    .thenReturn(new CryptoFearGreedHistory(List.of(crypto("2026-10-20T00:00:00Z", 60)), until));
+
+            service.getRecent("CRYPTO", 30);
+            when(clock.instant()).thenReturn(NOW.plusSeconds(30));
+            service.getRecent("CRYPTO", 30);
+            verify(cryptoPort, times(1)).fetchHistory(anyInt()); // 1분 이내
+
+            when(clock.instant()).thenReturn(NOW.plus(Duration.ofMinutes(2)));
+            service.getRecent("CRYPTO", 30);
+            verify(cryptoPort, times(2)).fetchHistory(anyInt());
+        }
+    }
+
+    @Test
+    void crypto_cache_clamps_untilNextUpdate_above_24h() {
+        when(cryptoPort.fetchHistory(anyInt()))
+                .thenReturn(new CryptoFearGreedHistory(List.of(crypto("2026-10-20T00:00:00Z", 60)), Duration.ofHours(48)));
+
+        service.getRecent("CRYPTO", 30);
+        when(clock.instant()).thenReturn(NOW.plus(Duration.ofHours(23)));
+        service.getRecent("CRYPTO", 30);
+        verify(cryptoPort, times(1)).fetchHistory(anyInt());
+
+        when(clock.instant()).thenReturn(NOW.plus(Duration.ofHours(25)));
+        service.getRecent("CRYPTO", 30);
+        verify(cryptoPort, times(2)).fetchHistory(anyInt()); // 48시간이 아니라 24시간에서 만료
+    }
+
+    @Test
+    void crypto_cache_is_one_minute_when_snapshots_empty() {
+        when(cryptoPort.fetchHistory(anyInt())).thenReturn(new CryptoFearGreedHistory(List.of(), Duration.ofHours(6)));
+
+        assertThat(service.getRecent("CRYPTO", 30)).isEmpty();
+        when(clock.instant()).thenReturn(NOW.plus(Duration.ofMinutes(2)));
+        service.getRecent("CRYPTO", 30);
+
+        verify(cryptoPort, times(2)).fetchHistory(anyInt());
+    }
+
+    @Test
+    void cnn_is_unaffected_by_crypto_failure() {
+        var snap = new FearGreedSnapshot(null, "CNN", Instant.parse("2026-10-20T00:00:00Z"), 72, FearGreedRating.GREED, null);
+        when(port.findBySourceSince(eq("CNN"), any(Instant.class))).thenReturn(List.of(snap));
+        when(cryptoPort.fetchHistory(anyInt())).thenThrow(new IllegalStateException("alternative.me down"));
+
+        // CRYPTO는 빈 이력(null이 아님), CNN은 그대로
+        assertThat(service.getRecent("CRYPTO", 30)).isEmpty();
+        assertThat(service.getRecent("CNN", 30)).containsExactly(snap);
+    }
+
+    @Test
+    void days_zero_collapses_to_last_per_kst_iso_week_with_boundary_and_duplicates() {
+        // KST 월요일 00:00 직전(일요일 23:59)은 앞 주, 직후(월 00:00)는 새 주
+        var sunLate = FearGreedSnapshot.of("CNN", Instant.parse("2026-10-18T14:59:00Z"), 40, FearGreedRating.FEAR); // KST 10-18(일) 23:59
+        var monStart = FearGreedSnapshot.of("CNN", Instant.parse("2026-10-18T15:00:00Z"), 50, FearGreedRating.NEUTRAL); // KST 10-19(월) 00:00
+        var wedA = new FearGreedSnapshot(null, "CNN", Instant.parse("2026-10-21T03:00:00Z"), 55, FearGreedRating.NEUTRAL, Instant.parse("2026-10-21T03:01:00Z"));
+        var wedB = new FearGreedSnapshot(null, "CNN", Instant.parse("2026-10-21T03:00:00Z"), 60, FearGreedRating.GREED, Instant.parse("2026-10-21T03:05:00Z"));
+        // 중복(같은 시각)이 역순으로 와도 createdAt이 늦은 wedB가 이긴다
+        when(port.findBySourceSince(eq("CNN"), any(Instant.class))).thenReturn(List.of(sunLate, monStart, wedB, wedA));
+
+        List<FearGreedSnapshot> result = service.getRecent("CNN", 0);
+
+        assertThat(result).containsExactly(sunLate, wedB); // 앞 주 마지막=일요일 23:59, 이번 주(진행 중) 마지막=wedB(=실제 최신값)
+        var since = ArgumentCaptor.forClass(Instant.class);
+        verify(port).findBySourceSince(eq("CNN"), since.capture());
+        assertThat(since.getValue()).isEqualTo(Instant.EPOCH);
+    }
+
+    @Test
+    void days_zero_crypto_utc_midnight_keeps_kst_date_and_uses_single_external_call() {
+        // UTC 00:00 = KST 09:00 같은 날 — 일요일(10-18) UTC 자정은 KST 일요일이라 앞 주, 월요일(10-19)은 새 주
+        var sun = crypto("2026-10-18T00:00:00Z", 30);
+        var mon = crypto("2026-10-19T00:00:00Z", 40);
+        var tue = crypto("2026-10-20T00:00:00Z", 50);
+        when(cryptoPort.fetchHistory(0)).thenReturn(history(sun, mon, tue));
+
+        assertThat(service.getRecent("CRYPTO", 0)).containsExactly(sun, tue);
+        service.getRecent("CRYPTO", 365);
+        verify(cryptoPort, times(1)).fetchHistory(anyInt());
+    }
+
+    @Test
+    void days_zero_crypto_failure_keeps_cnn() {
+        var snap = FearGreedSnapshot.of("CNN", Instant.parse("2026-10-20T00:00:00Z"), 72, FearGreedRating.GREED);
+        when(port.findBySourceSince(eq("CNN"), any(Instant.class))).thenReturn(List.of(snap));
+        when(cryptoPort.fetchHistory(anyInt())).thenThrow(new IllegalStateException("down"));
+
+        assertThat(service.getRecent("CRYPTO", 0)).isEmpty();
+        assertThat(service.getRecent("CNN", 0)).containsExactly(snap);
+    }
+
+    @Test
+    void getRecent_rejects_negative_and_over_max_days() {
+        assertThatThrownBy(() -> service.getRecent("CNN", -1)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.getRecent("CRYPTO", 366)).isInstanceOf(IllegalArgumentException.class);
     }
 }

@@ -16,7 +16,7 @@ jobs:
       - run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq bats >/dev/null
           bats .github/tests
-      - name: Flyway 마이그레이션 검사 (적용 이력 불변 + root expand/contract)
+      - name: Flyway 마이그레이션 검사 (적용 이력 불변 + expand/contract)
         run: bash .github/scripts/check-migrations.sh "origin/${{ github.base_ref }}"
 
   test:

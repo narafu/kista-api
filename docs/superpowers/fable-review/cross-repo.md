@@ -219,7 +219,7 @@ fida에 확인:
 | F2 | 접근 로그의 한계: Next 프리페치(`?_rsc=`)도 요청으로 잡혀 화면 조회 수보다 많이 나온다. 정확한 조회 수가 목적이면 앱 계측이 맞다 | | D17 판단 재료 | infra 04 2-8 |
 | F3 | 매매 시각 창 계약: 개장·마감 스케줄러 cron을 바꾸면 infra `.github/scripts/trading-guard.sh:13-14`의 시각 창도 바꾼다(사본이다) | 스케줄러 cron 변경 시 | | infra 04 3절 |
 | F4 | redis는 무인증이다. 조건은 `data_net`에 kista-api role만 붙는 것이다. 새 서비스를 `data_net`에 붙이지 않는다 | compose 변경 시 | | infra 04 3절 |
-| F5 | infra `docs/superpowers/specs/2026-10-02-deploy-reconcile-design.md`를 `docs/design.md`로 줄인다(사용자 승인됨, infra 05 T6 — 01~05 실행이 끝난 뒤). infra가 파일을 옮기는 날 링크를 바꾼다 | `deploy/server/README.md:113`, `docs/architecture-map.md:154`, `.github/workflows/server-deploy.yml:5` | `deploy/server/README.md:41`, `.github/workflows/server-deploy.yml:115` | infra 05 2-4, T6 |
+| F5 | **(완료 2026-11-24, infra 5d8601a 짝 — 실제 대상은 api 5곳(`server-deploy.yml:5`·`deploy/server/README.md:40`·`docker-infra.md:11·13`(blue/green은 "결정: blue/green" 절)·`architecture-map.md:145`) + ui 3곳, 줄 번호는 아래 열과 달랐다)** infra `docs/superpowers/specs/2026-10-02-deploy-reconcile-design.md`를 `docs/design.md`로 줄인다(사용자 승인됨, infra 05 T6 — 01~05 실행이 끝난 뒤). infra가 파일을 옮기는 날 링크를 바꾼다 | `deploy/server/README.md:113`, `docs/architecture-map.md:154`, `.github/workflows/server-deploy.yml:5` | `deploy/server/README.md:41`, `.github/workflows/server-deploy.yml:115` | infra 05 2-4, T6 |
 | F6 | infra를 설명하는 문서의 어긋난 서술(A절·infra 02 8절 목록에 없던 것): `.gpg`·`scripts/env.sh`·`ENV_PASSPHRASE`·`.env.example`(sops 전환), `scripts/backup.sh`·`0 2 * * *`(경로·주기), `/opt/kista-api/caddy` 마운트(→ `/opt/kista-infra/routes`), 앱 `.env`의 `API_DOMAIN`·`UI_DOMAIN`, "롤백은 헬스 재검증 없음", App 설치 범위, 수동 롤백 명령 3벌 | ✅(2026-11-13, fable-api) `deploy/server/README.md`·`docs/agents/docker-infra.md`·`docs/architecture-map.md` 수정. 백업 서술은 infra README 링크로 바꿔 F7의 api 몫도 함께 끝냈다 | 같음 | infra 05 9절 |
 | F7 | 백업 주기를 매시간으로 바꾼다(사용자 승인됨, infra 04 T3). `docs/agents/docker-infra.md`의 백업 서술은 infra README 링크로 | `docs/agents/docker-infra.md:160-170` | | infra 04 2-4 |
 
@@ -319,8 +319,9 @@ ui 코드 변경은 필요 없다. ui가 부르는 `/api/auth` 경로 6개(`kaka
 
 ### I-3. 전환 뒤에 따로 할 것 (kista-infra)
 
-- 엔진 대역 `lb_try_duration` 5초: 지금 `Caddyfile:9`의 `(upstream)` 스니펫이 전 대역 120초를 준다. 인자를 하나 더 받게 하거나 엔진용 스니펫을 따로 둔다(infra 지침서 03 5-5절, api 05 7절). api 스니펫의 `handle_errors`(`ENGINE_RESTARTING`)와 같은 배포.
-- `reconcile.yml:50` 주석과 `timeout-minutes: 45`의 "role 3개" 전제.
+- (커밋 완료, push 전 — 아래 2026-11-24 줄) 엔진 대역 `lb_try_duration` 5초: 그때 `Caddyfile:9`의 `(upstream)` 스니펫이 전 대역 120초를 준다. 인자를 하나 더 받게 하거나 엔진용 스니펫을 따로 둔다(infra 지침서 03 5-5절, api 05 7절). api 스니펫의 `handle_errors`(`ENGINE_RESTARTING`)와 같은 배포.
+- `reconcile.yml:50` 주석과 `timeout-minutes: 45`의 "role 3개" 전제 (해결 — 아래 2026-11-24 줄).
+- (2026-11-24 진행, push 전) 엔진 대역: infra `Caddyfile`에 `(upstream-stop-first)`(5초)를 추가했다(`(upstream)` 120초는 그대로, 현 스니펫 adapt 결과 동일). api 스니펫은 `@scheduler`·`@trading`이 `vars engine 1` + `import upstream-stop-first`, `handle_errors 502 503 504`가 `import site-headers` 뒤 `ENGINE_RESTARTING`을 낸다(`import site-headers`가 없으면 `(site)`의 보안 헤더가 빠진다 — 03 5-5). **배포 순서는 infra 먼저**다. api가 먼저 나가면 `upstream-stop-first`가 없어 reload가 하드 실패하고 reconcile이 스니펫을 원복한다. 옛 api release의 `import upstream`은 계속 유효하다. api가 새 스니펫을 쓰는 동안 infra를 이 변경 이전으로 되돌리면 안 된다. `ErrorCode.ENGINE_RESTARTING`은 api 세션이 476f96d8c 위 별도 커밋으로 넣었다(openapi enum에 실려 ui 타입이 code를 안다). 그 아래 미push 커밋(market 소스)이 이미 web·worker 교체를 부르므로 함께 나가면 추가 재시작은 없다. 스니펫만 config 범위로 따로 내보내려면 476f96d8c까지만 push하고 상수 커밋은 다음 코드 배포에 태운다. reconcile.yml의 "role 3개" 주석은 infra `39f71e2`에서 이미 고쳤다. 45분 산식에 worker 정지 유예(200s×2)를 더했고, 다시 계산해도 45분 안이라 값은 유지한다.
 - drift-check는 전환 중에는 조용하다(옛 컨테이너를 전부 정지하므로). 무중단 변형을 고르면 `kista-api: 고아 kista-api` 알림이 한 번 온다.
 
 ### I-4. 의심 사항 (확인하지 못했다)

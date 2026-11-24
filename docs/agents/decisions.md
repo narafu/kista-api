@@ -16,7 +16,7 @@
 이유: 소유 서비스 경계는 스키마로 충분하다. 물리 분리(옛 4b-2 보류)는 사용자 결정 D2로 폐기했다. 재검토 조건: 없음. (2026-11-12, fable 05 D2)
 
 ### trading 스키마도 expand/contract를 지킨다
-이유: 통합 뒤 롤링 배포 중 옛 코드가 새 스키마를 읽는다. `check-migrations.sh`는 root만 강제하므로 스스로 지킨다. 재검토 조건: 없음. (2026-11-12, fable 05 D3)
+이유: 통합 뒤 롤링 배포 중 옛 코드가 새 스키마를 읽는다. `check-migrations.sh`가 강제한다(이미 적용된 파일은 `TRADING_CHECK_AFTER`로 제외). 재검토 조건: 없음. (2026-11-12, fable 05 D3)
 
 ### Spring Modulith `explicitly-annotated`와 고정 모듈 ID 유지
 이유: 모듈 ID가 문서·아키텍처 맵·가드에 박혀 있다. 재검토 조건: 없음. 05 통합 뒤 모델은 1개다. (2026-11, fable 05 11절)

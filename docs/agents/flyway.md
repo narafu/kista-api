@@ -13,11 +13,11 @@
 - 새 마이그레이션 번호는 소유 서비스 디렉토리의 최신 버전 다음 번호다(`ls`로 확인).
 
 ### CI 강제 (`.github/scripts/check-migrations.sh`, `deploy-checks` 잡)
-① 이미 존재하던 마이그레이션 파일(양 서비스)의 수정·삭제·이름변경은 실패한다. ② root(`db/migration`, V1 baseline 제외)에서 DROP TABLE·DROP COLUMN·RENAME·SET NOT NULL·ALTER COLUMN TYPE·DEFAULT 없는 NOT NULL 컬럼 추가는 실패한다. 두 role을 같은 커밋에서 함께 배포하는 의도적 contract 단계면 파일에 `-- contract-ok: <사유>` 주석으로 예외를 표시한다.
+① 이미 존재하던 마이그레이션 파일(양 서비스)의 수정·삭제·이름변경은 실패한다. ② root(`db/migration`, V1 baseline 제외)와 trading(`db/migration-trading`, `TRADING_CHECK_AFTER` 초과)에서 DROP TABLE·DROP COLUMN·RENAME·SET NOT NULL·ALTER COLUMN TYPE·DEFAULT 없는 NOT NULL 컬럼 추가는 실패한다. 두 role을 같은 커밋에서 함께 배포하는 의도적 contract 단계면 파일에 `-- contract-ok: <사유>` 주석으로 예외를 표시한다.
 
 ### 2-role 배포 backward-compat (expand/contract)
-root(`db/migration`) 마이그레이션에만 해당한다. trading-core(`db/migration-trading`)는 자기 스키마·이력을 독립으로 가져 이 제약 밖이다.
-- `kista-web`·`kista-worker`가 같은 이미지지만 role별로 순차 교체되므로 root 새 마이그레이션은 직전 배포 이미지와 호환돼야 한다. 컬럼 추가는 nullable 또는 DEFAULT, 컬럼/테이블 드롭·리네임은 두 배포에 분리한다(먼저 코드 참조 제거 → 다음 배포에서 스키마 변경). 이를 못 지키는 마이그레이션을 실은 커밋은 두 role을 함께 배포한다.
+root(`db/migration`)와 trading(`db/migration-trading`) 마이그레이션에 해당한다. trading은 이 규칙 전에 적용된 파일을 `check-migrations.sh`의 `TRADING_CHECK_AFTER`로 검사에서 제외한다.
+- `kista-web`·`kista-worker`가 같은 이미지지만 role별로 순차 교체되므로 새 마이그레이션은 직전 배포 이미지와 호환돼야 한다. 컬럼 추가는 nullable 또는 DEFAULT, 컬럼/테이블 드롭·리네임은 두 배포에 분리한다(먼저 코드 참조 제거 → 다음 배포에서 스키마 변경). 이를 못 지키는 마이그레이션을 실은 커밋은 두 role을 함께 배포한다.
 - `ddl-auto: validate`는 기동 시에만 검사하므로, 스큐 상태의 스케쥴러는 드롭된 컬럼을 매매 도중 런타임에 만날 때까지 계속 돈다.
 - **"이벤트로 채워지는 복제 테이블"(`user_notify_profile`)**: 합병 뒤 발행(web 경로 — 가입·승인·거절·재신청·설정변경)과 복제 리스너가 같은 프로세스·같은 jar라 정상 배포에서는 role 순서 제약이 없다. 순서가 문제 되는 건 리스너를 다른 role로 옮기거나 리스너 동작을 바꾼 커밋이 role별로 엇갈려 배포되는 구간뿐 — 그런 커밋은 두 role을 함께 배포한다. 복제본 백필·전수 발행 조건은 `decisions.md`.
 

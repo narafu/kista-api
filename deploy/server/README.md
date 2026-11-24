@@ -19,7 +19,7 @@ Caddy 라우팅 스니펫(`deploy/server/caddy/kista-api.caddy`)은 이 디렉�
 
 ## 서버 초기 설정·백업·복구
 
-서버 초기 설정(OCI 인스턴스·예약 IP·방화벽·Docker·로그 로테이션)·백업·복구는 kista-infra 소관이다 — `kista-infra/README.md` "서버 재구축"·"백업/복구" 참고.
+서버 초기 설정(OCI 인스턴스·예약 IP·방화벽·Docker·로그 로테이션)·백업·복구는 kista-infra 소관이다 — `kista-infra/README.md` "서버 재구축"·"대기 호스트 승격"·"백업/복구" 참고.
 
 ## GitHub Secrets
 
@@ -37,7 +37,7 @@ Caddy 라우팅 스니펫(`deploy/server/caddy/kista-api.caddy`)은 이 디렉�
 
 ## 배포 흐름
 
-설계: `kista-infra/docs/superpowers/specs/2026-10-02-deploy-reconcile-design.md`
+설계: `kista-infra/docs/design.md`
 
 1. `plan` 잡 — 기준점은 kista-infra `state/kista-api.yml`(마지막 서버 적용 성공 상태). role별 `state SHA..이 커밋` diff를 `detect-deploy-scope.sh`로 분류해 바뀐 role만 이 커밋 SHA로, `deploy/server/**`·`deploy/hooks/**`가 바뀌면 `config`도 이 커밋으로(이미지 재빌드 없이 compose·Caddy만 재적용). state보다 옛 커밋(옛 run Re-run)이면 아무것도 하지 않는다. 수동 실행은 config·전 role을 이 커밋으로
 2. `deploy-checks` — 배포 판정 스크립트·hook shellcheck·bats(`compose-invariants.bats` 포함) + Flyway 마이그레이션 검사
@@ -50,7 +50,7 @@ Caddy 라우팅 스니펫(`deploy/server/caddy/kista-api.caddy`)은 이 디렉�
    - 모든 role 통과 후 Caddy 스니펫 설치 + reload 1회
    - 실패 시 이번에 바꾼 role을 역순으로 직전 release(이미지·compose·스니펫)로 롤백 — 앱 단위 전부 아니면 전무
    - 성공 시 `current` 전환, 오래된 release·미사용 이미지 태그 정리 → kista-infra가 `state/kista-api.yml` 커밋
-6. Caddy `lb_try_duration 120s`(kista-infra Caddyfile `(upstream)` snippet)가 컨테이너 재시작 공백을 클라이언트에 투명하게 처리
+6. kista-web 경로는 Caddy `lb_try_duration 120s`(kista-infra `(upstream)` snippet)가 blue/green 교체 공백을 흡수한다. kista-worker 경로는 `(upstream-stop-first)`(5초)라 재시작(3~4분) 중에는 스니펫 `handle_errors`가 503 `ENGINE_RESTARTING`(`Retry-After: 30`)을 바로 낸다
 
 ## 배포 시간 제한
 

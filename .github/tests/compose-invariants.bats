@@ -35,7 +35,10 @@ block() { awk -v s="  $1:" '$0 == s {on=1; next} on && /^  [a-z]/ {exit} on' "$D
   # readiness로 바꾸면 DB 순간 장애 때 upstream 전체가 빠져 502. health_uri는 kista-infra (upstream) snippet 인자로만 넘긴다
   n=$(grep -cE '^[[:space:]]*reverse_proxy ' "$D/caddy/kista-api.caddy")
   [ "$n" -gt 0 ]
-  [ "$(grep -c 'import upstream /actuator/health/liveness$' "$D/caddy/kista-api.caddy")" -eq "$n" ]
+  [ "$(grep -cE 'import upstream(-stop-first)? /actuator/health/liveness$' "$D/caddy/kista-api.caddy")" -eq "$n" ]
+  # lb_try 대역: kista-worker(stop-first)는 5초 snippet, kista-web(blue/green)은 120초 snippet
+  [ "$(grep -A2 'reverse_proxy kista-worker:' "$D/caddy/kista-api.caddy" | grep -c 'import upstream-stop-first ')" -eq "$(grep -c 'reverse_proxy kista-worker:' "$D/caddy/kista-api.caddy")" ]
+  [ "$(grep -A2 'reverse_proxy kista-web:' "$D/caddy/kista-api.caddy" | grep -c 'import upstream ')" -eq "$(grep -c 'reverse_proxy kista-web:' "$D/caddy/kista-api.caddy")" ]
   [ "$(grep -vE '^[[:space:]]*#' "$D/caddy/kista-api.caddy" | grep -c 'health_uri')" -eq 0 ]
   # unhealthy 기반 재기동 금지 — DB 장애가 kista-worker 재기동으로 번진다
   [ "$(grep -vE '^[[:space:]]*#' "$D/docker-compose.yml" | grep -ci autoheal)" -eq 0 ]

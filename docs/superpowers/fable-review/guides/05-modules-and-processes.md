@@ -253,7 +253,7 @@ market  benchmark  finance  notification  ops  platform  app(모듈 아님: 앱 
   - fable-ui 확인 결과(2026-11-12): UI는 api의 리다이렉트를 브라우저로 넘기지 않고 AT 쿠키를 직접 만든다. api의 RT `Set-Cookie`는 3곳에서 그대로 전달하지만 `RefreshTokenCookieHelper.java:23-38`이 Secure·SameSite를 설정값으로 만들고 Domain을 달지 않아 영향이 없다. **불변 조건: RT 쿠키를 요청의 scheme·Host로 만들지 않는다.** `server.forward-headers-strategy`를 켜거나 Secure를 `request.isSecure()`로 바꾸면 UI 중계가 깨진다. 이 조건을 `RefreshTokenCookieHelper`의 주석과 테스트(요청 scheme이 http여도 Secure 값이 설정대로)로 고정한다.
   - SSE(fable-infra 로컬 실증 2026-11-12): 내부 리스너를 지나는 SSE는 버퍼링되지 않고(`flush_interval` 지정 불필요, `encode` 포함 상태), 130초 무송신에도 끊기지 않았다. upstream 정지 시 스트림은 정상 종료로 닫히고 재연결하면 새 컨테이너로 간다. `caddy reload`에도 유지된다. 미확인: undici Agent로 붙었을 때와 Spring SSE의 graceful 종료 — 첫 실배포에서 본다.
   - worker가 내려가 있을 때의 응답(실증 완료): 엔진 handle 안에서 `vars engine 1`을 심고 사이트 블록 수준의 `handle_errors`에서 그 변수와 상태 502·503·504로 가른다(`handle_errors`는 `handle @trading` 안에 넣을 수 없다. matcher를 다시 적지 않는다). 본문 `{"status":503,"code":"ENGINE_RESTARTING","detail":"매매 서버를 재시작하는 중입니다. 잠시 후 다시 시도해 주세요."}`, `Content-Type: application/problem+json`, `Retry-After: 30`. Caddy가 만든 오류에만 걸리고 worker가 직접 응답한 5xx는 그대로 지나간다. 스니펫 전문은 kista-infra 지침서 03 5-5절. `RoleRoutingGuard`의 `WRONG_ROLE`도 같은 형식이다. 두 code를 `ErrorCode`에 추가한다. detail에 내부 호스트·경로를 넣지 않는다.
-  - 엔진 대역의 `lb_try_duration`은 **5초**(지금 `@scheduler`는 120초). worker 재시작이 3~4분이라 길게 기다려도 넘기지 못하고 요청만 붙잡힌다. web 대역은 현재 값 유지.
+  - 엔진 대역의 `lb_try_duration`은 **5초**. worker 재시작이 3~4분이라 길게 기다려도 넘기지 못하고 요청만 붙잡힌다. web 대역은 120초 유지. (2026-11-24 커밋 완료, 배포 전: infra `(upstream-stop-first)` 03355b3 + api 스니펫 476f96d8c — `cross-repo.md` I-3)
   - `CaddyRoutingTest`가 `vars`·`handle_errors` 줄과 주소 2개짜리 사이트 줄을 견디는지 확인하고 고친다.
   - 통합 OpenAPI 스펙 주소: `/api-docs`(지금의 root 주소 그대로, 단계 M부터 trading 경로 포함). UI의 스펙 병합 스크립트(`scripts/fetch-spec.mjs`)는 단일 주소 내려받기로 바뀐다.
   - 상세: kista-infra 지침서 03 5-4절.
@@ -564,7 +564,8 @@ ssh kista-server 'docker ps -a --format "{{.Names}}\t{{.Status}}" | grep kista-'
 
 - 관찰 2거래일(월요일 22:00 개장 배치부터). 볼 것: 개장·마감 배치의 주문 수와 금액(전략별로 직전 거래일과 같은 꼴), `trading.scheduler_locks`의 `trading-open`·`trading-close`가 한 번씩만 잡혔는지(`locked_by`가 하나), 텔레그램 리포트 1통씩, `app_error_logs`, EPR 미완료 0, healthchecks.io 핑. 관찰 결과를 로드맵 N1 칸에 적는다.
 - 첫 일반 배포에서 web의 blue/green 교체가 처음 돈다(전환 때는 실행 중 컨테이너가 없어 stop-first로 떴다). 교체 중 web이 2개 뜨는 것이 정상이다.
-- 하지 않고 넘긴 것(안정된 뒤 따로): 엔진 대역 `lb_try_duration` 5초와 `handle_errors`의 `ENGINE_RESTARTING` 응답(7절. kista-infra `Caddyfile`의 `(upstream)` 스니펫이 인자를 더 받아야 한다 — `cross-repo.md` I-3), Caddy 내부 리스너와 ui의 `API_BASE_URL` 단일화, Grafana 대시보드의 role 구분.
+- 전환 뒤 따로 한 것: 엔진 대역 `lb_try_duration` 5초와 `handle_errors`의 `ENGINE_RESTARTING` 응답(7절)은 2026-11-24 커밋 완료, 배포 전이다(infra 03355b3 먼저 — `cross-repo.md` I-3).
+- 하지 않고 넘긴 것(안정된 뒤 따로): Caddy 내부 리스너와 ui의 `API_BASE_URL` 단일화, Grafana 대시보드의 role 구분.
 
 #### 옛 api를 살려 두는 변형 (사용자가 무중단을 고른 경우에만)
 

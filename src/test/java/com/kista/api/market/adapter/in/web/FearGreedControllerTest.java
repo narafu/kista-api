@@ -23,6 +23,7 @@ import java.util.UUID;
 
 import static com.kista.shared.support.WebMvcTestSupport.*;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -47,10 +48,12 @@ class FearGreedControllerTest {
     private static final UUID USER_UUID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     @Test
-    void getFearGreed_returns_cnn_current_and_history() throws Exception {
+    void getFearGreed_returns_cnn_and_crypto_bundle() throws Exception {
         when(fearGreedQueryService.getRecent(eq("CNN"), anyInt())).thenReturn(List.of(
                 new FearGreedSnapshot(null, "CNN", Instant.parse("2026-06-21T00:00:00Z"), 60, FearGreedRating.GREED, null),
                 new FearGreedSnapshot(null, "CNN", Instant.parse("2026-06-22T00:00:00Z"), 72, FearGreedRating.GREED, null)));
+        when(fearGreedQueryService.getRecent(eq("CRYPTO"), anyInt())).thenReturn(List.of(
+                new FearGreedSnapshot(null, "CRYPTO", Instant.parse("2026-06-22T00:00:00Z"), 30, FearGreedRating.FEAR, null)));
 
         mockMvc.perform(get("/api/market/fear-greed")
                         .param("days", "90")
@@ -60,7 +63,33 @@ class FearGreedControllerTest {
                 .andExpect(jsonPath("$.cnn.current.value").value(72))
                 .andExpect(jsonPath("$.cnn.current.rating").value("GREED"))
                 .andExpect(jsonPath("$.cnn.history.length()").value(2))
-                .andExpect(jsonPath("$.cnn.history[0].date").value("2026-06-21T00:00:00Z"));
+                .andExpect(jsonPath("$.cnn.history[0].date").value("2026-06-21T00:00:00Z"))
+                .andExpect(jsonPath("$.crypto.current.value").value(30));
+    }
+
+    @Test
+    void getFearGreed_empty_crypto_keeps_cnn_and_nulls_crypto_current() throws Exception {
+        // CRYPTO 외부 조회 실패 시 서비스가 빈 이력을 돌려준다 — CNN은 정상, crypto.current=null
+        when(fearGreedQueryService.getRecent(eq("CNN"), anyInt())).thenReturn(List.of(
+                new FearGreedSnapshot(null, "CNN", Instant.parse("2026-06-22T00:00:00Z"), 72, FearGreedRating.GREED, null)));
+        when(fearGreedQueryService.getRecent(eq("CRYPTO"), anyInt())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/market/fear-greed").param("days", "90"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cnn.current.value").value(72))
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("max-age=600")))) // 장애 응답은 공개 캐시하지 않는다(Spring Security 기본 no-cache는 남음)
+                .andExpect(jsonPath("$.crypto.current").doesNotExist())
+                .andExpect(jsonPath("$.crypto.history.length()").value(0));
+    }
+
+    @Test
+    void getFearGreed_days_out_of_range_returns_400() throws Exception {
+        // 서비스가 범위 밖 days에 IAE를 던진다 — ProblemDetailExceptionHandler가 400으로 매핑
+        when(fearGreedQueryService.getRecent(anyString(), eq(-1))).thenThrow(new IllegalArgumentException("조회 기간은 0(전체) 또는 1~365일이어야 합니다."));
+        when(fearGreedQueryService.getRecent(anyString(), eq(366))).thenThrow(new IllegalArgumentException("조회 기간은 0(전체) 또는 1~365일이어야 합니다."));
+
+        mockMvc.perform(get("/api/market/fear-greed").param("days", "-1")).andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/market/fear-greed").param("days", "366")).andExpect(status().isBadRequest());
     }
 
     @Test

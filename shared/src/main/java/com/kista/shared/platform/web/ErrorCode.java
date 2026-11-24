@@ -15,5 +15,6 @@ public enum ErrorCode {
     ACCESS_DENIED,               // 403 소유·권한 위반
     COOLDOWN_ACTIVE,             // 429 재신청 대기 시간 미경과
     TRADING_CORE_UNAVAILABLE,    // 503 매매 서버(trading-core) 도달 실패
-    WRONG_ROLE                   // 503 이 서버 role이 처리하지 않는 경로로 온 요청
+    WRONG_ROLE,                  // 503 이 서버 role이 처리하지 않는 경로로 온 요청
+    ENGINE_RESTARTING            // 503 kista-worker 재시작 중 — 앱이 아니라 Caddy 스니펫 handle_errors가 낸다(deploy/server/caddy/kista-api.caddy)
 }

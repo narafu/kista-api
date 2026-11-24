@@ -41,18 +41,6 @@ class RedisStreamsTest {
     }
 
     @Test
-    void add_3인자는_기본_MAXLEN_1000으로_위임한다() {
-        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
-        var ops = stubOps(redisTemplate);
-
-        RedisStreams.add(redisTemplate, STREAM, "{}");
-
-        ArgumentCaptor<XAddOptions> options = ArgumentCaptor.forClass(XAddOptions.class);
-        verify(ops).add(any(MapRecord.class), options.capture());
-        assertThat(options.getValue().getMaxlen()).isEqualTo(1000L);
-    }
-
-    @Test
     void add_maxLen_오버로드는_지정한_상한으로_근사_트리밍한다() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         var ops = stubOps(redisTemplate);

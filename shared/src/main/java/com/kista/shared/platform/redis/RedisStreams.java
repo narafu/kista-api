@@ -27,18 +27,12 @@ import java.util.function.Consumer;
 public final class RedisStreams {
 
     public static final String PAYLOAD_FIELD = "payload"; // 봉투 필드명 — 발행·구독 양쪽 공용
-    private static final long DEFAULT_MAXLEN = 1000; // 무기한 적재 방지 — 최근 N건만 근사 보존
 
     private RedisStreams() {
     }
 
-    // JSON payload 1필드로 감싸 XADD — 기본 MAXLEN(최근 1000건 근사 보존)
-    public static void add(StringRedisTemplate redisTemplate, String streamKey, String payloadJson) {
-        add(redisTemplate, streamKey, payloadJson, DEFAULT_MAXLEN);
-    }
-
     // JSON payload 1필드로 감싸 XADD — maxLen 근사 트리밍(초과 시 오래된 것부터 삭제)으로 무한 적재를 막는다.
-    // 소비자가 오래 멈춰도 보존해야 하는 스트림은 상한을 키워서 호출한다
+    // 상한은 스트림마다 호출자가 정한다 — 소비자가 오래 멈춰도 보존할 만큼 잡는다
     public static void add(StringRedisTemplate redisTemplate, String streamKey, String payloadJson, long maxLen) {
         redisTemplate.opsForStream().add(StreamRecords.newRecord()
                         .in(streamKey)
