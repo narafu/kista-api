@@ -317,8 +317,9 @@ ui 코드 변경은 필요 없다. ui가 부르는 `/api/auth` 경로 6개(`kaka
 
 ### I-3. 전환 뒤에 따로 할 것 (kista-infra)
 
-- 엔진 대역 `lb_try_duration` 5초: 지금 `Caddyfile:9`의 `(upstream)` 스니펫이 전 대역 120초를 준다. 인자를 하나 더 받게 하거나 엔진용 스니펫을 따로 둔다(infra 지침서 03 5-5절, api 05 7절). api 스니펫의 `handle_errors`(`ENGINE_RESTARTING`)와 같은 배포.
-- `reconcile.yml:50` 주석과 `timeout-minutes: 45`의 "role 3개" 전제.
+- (커밋 완료, push 전 — 아래 2026-11-24 줄) 엔진 대역 `lb_try_duration` 5초: 그때 `Caddyfile:9`의 `(upstream)` 스니펫이 전 대역 120초를 준다. 인자를 하나 더 받게 하거나 엔진용 스니펫을 따로 둔다(infra 지침서 03 5-5절, api 05 7절). api 스니펫의 `handle_errors`(`ENGINE_RESTARTING`)와 같은 배포.
+- `reconcile.yml:50` 주석과 `timeout-minutes: 45`의 "role 3개" 전제 (해결 — 아래 2026-11-24 줄).
+- (2026-11-24 진행, push 전) 엔진 대역: infra `Caddyfile`에 `(upstream-stop-first)`(5초)를 추가했다(`(upstream)` 120초는 그대로, 현 스니펫 adapt 결과 동일). api 스니펫은 `@scheduler`·`@trading`이 `vars engine 1` + `import upstream-stop-first`, `handle_errors 502 503 504`가 `import site-headers` 뒤 `ENGINE_RESTARTING`을 낸다(`import site-headers`가 없으면 `(site)`의 보안 헤더가 빠진다 — 03 5-5). **배포 순서는 infra 먼저**다. api가 먼저 나가면 `upstream-stop-first`가 없어 reload가 하드 실패하고 reconcile이 스니펫을 원복한다. 옛 api release의 `import upstream`은 계속 유효하다. api가 새 스니펫을 쓰는 동안 infra를 이 변경 이전으로 되돌리면 안 된다. `ErrorCode.ENGINE_RESTARTING`은 넣지 않았다. 넣으면 jar가 바뀌어 worker가 재시작되는데, 이번 배포는 caddy reload만 일어나는 config 범위로 둔다. 그 상수는 다음 코드 배포 때 넣는다. reconcile.yml의 "role 3개" 주석은 infra `39f71e2`에서 이미 고쳤다. 45분 산식에 worker 정지 유예(200s×2)를 더했고, 다시 계산해도 45분 안이라 값은 유지한다.
 - drift-check는 전환 중에는 조용하다(옛 컨테이너를 전부 정지하므로). 무중단 변형을 고르면 `kista-api: 고아 kista-api` 알림이 한 번 온다.
 
 ### I-4. 의심 사항 (확인하지 못했다)
