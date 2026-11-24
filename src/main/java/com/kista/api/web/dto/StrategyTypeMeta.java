@@ -1,11 +1,22 @@
 package com.kista.api.web.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 import com.kista.shared.kernel.StrategyCapability;
+import com.kista.shared.kernel.RecurringMode;
+import com.kista.shared.kernel.StrategyCreationSettings;
 import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.TradingPolicySettings;
+import com.kista.tradingcore.trading.domain.creation.VrRampInput;
+import com.kista.tradingcore.trading.domain.creation.VrRampParams;
+import org.jspecify.annotations.Nullable;
 
+import java.util.EnumMap;
+import java.util.Map;
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record StrategyTypeMeta(
         @Schema(description = "enum name() 값", example = "INFINITE")
         String code,                   // enum name() 값
@@ -32,9 +43,20 @@ public record StrategyTypeMeta(
         @Schema(description = "DCA 조건 지표 name() 목록")
         List<String> conditionIndicators, // DCA 조건 지표 옵션
         @Schema(description = "등록 가능 증권사 name() 목록 (빈 목록이면 전체 허용)")
-        List<String> supportedBrokers  // 등록 가능 증권사 — 빈 목록이면 전체 허용
+        List<String> supportedBrokers, // 등록 가능 증권사 — 빈 목록이면 전체 허용
+        @Schema(description = "신규 전략 생성 허용 여부 (/api/runtime-config strategies[type].enabled와 같은 값)")
+        boolean enabled,               // 신규 전략 생성 허용 여부
+        @Schema(description = "생성 필드별 허용값·기본값 (/api/runtime-config strategies[type].fields와 같은 값)")
+        StrategyFieldsMeta fields,     // 생성 필드 정책
+        @Schema(description = "VR 램프 기본값표 — 적립 모드(DEPOSIT·HOLD·WITHDRAW)별. VR 외 전략은 생략")
+        @Nullable Map<RecurringMode, VrRampParams> vrRampDefaults // VR 전용 램프 기본값표
 ) {
+    // 런타임 정책 없이 쓰는 정적 조립 — 정책은 기본 정책(TradingPolicySettings.defaults)을 쓴다
     public static StrategyTypeMeta from(StrategyType t) {
+        return from(t, TradingPolicySettings.defaults().strategy(t));
+    }
+
+    public static StrategyTypeMeta from(StrategyType t, StrategyCreationSettings policy) {
         StrategyCapability capability = t.capability();
         List<String> tickers = capability.availableTickers().stream().map(Enum::name).toList();
         return new StrategyTypeMeta(
@@ -45,8 +67,19 @@ public record StrategyTypeMeta(
                 capability.divisionCounts(),
                 names(capability.orderTypes()), names(capability.directions()),
                 names(capability.frequencies()), names(capability.conditionIndicators()),
-                capability.supportedBrokers().stream().map(Enum::name).toList()
+                capability.supportedBrokers().stream().map(Enum::name).toList(),
+                policy.enabled(), StrategyFieldsMeta.from(policy),
+                t == StrategyType.VR ? vrRampTable() : null
         );
+    }
+
+    // 적립 모드별 램프 기본값 — VrRampInput.withDefaults 표를 그대로 꺼낸다(값 복제 없음)
+    private static Map<RecurringMode, VrRampParams> vrRampTable() {
+        Map<RecurringMode, VrRampParams> table = new EnumMap<>(RecurringMode.class);
+        for (RecurringMode mode : RecurringMode.values()) {
+            table.put(mode, VrRampInput.defaultsFor(mode));
+        }
+        return table;
     }
 
     private static List<String> names(List<? extends Enum<?>> values) {

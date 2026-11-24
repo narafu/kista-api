@@ -6,6 +6,7 @@ import com.kista.api.admin.domain.model.TradingPolicyUnavailableException;
 import com.kista.shared.kernel.TradingPolicySettings;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.modulith.NamedInterface;
 import org.springframework.stereotype.Service;
 
 // 공개 런타임 설정(GET /api/runtime-config, 로그인 전 화면) 조회 — 관리자 조회(AdminSettingsService)와 달리
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 // 강등한다. 정책 집행은 어차피 trading-core가 하므로 UI가 잠시 기본값을 보여도 등록이 실제 정책을 우회하지 못한다.
 @Slf4j
 @Service
+@NamedInterface("api") // 공개 런타임 설정 — 메타 번들(api.web MetaController)이 같은 경로로 읽는다
 @RequiredArgsConstructor
 public class RuntimeConfigService {
 

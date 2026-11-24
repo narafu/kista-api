@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.domain.creation;
 
+import com.kista.shared.kernel.RecurringMode;
 import com.kista.tradingcore.matching.domain.model.StrategyVrDetail;
 
 import java.math.BigDecimal;
@@ -38,6 +39,15 @@ public record VrRampInput(
                 pGraceWeeks != null ? pGraceWeeks : DEFAULT_GRACE_WEEKS,
                 pStepWeeks != null ? pStepWeeks : DEFAULT_STEP_WEEKS,
                 poolLimitFloor != null ? poolLimitFloor : defaultPoolLimitFloor);
+    }
+
+    // 적립 모드별 운영 기본값 표(메타 번들용) — withDefaults와 같은 표를 모드의 부호 대표값(+1/0/-1)으로 꺼낸다
+    public static VrRampParams defaultsFor(RecurringMode mode) {
+        return NONE.withDefaults(switch (mode) {
+            case DEPOSIT -> 1;
+            case HOLD -> 0;
+            case WITHDRAW -> -1;
+        });
     }
 
     // 미지정(null) 필드를 현재 활성 버전 값으로 채운다 (재설정용)

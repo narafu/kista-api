@@ -14,7 +14,17 @@ public record FinanceGroupInvitation(
         Instant createdAt    // DB created_at, 신규 등록 시 null
 ) {
     public enum Status {
-        PENDING, ACCEPTED, DECLINED, EXPIRED
+        PENDING("대기"), ACCEPTED("수락"), DECLINED("거절"), EXPIRED("만료");
+
+        private final String label; // 한국어 표시 이름 (메타 번들)
+
+        Status(String label) {
+            this.label = label;
+        }
+
+        public String getLabel() {
+            return label;
+        }
     }
 
     // 만료되었거나 이미 처리된 초대 수락/거절 시도 — 컨트롤러에서 409 매핑
