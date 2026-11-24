@@ -37,7 +37,7 @@ Caddy 라우팅 스니펫(`deploy/server/caddy/kista-api.caddy`)은 이 디렉�
 
 ## 배포 흐름
 
-설계: `kista-infra/docs/superpowers/specs/2026-10-02-deploy-reconcile-design.md`
+설계: `kista-infra/docs/design.md`
 
 1. `plan` 잡 — 기준점은 kista-infra `state/kista-api.yml`(마지막 서버 적용 성공 상태). role별 `state SHA..이 커밋` diff를 `detect-deploy-scope.sh`로 분류해 바뀐 role만 이 커밋 SHA로, `deploy/server/**`·`deploy/hooks/**`가 바뀌면 `config`도 이 커밋으로(이미지 재빌드 없이 compose·Caddy만 재적용). state보다 옛 커밋(옛 run Re-run)이면 아무것도 하지 않는다. 수동 실행은 config·전 role을 이 커밋으로
 2. `deploy-checks` — 배포 판정 스크립트·hook shellcheck·bats(`compose-invariants.bats` 포함) + Flyway 마이그레이션 검사
