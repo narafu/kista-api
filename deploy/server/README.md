@@ -19,7 +19,7 @@ Caddy 라우팅 스니펫(`deploy/server/caddy/kista-api.caddy`)은 이 디렉�
 
 ## 서버 초기 설정·백업·복구
 
-서버 초기 설정(OCI 인스턴스·예약 IP·방화벽·Docker·로그 로테이션)·백업·복구는 kista-infra 소관이다 — `kista-infra/README.md` "서버 재구축"·"백업/복구" 참고.
+서버 초기 설정(OCI 인스턴스·예약 IP·방화벽·Docker·로그 로테이션)·백업·복구는 kista-infra 소관이다 — `kista-infra/README.md` "서버 재구축"·"대기 호스트 승격"·"백업/복구" 참고.
 
 ## GitHub Secrets
 
