@@ -28,22 +28,27 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import com.kista.shared.kernel.NotificationChannel;
 
 @ExtendWith(MockitoExtension.class)
 class TokenServiceTest {
 
+    static final String KEY = "dGVzdC1hZXMtMzItYnl0ZXMta2V5LXBhZGRpbmchISE="; // 테스트 AES 키(Base64)
+
     @Mock RefreshTokenPort refreshTokenPort;
     @Mock BlacklistPort blacklistPort;
     @Mock UserPort userPort;
     final Clock clock = FixedClockTestConfig.FIXED; // 고정 시각
+    final RefreshTokenSuccessorDeriver deriver = new RefreshTokenSuccessorDeriver(KEY);
     TokenService tokenService;
 
     @BeforeEach
     void setUp() {
-        tokenService = new TokenService(refreshTokenPort, blacklistPort, userPort, clock);
+        tokenService = new TokenService(refreshTokenPort, blacklistPort, userPort, clock, deriver);
     }
 
     private static final UUID USER_ID = UUID.randomUUID();
@@ -63,58 +68,146 @@ class TokenServiceTest {
         assertThat(saved.expiresAt()).isEqualTo(Instant.now(clock).plus(Duration.ofDays(5))); // 쿠키 maxAge와 같은 값
     }
 
-    // 정상 갱신: 미회전 RT → markRotated + 새 RT 발급
+    // 정상 회전: markRotated 승자 → 결정적 후계 저장·반환
     @Test
-    void refresh_validToken_rotatesAndIssuesNewToken() {
+    void refresh_validToken_rotatesAndIssuesDerivedSuccessor() {
         String rawToken = "validRawToken12345";
         String hash = TokenService.sha256Hex(rawToken);
-        RefreshToken existing = makeRt(hash, Instant.now(clock).plus(Duration.ofHours(120)), null);
-        User user = mockUser();
-
-        given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(existing));
-        given(refreshTokenPort.markRotated(eq(hash), any())).willReturn(1); // 회전 승자
-        given(userPort.findByIdOrThrow(USER_ID)).willReturn(user);
+        String successor = deriver.successorOf(rawToken);
+        given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(makeRt(hash, future(), null)));
+        given(refreshTokenPort.markRotated(eq(hash), any())).willReturn(1);
+        given(userPort.findByIdOrThrow(USER_ID)).willReturn(mockUser());
 
         TokenRefreshResult result = tokenService.refresh(rawToken, "ua");
 
-        verify(refreshTokenPort).markRotated(eq(hash), any(Instant.class));
-        verify(refreshTokenPort).save(any(RefreshToken.class)); // 새 RT 저장
-        assertThat(result.newRawRefreshToken()).isNotEqualTo(rawToken); // 새 RT 반환
+        ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
+        verify(refreshTokenPort).save(captor.capture());
+        assertThat(captor.getValue().tokenHash()).isEqualTo(TokenService.sha256Hex(successor));
+        assertThat(result.newRawRefreshToken()).isEqualTo(successor);
         assertThat(result.userId()).isEqualTo(USER_ID);
     }
 
-    // grace 이내 회전된 RT 재제시 → 동시 경쟁 패자로 허용, 새 RT 발급
+    // 응답 유실 후 재시도: T 회전됨, 후계 미회전 존재 → 같은 후계 반환, 저장·폐기 없음
     @Test
-    void refresh_rotatedWithinGrace_allowsAndIssuesNewToken() {
+    void refresh_rotatedWithLiveSuccessor_returnsSameSuccessor() {
+        assertRetryReturnsSameSuccessor(Instant.now(clock).minusSeconds(30));
+    }
+
+    // grace 없음: 회전 1일 뒤 재시도도 같은 후계
+    @Test
+    void refresh_rotatedOneDayAgo_stillReturnsSameSuccessor() {
+        assertRetryReturnsSameSuccessor(Instant.now(clock).minus(Duration.ofDays(1)));
+    }
+
+    private void assertRetryReturnsSameSuccessor(Instant rotatedAt) {
         String rawToken = "rotatedToken";
         String hash = TokenService.sha256Hex(rawToken);
-        Instant rotatedAt = Instant.now(clock).minusSeconds(30); // 30초 전 회전 (grace 60초 이내)
-        RefreshToken rotated = makeRt(hash, Instant.now(clock).plus(Duration.ofHours(120)), rotatedAt);
-        User user = mockUser();
-
-        given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(rotated));
-        given(userPort.findByIdOrThrow(USER_ID)).willReturn(user);
+        String successor = deriver.successorOf(rawToken);
+        given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(makeRt(hash, future(), rotatedAt)));
+        given(refreshTokenPort.findByTokenHash(TokenService.sha256Hex(successor)))
+                .willReturn(Optional.of(makeRt(TokenService.sha256Hex(successor), future(), null)));
+        given(userPort.findByIdOrThrow(USER_ID)).willReturn(mockUser());
 
         TokenRefreshResult result = tokenService.refresh(rawToken, "ua");
 
-        verify(refreshTokenPort, never()).deleteAllByUserId(any()); // 세션 폐기 없음
-        verify(refreshTokenPort).save(any(RefreshToken.class)); // 새 RT 발급
-        assertThat(result.userId()).isEqualTo(USER_ID);
+        assertThat(result.newRawRefreshToken()).isEqualTo(successor);
+        verify(refreshTokenPort, never()).save(any());
+        verify(refreshTokenPort, never()).deleteAllByUserId(any());
     }
 
-    // grace 초과 회전된 RT 재제시 → 재사용 공격 의심, 전체 세션 폐기
+    // grace 안 T0 재제시, S1 회전·S2 미사용 → 체인 따라가 S2 반환, 폐기·저장 없음
     @Test
-    void refresh_rotatedBeyondGrace_revokesAllSessions() {
-        String rawToken = "staleRotatedToken";
-        String hash = TokenService.sha256Hex(rawToken);
-        Instant rotatedAt = Instant.now(clock).minusSeconds(120); // 120초 전 회전 (grace 60초 초과)
-        RefreshToken rotated = makeRt(hash, Instant.now(clock).plus(Duration.ofHours(120)), rotatedAt);
+    void refresh_withinGraceSuccessorRotated_followsChainToS2() {
+        String t0 = "chainToken";
+        String s1 = deriver.successorOf(t0);
+        String s2 = deriver.successorOf(s1);
+        stubChain(t0, Instant.now(clock).minusSeconds(30), s1, s2, true);
+        given(userPort.findByIdOrThrow(USER_ID)).willReturn(mockUser());
 
-        given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(rotated));
+        TokenRefreshResult result = tokenService.refresh(t0, "ua");
+
+        assertThat(result.newRawRefreshToken()).isEqualTo(s2);
+        verify(refreshTokenPort, never()).save(any());
+        verify(refreshTokenPort, never()).deleteAllByUserId(any());
+    }
+
+    // grace 밖 같은 상태(후계 사용 후 T 재제시, 탈취 RT 재사용) → 전체 세션 폐기
+    @Test
+    void refresh_beyondGraceSuccessorRotated_revokesAllSessions() {
+        String t0 = "stolenToken";
+        String s1 = deriver.successorOf(t0);
+        stubChain(t0, Instant.now(clock).minusSeconds(120), s1, deriver.successorOf(s1), true);
+
+        assertThatThrownBy(() -> tokenService.refresh(t0, "ua"))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+        verify(refreshTokenPort).deleteAllByUserId(USER_ID);
+    }
+
+    // grace 안 체인 도중 행 없음 → 이 기기만 거부, 폐기 없음
+    @Test
+    void refresh_withinGraceChainRowMissing_rejectsWithoutRevoke() {
+        String t0 = "chainGapToken";
+        String s1 = deriver.successorOf(t0);
+        stubChain(t0, Instant.now(clock).minusSeconds(30), s1, deriver.successorOf(s1), false);
+
+        assertThatThrownBy(() -> tokenService.refresh(t0, "ua"))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+        verify(refreshTokenPort, never()).deleteAllByUserId(any());
+    }
+
+    // T0(회전됨)·S1(회전됨) 시드, S2는 s2Exists일 때 미회전으로 시드
+    private void stubChain(String t0, Instant t0RotatedAt, String s1, String s2, boolean s2Exists) {
+        String h0 = TokenService.sha256Hex(t0);
+        String h1 = TokenService.sha256Hex(s1);
+        String h2 = TokenService.sha256Hex(s2);
+        given(refreshTokenPort.findByTokenHash(h0)).willReturn(Optional.of(makeRt(h0, future(), t0RotatedAt)));
+        given(refreshTokenPort.findByTokenHash(h1)).willReturn(Optional.of(makeRt(h1, future(), Instant.now(clock).minusSeconds(10))));
+        lenient().when(refreshTokenPort.findByTokenHash(h2)).thenReturn(s2Exists ? Optional.of(makeRt(h2, future(), null)) : Optional.empty());
+    }
+
+    // 후계 없음(로그아웃·재로그인으로 삭제) → 이 기기만 거부, 폐기 없음
+    @Test
+    void refresh_noSuccessor_rejectsWithoutRevoke() {
+        String rawToken = "orphanToken";
+        String hash = TokenService.sha256Hex(rawToken);
+        given(refreshTokenPort.findByTokenHash(hash))
+                .willReturn(Optional.of(makeRt(hash, future(), Instant.now(clock).minusSeconds(120))));
+        given(refreshTokenPort.findByTokenHash(TokenService.sha256Hex(deriver.successorOf(rawToken))))
+                .willReturn(Optional.empty());
 
         assertThatThrownBy(() -> tokenService.refresh(rawToken, "ua"))
                 .isInstanceOf(InvalidRefreshTokenException.class);
-        verify(refreshTokenPort).deleteAllByUserId(USER_ID); // 전체 세션 폐기
+        verify(refreshTokenPort, never()).deleteAllByUserId(any());
+    }
+
+    // markRotated=0(경쟁 패자) → T 재조회 없이 후계 조회 경로로 같은 후계 반환
+    @Test
+    void refresh_lostRace_returnsSameSuccessorWithoutRereadingToken() {
+        String rawToken = "raceToken";
+        String hash = TokenService.sha256Hex(rawToken);
+        String successor = deriver.successorOf(rawToken);
+        String successorHash = TokenService.sha256Hex(successor);
+        given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(makeRt(hash, future(), null))); // stale: 미회전
+        given(refreshTokenPort.markRotated(eq(hash), any())).willReturn(0);
+        given(refreshTokenPort.findByTokenHash(successorHash)).willReturn(Optional.of(makeRt(successorHash, future(), null)));
+        given(userPort.findByIdOrThrow(USER_ID)).willReturn(mockUser());
+
+        TokenRefreshResult result = tokenService.refresh(rawToken, "ua");
+
+        assertThat(result.newRawRefreshToken()).isEqualTo(successor);
+        verify(refreshTokenPort, times(1)).findByTokenHash(hash); // T 재조회 없음
+        verify(refreshTokenPort, never()).save(any());
+        verify(refreshTokenPort, never()).deleteAllByUserId(any());
+    }
+
+    @Test
+    void deriver_deterministicKeyDependentAndBase64Url43() {
+        String out = deriver.successorOf("abc");
+        assertThat(deriver.successorOf("abc")).isEqualTo(out);
+        assertThat(deriver.successorOf("abd")).isNotEqualTo(out);
+        assertThat(out).hasSize(43).matches("[A-Za-z0-9_-]{43}");
+        String otherKey = java.util.Base64.getEncoder().encodeToString("another-32-bytes-key-padding!!!!!".getBytes());
+        assertThat(new RefreshTokenSuccessorDeriver(otherKey).successorOf("abc")).isNotEqualTo(out);
     }
 
     @Test
@@ -221,6 +314,10 @@ class TokenServiceTest {
         String hash = TokenService.sha256Hex("test");
         assertThat(hash).hasSize(64);
         assertThat(TokenService.sha256Hex("test")).isEqualTo(hash);
+    }
+
+    private Instant future() {
+        return Instant.now(clock).plus(Duration.ofHours(120));
     }
 
     private RefreshToken makeRt(String hash, Instant expiresAt, Instant rotatedAt) {

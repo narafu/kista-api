@@ -44,9 +44,4 @@ interface RefreshTokenJpaRepository extends JpaRepository<RefreshTokenEntity, UU
     @Modifying
     @Query("update RefreshTokenEntity e set e.rotatedAt = :now where e.tokenHash = :hash and e.rotatedAt is null")
     int markRotated(@Param("hash") String hash, @Param("now") Instant now);
-
-    // grace 기간이 지난 회전 토큰 일괄 삭제 (스케쥴러)
-    @Modifying
-    @Query("delete from RefreshTokenEntity e where e.rotatedAt < :threshold")
-    int deleteAllByRotatedAtBefore(@Param("threshold") Instant threshold);
 }

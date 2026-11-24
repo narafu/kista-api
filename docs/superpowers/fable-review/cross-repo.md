@@ -356,3 +356,11 @@ ui 코드 변경은 필요 없다. ui가 부르는 `/api/auth` 경로 6개(`kaka
 | # | 변경 | api | ui | 상태 |
 |---|---|---|---|---|
 | J1 | `POST /api/trading-cycles/{id}/execute`(바로 주문) 삭제. 전체 취소 `DELETE` 같은 경로·미리보기는 유지. `ErrorCode` `ALREADY_ORDERED_TODAY`·`DCA_MANUAL_EXECUTION_UNSUPPORTED`는 발행처 없이 보존(decisions.md) | main `cccd6c1d8` | 버튼·호출·문구 제거, `api-types.ts` 재생성은 api 배포 뒤 | ui 제거 완료(kista-ui 01782862), ui 배포 완료(8b0fb645, 2026-11-21). api 배포 완료(`145cd5080`, 2026-11-21). ui `api-types.ts` 재생성 완료(kista-ui `05df817c`) |
+
+## K. RT 갱신 재시도 안전화 (2026-11-25, 사용자 요청)
+
+api는 `TokenService.refresh`의 후계 RT를 결정적으로 유도해, 회전된 RT를 다시 내면 시각과 무관하게 같은 후계를 돌려준다(후계를 이미 쓴 뒤에만 전체 세션 폐기, 회전 후 60초 안 연속 회전은 체인을 따라가 미사용 후계 반환). 200·401·503의 뜻과 Set-Cookie 형식은 바뀌지 않았다. 규칙 → `docs/agents/modules/api/user.md` "Refresh Token 회전(RTR)".
+
+| # | 변경 | api | ui | 상태 |
+|---|---|---|---|---|
+| K1 | 응답 유실 후 재시도가 안전해졌으니 세션 유지 범위를 넓힐 수 있다: `shared/lib/auth/refresh.ts`의 서버 쪽 timeout·연결 끊김·500·502도 `REFRESH_UNAVAILABLE`(세션 유지)로. 같은 파일 주석의 "60초 grace 뒤 전체 세션 폐기" 서술 갱신 | 완료(이 커밋) | 제안만 — api 배포 뒤 ui 세션에서 판단 | 후보 |

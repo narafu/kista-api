@@ -30,14 +30,4 @@ public class RefreshTokenCleanupScheduler {
                     log.info("만료 refresh_token {} 건 정리 완료", deleted);
                 }));
     }
-
-    // 매일 03:05 KST — grace 기간이 지난 회전 RT 일괄 삭제
-    @Scheduled(cron = "0 5 3 * * *", zone = "Asia/Seoul")
-    public void cleanupRotatedTokens() throws InterruptedException {
-        schedulerLockService.tryRun("refresh-token-rotated-cleanup", Duration.ofMinutes(30),
-                () -> jobRunner.run("회전 RT 정리 스케쥴러", () -> {
-                    int deleted = tokenService.cleanupRotatedTokens();
-                    log.info("grace 초과 회전 refresh_token {} 건 정리 완료", deleted);
-                }));
-    }
 }

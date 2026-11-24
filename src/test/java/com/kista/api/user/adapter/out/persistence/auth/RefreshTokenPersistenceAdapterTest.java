@@ -79,15 +79,4 @@ class RefreshTokenPersistenceAdapterTest {
         assertThat(result).isEqualTo(1);
         verify(repository).markRotated(hash, now);
     }
-
-    @Test
-    void deleteAllRotatedBefore_delegatesToRepository() {
-        Instant threshold = Instant.now();
-        given(repository.deleteAllByRotatedAtBefore(threshold)).willReturn(3);
-
-        int result = adapter.deleteAllRotatedBefore(threshold);
-
-        assertThat(result).isEqualTo(3);
-        verify(repository).deleteAllByRotatedAtBefore(threshold);
-    }
 }

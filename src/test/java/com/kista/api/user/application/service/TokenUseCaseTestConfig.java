@@ -5,6 +5,7 @@ import java.time.Clock;
 import com.kista.api.user.application.port.output.BlacklistPort;
 import com.kista.api.user.application.port.output.RefreshTokenPort;
 import com.kista.api.user.application.port.output.UserPort;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 
@@ -13,7 +14,13 @@ import org.springframework.context.annotation.Bean;
 public class TokenUseCaseTestConfig {
 
     @Bean
-    public TokenService tokenService(RefreshTokenPort refreshTokenPort, BlacklistPort blacklistPort, UserPort userPort, Clock clock) {
-        return new TokenService(refreshTokenPort, blacklistPort, userPort, clock);
+    public RefreshTokenSuccessorDeriver refreshTokenSuccessorDeriver(@Value("${crypto.aes-key}") String aesKey) {
+        return new RefreshTokenSuccessorDeriver(aesKey);
+    }
+
+    @Bean
+    public TokenService tokenService(RefreshTokenPort refreshTokenPort, BlacklistPort blacklistPort, UserPort userPort, Clock clock,
+                                    RefreshTokenSuccessorDeriver deriver) {
+        return new TokenService(refreshTokenPort, blacklistPort, userPort, clock, deriver);
     }
 }

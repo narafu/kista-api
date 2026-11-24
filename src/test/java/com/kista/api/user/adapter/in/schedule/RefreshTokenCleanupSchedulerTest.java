@@ -46,16 +46,4 @@ class RefreshTokenCleanupSchedulerTest {
         jobCaptor.getValue().run();
         verify(tokenService).cleanupExpiredTokens();
     }
-
-    @Test
-    void cleanupRotatedTokens_jobRunner에게_이름과_작업을_위임한다() throws InterruptedException {
-        scheduler.cleanupRotatedTokens();
-
-        ArgumentCaptor<Runnable> jobCaptor = ArgumentCaptor.forClass(Runnable.class);
-        verify(jobRunner).run(eq("회전 RT 정리 스케쥴러"), jobCaptor.capture());
-
-        when(tokenService.cleanupRotatedTokens()).thenReturn(5);
-        jobCaptor.getValue().run();
-        verify(tokenService).cleanupRotatedTokens();
-    }
 }
