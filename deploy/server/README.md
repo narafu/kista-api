@@ -50,7 +50,7 @@ Caddy 라우팅 스니펫(`deploy/server/caddy/kista-api.caddy`)은 이 디렉�
    - 모든 role 통과 후 Caddy 스니펫 설치 + reload 1회
    - 실패 시 이번에 바꾼 role을 역순으로 직전 release(이미지·compose·스니펫)로 롤백 — 앱 단위 전부 아니면 전무
    - 성공 시 `current` 전환, 오래된 release·미사용 이미지 태그 정리 → kista-infra가 `state/kista-api.yml` 커밋
-6. Caddy `lb_try_duration 120s`(kista-infra Caddyfile `(upstream)` snippet)가 컨테이너 재시작 공백을 클라이언트에 투명하게 처리
+6. kista-web 경로는 Caddy `lb_try_duration 120s`(kista-infra `(upstream)` snippet)가 blue/green 교체 공백을 흡수한다. kista-worker 경로는 `(upstream-stop-first)`(5초)라 재시작(3~4분) 중에는 스니펫 `handle_errors`가 503 `ENGINE_RESTARTING`(`Retry-After: 30`)을 바로 낸다
 
 ## 배포 시간 제한
 
