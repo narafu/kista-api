@@ -70,6 +70,14 @@ public record MetaBundle(
         List<EnumMeta> financeInvitationStatuses, // 가계부 그룹 초대 상태 목록
         @Schema(description = "다음 주문 미리보기 skip 사유 목록")
         List<EnumMeta> nextOrdersSkipReasons,  // 다음 주문 미리보기 skip 사유 목록
+        @Schema(description = "전략 행위 목록 (전략 응답 allowedActions·blockedActions 코드값)")
+        List<EnumMeta> strategyActions,        // 전략 행위 목록
+        @Schema(description = "전략 행위 막힘 사유 목록 (blockedActions[].reasonCode 코드값)")
+        List<EnumMeta> strategyActionBlockReasons, // 전략 행위 막힘 사유 목록
+        @Schema(description = "API 키 만료 상태 목록 (계좌 응답 apiKeyExpiry.status 코드값)")
+        List<EnumMeta> apiKeyExpiryStatuses,   // API 키 만료 상태 목록
+        @Schema(description = "다음 주문 미리보기 경고 코드 목록 (미리보기 warnings[].code 코드값)")
+        List<EnumMeta> orderPreviewWarningCodes, // 미리보기 경고 코드 목록
         @Schema(description = "가입 승인 필수 여부 (/api/runtime-config auth.approvalRequired와 같은 값)")
         boolean approvalRequired,              // 가입 승인 필수 여부
         @Schema(description = "ETF 벤치마크 비교 자산 허용값·기본값")

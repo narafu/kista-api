@@ -16,6 +16,7 @@ import com.kista.tradingcore.trading.domain.model.CycleCapitalEvent;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.DepositAmounts;
 import com.kista.tradingcore.trading.domain.model.Strategy;
+import com.kista.tradingcore.trading.domain.model.StrategyAction;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.trading.domain.model.StrategyDetail;
 import com.kista.tradingcore.trading.domain.model.UpdateStrategyCommand;
@@ -57,11 +58,11 @@ class StrategyUpdateWriter {
         OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
         Strategy strategy = owned.strategy();
         strategy.requireNotArchived();
-        if (strategy.isVr() && cmd.newSeed() != null) {
-            throw new IllegalArgumentException("VR 전략의 시작 예수금은 일반 수정으로 변경할 수 없습니다. VR 재설정을 이용해야 합니다.");
-        }
-        if (strategy.isDca() && cmd.newSeed() != null) {
-            throw new IllegalArgumentException("DCA 전략의 예수금은 일반 수정으로 변경할 수 없습니다. 투자금 추가·인출을 이용해야 합니다.");
+        // 시드 수정 미지원 종류(VR·DCA) — 지원 종류는 StrategyAction.supports가 SSOT, 문구는 종류별 대체 경로 안내
+        if (cmd.newSeed() != null && !StrategyAction.EDIT_SEED.supports(strategy.type())) {
+            throw new IllegalArgumentException(strategy.isVr()
+                    ? "VR 전략의 시작 예수금은 일반 수정으로 변경할 수 없습니다. VR 재설정을 이용해야 합니다."
+                    : "DCA 전략의 예수금은 일반 수정으로 변경할 수 없습니다. 투자금 추가·인출을 이용해야 합니다.");
         }
         // 연속 사이클 정책 미지원 전략(VR·DCA)은 NONE으로 고정된다
         if (!strategy.supportsCycleSeed() && cmd.cycleSeedType() != null && cmd.cycleSeedType() != StrategyCycleSeedType.NONE) {

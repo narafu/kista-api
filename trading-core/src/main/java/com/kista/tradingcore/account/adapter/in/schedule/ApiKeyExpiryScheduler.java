@@ -1,6 +1,7 @@
 package com.kista.tradingcore.account.adapter.in.schedule;
 
 import com.kista.shared.kernel.TimeZones;
+import com.kista.tradingcore.account.domain.model.ApiKeyExpiry;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.tradingcore.account.application.event.ApiKeyExpiringEvent;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
@@ -13,7 +14,6 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.Set;
 
 // 거래소 API 키 만료 일일 점검 — 30·7·0일 전에만 알림 이벤트 발행
@@ -22,7 +22,7 @@ import java.util.Set;
 @ConditionalOnWorkerRole // web role(kista-api)에서는 미등록 — 운영 DB·텔레그램 중복 실행 방지
 public class ApiKeyExpiryScheduler {
 
-    private static final Set<Long> NOTIFY_DAYS_LEFT = Set.of(30L, 7L, 0L); // 알림 시점(만료까지 남은 일수)
+    private static final Set<Integer> NOTIFY_DAYS_LEFT = Set.of(30, 7, 0); // 알림 시점(만료까지 남은 일수)
 
     private final AccountPort accountPort;
     private final ApplicationEventPublisher eventPublisher;
@@ -37,11 +37,10 @@ public class ApiKeyExpiryScheduler {
     void publishDue() {
         LocalDate today = LocalDate.now(clock);
         accountPort.findAll().stream().filter(a -> a.broker().isApiKeyExpiring() && a.apiKeyExpiresAt() != null).forEach(a -> {
-            LocalDate expiresOn = a.apiKeyExpiresAt().atZone(TimeZones.KST).toLocalDate();
-            long daysLeft = ChronoUnit.DAYS.between(today, expiresOn);
-            if (NOTIFY_DAYS_LEFT.contains(daysLeft)) {
+            ApiKeyExpiry expiry = ApiKeyExpiry.of(a.apiKeyExpiresAt(), today); // 만료일·남은 일수는 계좌 응답과 같은 판정
+            if (NOTIFY_DAYS_LEFT.contains(expiry.daysLeft())) {
                 eventPublisher.publishEvent(new ApiKeyExpiringEvent(
-                        a.userId(), a.id(), a.nickname(), a.broker(), expiresOn, (int) daysLeft));
+                        a.userId(), a.id(), a.nickname(), a.broker(), expiry.expiresOn(), expiry.daysLeft()));
             }
         });
     }

@@ -161,4 +161,15 @@ class MetaControllerTest {
                 .andExpect(jsonPath("$.strategyTypes[?(@.code=='VR')].vrRampDefaults.DEPOSIT.initialPoolLimitRate").value(org.hamcrest.Matchers.contains(1)))
                 .andExpect(jsonPath("$.strategyTypes[0].vrRampDefaults").doesNotExist());
     }
+
+    // 상태 플래그(T6) 코드값 — 전략 행위·막힘 사유·API 키 만료 상태·미리보기 경고 코드
+    @Test
+    void getBundle_carriesStateFlagEnums() throws Exception {
+        mockMvc.perform(get("/api/meta").with(authentication(userToken(DEV_USER_UUID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.strategyActions[?(@.code=='RESET_VR')].label").value(org.hamcrest.Matchers.contains("VR 재설정")))
+                .andExpect(jsonPath("$.strategyActionBlockReasons[?(@.code=='HAS_HOLDINGS')].label").value(org.hamcrest.Matchers.contains("보유 수량 있음")))
+                .andExpect(jsonPath("$.apiKeyExpiryStatuses.length()").value(4))
+                .andExpect(jsonPath("$.orderPreviewWarningCodes[?(@.code=='ACCOUNT_CASH_PARTIAL')].label").value(org.hamcrest.Matchers.contains("보정 주문 거절 가능")));
+    }
 }

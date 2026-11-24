@@ -13,6 +13,7 @@ import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.trading.domain.model.ReconfigureVrCommand;
 import com.kista.tradingcore.trading.domain.model.Strategy;
+import com.kista.tradingcore.trading.domain.model.StrategyAction;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.trading.domain.model.StrategyCycleVrDetail;
 import com.kista.tradingcore.matching.domain.model.StrategyVrDetail;
@@ -66,7 +67,7 @@ public class VrReconfigureService {
         Strategy strategy = owned.strategy();
         Account account = owned.account();
         strategy.requireNotArchived();
-        if (!strategy.isVr()) {
+        if (!StrategyAction.RESET_VR.supports(strategy.type())) { // 지원 종류 SSOT — 응답 allowedActions 판정과 같은 기준
             throw new IllegalArgumentException("VR 전략만 재설정할 수 있습니다.");
         }
 

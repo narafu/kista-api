@@ -9,6 +9,7 @@ import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.service.support.OwnedStrategy;
 import com.kista.tradingcore.trading.application.port.output.StrategyVersionPort;
 import com.kista.tradingcore.trading.domain.model.Strategy;
+import com.kista.tradingcore.trading.domain.model.StrategyAction;
 import com.kista.tradingcore.trading.domain.model.StrategyVersion;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -36,7 +37,7 @@ public class DcaConfigService {
         Strategy strategy = owned.strategy();
         Account account = owned.account();
         strategy.requireNotArchived();
-        if (!strategy.isDca()) throw new IllegalArgumentException("DCA 전략이 아닙니다.");
+        if (!StrategyAction.EDIT_DCA_CONFIG.supports(strategy.type())) throw new IllegalArgumentException("DCA 전략이 아닙니다."); // 지원 종류 SSOT — 응답 allowedActions 판정과 같은 기준
         DcaStrategyConfig current = dcaDetailPort.findActiveByStrategyId(strategyId)
                 .orElseThrow(() -> new NoSuchElementException("DCA 설정이 없습니다: " + strategyId));
         // ruleKey 확정 — 기존 키는 보존(같은 날 재발동 방지), null은 신규 UUID, 현재 버전에 없는 키는 400. 방향 변경도 허용(규칙 단위)

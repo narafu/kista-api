@@ -735,4 +735,43 @@ class TradingCycleControllerTest {
         mockMvc.perform(get("/api/trading-cycles/{id}/dca-executions", CYCLE_ID).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    void get_carriesAllowedAndBlockedActions() throws Exception {
+        // 보유 수량 있는 운영 중 INFINITE — 보관·시드 수정은 HAS_HOLDINGS로 막히고 재개는 ALREADY_ACTIVE
+        Strategy strategy = new Strategy(CYCLE_ID, ACCOUNT_ID, com.kista.shared.kernel.StrategyType.INFINITE,
+                com.kista.shared.kernel.StrategyStatus.ACTIVE, com.kista.shared.kernel.StrategyTicker.SOXL,
+                com.kista.shared.kernel.StrategyCycleSeedType.NONE);
+        when(tradingCycle.getById(CYCLE_ID, USER_ID)).thenReturn(
+                new StrategyDetail(strategy, new BigDecimal("1000"), LocalDate.of(2026, 1, 5), 20, false, 1.0, 3, null, null, true, new BigDecimal("500")));
+
+        mockMvc.perform(get("/api/trading-cycles/{id}", CYCLE_ID).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.allowedActions").value(org.hamcrest.Matchers.contains("PAUSE", "DELETE", "INJECT_CAPITAL", "WITHDRAW_CAPITAL")))
+                .andExpect(jsonPath("$.blockedActions[0].action").value("RESUME"))
+                .andExpect(jsonPath("$.blockedActions[0].reasonCode").value("ALREADY_ACTIVE"))
+                .andExpect(jsonPath("$.blockedActions[1].action").value("ARCHIVE"))
+                .andExpect(jsonPath("$.blockedActions[1].reasonCode").value("HAS_HOLDINGS"))
+                .andExpect(jsonPath("$.blockedActions[2].action").value("EDIT_SEED"))
+                .andExpect(jsonPath("$.blockedActions[2].reasonCode").value("HAS_HOLDINGS"))
+                .andExpect(jsonPath("$.blockedActions.length()").value(3));
+    }
+
+    @Test
+    void preview_carriesWarnings() throws Exception {
+        // BUY 계획 + 원장 부족 → LEDGER_SHORTFALL 한 건
+        var buy = com.kista.tradingcore.matching.domain.model.PlannedOrder.of(LocalDate.of(2026, 1, 5),
+                com.kista.shared.kernel.StrategyTicker.SOXL, OrderType.LOC, OrderDirection.BUY, 1, new BigDecimal("100"));
+        var preview = new com.kista.tradingcore.trading.domain.model.NextOrdersPreview(
+                LocalDate.of(2026, 1, 5), null, List.of(buy), null, List.of(), BigDecimal.ZERO,
+                new com.kista.tradingcore.trading.domain.model.LedgerCheckPreview(new BigDecimal("50"), new BigDecimal("100"), false, false),
+                null, null);
+        when(tradingExecution.preview(eq(CYCLE_ID), any())).thenReturn(preview);
+
+        mockMvc.perform(get("/api/trading-cycles/{id}/preview", CYCLE_ID).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.warnings.length()").value(1))
+                .andExpect(jsonPath("$.warnings[0].code").value("LEDGER_SHORTFALL"))
+                .andExpect(jsonPath("$.warnings[0].detail").value("전략 원장 예수금이 부족해 매수가 접수되지 않습니다(원장 $50.00 / 필요 $100.00)."));
+    }
 }

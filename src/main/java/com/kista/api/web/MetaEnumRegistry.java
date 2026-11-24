@@ -32,7 +32,10 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.UserRole;
 import com.kista.shared.kernel.UserStatus;
+import com.kista.tradingcore.account.domain.model.ApiKeyExpiry;
 import com.kista.tradingcore.trading.domain.model.NextOrdersPreview;
+import com.kista.tradingcore.trading.domain.model.OrderPreviewWarning;
+import com.kista.tradingcore.trading.domain.model.StrategyAction;
 
 import org.jspecify.annotations.Nullable;
 
@@ -92,7 +95,11 @@ public final class MetaEnumRegistry {
             new Spec<>("benchmarkAssetTypes", BenchmarkAssetType.class, BenchmarkAssetType::getLabel),
             new Spec<>("etfBenchmarkSymbols", EtfBenchmarkSymbol.class, EtfBenchmarkSymbol::name, EtfBenchmarkSymbol::description), // 라벨=심볼, 설명=ETF 정식 명칭
             new Spec<>("financeInvitationStatuses", FinanceGroupInvitation.Status.class, FinanceGroupInvitation.Status::getLabel),
-            new Spec<>("nextOrdersSkipReasons", NextOrdersPreview.SkipReason.class, NextOrdersPreview.SkipReason::getLabel)
+            new Spec<>("nextOrdersSkipReasons", NextOrdersPreview.SkipReason.class, NextOrdersPreview.SkipReason::getLabel),
+            new Spec<>("strategyActions", StrategyAction.class, StrategyAction::getLabel),
+            new Spec<>("strategyActionBlockReasons", StrategyAction.BlockReason.class, StrategyAction.BlockReason::getLabel),
+            new Spec<>("apiKeyExpiryStatuses", ApiKeyExpiry.Status.class, ApiKeyExpiry.Status::getLabel),
+            new Spec<>("orderPreviewWarningCodes", OrderPreviewWarning.Code.class, OrderPreviewWarning.Code::getLabel)
     );
 
     // 전용 DTO(StrategyTypeMeta·TickerMeta·BrokerMeta·DcaIndicatorMeta)로 싣는 enum — 필드 구조가 달라 SPECS 밖
