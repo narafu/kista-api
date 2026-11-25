@@ -381,6 +381,14 @@
 - 묶음·태스크: S7 / 10 T6·T10·T12
 - 답: ① T6 마감 리포트 창·당일 주문 반영 전 보관·재개 시 1주 미만 잔액은 판정에서 제외한다(응답 조립 때 데이터가 없다) → allowed여도 400이 날 수 있고 ui는 400 `detail`을 보인다. ② T10 `fieldErrors`는 `{field, detail}`(지침서 2-5, 초안의 `message`는 오류)이고 경고 `AVAILABLE_CASH_EXCEEDED`를 더했다. ③ T12 캔들 지표는 RAW 종가, DCA는 수정주가라 같은 코드·다른 입력이다. RSI 창은 250(`DcaIndicators.CLOSE_WINDOW`, DCA 수집과 같음).
 
+### Q-35 S7 T10: ui에만 있는 등록 규칙 2건을 서버에 넣을지
+- 상태: 사용자 결정 필요(2026-11-25)
+- 묶음·태스크: S7 / 10 T10(`cross-repo.md` "ui에만 있던 규칙은 서버에 먼저")
+- 내용: ① 비VR 예수금 > 0 ② PRIVACY 최소 시드. 지금 서버는 INFINITE·PRIVACY 등록의 null 예수금을 0으로 저장하고(테스트 `register_infinite_nullDeposit_persistsZero`·`register_privacy_nullDeposit_persistsZero` 등 4건이 고정), DCA는 보유 수량만으로 시작할 수 있다. 최소 시드 검사는 INFINITE만 한다.
+- 선택지: (가) 지금 동작 유지 — ui가 계속 막는다(검증 엔드포인트로는 우회 불가가 아니다). (나) 서버에 추가 — 기존 테스트 기대값을 바꾸고 null 예수금 등록이 400이 된다(ui는 이미 막으므로 화면 영향 없음, API 직접 호출만 바뀜).
+- 권고: (가). 돈이 더 움직이지 않고 ui가 막고 있다. (나)는 PRIVACY 최소 시드 계산(기준표·가격 조회)이 등록 경로에 새 외부 의존을 더한다.
+- 같이 정한 것: 평단가만 입력은 서버에 넣었다. NO_PRIVACY_BASE·VR 금액 0은 ui에 남긴다(시점 의존·폼 개념).
+
 ## Fable 대기 작업 (2026-11-15 추가) — 2026-11-16 처리
 
 | 항목 | 결과 | 원본 |
