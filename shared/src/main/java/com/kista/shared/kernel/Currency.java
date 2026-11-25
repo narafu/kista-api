@@ -1,5 +1,7 @@
 package com.kista.shared.kernel;
 
+import lombok.Getter;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Locale;
@@ -7,13 +9,16 @@ import java.util.Optional;
 
 // 통화 — broker(응답 통화 코드 파싱)와 계좌 응답(broker 파생 통화)이 공유하는 어휘. broker.domain.model에서 승격(복제 금지)
 public enum Currency {
-    KRW(0),  // 원화
-    USD(2),  // 미국 달러
-    JPY(0);  // 일본 엔
+    KRW("원화", 0),  // 원화
+    USD("미국 달러", 2),  // 미국 달러
+    JPY("일본 엔", 0);  // 일본 엔
 
+    @Getter
+    private final String label; // 한국어 표시 이름 (메타 번들)
     private final int amountScale; // 금액 소수 자릿수 (반올림·표기 SSOT)
 
-    Currency(int amountScale) {
+    Currency(String label, int amountScale) {
+        this.label = label;
         this.amountScale = amountScale;
     }
 

@@ -191,6 +191,12 @@ public class AccountService {
         return accountPort.findByUserId(userId);
     }
 
+    // 내 계좌 단건 조회 — 없으면 NoSuchElementException(404), 남의 계좌면 SecurityException(403)
+    @Transactional(readOnly = true)
+    public Account getOwned(UUID accountId, UUID requesterId) {
+        return accountPort.requireOwnedAccount(accountId, requesterId);
+    }
+
     // 등록 전 사전 검증 — 어느 계좌의 토큰 캐시도 건드리지 않는다. 실패 시 BrokerCredentialException throw
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 외부 API 호출 — 트랜잭션 불필요
     public void test(Broker requestedBroker, String appKey, String appSecret) {
@@ -211,14 +217,14 @@ public class AccountService {
         }
     }
 
-    // 사용자 입력 만료일(KST 날짜) → KST 자정 Instant — 추정 증권사만 허용, KST 오늘부터 유효
+    // 사용자 입력 만료일(KST 날짜) → KST 자정 Instant — 추정 증권사만 허용. 만료일 당일은 ApiKeyExpiry가 EXPIRED로 보므로 KST 내일부터 받는다
     private @Nullable Instant manualExpiry(Broker broker, @Nullable LocalDate expiresOn) {
         if (expiresOn == null) return null;
         if (broker.getApiKeyExpirySource() != ApiKeyExpirySource.ESTIMATED) {
             throw new IllegalArgumentException("이 거래소는 API 키 만료일을 직접 바꿀 수 없습니다.");
         }
-        if (expiresOn.isBefore(LocalDate.now(clock.withZone(TimeZones.KST)))) {
-            throw new IllegalArgumentException("API 키 만료일은 오늘 이후여야 합니다.");
+        if (!expiresOn.isAfter(LocalDate.now(clock.withZone(TimeZones.KST)))) {
+            throw new IllegalArgumentException("API 키 만료일은 내일 이후여야 합니다.");
         }
         return expiresOn.atStartOfDay(TimeZones.KST).toInstant();
     }

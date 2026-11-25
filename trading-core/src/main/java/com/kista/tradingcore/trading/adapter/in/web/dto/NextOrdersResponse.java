@@ -7,6 +7,7 @@ import com.kista.tradingcore.trading.domain.model.AccountHoldingsCheckPreview;
 import com.kista.tradingcore.trading.domain.model.LedgerCheckPreview;
 import com.kista.tradingcore.trading.domain.model.NextOrdersPreview;
 import com.kista.tradingcore.trading.domain.model.Order;
+import com.kista.tradingcore.trading.domain.model.OrderPreviewWarning;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.OrderDirection;
@@ -38,8 +39,19 @@ public record NextOrdersResponse(
         @Schema(description = "계좌 주문가능 USD 대비 오늘 BUY 경고 — 계좌 단위(계좌 내 모든 전략 동일 값), 조회 시점 추정, 경고 전용. MOCK·필요 BUY 없음·증권사 조회 실패면 null")
         @Nullable AccountCashCheckSummary accountCashCheck,
         @Schema(description = "계좌 보유(판매 가능) 수량 대비 오늘 SELL 경고 — (계좌, 종목) 단위(같은 종목 전략 동일 값), 조회 시점 추정, 경고 전용. MOCK·필요 SELL 없음·증권사 조회 실패면 null")
-        @Nullable AccountHoldingsCheckSummary accountHoldingsCheck
+        @Nullable AccountHoldingsCheckSummary accountHoldingsCheck,
+        @Schema(description = "서버 판정 경고 목록 (원장 부족·계좌 예수금 부족/부분 부족·보유 수량 부족·방향별 미접수 순, 없으면 빈 목록) — ledgerCheck·accountCashCheck·accountHoldingsCheck와 주문 목록에서 파생")
+        List<Warning> warnings
 ) {
+    // 미리보기 경고 하나 — 코드 라벨은 메타 orderPreviewWarningCodes. OpenAPI 스키마 이름은 다른 Warning 레코드와 겹치지 않게 명시
+    @Schema(name = "NextOrderWarning")
+    public record Warning(
+            @Schema(description = "경고 코드", example = "LEDGER_SHORTFALL")
+            OrderPreviewWarning.Code code,
+            @Schema(description = "한국어 안내 문장")
+            String detail
+    ) {}
+
     public record PositionSnapshot(
             @Schema(description = "거래 종목")
             StrategyTicker ticker,           // 거래 종목
@@ -188,7 +200,8 @@ public record NextOrdersResponse(
                 result.otherStrategiesPlannedBuyUsd(),
                 result.ledgerCheck() == null ? null : LedgerCheckSummary.from(result.ledgerCheck()),
                 result.accountCashCheck() == null ? null : AccountCashCheckSummary.from(result.accountCashCheck()),
-                result.accountHoldingsCheck() == null ? null : AccountHoldingsCheckSummary.from(result.accountHoldingsCheck())
+                result.accountHoldingsCheck() == null ? null : AccountHoldingsCheckSummary.from(result.accountHoldingsCheck()),
+                OrderPreviewWarning.of(result).stream().map(w -> new Warning(w.code(), w.detail())).toList()
         );
     }
 }

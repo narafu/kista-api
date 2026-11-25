@@ -56,7 +56,7 @@ public class AuthController {
         httpResponse.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.issue(rawRt).toString());
         String at = jwtIssuerService.issue(user.id(), user.role());
         UserSettings settings = userSettingsService.getByUserId(user.id());
-        return new KakaoLoginResponse(at, "bearer", jwtIssuerService.expiresInSeconds(), UserResponse.from(user, settings));
+        return new KakaoLoginResponse(at, "bearer", jwtIssuerService.expiresInSeconds(), UserResponse.from(user, settings, userService.reapplyAvailableAt(user)));
     }
 
     // RT 쿠키로 새 AT + RT 발급 (RTR)
@@ -112,7 +112,7 @@ public class AuthController {
     public UserResponse me(@AuthenticationPrincipal UUID userId) {
         User user = userService.getById(userId);
         UserSettings settings = userSettingsService.getByUserId(userId);
-        return UserResponse.from(user, settings);
+        return UserResponse.from(user, settings, userService.reapplyAvailableAt(user));
     }
 
     // REJECTED(24h)/PENDING(1h) 쿨다운 후 재신청 — CooldownException→429, IllegalStateException→400은 ProblemDetailExceptionHandler 처리

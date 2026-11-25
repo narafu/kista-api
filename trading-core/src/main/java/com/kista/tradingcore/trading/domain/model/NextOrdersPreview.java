@@ -2,6 +2,8 @@ package com.kista.tradingcore.trading.domain.model;
 
 import com.kista.tradingcore.matching.domain.model.InfinitePosition;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -26,12 +28,16 @@ public record NextOrdersPreview(
         return new NextOrdersPreview(tradeDate, position, orders, skipReason, todayOrders, otherStrategiesPlannedBuyUsd, ledgerCheck, accountCashCheck, check);
     }
 
+    @Getter
+    @RequiredArgsConstructor
     public enum SkipReason {
-        NO_CYCLE_HISTORY,          // 사이클 이력 없음 (신규)
-        NO_PRIVACY_BASE,           // PRIVACY 기준매매표 미수신
-        SCHEDULED_START_NOT_REACHED, // 사이클 시작예정일 미도래
-        CYCLE_ENDED,               // 최신 사이클이 종료됨 (청산 후 재등록 미완료) — 재등록/수동 개입 필요
-        PRIVACY_BASE_BLOCKED,      // PRIVACY 기준매매표 점검 이슈로 오늘 신규 주문 차단
-        MARKET_CLOSED              // 다음 거래일이 미국 시장 휴장일 — 계획 계산 없이 skip
+        NO_CYCLE_HISTORY("사이클 이력 없음"),          // 사이클 이력 없음 (신규)
+        NO_PRIVACY_BASE("기준매매표 미수신"),           // PRIVACY 기준매매표 미수신
+        SCHEDULED_START_NOT_REACHED("시작예정일 미도래"), // 사이클 시작예정일 미도래
+        CYCLE_ENDED("사이클 종료"),               // 최신 사이클이 종료됨 (청산 후 재등록 미완료) — 재등록/수동 개입 필요
+        PRIVACY_BASE_BLOCKED("기준매매표 점검 이슈로 차단"),      // PRIVACY 기준매매표 점검 이슈로 오늘 신규 주문 차단
+        MARKET_CLOSED("휴장일");              // 다음 거래일이 미국 시장 휴장일 — 계획 계산 없이 skip
+
+        private final String label; // 한국어 표시 이름 (메타 번들)
     }
 }

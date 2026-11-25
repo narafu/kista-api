@@ -19,10 +19,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.jspecify.annotations.Nullable;
+
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 import com.kista.shared.kernel.UserRole;
@@ -36,8 +37,6 @@ import com.kista.shared.kernel.UserStatus;
 public class UserService {
 
     private static final Duration REJECT_BLACKLIST_TTL = Duration.ofMinutes(15); // 거절 직후 AT 차단 기간
-    private static final long PENDING_REAPPLY_COOLDOWN_HOURS = 1;               // PENDING 상태 재신청 쿨다운 (시간)
-    private static final long REJECTED_REAPPLY_COOLDOWN_HOURS = 24;             // REJECTED 상태 재신청 쿨다운 (시간)
 
     private final UserPort userPort;
     private final UserCascadeDeleter userCascadeDeleter;
@@ -55,6 +54,15 @@ public class UserService {
     @Transactional(readOnly = true)
     public User getById(UUID id) {
         return userPort.findByIdOrThrow(id);
+    }
+
+    // /me 응답용 재신청 가능 시각 — 쿨다운이 걸려 있으면 해제 시각, 아니면 null
+    @Transactional(readOnly = true)
+    public @Nullable Instant reapplyAvailableAt(User user) {
+        // PENDING만 승인 설정에 좌우된다 — 그 외 상태는 설정 조회(DB) 없이 판정
+        if (user.status() != UserStatus.PENDING && user.status() != UserStatus.REJECTED) return null;
+        boolean approvalRequired = user.status() != UserStatus.PENDING || approvalPolicyPort.approvalRequired();
+        return user.reapplyAvailableAt(approvalRequired, Instant.now(clock));
     }
 
     // 텔레그램 봇 명령 발신자 userId 조회
@@ -154,15 +162,10 @@ public class UserService {
         // register()와 동일한 이유로 잠금 조회 필수 — 관리자의 승인설정 전환과 직렬화한다.
         boolean approvalRequired = approvalPolicyPort.approvalRequiredForUpdate();
 
-        // 상태별 쿨다운 검증
-        switch (user.status()) {
-            case PENDING  -> {
-                // 승인 불필요 전환 직후 남아 있는 PENDING 사용자는 쿨다운 없이 즉시 활성화한다.
-                if (approvalRequired) requireCooldownPassed(user, PENDING_REAPPLY_COOLDOWN_HOURS, now);
-            }
-            case REJECTED -> requireCooldownPassed(user, REJECTED_REAPPLY_COOLDOWN_HOURS, now);
-            default -> throw new IllegalStateException("현재 상태에서는 재신청할 수 없습니다.");
-        }
+        // PENDING·REJECTED만 재신청 가능, 쿨다운 판정은 도메인 User 한 곳
+        if (user.status() != UserStatus.PENDING && user.status() != UserStatus.REJECTED)
+            throw new IllegalStateException("현재 상태에서는 재신청할 수 없습니다.");
+        user.requireReapplyAllowed(approvalRequired, now);
 
         // 승인 설정에 맞는 상태로 전환하고 기존 재신청 시각과 이벤트 흐름을 보존한다.
         UserStatus status = approvalRequired ? UserStatus.PENDING : UserStatus.ACTIVE;
@@ -176,13 +179,6 @@ public class UserService {
             eventPublisher.publishEvent(new UserApprovedEvent(updated.id()));
         }
         userNotifyProfilePublisher.publishStatusChanged(updated);
-    }
-
-    // 쿨다운 미경과 시 CooldownException 발생 — PENDING/REJECTED 공통 판정
-    private void requireCooldownPassed(User user, long cooldownHours, Instant now) {
-        if (user.lastReappliedAt() != null &&
-                now.isBefore(user.lastReappliedAt().plus(cooldownHours, ChronoUnit.HOURS)))
-            throw new User.CooldownException(user.lastReappliedAt().plus(cooldownHours, ChronoUnit.HOURS));
     }
 
     // 역할 저장 + 기존 AT 무효화 (자기 강등·마지막 ADMIN 검증은 호출자 정책)

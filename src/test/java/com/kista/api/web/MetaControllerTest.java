@@ -14,6 +14,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import com.kista.api.admin.application.port.output.AppErrorLogPort;
+import com.kista.api.admin.application.service.RuntimeConfigService;
+import com.kista.api.admin.domain.model.RuntimeSettingsBundle;
+import org.junit.jupiter.api.BeforeEach;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyCycleSeedType;
@@ -24,6 +29,12 @@ class MetaControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean AppErrorLogPort appErrorLogPort;
+    @MockitoBean RuntimeConfigService runtimeConfigService; // 런타임 값 출처 — 기본 설정으로 대역
+
+    @BeforeEach
+    void stubRuntimeConfig() {
+        when(runtimeConfigService.getSettings()).thenReturn(RuntimeSettingsBundle.defaults());
+    }
 
     @Test
     void getBundle_anonymous_returns401() throws Exception {
@@ -120,5 +131,45 @@ class MetaControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.brokers[?(@.code=='TOSS')].description").value(org.hamcrest.Matchers.contains("토스")))
                 .andExpect(jsonPath("$.brokers[?(@.code=='TOSS')].currency").value(org.hamcrest.Matchers.contains("USD")));
+    }
+
+    @Test
+    void getBundle_exposesAddedEnumsAndNoStoreCache() throws Exception {
+        mockMvc.perform(get("/api/meta").with(authentication(userToken(DEV_USER_UUID))))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.userStatuses[?(@.code=='REJECTED')].label").value(org.hamcrest.Matchers.contains("반려")))
+                .andExpect(jsonPath("$.userRoles.length()").value(2))
+                .andExpect(jsonPath("$.recurringModes[?(@.code=='WITHDRAW')].label").value(org.hamcrest.Matchers.contains("정기 인출")))
+                .andExpect(jsonPath("$.currencies[?(@.code=='USD')].label").value(org.hamcrest.Matchers.contains("미국 달러")))
+                .andExpect(jsonPath("$.nextOrdersSkipReasons.length()").value(6))
+                .andExpect(jsonPath("$.etfBenchmarkSymbols[?(@.code=='SPY')].description").value(org.hamcrest.Matchers.contains("SPDR S&P 500 ETF Trust")));
+    }
+
+    // 런타임 값은 RuntimeConfigService 결과를 그대로 싣는다 — /api/runtime-config와 같은 출처
+    @Test
+    void getBundle_carriesRuntimeValuesAndVrRampDefaults() throws Exception {
+        mockMvc.perform(get("/api/meta").with(authentication(userToken(DEV_USER_UUID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.approvalRequired").value(true))
+                .andExpect(jsonPath("$.benchmarkEtf.defaultValue").value("SPY"))
+                .andExpect(jsonPath("$.brokers[?(@.code=='MERITZ')].enabled").value(org.hamcrest.Matchers.contains(false)))
+                .andExpect(jsonPath("$.brokers[?(@.code=='TOSS')].enabled").value(org.hamcrest.Matchers.contains(true)))
+                .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].enabled").value(org.hamcrest.Matchers.contains(false)))
+                .andExpect(jsonPath("$.strategyTypes[?(@.code=='VR')].fields.recurringMode.defaultValue").value(org.hamcrest.Matchers.contains("HOLD")))
+                .andExpect(jsonPath("$.strategyTypes[?(@.code=='VR')].vrRampDefaults.WITHDRAW.initialGradient").value(org.hamcrest.Matchers.contains(40)))
+                .andExpect(jsonPath("$.strategyTypes[?(@.code=='VR')].vrRampDefaults.DEPOSIT.initialPoolLimitRate").value(org.hamcrest.Matchers.contains(1)))
+                .andExpect(jsonPath("$.strategyTypes[0].vrRampDefaults").doesNotExist());
+    }
+
+    // 상태 플래그(T6) 코드값 — 전략 행위·막힘 사유·API 키 만료 상태·미리보기 경고 코드
+    @Test
+    void getBundle_carriesStateFlagEnums() throws Exception {
+        mockMvc.perform(get("/api/meta").with(authentication(userToken(DEV_USER_UUID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.strategyActions[?(@.code=='RESET_VR')].label").value(org.hamcrest.Matchers.contains("VR 재설정")))
+                .andExpect(jsonPath("$.strategyActionBlockReasons[?(@.code=='HAS_HOLDINGS')].label").value(org.hamcrest.Matchers.contains("보유 수량 있음")))
+                .andExpect(jsonPath("$.apiKeyExpiryStatuses.length()").value(4))
+                .andExpect(jsonPath("$.orderPreviewWarningCodes[?(@.code=='ACCOUNT_CASH_PARTIAL')].label").value(org.hamcrest.Matchers.contains("보정 주문 거절 가능")));
     }
 }

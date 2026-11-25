@@ -3,7 +3,10 @@ package com.kista.tradingcore.trading.application.service;
 import com.kista.shared.kernel.Currency;
 import java.util.NoSuchElementException;
 import com.kista.tradingcore.trading.domain.creation.VrRampParams;
+import com.kista.tradingcore.trading.domain.creation.StrategyCreationResolver;
 import com.kista.tradingcore.trading.domain.creation.VrRampValidator;
+import com.kista.tradingcore.trading.domain.model.FieldRejectedException;
+import com.kista.tradingcore.trading.domain.model.StrategyValidation;
 import com.kista.tradingcore.trading.application.event.NewCycleStartedEvent;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
@@ -13,6 +16,7 @@ import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.trading.domain.model.ReconfigureVrCommand;
 import com.kista.tradingcore.trading.domain.model.Strategy;
+import com.kista.tradingcore.trading.domain.model.StrategyAction;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.trading.domain.model.StrategyCycleVrDetail;
 import com.kista.tradingcore.matching.domain.model.StrategyVrDetail;
@@ -62,11 +66,66 @@ public class VrReconfigureService {
 
     // VR 전략 운영 중 재설정 — 새 버전 발급 + 강제 롤오버(현재 사이클 종료→새 사이클 즉시 생성)
     public void reconfigure(UUID strategyId, UUID requesterId, ReconfigureVrCommand cmd) {
+        Plan plan = plan(strategyId, requesterId, cmd);
+        Strategy strategy = plan.owned().strategy();
+        Account account = plan.owned().account();
+        AccountBalance postBalance = plan.reconfiguration().postBalance();
+        boolean beforeStart = plan.beforeStart();
+
+        // 미체결 주문 전체 취소(best-effort) — 위 검증을 모두 통과한 뒤에만 호출 (독립 트랜잭션이라 이후 실패해도 롤백 불가하므로 최대한 뒤로 미룸)
+        orderCancelService.cancelByCycle(strategyId, requesterId);
+
+        // 새 버전 발급 + (시작 전) 현재 사이클 in-place 갱신 / (시작 후) 강제 롤오버(사이클 종료 → 새 사이클) 원자 처리
+        if (beforeStart) {
+            cycleSnapshotCreator.reconfigureVrCycleBeforeStart(plan.reconfiguration());
+        } else {
+            cycleSnapshotCreator.reconfigureVrCycle(plan.reconfiguration());
+        }
+
+        // stats 캐시 무효화 — @EventListener라 동기 실행되며, 트랜잭션 동기화가 활성이면 afterCommit에 아니면 즉시 비운다
+        eventPublisher.publishEvent(new StrategyCapitalChangedEvent(requesterId));
+
+        // 시작 전 재설정은 새 사이클이 없으므로 새 사이클 시작 알림을 보내지 않는다
+        if (beforeStart) {
+            return;
+        }
+
+        // 사용자 알림 이벤트 발행 — 실패해도 재설정 자체는 이미 완료된 상태이므로 로그만 남기고 무시
+        // 이 클래스/메서드가 비-트랜잭션이라 publishEvent가 리스너를 즉시 동기 실행하므로 try/catch가 유효함
+        // (향후 @Transactional을 붙이면 AFTER_COMMIT 리스너가 지연 실행되어 이 try/catch가 무력화됨에 주의)
+        try {
+            eventPublisher.publishEvent(new NewCycleStartedEvent(requesterId, account.id(), account.nickname(),
+                    strategy.type(), strategy.ticker(), postBalance.deposit()));
+        } catch (Exception e) {
+            log.warn("[strategyId={}] VR 재설정 알림 실패: {}", strategyId, e.getMessage());
+            eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
+        }
+    }
+
+    // 재설정 검증 전용 — reconfigure와 같은 검사(plan)만 태우고 주문 취소·저장·이벤트는 없다(현재가 조회는 읽기 전용 외부 호출)
+    // 소유권 실패는 재설정과 같은 403/404로 전파하고, 재설정이 400으로 거절하는 입력은 fieldErrors로 돌려준다
+    public StrategyValidation validate(UUID strategyId, UUID requesterId, ReconfigureVrCommand cmd) {
+        try { // 소유권 실패(SecurityException·NoSuchElementException)는 catch 대상이 아니라 그대로 전파된다
+            CycleSnapshotCreator.VrReconfiguration r = plan(strategyId, requesterId, cmd).reconfiguration();
+            BigDecimal requiredWithdrawal = r.recurringAmount() < 0
+                    ? VrRampValidator.requiredWithdrawalAssets(r.recurringAmount(), r.intervalWeeks()) : null;
+            return new StrategyValidation(List.of(), List.of(), new StrategyValidation.Derived(
+                    null, null, StrategyCreationResolver.recurringModeOf(r.recurringAmount()), r.bandWidth(), r.intervalWeeks(),
+                    r.ramp(), requiredWithdrawal, null, null, null, null));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return new StrategyValidation(List.of(StrategyValidation.FieldError.of(e)), List.of(), StrategyValidation.Derived.EMPTY);
+        }
+    }
+
+    // 재설정 계획 — 소유권·종류·램프·투자금 조정·현재가·인출식 최소자산·램프 시계까지. 쓰기 없음(reconfigure와 validate가 공유)
+    private record Plan(OwnedStrategy owned, boolean beforeStart, CycleSnapshotCreator.VrReconfiguration reconfiguration) {}
+
+    private Plan plan(UUID strategyId, UUID requesterId, ReconfigureVrCommand cmd) {
         OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
         Strategy strategy = owned.strategy();
         Account account = owned.account();
         strategy.requireNotArchived();
-        if (!strategy.isVr()) {
+        if (!StrategyAction.RESET_VR.supports(strategy.type())) { // 지원 종류 SSOT — 응답 allowedActions 판정과 같은 기준
             throw new IllegalArgumentException("VR 전략만 재설정할 수 있습니다.");
         }
 
@@ -116,37 +175,9 @@ public class VrReconfigureService {
                 .startDate();
         long weeks = Math.max(0, ChronoUnit.WEEKS.between(firstStart, today));
 
-        // 미체결 주문 전체 취소(best-effort) — 위 검증을 모두 통과한 뒤에만 호출 (독립 트랜잭션이라 이후 실패해도 롤백 불가하므로 최대한 뒤로 미룸)
-        orderCancelService.cancelByCycle(strategyId, requesterId);
-
-        // 새 버전 발급 + (시작 전) 현재 사이클 in-place 갱신 / (시작 후) 강제 롤오버(사이클 종료 → 새 사이클) 원자 처리
-        var reconfiguration = new CycleSnapshotCreator.VrReconfiguration(
+        return new Plan(owned, beforeStart, new CycleSnapshotCreator.VrReconfiguration(
                 strategyId, currentCycle.id(), intervalWeeks, bandWidth, recurringAmount, ramp,
-                postBalance, currentPrice, newValue, weeks);
-        if (beforeStart) {
-            cycleSnapshotCreator.reconfigureVrCycleBeforeStart(reconfiguration);
-        } else {
-            cycleSnapshotCreator.reconfigureVrCycle(reconfiguration);
-        }
-
-        // stats 캐시 무효화 — @EventListener라 동기 실행되며, 트랜잭션 동기화가 활성이면 afterCommit에 아니면 즉시 비운다
-        eventPublisher.publishEvent(new StrategyCapitalChangedEvent(requesterId));
-
-        // 시작 전 재설정은 새 사이클이 없으므로 새 사이클 시작 알림을 보내지 않는다
-        if (beforeStart) {
-            return;
-        }
-
-        // 사용자 알림 이벤트 발행 — 실패해도 재설정 자체는 이미 완료된 상태이므로 로그만 남기고 무시
-        // 이 클래스/메서드가 비-트랜잭션이라 publishEvent가 리스너를 즉시 동기 실행하므로 try/catch가 유효함
-        // (향후 @Transactional을 붙이면 AFTER_COMMIT 리스너가 지연 실행되어 이 try/catch가 무력화됨에 주의)
-        try {
-            eventPublisher.publishEvent(new NewCycleStartedEvent(requesterId, account.id(), account.nickname(),
-                    strategy.type(), strategy.ticker(), postBalance.deposit()));
-        } catch (Exception e) {
-            log.warn("[strategyId={}] VR 재설정 알림 실패: {}", strategyId, e.getMessage());
-            eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
-        }
+                postBalance, currentPrice, newValue, weeks));
     }
 
     // 투자금 추가/인출 계산 — injectShares>0: holdings+=N, 평단가 가중평균, V+=N×현재가 / injectDeposit: deposit+=X
@@ -165,7 +196,7 @@ public class VrReconfigureService {
         BigDecimal newAvgPrice;
         if (injectShares > 0) {
             if (cmd.injectSharePrice() == null || cmd.injectSharePrice().signum() <= 0) {
-                throw new IllegalArgumentException("투자금 추가 주식의 매수단가는 0보다 커야 합니다.");
+                throw new FieldRejectedException("injectSharePrice", "투자금 추가 주식의 매수단가는 0보다 커야 합니다.");
             }
             BigDecimal existingCost = latestPosition.avgPrice() != null
                     ? latestPosition.avgPrice().multiply(BigDecimal.valueOf(holdingsAfterWithdrawal))

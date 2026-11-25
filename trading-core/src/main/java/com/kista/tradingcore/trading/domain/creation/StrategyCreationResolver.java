@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.domain.creation;
 
+import com.kista.tradingcore.trading.domain.model.FieldRejectedException;
 import java.math.BigDecimal;
 import com.kista.shared.kernel.RecurringMode;
 import com.kista.shared.kernel.StrategyCreationSettings;
@@ -15,7 +16,7 @@ public interface StrategyCreationResolver {
 
     // ticker는 모든 전략 유형에서 생략 기본값·허용값·고정값 정책을 동일하게 적용한다.
     default ResolvedCreation resolve(StrategyCreationRequest request, StrategyCreationSettings settings) {
-        StrategyTicker ticker = settings.ticker().resolve(request.ticker());
+        StrategyTicker ticker = FieldRejectedException.attribute("ticker", () -> settings.ticker().resolve(request.ticker())); // 거절은 ticker에 귀속
         return resolveTypeFields(request, settings, ticker);
     }
 

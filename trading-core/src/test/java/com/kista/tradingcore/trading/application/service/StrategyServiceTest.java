@@ -55,6 +55,7 @@ import static com.kista.tradingcore.support.StrategyCommands.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -147,6 +148,13 @@ class StrategyServiceTest {
                 new CycleOrderStrategies(List.of(
                         new InfiniteCycleOrderStrategy(null, null))),
                 strategyInfiniteDetailPort);
+        var historyStrategies = new CycleOrderStrategies(List.of(
+                new InfiniteCycleOrderStrategy(null, null),
+                new PrivacyCycleOrderStrategy(null)));
+        StrategyHistoryQueryService strategyHistoryQueryService = new StrategyHistoryQueryService(
+                accountPort, strategyPort, cyclePositionPort, orderPort, historyStrategies,
+                privacyTradePort, marketData,
+                new UnassignedCashCalculator(strategyPort, cyclePositionPort, marginPort), FIXED);
         StrategyCreationService creationService = new StrategyCreationService(
                 strategyPort,
                 accountPort,
@@ -159,14 +167,7 @@ class StrategyServiceTest {
                         vrStrategyDetailService, strategyCyclePort, cyclePositionPort, cyclePositionInfiniteDetailPort,
                         dcaDetailPort),
                 minSeedGuard,
-                detailAssembler, FIXED);
-        var historyStrategies = new CycleOrderStrategies(List.of(
-                new InfiniteCycleOrderStrategy(null, null),
-                new PrivacyCycleOrderStrategy(null)));
-        StrategyHistoryQueryService strategyHistoryQueryService = new StrategyHistoryQueryService(
-                accountPort, strategyPort, cyclePositionPort, orderPort, historyStrategies,
-                privacyTradePort, marketData,
-                new UnassignedCashCalculator(strategyPort, cyclePositionPort, marginPort), FIXED);
+                detailAssembler, strategyHistoryQueryService, FIXED);
         strategyService = new StrategyService(
                 strategyPort,
                 strategyVersionPort,
@@ -2978,5 +2979,177 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
                 dcaCommand(StrategyTicker.UPRO, dcaConfig(OrderDirection.BUY))))
                 .isInstanceOf(NoSuchElementException.class);
         verify(strategyPort, never()).save(any());
+    }
+
+    // --- 검증 전용(validateRegistration·validateUpdate) — 저장 경로와 대칭 ---
+
+    // 등록이 던지는 거절 문장과 검증의 fieldError가 같고, 검증은 저장·이벤트를 남기지 않는다
+    private StrategyValidation.FieldError assertRegistrationSymmetric(RegisterStrategyCommand cmd, String expectedField) {
+        Throwable thrown = catchThrowable(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd));
+        assertThat(thrown).isInstanceOfAny(IllegalArgumentException.class, IllegalStateException.class);
+        clearInvocations(eventPublisher);
+
+        StrategyValidation validation = strategyService.validateRegistration(USER_ID, ACCOUNT_ID, cmd);
+
+        assertThat(validation.fieldErrors()).containsExactly(new StrategyValidation.FieldError(expectedField, thrown.getMessage()));
+        verify(strategyPort, never()).save(any());
+        verifyNoInteractions(eventPublisher);
+        return validation.fieldErrors().getFirst();
+    }
+
+    @Test
+    @DisplayName("검증: 비활성 전략 유형은 등록과 같은 문장을 type에 귀속한다")
+    void validateRegistration_disabledType_symmetric() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyCreationPolicyPort.find(StrategyType.INFINITE)).thenReturn(Optional.of(disabledSettings(StrategyType.INFINITE)));
+
+        assertRegistrationSymmetric(commandFor(StrategyType.INFINITE, StrategyTicker.SOXL, 20, null, null, null), "type");
+    }
+
+    @Test
+    @DisplayName("검증: 허용값 밖 ticker·divisionCount는 등록과 같은 문장을 각 필드에 귀속한다")
+    void validateRegistration_disallowedFields_symmetric() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        StrategyCreationSettings infinite = defaultTradingSettings(StrategyType.INFINITE);
+        when(strategyCreationPolicyPort.find(StrategyType.INFINITE)).thenReturn(Optional.of(new StrategyCreationSettings(true,
+                new StrategyFieldSettings<>(true, List.of(StrategyTicker.SOXL), StrategyTicker.SOXL),
+                infinite.divisionCount(), null, null, null)));
+
+        assertRegistrationSymmetric(commandFor(StrategyType.INFINITE, StrategyTicker.MAGX, 20, null, null, null), "ticker");
+        assertRegistrationSymmetric(commandFor(StrategyType.INFINITE, StrategyTicker.SOXL, 25, null, null, null), "divisionCount");
+    }
+
+    @Test
+    @DisplayName("검증: 과거 시작예정일은 등록과 같은 문장을 scheduledStartDate에 귀속한다")
+    void validateRegistration_pastScheduledStart_symmetric() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        RegisterStrategyCommand cmd = vr().deposit("1000").intervalWeeks(2).bandWidth("15.00").recurringAmount(0)
+                .scheduledStartDate(LocalDate.now(FIXED).minusDays(1)).build();
+
+        StrategyValidation.FieldError error = assertRegistrationSymmetric(cmd, "scheduledStartDate");
+        assertThat(error.detail()).isEqualTo("시작예정일은 오늘 이후여야 합니다.");
+    }
+
+    @Test
+    @DisplayName("검증: VR 램프 위반(gMax < initialGradient)은 등록과 같은 문장을 gMax에 귀속하고 램프 실효값을 준다")
+    void validateRegistration_vrRampInvalid_symmetric() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
+        RegisterStrategyCommand cmd = vr().deposit("1000").intervalWeeks(4).bandWidth("15.00").recurringAmount(0)
+                .vrRamp(new VrRampInput(15, null, null, 10, null, null, null, null)).build();
+
+        assertRegistrationSymmetric(cmd, "gMax");
+        StrategyValidation.Derived derived = strategyService.validateRegistration(USER_ID, ACCOUNT_ID, cmd).derived();
+        assertThat(derived.ramp()).isEqualTo(cmd.vrRamp().withDefaults(0)); // VrRegistration과 같은 withDefaults
+        assertThat(derived.recurringMode()).isEqualTo(RecurringMode.HOLD);
+        assertThat(derived.ticker()).isEqualTo(StrategyTicker.TQQQ);
+    }
+
+    @Test
+    @DisplayName("검증: VR 인출식 최소 자산 미달은 등록과 같은 문장(field null)이고 필요 자산을 파생값으로 준다")
+    void validateRegistration_vrWithdrawalShortfall_symmetric() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
+        RegisterStrategyCommand cmd = vr().deposit("1000").intervalWeeks(4).bandWidth("15.00").recurringAmount(-100).build();
+
+        StrategyValidation.FieldError error = assertRegistrationSymmetric(cmd, null);
+        assertThat(error.detail()).isEqualTo("인출식 VR 전략의 초기 자산은 10000.00 이상이어야 합니다.");
+        assertThat(strategyService.validateRegistration(USER_ID, ACCOUNT_ID, cmd).derived().requiredWithdrawalAssets())
+                .isEqualByComparingTo("10000.00");
+    }
+
+    @Test
+    @DisplayName("검증: INFINITE 최소 시드 미만은 등록과 같은 문장을 initialDeposit에 귀속한다")
+    void validateRegistration_infiniteBelowMinSeed_symmetric() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
+        when(marketData.requireLatestClose(eq(StrategyTicker.SOXL))).thenReturn(new BigDecimal("60"));
+
+        StrategyValidation.FieldError error = assertRegistrationSymmetric(infiniteSeedCommand("2000"), "initialDeposit");
+        assertThat(error.detail()).isEqualTo("최소 투자금 $2,400.00 이상이 필요합니다.");
+    }
+
+    @Test
+    @DisplayName("검증: 종목 중복(등록 409)은 같은 문장을 ticker에 귀속한다")
+    void validateRegistration_duplicateTicker_symmetric() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.SOXL)).thenReturn(List.of(ACTIVE_STRATEGY));
+
+        assertRegistrationSymmetric(infinite().ticker(StrategyTicker.SOXL).divisionCount(20).build(), "ticker");
+    }
+
+    @Test
+    @DisplayName("검증: 통과 입력은 fieldErrors가 비고 해석된 기본값·시드 미리보기를 파생값으로 주며 저장하지 않는다")
+    void validateRegistration_valid_returnsDerivedWithoutSaving() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
+        when(marketData.requireLatestClose(eq(StrategyTicker.SOXL))).thenReturn(new BigDecimal("60"));
+
+        StrategyValidation validation = strategyService.validateRegistration(USER_ID, ACCOUNT_ID,
+                infinite().deposit("3000").build());
+
+        assertThat(validation.fieldErrors()).isEmpty();
+        assertThat(validation.derived().ticker()).isEqualTo(StrategyTicker.SOXL);
+        assertThat(validation.derived().divisionCount()).isEqualTo(StrategyDefaults.DEFAULT_DIVISION_COUNT);
+        assertThat(validation.derived().basePrice()).isEqualByComparingTo("60");
+        assertThat(validation.derived().minSeed()).isEqualByComparingTo("2400");
+        verify(strategyPort, never()).save(any());
+        verifyNoInteractions(strategyVersionPort, strategyCyclePort, cyclePositionPort, eventPublisher);
+    }
+
+    @Test
+    @DisplayName("검증: 계좌 소유권 실패는 fieldError가 아니라 등록과 같은 예외로 전파된다")
+    void validateRegistration_notOwner_propagates() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenThrow(new SecurityException("계좌에 대한 접근 권한이 없습니다"));
+
+        assertThatThrownBy(() -> strategyService.validateRegistration(USER_ID, ACCOUNT_ID,
+                commandFor(StrategyType.INFINITE, null, null, null, null, null)))
+                .isInstanceOf(SecurityException.class);
+    }
+
+    @Test
+    @DisplayName("검증: 수정의 VR 연속 사이클 정책 변경은 update와 같은 문장을 cycleSeedType에 귀속하고 쓰지 않는다")
+    void validateUpdate_vrCycleSeedType_symmetric() {
+        Strategy vrStrategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
+                StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(vrStrategy);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        UpdateStrategyCommand cmd = new UpdateStrategyCommand(StrategyCycleSeedType.MAINTAIN, null);
+        Throwable thrown = catchThrowable(() -> strategyService.update(STRATEGY_ID, USER_ID, cmd));
+
+        StrategyValidation validation = strategyService.validateUpdate(STRATEGY_ID, USER_ID, cmd);
+
+        assertThat(validation.fieldErrors()).containsExactly(new StrategyValidation.FieldError("cycleSeedType", thrown.getMessage()));
+        verify(strategyPort, never()).updateCycleSeedTypeUnlessArchived(any(), any());
+    }
+
+    @Test
+    @DisplayName("검증: 수정의 INFINITE 최소 시드 미만은 update와 같은 문장을 initialDeposit에 귀속하고 최소 시드를 파생값으로 준다")
+    void validateUpdate_infiniteSeedBelowMin_symmetric() {
+        stubInfiniteSeedUpdate();
+        when(marketData.requireLatestClose(eq(StrategyTicker.SOXL))).thenReturn(new BigDecimal("60"));
+        UpdateStrategyCommand cmd = new UpdateStrategyCommand(null, new BigDecimal("2399.99"));
+        Throwable thrown = catchThrowable(() -> strategyService.update(STRATEGY_ID, USER_ID, cmd));
+        clearInvocations(strategyPort, strategyCyclePort);
+
+        StrategyValidation validation = strategyService.validateUpdate(STRATEGY_ID, USER_ID, cmd);
+
+        assertThat(validation.fieldErrors()).containsExactly(new StrategyValidation.FieldError("initialDeposit", thrown.getMessage()));
+        assertThat(validation.derived().minSeed()).isEqualByComparingTo("2400");
+        verify(strategyPort, never()).updateCycleSeedTypeUnlessArchived(any(), any());
+        verify(strategyCyclePort, never()).lockForUpdate(any());
+        verify(strategyCyclePort, never()).updateStartAmount(any(), any());
+    }
+
+    @Test
+    @DisplayName("검증: 평단가만 입력하고 수량이 없거나 0이면 등록 400과 같은 문장을 initialHoldings에 귀속한다")
+    void validateRegistration_avgPriceWithoutHoldings_symmetric() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        StrategyValidation.FieldError missing = assertRegistrationSymmetric(
+                infinite().ticker(StrategyTicker.SOXL).divisionCount(20).avgPrice(new BigDecimal("45.50")).build(), "initialHoldings");
+        assertThat(missing.detail()).isEqualTo("평단가를 입력하면 수량은 0보다 커야 합니다.");
+        assertRegistrationSymmetric(
+                infinite().ticker(StrategyTicker.SOXL).divisionCount(20).holdings(BigDecimal.ZERO).avgPrice(new BigDecimal("45.50")).build(), "initialHoldings");
     }
 }

@@ -12,6 +12,7 @@ import com.kista.tradingcore.broker.domain.model.DailyCandleQuery;
 import com.kista.tradingcore.broker.domain.model.BrokerCandle;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
+import com.kista.tradingcore.matching.domain.model.DcaIndicators;
 import com.kista.tradingcore.matching.domain.model.DcaRule;
 import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
@@ -50,7 +51,6 @@ import java.util.concurrent.atomic.AtomicReference;
 @RequiredArgsConstructor
 class DcaPlanInputCollector {
 
-    private static final int CANDLE_COUNT = 250;            // SMA 최대 200 + RSI 안정화
     private static final int PREVIOUS_SESSION_SCAN_DAYS = 10; // 직전 개장일 역탐색 상한 (연휴 여유)
     private static final Duration FEAR_GREED_TTL = Duration.ofMinutes(10); // 배치 1회를 덮는 길이 — 10분 안의 재계획은 같은 값
 
@@ -141,7 +141,7 @@ class DcaPlanInputCollector {
     private List<BigDecimal> fetchCloses(StrategyTicker ticker, LocalDate usSession) {
         return BrokerCallGuard.tryGet("DCA 일봉 조회: ticker=" + ticker + ", usSession=" + usSession, () -> {
             List<BrokerCandle> candles = marketData.dailyCandles(ticker.name(),
-                    DailyCandleQuery.lastBefore(usSession, CANDLE_COUNT, DailyCandleQuery.Adjustment.ALL));
+                    DailyCandleQuery.lastBefore(usSession, DcaIndicators.CLOSE_WINDOW, DailyCandleQuery.Adjustment.ALL));
             LocalDate expected = previousOpenSession(usSession);
             if (candles.isEmpty() || expected == null || !candles.getLast().date().equals(expected)) {
                 log.warn("[DCA] 일봉 피드 지연·부족: ticker={}, usSession={}, 기대={}, 마지막={}",

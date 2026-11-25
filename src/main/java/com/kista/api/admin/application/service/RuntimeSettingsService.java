@@ -28,6 +28,12 @@ class RuntimeSettingsService implements ApprovalPolicyPort {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public boolean approvalRequired() {
+        return settingsPort.load().approvalRequired();
+    }
+
+    @Override
     @Transactional
     public boolean approvalRequiredForUpdate() {
         return settingsPort.loadForUpdate().approvalRequired();

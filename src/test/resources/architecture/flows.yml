@@ -452,7 +452,7 @@ flows:
         title: 재신청
         desc: >-
           반려(24시간) 또는 대기(1시간) 쿨다운이 지나면 재신청할 수 있다. 승인 설정이 켜져 있으면 PENDING으로 돌아가 관리자에게 다시 승인 버튼 알림이 가고,
-          꺼져 있으면 바로 ACTIVE가 된다.
+          꺼져 있으면 바로 ACTIVE가 된다. 가능 시각은 응답 reapplyAvailableAt으로 내려간다.
         code: [AuthController#requestApproval, UserService#reapply]
         cond: PENDING 또는 REJECTED
         state: "users → PENDING 또는 ACTIVE"
@@ -478,8 +478,12 @@ flows:
         lane: user
         to: [ui]
         title: 등록 폼 입력
-        desc: 유형·종목·분할수·시드, 중간부터 시작(보유수량·평단), 시작예정일(비우면 오늘), VR 설정을 입력한다. 시드 미리보기로 최소 시드와 기준가를 볼 수 있다.
-        code: [StrategyHistoryQueryService#strategySeedPreview]
+        desc: >-
+          유형·종목·분할수·시드, 중간부터 시작(보유수량·평단), 시작예정일(비우면 오늘), VR 설정을 입력한다. 시드 미리보기로 최소 시드와 기준가를 볼 수 있다.
+          검증 전용 POST .../trading-cycle-validations는 등록과 같은 해석·검증을 저장 없이 태워 fieldErrors·warnings·파생값(해석된 기본값·VR 램프 실효값·시드 미리보기)을 200으로 준다.
+          수정·VR 재설정도 같은 형태의 update-validations·vr-config-validations가 있다.
+        code: [StrategyHistoryQueryService#strategySeedPreview, TradingCycleController#validateRegistration, StrategyCreationService#validate,
+               StrategyUpdateWriter#validate, VrReconfigureService#validate]
 
       - id: request
         lane: ui
@@ -499,7 +503,7 @@ flows:
         code: [AccountPort#requireOwnedAccount, StrategyCreationService#resolveCreationSettings, BootstrapPosition#validate,
                StrategyCreationService#resolveScheduledStart, StrategyCreationService#validateUniqueTicker,
                InfiniteMinSeedGuard#minSeed, DepositAmounts#normalizeForRegistration]
-        fail: 위반이면 400(PRIVACY는 MERITZ·MOCK 계좌만 등록 가능 — 그 외 증권사 400), 계좌+종목 중복은 409(DuplicateStrategyTickerException, 전 전략 유형 공통). DCA도 같은 계좌·종목 전략은 1개(매수·매도는 한 전략의 규칙)이고 런타임 정책(기본 비활성)이 켜져 있어야 등록된다. DCA 규칙 ruleKey는 서버가 발급한다(등록 요청에 ruleKey를 보내면 400, 수정 시 기존 키 재전송·생략=신규·없는 키 400). 중간부터 시작(initialHoldings·initialAvgPrice)은 DCA에도 허용하며 정수 주다. 예수금(initialDeposit)은 전 유형 공통으로 0 이상·계좌 통화 금액 자릿수 이하(생략=0)여야 하며 DCA는 이를 받아 시작 금액 = 예수금 + 평단×보유로 기록하고, 일반 수정(PUT)은 DCA 시드 변경을 거부한다. INFINITE는 시작 금액(예수금+보유 평가금)이 최소 시드(전일종가×분할×2) 미만이면 400 — 전일종가 조회가 실패하면 이 검증만 건너뛴다(폼이 같은 기준으로 먼저 막는다).
+        fail: 위반이면 400(PRIVACY는 MERITZ·MOCK 계좌만 등록 가능 — 그 외 증권사 400), 계좌+종목 중복은 409(DuplicateStrategyTickerException, 전 전략 유형 공통). DCA도 같은 계좌·종목 전략은 1개(매수·매도는 한 전략의 규칙)이고 런타임 정책(기본 비활성)이 켜져 있어야 등록된다. DCA 규칙 ruleKey는 서버가 발급한다(등록 요청에 ruleKey를 보내면 400, 수정 시 기존 키 재전송·생략=신규·없는 키 400). 중간부터 시작(initialHoldings·initialAvgPrice)은 DCA에도 허용하며 정수 주다. 평단가만 넣고 수량이 없으면 400이다. 예수금(initialDeposit)은 전 유형 공통으로 0 이상·계좌 통화 금액 자릿수 이하(생략=0)여야 하며 DCA는 이를 받아 시작 금액 = 예수금 + 평단×보유로 기록하고, 일반 수정(PUT)은 DCA 시드 변경을 거부한다. INFINITE는 시작 금액(예수금+보유 평가금)이 최소 시드(전일종가×분할×2) 미만이면 400 — 전일종가 조회가 실패하면 이 검증만 건너뛴다(폼이 같은 기준으로 먼저 막는다).
 
       - id: balance
         lane: worker
@@ -785,8 +789,9 @@ flows:
         title: 계좌 상세(잔고·전략·거래 이력)
         desc: >-
           계좌 상세 화면(AccountDetailContent)은 서버에서 계좌·전략 목록·전략별 다음 주문 미리보기와 증권사 실시간 포트폴리오(GET /api/accounts/{id}/portfolio)를 채운다.
+          계좌 한 건은 GET /api/accounts/{id}(응답 apiKeyExpiry 상태·남은 일수는 서버 판정)로 읽는다. 전략 응답의 allowedActions·blockedActions(사유 코드)가 버튼 활성을 정한다.
           모의계좌는 포트폴리오 조회를 건너뛴다. 거래 탭(TradesTab)은 계좌의 사이클 포지션 이력을 커서 페이지로 보여 준다(GET /api/accounts/{id}/cycle-history — DCA 포함·행마다 strategyType, 필드 deposit은 계좌 통화 예수금).
-        code: [StatisticsController#getPresentBalance, DashboardController#getCycleHistory, AccountStatisticsService#getPresentBalance, AccountStatisticsService#getByAccount]
+        code: [StatisticsController#getPresentBalance, DashboardController#getCycleHistory, AccountStatisticsService#getPresentBalance, AccountStatisticsService#getByAccount, AccountController#get, StrategyActionJudgment#of]
         fail: 포트폴리오 조회가 실패하면 예수금·평가금을 0으로 두고 화면은 계속 나온다. 다른 사람의 계좌면 403, 없으면 404, 증권사 호출 실패는 503.
 
       - id: orders-account

@@ -54,8 +54,11 @@ public class StrategyHistoryQueryService {
     public StrategySeedPreview strategySeedPreview(
             UUID accountId, UUID requesterId,
             StrategyType type, StrategyTicker ticker, int divisionCount) {
-        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
+        return strategySeedPreview(accountPort.requireOwnedAccount(accountId, requesterId), type, ticker, divisionCount);
+    }
 
+    // 소유권 검증을 마친 계좌용 — 등록 검증(StrategyCreationService.validate)이 같은 계산을 공유한다
+    public StrategySeedPreview strategySeedPreview(Account account, StrategyType type, StrategyTicker ticker, int divisionCount) {
         // 1단계: 전략 타입별 capability 로드
         CycleOrderStrategy strategy = cycleStrategies.of(type);
 

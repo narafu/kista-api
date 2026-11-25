@@ -16,6 +16,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,6 +28,7 @@ import java.util.UUID;
 public class AccountController {
 
     private final AccountService accountService;
+    private final Clock clock; // API 키 만료 판정 기준일(KST 오늘) — 테스트에서 Clock.fixed 주입
 
     // 내 계좌 목록 조회 (민감정보 마스킹)
     @Operation(summary = "내 계좌 목록 조회", description = "로그인한 사용자의 전체 계좌 목록 반환. 계좌번호는 마지막 4자리만 노출.")
@@ -33,8 +36,23 @@ public class AccountController {
     @GetMapping
     public List<AccountResponse> list(@AuthenticationPrincipal UUID userId) {
         return accountService.listByUser(userId).stream()
-                .map(AccountResponse::from)
+                .map(a -> AccountResponse.from(a, LocalDate.now(clock)))
                 .toList();
+    }
+
+    // 내 계좌 단건 조회 (소유권 검증, 목록과 같은 DTO)
+    @Operation(summary = "내 계좌 단건 조회", description = "계좌 ID로 내 계좌 1건 반환. 응답 형식은 목록 항목과 같다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
+            @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음")
+    })
+    @GetMapping("/{id}")
+    public AccountResponse get(
+            @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId) {
+        return AccountResponse.from(accountService.getOwned(id, userId), LocalDate.now(clock));
     }
 
     // 계좌 등록 (AES-256 암호화 저장)
@@ -49,7 +67,7 @@ public class AccountController {
     public AccountResponse register(@AuthenticationPrincipal UUID userId,
                                     @Valid @RequestBody AccountRequest request) {
         // 자격증명+계좌 검증은 AccountService.register()가 증권사별로 통합 처리
-        return AccountResponse.from(accountService.register(userId, request.toRegisterCommand()));
+        return AccountResponse.from(accountService.register(userId, request.toRegisterCommand()), LocalDate.now(clock));
     }
 
     // 계좌 수정 (소유권 검증)
@@ -66,7 +84,7 @@ public class AccountController {
             @AuthenticationPrincipal UUID userId,
             @RequestBody AccountRequest request) {
         return AccountResponse.from(
-                accountService.update(id, userId, request.toUpdateCommand())
+                accountService.update(id, userId, request.toUpdateCommand()), LocalDate.now(clock)
         );
     }
 
@@ -86,7 +104,7 @@ public class AccountController {
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId,
             @Valid @RequestBody CredentialsRequest request) {
-        return AccountResponse.from(accountService.updateCredentials(id, userId, request.toCommand()));
+        return AccountResponse.from(accountService.updateCredentials(id, userId, request.toCommand()), LocalDate.now(clock));
     }
 
     // 계좌 삭제 (소유권 검증)

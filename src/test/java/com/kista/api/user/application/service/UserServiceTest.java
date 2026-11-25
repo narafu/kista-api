@@ -67,6 +67,33 @@ class UserServiceTest {
         lenient().when(userServiceProvider.getObject()).thenReturn(userService);
     }
 
+    @Test
+    void reapplyAvailableAt_active는_승인설정을_조회하지_않고_null() {
+        User active = DomainFixtures.userWithStatus(UUID.randomUUID(), UserStatus.ACTIVE);
+
+        assertThat(userService.reapplyAvailableAt(active)).isNull();
+        verifyNoInteractions(approvalPolicyPort);
+    }
+
+    @Test
+    void reapplyAvailableAt_rejected는_승인설정을_조회하지_않고_24시간_후() {
+        Instant t = Instant.now(FixedClockTestConfig.FIXED);
+        User rejected = rejectedUser(UUID.randomUUID()).withStatus(UserStatus.REJECTED, t);
+
+        assertThat(userService.reapplyAvailableAt(rejected)).isEqualTo(t.plus(User.REJECTED_REAPPLY_COOLDOWN));
+        verifyNoInteractions(approvalPolicyPort);
+    }
+
+    @Test
+    void reapplyAvailableAt_pending은_승인설정에_따라_결정() {
+        Instant t = Instant.now(FixedClockTestConfig.FIXED);
+        User pending = pendingUser(UUID.randomUUID()).withStatus(UserStatus.PENDING, t);
+        when(approvalPolicyPort.approvalRequired()).thenReturn(true, false);
+
+        assertThat(userService.reapplyAvailableAt(pending)).isEqualTo(t.plus(User.PENDING_REAPPLY_COOLDOWN));
+        assertThat(userService.reapplyAvailableAt(pending)).isNull();
+    }
+
     private User pendingUser(UUID id) {
         // lastReappliedAt=null → 쿨다운 없음 (신규 PENDING)
         return DomainFixtures.userWithStatus(id, UserStatus.PENDING, (Instant) null);

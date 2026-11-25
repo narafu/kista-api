@@ -9,6 +9,7 @@ import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeConflictException;
 import com.kista.tradingcore.support.StubBrokerApiException;
 import com.kista.tradingcore.trading.domain.model.DuplicateStrategyTickerException;
+import com.kista.tradingcore.trading.domain.model.FieldRejectedException;
 import com.kista.tradingcore.trading.domain.model.OrderCancelException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -81,6 +82,8 @@ class ExceptionResponseTableTest {
             new Row("Security", () -> new SecurityException("본인 계좌가 아닙니다."), 403, "Access Denied", "ACCESS_DENIED", "본인 계좌가 아닙니다.", false),
             new Row("IllegalState", () -> new IllegalStateException("상태가 맞지 않습니다."), 400, "Invalid State", null, "상태가 맞지 않습니다.", false),
             new Row("IllegalArgument", () -> new IllegalArgumentException("값이 틀렸습니다."), 400, "Invalid Request", null, "값이 틀렸습니다.", false),
+            // 필드 귀속 IAE 하위 예외 — 검증 전용 엔드포인트만 field를 쓰고 HTTP 응답은 IAE와 같다
+            new Row("FieldRejected", () -> new FieldRejectedException("ticker", "값이 틀렸습니다."), 400, "Invalid Request", null, "값이 틀렸습니다.", false),
             new Row("NoSuchElement", () -> new NoSuchElementException("id=abc"), 404, "Resource Not Found", null, "요청한 정보를 찾을 수 없습니다.", false),
             new Row("DateTimeParse", () -> {
                 try { LocalDate.parse("2026-13-01"); return null; } catch (Exception e) { return e; }

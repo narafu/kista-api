@@ -63,16 +63,25 @@ ui 지침서: `kista-ui/docs/superpowers/fable-review/guides/`. api 태스크 �
 |---|---|---|
 | T1 required 표기, T2 BigDecimal plain number — **T1·T2 완료(2026-11-13, api `1915ba682`), ui 01 시작 가능** | ui 01 타입 SSOT(생성 타입 직접 사용) | api 먼저, ui는 타입 재생성 후 |
 | (없음) | ui 02 데이터 층(openapi-fetch, `resolveUpstream` 한 함수) ← ui 01 | ui 단독 |
-| T11 단건 조회 | ui 02의 "목록을 받아 find" 쿼리 삭제 | api 먼저 |
-| T5 메타 통합 | ui 05 메타 소비·runtime-config 통합 | api 먼저(추가만이라 안전) |
-| T6 상태 플래그 | ui 05 상태 재판정 삭제 | api 먼저 |
+| T11 단건 조회 — **api 완료(`198992106`, 2026-11-25, 미배포)**: `GET /api/accounts/{id}` | ui 02의 "목록을 받아 find" 쿼리 삭제 | api 먼저 |
+| T5 메타 통합 — **api 완료(`e13afa115`, 미배포)** | ui 05 메타 소비·runtime-config 통합 | api 먼저(추가만이라 안전) |
+| T6 상태 플래그 — **api 완료(`8975b9296`, 미배포)** | ui 05 상태 재판정 삭제 | api 먼저 |
 | T7 오류 문구 | ui 05 오류 문구 맵 삭제 | api 먼저 |
 | T3·T4 목록 규약(가계부 → 전략 주문·체결·이력 → 관리자) | ui 05 목록 페이지형, ui 06 DataList 페이지형 | **묶음별 같은 날 배포**(봉투가 바뀐다) |
 | T8 가계부 집계 | ui 05 가계부 집계 삭제 | api 먼저 |
-| T10 검증 전용 엔드포인트 | ui 05 규칙 사본 삭제, ui 04 태스크 6(전략 폼 통합, T5·T7도 필요) | api 먼저 |
-| T12 차트 지표, `reapplyAvailableAt` | ui 05 indicators.ts·localStorage 쿨다운 삭제 | api 먼저 |
+| T10 검증 전용 엔드포인트 — **api 완료(`fb9f1d1b9`, 미배포)** | ui 05 규칙 사본 삭제, ui 04 태스크 6(전략 폼 통합, T5·T7도 필요) | api 먼저 |
+| T12 차트 지표, `reapplyAvailableAt` — **api 완료(`dc419a66b`, 미배포)** | ui 05 indicators.ts·localStorage 쿨다운 삭제 | api 먼저 |
 | 지침서 04 단계 A(KIS·업비트 삭제) | ui 05 KIS·업비트 전용 코드 삭제 | 같은 배포 묶음. api의 KIS 삭제는 완료(2026-11-15, 미배포). ui에는 KIS 언급이 41파일 남아 있다(예: `features/account/create-account/steps/AccountInfoStep.tsx:57`, `ConfirmStep.tsx:24`의 `data.broker \|\| 'KIS'`, `entities/meta/__fixtures__/testMeta.ts:10`, `e2e/ledger-budget.spec.ts:12`). 운영 secret에서 뺄 키는 없다(KIS 키는 `.env.example`·compose·deploy에 없음). **ui 제거 완료(b33118f1, 2026-11-15, 미push)** |
 | T9 원칙 문서를 `docs/agents/ui-api-contract.md`로 이동 | ui 08 태스크 10(루트 CLAUDE.md가 그 경로를 가리킴) | 문서 |
+
+S7 api 완료분의 ui 후속(2026-11-25, 모두 추가만, 미배포 — N19 관찰 뒤 api 먼저 배포, ui는 `gen:types` 재생성부터):
+
+- T5: 메타 소비로 runtime-config 통합(`StrategyTypeMeta.enabled·fields·vrRampDefaults`, `BrokerMeta.enabled`, `approvalRequired`, `benchmarkEtf`), `RAMP_DEFAULTS_BY_MODE` 사본 삭제, `userStatuses` 라벨 사용. 메타가 `no-store`가 됐다. `/api/runtime-config`는 ui 전환 뒤 삭제 대상이다.
+- T6: `computeOrderReadiness`·`canWithdrawCapital`/`capitalAdjustment`·`apiKeyExpiryState`·`isScheduledStart` 재판정 삭제 → `allowedActions`/`blockedActions`(둘 다에 없으면 버튼 없음, blocked는 비활성 + 사유 라벨=메타), `apiKeyExpiry`, `warnings`. 서버 판정 밖 3건(마감 리포트 창·당일 주문 반영 전 보관·재개 시 1주 미만 잔액)은 서버 400 `detail`로 처리한다.
+- 계좌 API 키 만료일 직접 입력(토스 등 추정 증권사): 서버가 KST 오늘을 400으로 거부한다("API 키 만료일은 내일 이후여야 합니다.", Q-36). 날짜 입력 최솟값을 내일로 맞춘다.
+- T10: `strategyFormGuards`·`vrDerived`·`useTypeDefaults`·`useStrategySeedPreviewQuery` 삭제, 검증 엔드포인트 3개를 디바운스로 호출한다. 검증은 404(사용자 복제본 없음)·429/503(벤더)을 낼 수 있다. ui 규칙 사본 가운데 평단가만 입력(수량 없음)은 서버가 등록·검증에서 막는다(2026-11-25, 이 행의 후속 커밋). 나머지 4건은 서버가 검증하지 않으므로 `strategyFormGuards`에서 지우지 말고 남긴다: 비VR 예수금>0·PRIVACY 최소 시드(서버에 넣으면 지금 등록되는 null 예수금이 거절돼 사용자 결정 Q-35), NO_PRIVACY_BASE(기준표가 22:00Z 무렵 들어와 시점마다 결과가 달라 ui가 derived.skipReason으로 막는다), VR recurringMode≠HOLD인데 금액 0(폼 모드 개념). 메타가 런타임 값을 실어 `/api/meta`가 정책 조회(worker)에 묶인다 — worker 재기동 중에는 기본 정책이 내려가고 지연은 최대 10초다.
+- T11: 계좌 목록 `find` 대신 `GET /api/accounts/{id}`.
+- T12: `indicators.ts` 삭제·캔들 `sma*`/`rsi14` 사용(RAW 종가 기준), localStorage 쿨다운 삭제 → `reapplyAvailableAt`.
 
 **테스트 짝 확인**(ui 테스트를 지우기 전에 서버 테스트가 같은 케이스를 갖는지 대조한다. ui 07):
 

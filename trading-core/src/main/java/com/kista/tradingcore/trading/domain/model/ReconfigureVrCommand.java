@@ -25,23 +25,23 @@ public record ReconfigureVrCommand(
     // 투자금 조정 입력 검증 — 음수 거부, 인출은 현재 보유 수량·예수금 이내(wholeShares: 정수 보유 수량, holdings: 문구 표시용)
     public void validateCapitalAdjustment(int wholeShares, BigDecimal holdings, BigDecimal deposit) {
         if (injectSharesOrZero() < 0) {
-            throw new IllegalArgumentException("투자금 추가 주식 수는 0 이상이어야 합니다.");
+            throw new FieldRejectedException("injectShares", "투자금 추가 주식 수는 0 이상이어야 합니다.");
         }
         if (injectDepositOrZero().signum() < 0) {
-            throw new IllegalArgumentException("투자금 추가 예수금은 0 이상이어야 합니다.");
+            throw new FieldRejectedException("injectDeposit", "투자금 추가 예수금은 0 이상이어야 합니다.");
         }
         if (withdrawSharesOrZero() < 0) {
-            throw new IllegalArgumentException("투자금 인출 주식 수는 0 이상이어야 합니다.");
+            throw new FieldRejectedException("withdrawShares", "투자금 인출 주식 수는 0 이상이어야 합니다.");
         }
         if (withdrawSharesOrZero() > wholeShares) {
-            throw new IllegalArgumentException(
+            throw new FieldRejectedException("withdrawShares",
                     "투자금 인출 주식 수는 보유 수량(" + holdings + ")을 초과할 수 없습니다.");
         }
         if (withdrawDepositOrZero().signum() < 0) {
-            throw new IllegalArgumentException("투자금 인출 예수금은 0 이상이어야 합니다.");
+            throw new FieldRejectedException("withdrawDeposit", "투자금 인출 예수금은 0 이상이어야 합니다.");
         }
         if (withdrawDepositOrZero().compareTo(deposit) > 0) {
-            throw new IllegalArgumentException(
+            throw new FieldRejectedException("withdrawDeposit",
                     "투자금 인출 예수금은 보유 예수금(" + deposit + ")을 초과할 수 없습니다.");
         }
     }

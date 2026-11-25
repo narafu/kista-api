@@ -4,7 +4,9 @@ import com.kista.shared.kernel.NotificationChannel;
 import com.kista.shared.kernel.UserRole;
 import com.kista.shared.kernel.UserStatus;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -23,6 +25,8 @@ public record User(
         @With NotificationChannel notificationChannel // 알림 수단
 ) {
     public static final NotificationChannel DEFAULT_CHANNEL = NotificationChannel.NONE; // 신규 유저 기본값
+    public static final Duration PENDING_REAPPLY_COOLDOWN = Duration.ofHours(1);   // PENDING 상태 재신청 쿨다운
+    public static final Duration REJECTED_REAPPLY_COOLDOWN = Duration.ofHours(24); // REJECTED 상태 재신청 쿨다운
 
     // 재신청 쿨다운 미경과 시 발생 — ProblemDetailExceptionHandler에서 429(Retry-After) 매핑
     public static class CooldownException extends RuntimeException {
@@ -81,4 +85,22 @@ public record User(
                 botToken, chatId, botUsername, rejectReason, lastReappliedAt, notificationChannel);
     }
 
+    // 재신청 쿨다운 해제 시각 — 쿨다운이 걸려 있으면 그 시각, 지났거나 적용 대상이 아니면 null (reapply 판정·/me 노출 공용)
+    // 승인 불필요 전환 직후 남은 PENDING은 쿨다운 없이 즉시 재신청 가능하다
+    public @Nullable Instant reapplyAvailableAt(boolean approvalRequired, Instant now) {
+        Duration cooldown = switch (status) {
+            case PENDING -> approvalRequired ? PENDING_REAPPLY_COOLDOWN : null;
+            case REJECTED -> REJECTED_REAPPLY_COOLDOWN;
+            default -> null;
+        };
+        if (cooldown == null || lastReappliedAt == null) return null;
+        Instant availableAt = lastReappliedAt.plus(cooldown);
+        return now.isBefore(availableAt) ? availableAt : null;
+    }
+
+    // 쿨다운 미경과 시 CooldownException — reapply()가 호출
+    public void requireReapplyAllowed(boolean approvalRequired, Instant now) {
+        Instant availableAt = reapplyAvailableAt(approvalRequired, now);
+        if (availableAt != null) throw new CooldownException(availableAt);
+    }
 }

@@ -12,6 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.context.annotation.Import;
+import com.kista.shared.support.FixedClockTestConfig;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -31,6 +33,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Import(FixedClockTestConfig.class) // API 키 만료 판정 기준일(KST 오늘)
 @WebMvcTest(AccountController.class)
 @Execution(ExecutionMode.SAME_THREAD)
 class AccountControllerTest {
@@ -54,6 +57,42 @@ class AccountControllerTest {
     @Test
     void list_accounts_anonymous_returns_401() throws Exception {
         mockMvc.perform(get("/api/accounts"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void get_account_returns_200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(accountService.getOwned(id, UUID.fromString(USER_ID)))
+                .thenReturn(com.kista.tradingcore.support.TradingFixtures.stockAccount(id, UUID.fromString(USER_ID)));
+
+        mockMvc.perform(get("/api/accounts/" + id)
+                        .with(authentication(userToken(UUID.fromString(USER_ID)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.toString()));
+    }
+
+    @Test
+    void get_account_not_owner_returns_403() throws Exception {
+        when(accountService.getOwned(any(), any())).thenThrow(new SecurityException("계좌에 대한 접근 권한이 없습니다"));
+
+        mockMvc.perform(get("/api/accounts/" + UUID.randomUUID())
+                        .with(authentication(userToken(UUID.fromString(USER_ID)))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void get_account_missing_returns_404() throws Exception {
+        when(accountService.getOwned(any(), any())).thenThrow(new java.util.NoSuchElementException("계좌를 찾을 수 없습니다."));
+
+        mockMvc.perform(get("/api/accounts/" + UUID.randomUUID())
+                        .with(authentication(userToken(UUID.fromString(USER_ID)))))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void get_account_anonymous_returns_401() throws Exception {
+        mockMvc.perform(get("/api/accounts/" + UUID.randomUUID()))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -259,5 +298,20 @@ class AccountControllerTest {
                 .andExpect(status().isOk());
         verify(accountService).update(id, UUID.fromString(USER_ID),
                 new com.kista.tradingcore.account.domain.model.UpdateAccountCommand("새이름", null));
+    }
+
+    @Test
+    void list_accounts_carriesApiKeyExpiry() throws Exception {
+        // 고정 Clock KST 2026-01-06 기준 — 만료 2026-01-12(KST)는 6일 남아 EXPIRING
+        when(accountService.listByUser(any())).thenReturn(List.of(
+                new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID), "토스계좌", "131-01-001931", "cid", "csecret", "42",
+                        Broker.TOSS, null, java.time.Instant.parse("2026-01-12T00:00:00+09:00"))));
+
+        mockMvc.perform(get("/api/accounts")
+                        .with(authentication(userToken(UUID.fromString(USER_ID)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].apiKeyExpiry.status").value("EXPIRING"))
+                .andExpect(jsonPath("$[0].apiKeyExpiry.expiresOn").value("2026-01-12"))
+                .andExpect(jsonPath("$[0].apiKeyExpiry.daysLeft").value(6));
     }
 }

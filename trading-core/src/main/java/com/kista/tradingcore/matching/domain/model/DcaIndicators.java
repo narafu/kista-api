@@ -10,6 +10,8 @@ public final class DcaIndicators {
 
     public static final int RSI_PERIOD = 14; // RSI 기간 고정 (spec 1장 RSI(14))
 
+    public static final int CLOSE_WINDOW = 250; // DCA 판정이 조회하는 종가 개수 (SMA 최대 200 + RSI 안정화) — 차트 RSI도 같은 창 길이를 쓴다(차트는 RAW 종가, DCA는 조정 종가라 값은 다를 수 있음)
+
     private DcaIndicators() {}
 
     // 마지막 period개 종가 평균 — 부족하면 empty

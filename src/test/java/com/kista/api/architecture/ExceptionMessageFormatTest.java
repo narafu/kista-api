@@ -26,7 +26,7 @@ class ExceptionMessageFormatTest {
             Path.of("src/main/java"), Path.of("trading-core/src/main/java"), Path.of("shared/src/main/java"));
     // 동결된 기존 위반 목록 — 고치면 이 파일에서도 지운다(stale 항목은 실패)
     private static final Path ALLOWLIST = Path.of("src/test/resources/architecture/exception-message-allowlist.txt");
-    private static final Pattern THROW_SITE = Pattern.compile("new (IllegalArgumentException|IllegalStateException)\\(");
+    private static final Pattern THROW_SITE = Pattern.compile("new (IllegalArgumentException|IllegalStateException|FieldRejectedException)\\(");
     private static final Pattern LAYER_PATH = Pattern.compile("/(application|domain)/");
 
     @Test
@@ -58,6 +58,8 @@ class ExceptionMessageFormatTest {
         assertThat(violationsIn("throw new IllegalStateException(String.format(\"금액 %.2f 미만입니다.\", x) + id);")).hasSize(1);
         assertThat(violationsIn("throw new IllegalArgumentException(\"값 %s입니다.\".formatted(x) + id);")).hasSize(1);
         assertThat(violationsIn("throw new IllegalArgumentException(\"마침표 없음입니다\");")).hasSize(1);
+        assertThat(violationsIn("throw new FieldRejectedException(\"gMax\", \"마침표 없음입니다\");")).hasSize(1);
+        assertThat(violationsIn("throw new FieldRejectedException(\"gMax\", \"상한이 틀렸습니다.\");")).isEmpty();
         assertThat(violationsIn("throw new IllegalArgumentException(\"DCA 전략이 아닙니다: \" + id);")).hasSize(1);
         assertThat(violationsIn("throw new IllegalArgumentException(\"잘못된 값입니다.\" + id);")).hasSize(1);
         assertThat(violationsIn("throw new IllegalArgumentException(c ? \"정수여야 합니다.\"\n : \"소수여야 합니다\");")).hasSize(1);
@@ -83,7 +85,11 @@ class ExceptionMessageFormatTest {
         Matcher m = THROW_SITE.matcher(source);
         while (m.find()) {
             String args = source.substring(m.end(), closingParen(source, m.end()));
-            String message = splitTopLevel(args, ',').getFirst();
+            List<String> argList = splitTopLevel(args, ',');
+            // FieldRejectedException(field, message)는 둘째 인자가 메시지 — 인자 하나(cause 생성자 등)는 대상 아님
+            boolean fieldRejected = m.group(1).equals("FieldRejectedException");
+            if (fieldRejected && argList.size() < 2) continue;
+            String message = argList.get(fieldRejected ? 1 : 0);
             List<String> branches = ternaryBranches(message);
             boolean violated = false;
             List<String> literals = new ArrayList<>();

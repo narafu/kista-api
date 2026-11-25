@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.domain.creation;
 
+import com.kista.shared.kernel.RecurringMode;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.matching.domain.model.StrategyVrDetail;
 import com.kista.tradingcore.trading.domain.model.RegisterStrategyCommand;
@@ -89,5 +90,13 @@ class VrRampInputTest {
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, null, null, null, null, null,
                 null, null, null, null, null, null, null);
         assertThat(cmd.vrRamp()).isEqualTo(VrRampInput.NONE);
+    }
+
+    // 메타 번들용 모드별 기본값표 — 대표 금액(+1/0/-1)으로 withDefaults 표와 같은 값이 나온다
+    @Test
+    void defaultsFor_matchesWithDefaultsPerMode() {
+        assertThat(VrRampInput.defaultsFor(RecurringMode.DEPOSIT)).isEqualTo(VrRampInput.NONE.withDefaults(100));
+        assertThat(VrRampInput.defaultsFor(RecurringMode.HOLD)).isEqualTo(VrRampInput.NONE.withDefaults(0));
+        assertThat(VrRampInput.defaultsFor(RecurringMode.WITHDRAW)).isEqualTo(VrRampInput.NONE.withDefaults(-100));
     }
 }

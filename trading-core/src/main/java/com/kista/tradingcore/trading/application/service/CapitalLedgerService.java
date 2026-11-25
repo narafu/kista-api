@@ -17,6 +17,7 @@ import com.kista.tradingcore.trading.domain.model.DepositAmounts;
 import com.kista.tradingcore.trading.domain.model.InjectCapitalCommand;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.Strategy;
+import com.kista.tradingcore.trading.domain.model.StrategyAction;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.trading.domain.model.WithdrawCapitalCommand;
 import lombok.RequiredArgsConstructor;
@@ -74,7 +75,7 @@ public class CapitalLedgerService {
         cmd.validate();
         BigDecimal deposit = cmd.depositOrZero();
         int shares = cmd.sharesOrZero();
-        requireSupportedType(strategy, "투자금 추가는 PRIVACY·INFINITE·DCA 전략만 지원합니다.");
+        requireSupportedType(strategy, StrategyAction.INJECT_CAPITAL, "투자금 추가는 PRIVACY·INFINITE·DCA 전략만 지원합니다.");
         if (strategy.isDca() && cmd.shares() != null) {
             throw new IllegalArgumentException("DCA 전략은 예수금만 추가할 수 있습니다.");
         }
@@ -164,12 +165,13 @@ public class CapitalLedgerService {
         if (amount == null || amount.signum() <= 0) {
             throw new IllegalArgumentException("투자금 인출 금액은 0보다 커야 합니다.");
         }
-        requireSupportedType(strategy, "투자금 인출은 PRIVACY·INFINITE·DCA 전략만 지원합니다.");
+        requireSupportedType(strategy, StrategyAction.WITHDRAW_CAPITAL, "투자금 인출은 PRIVACY·INFINITE·DCA 전략만 지원합니다.");
         DepositAmounts.requireScale(amount, currency);
     }
 
-    private static void requireSupportedType(Strategy strategy, String message) {
-        if (!strategy.isPrivacy() && !strategy.isInfinite() && !strategy.isDca()) {
+    // 지원 종류는 StrategyAction.supports가 SSOT — 응답 allowedActions 판정과 같은 기준
+    private static void requireSupportedType(Strategy strategy, StrategyAction action, String message) {
+        if (!action.supports(strategy.type())) {
             throw new IllegalArgumentException(message);
         }
     }

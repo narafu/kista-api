@@ -3,12 +3,15 @@ package com.kista.tradingcore.trading.adapter.in.web.dto;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.kista.tradingcore.trading.domain.model.Strategy;
+import com.kista.tradingcore.trading.domain.model.StrategyAction;
+import com.kista.tradingcore.trading.domain.model.StrategyActionJudgment;
 import com.kista.tradingcore.trading.domain.model.StrategyDetail;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
@@ -49,8 +52,20 @@ public record TradingCycleResponse(
         @Nullable BigDecimal ledgerDeposit,
         @Schema(description = "등록 응답 전용 — 오늘 시작인데 오늘 개장 배치(22:00 KST, 월~금) 이후 등록돼 오늘 밤 장 시작 주문(INFINITE 지정가 매도·VR 사다리)이 자동 생성되지 않으면 true(PRIVACY는 항상 false, 미국 휴장일엔 거짓 양성 가능). 등록 외 응답에선 생략")
         @JsonInclude(JsonInclude.Include.NON_NULL)
-        @Nullable Boolean todayOpenBatchMissed
+        @Nullable Boolean todayOpenBatchMissed,
+        @Schema(description = "지금 가능한 전략 행위 (enum 선언순). allowedActions ∪ blockedActions[].action = 이 전략 종류가 지원하는 행위 전체 — 둘 다에 없으면 미지원. 마감 리포트 창·보관 전 당일 주문 마감 반영·재개 시 원장 부족은 판정하지 않아 요청 시 거절될 수 있다")
+        List<StrategyAction> allowedActions,
+        @Schema(description = "지원하지만 지금 막힌 전략 행위와 사유 (사유 문구는 메타 strategyActionBlockReasons)")
+        List<BlockedAction> blockedActions
 ) {
+    // 막힌 행위 하나 — 사유 코드는 항상 있다
+    public record BlockedAction(
+            @Schema(description = "막힌 행위", example = "ARCHIVE")
+            StrategyAction action,
+            @Schema(description = "막힌 사유", example = "HAS_HOLDINGS")
+            StrategyAction.BlockReason reasonCode
+    ) {}
+
     // VR 전략 응답 요약 DTO
     public record VrSummary(
             @Schema(description = "V값 (실력 기준선)")
@@ -101,6 +116,7 @@ public record TradingCycleResponse(
 
     private static TradingCycleResponse of(StrategyDetail detail, Boolean todayOpenBatchMissed) {
         Strategy c = detail.strategy();
+        StrategyActionJudgment actions = StrategyActionJudgment.of(detail); // 이미 조립된 상세만으로 판정 — 추가 조회 없음
         return new TradingCycleResponse(
                 c.id(), c.accountId(),
                 c.type().name(), c.status().name(),
@@ -115,7 +131,9 @@ public record TradingCycleResponse(
                 detail.dca() != null ? DcaResponse.from(detail.dca()) : null,
                 detail.cycleInProgress(),
                 detail.ledgerDeposit(),
-                todayOpenBatchMissed
+                todayOpenBatchMissed,
+                actions.allowed(),
+                actions.blocked().stream().map(b -> new BlockedAction(b.action(), b.reason())).toList()
         );
     }
 

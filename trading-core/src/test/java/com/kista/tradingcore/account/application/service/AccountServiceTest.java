@@ -177,6 +177,25 @@ class AccountServiceTest {
     }
 
     @Test
+    @DisplayName("단건 조회는 소유권 검증된 계좌를 반환한다")
+    void getOwned_returns_owned_account() {
+        Account account = activeAccount(userId);
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
+
+        assertThat(accountService.getOwned(accountId, userId)).isSameAs(account);
+    }
+
+    @Test
+    @DisplayName("단건 조회 시 타 사용자 계좌는 SecurityException, 없는 계좌는 NoSuchElementException")
+    void getOwned_propagates_forbidden_and_not_found() {
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenThrow(new SecurityException("소유자가 아닙니다"));
+        assertThatThrownBy(() -> accountService.getOwned(accountId, userId)).isInstanceOf(SecurityException.class);
+
+        doThrow(new java.util.NoSuchElementException("계좌를 찾을 수 없습니다.")).when(accountPort).requireOwnedAccount(accountId, userId);
+        assertThatThrownBy(() -> accountService.getOwned(accountId, userId)).isInstanceOf(java.util.NoSuchElementException.class);
+    }
+
+    @Test
     @DisplayName("타 사용자 계좌 수정 시 SecurityException 발생 (→ 403)")
     void update_by_non_owner_throws_forbidden() {
         when(accountPort.requireOwnedAccount(accountId, userId))
@@ -501,7 +520,7 @@ class AccountServiceTest {
     // ---- API 키 만료일 결정 (토스·메리츠 추정/사용자 입력) ----
 
     private static final String MANUAL_REJECTED = "이 거래소는 API 키 만료일을 직접 바꿀 수 없습니다.";
-    private static final String PAST_REJECTED = "API 키 만료일은 오늘 이후여야 합니다.";
+    private static final String PAST_REJECTED = "API 키 만료일은 내일 이후여야 합니다.";
 
     // Toss 등록 공통 stub — 검증은 만료일 없이 통과
     private void stubTossRegister() {
@@ -589,14 +608,14 @@ class AccountServiceTest {
 
     @Test
     void manualExpiryUsesKstToday() {
-        // 고정 시각은 UTC 11-10이지만 KST로는 11-11 — 11-10은 어제라 거부, 11-11(오늘)은 허용
+        // 고정 시각은 UTC 11-10이지만 KST로는 11-11 — 11-11(오늘)은 저장 즉시 만료라 거부, 11-12(내일)는 허용
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(tossAccountExpiring(null));
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        assertThatThrownBy(() -> accountService.update(accountId, userId, new UpdateAccountCommand("닉", LocalDate.of(2026, 11, 10))))
+        assertThatThrownBy(() -> accountService.update(accountId, userId, new UpdateAccountCommand("닉", LocalDate.of(2026, 11, 11))))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage(PAST_REJECTED);
-        Account saved = accountService.update(accountId, userId, new UpdateAccountCommand("닉", LocalDate.of(2026, 11, 11)));
-        assertThat(saved.apiKeyExpiresAt()).isEqualTo(Instant.parse("2026-11-10T15:00:00Z"));
+        Account saved = accountService.update(accountId, userId, new UpdateAccountCommand("닉", LocalDate.of(2026, 11, 12)));
+        assertThat(saved.apiKeyExpiresAt()).isEqualTo(Instant.parse("2026-11-11T15:00:00Z"));
     }
 
     @Test
