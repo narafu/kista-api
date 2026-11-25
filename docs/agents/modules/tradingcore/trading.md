@@ -21,6 +21,11 @@
 - 시드 수정은 비-VR 진행 중 사이클의 최신 포지션 `holdings=0`일 때만 허용, 종료 사이클이면 400(재개 후 수정)
 - 응답 `ledgerDeposit`이 UI 최대 인출 기준이다(DB `cycle_position.deposit`·도메인 `deposit`은 이름 유지)
 
+### 상태 플래그·검증 엔드포인트
+- 행위 판정 SSOT: `StrategyAction.supports(type)`(종류별 지원 동작)·`StrategyActionJudgment.of(detail)`(`allowedActions`/`blockedActions{action,reasonCode}`). 불변식 allowed ∪ blocked = 지원 전체. 서비스 가드(`requireSupportedType` 등)도 `supports()`를 쓴다. 미리보기 `warnings`는 `OrderPreviewWarning`
+- 한계: 마감 리포트 창·당일 주문 반영 전 보관·재개 시 1주 미만 잔액은 판정 밖이라 allowed여도 400 가능
+- 검증 POST `trading-cycle-validations`·`update-validations`·`vr-config-validations`: 통과·거절 모두 200 `{fieldErrors[{field,detail}], warnings[{code,detail}], derived}`. 등록·수정·재설정과 같은 `plan()`을 저장 없이 공유(거절 순서 동일). 경고 `AVAILABLE_CASH_EXCEEDED`
+
 ### Account ↔ Strategy 분리
 - 계좌(account 모듈)와 전략은 별도 aggregate다. `Account`에 type/status/ticker/multiple을 다시 두지 않는다 — 전략 속성은 `Strategy` 소유
 - `CyclePosition`은 체결마다 append되는 스냅샷이다(dedup/UNIQUE 없음). 투자금·시드 변경만 최신 행을 in-place로 바꾼다

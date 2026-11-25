@@ -14,3 +14,5 @@ Spring Modulith 모듈(CLOSED) — 가입·승인·프로필·설정 + JWT/Refre
 
 ### 상태 종속 민감 필드 마스킹 (rejectReason 사례)
 `User.rejectReason`은 REJECTED에서만 의미가 있어 `UserResponse.from()`이 `status() == REJECTED`일 때만 노출하고 그 외는 `null`을 강제한다. 특정 상태에서만 유효한 민감 필드는 DB엔 보존하고 응답 DTO `from()`에서 상태 조건부로 마스킹한다.
+
+- 재신청 쿨다운 SSOT는 `User`(`reapplyAvailableAt`·`requireReapplyAllowed`, PENDING 1h·REJECTED 24h). `UserResponse.reapplyAvailableAt`로 ui에 내려간다(승인 불필요면 null)

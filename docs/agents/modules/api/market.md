@@ -13,3 +13,5 @@ com.kista.api.market/    ← Spring Modulith 모듈(CLOSED, root 전용) — 공
   adapter/out/feargreed/ ← CnnFearGreedAdapter/CryptoFearGreedAdapter(포트 없음, 서비스가 직접 사용)/FearGreedConfig
   adapter/out/internal/ ← MarketCalendarQueryHttpAdapter(`/api/internal/marketcalendar/**`)/CandleQueryHttpAdapter(`/api/internal/broker/candles/latest`, 일봉만)
   adapter/out/persistence/feargreed/ ← FearGreedSnapshotEntity + JpaRepository + PersistenceAdapter
+
+- 캔들 응답 `sma20/50/120/200·rsi14`(`TossCandleResponse`): RAW 종가 기준이며 DCA(수정주가)와 같은 `DcaIndicators` 코드·다른 입력이다. RSI 창 `DcaIndicators.CLOSE_WINDOW`(250)

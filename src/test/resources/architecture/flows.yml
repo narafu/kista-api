@@ -452,7 +452,7 @@ flows:
         title: 재신청
         desc: >-
           반려(24시간) 또는 대기(1시간) 쿨다운이 지나면 재신청할 수 있다. 승인 설정이 켜져 있으면 PENDING으로 돌아가 관리자에게 다시 승인 버튼 알림이 가고,
-          꺼져 있으면 바로 ACTIVE가 된다.
+          꺼져 있으면 바로 ACTIVE가 된다. 가능 시각은 응답 reapplyAvailableAt으로 내려간다.
         code: [AuthController#requestApproval, UserService#reapply]
         cond: PENDING 또는 REJECTED
         state: "users → PENDING 또는 ACTIVE"
@@ -789,8 +789,9 @@ flows:
         title: 계좌 상세(잔고·전략·거래 이력)
         desc: >-
           계좌 상세 화면(AccountDetailContent)은 서버에서 계좌·전략 목록·전략별 다음 주문 미리보기와 증권사 실시간 포트폴리오(GET /api/accounts/{id}/portfolio)를 채운다.
+          계좌 한 건은 GET /api/accounts/{id}(응답 apiKeyExpiry 상태·남은 일수는 서버 판정)로 읽는다. 전략 응답의 allowedActions·blockedActions(사유 코드)가 버튼 활성을 정한다.
           모의계좌는 포트폴리오 조회를 건너뛴다. 거래 탭(TradesTab)은 계좌의 사이클 포지션 이력을 커서 페이지로 보여 준다(GET /api/accounts/{id}/cycle-history — DCA 포함·행마다 strategyType, 필드 deposit은 계좌 통화 예수금).
-        code: [StatisticsController#getPresentBalance, DashboardController#getCycleHistory, AccountStatisticsService#getPresentBalance, AccountStatisticsService#getByAccount]
+        code: [StatisticsController#getPresentBalance, DashboardController#getCycleHistory, AccountStatisticsService#getPresentBalance, AccountStatisticsService#getByAccount, AccountController#get, StrategyActionJudgment#of]
         fail: 포트폴리오 조회가 실패하면 예수금·평가금을 0으로 두고 화면은 계속 나온다. 다른 사람의 계좌면 403, 없으면 404, 증권사 호출 실패는 503.
 
       - id: orders-account

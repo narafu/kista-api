@@ -360,6 +360,27 @@
 - 답: 자체 결정 ①. 알려진 한계: 보류 알림이 KST 자정까지 매시 반복되고, 보류일에도 heartbeat는 핑하며, `CloseReportScope` 창은 마감+10부터 시작한다(리포트보다 이르지만 보수적이라 유지).
 - 멈춘 범위: 없음.
 
+### Q-31 S7 T5: `description` 필드를 유지하고 원천 있는 enum만 채운다
+- 상태: 자체 결정(2026-11-25)
+- 묶음·태스크: S7 / 10 T5
+- 걸린 곳: 지침서 2-3 "필드를 없앤다" 대 추가만 원칙. `StrategyTypeMeta`는 label==description이다.
+- 답: 자체 결정. 추가만 원칙이 우선이라 `description`은 유지하고 설명 원천이 있는 enum(ETF 명칭)만 채운다. label 값은 바꾸지 않는다. 반대쪽: label을 짧게 바꾸면 ui 화면 문구가 바뀌어 ui 확인이 필요하다.
+
+### Q-32 S7 T5: 메타 `Cache-Control`을 1시간에서 `no-store`로 바꾼다
+- 상태: 자체 결정(2026-11-25)
+- 묶음·태스크: S7 / 10 T5
+- 답: 자체 결정. 런타임 값(활성 여부·기본값·승인 설정)이 섞여 캐시하면 낡은 값이 나간다. 반대쪽: 요청마다 DB 1회와 정책 조회(같은 프로세스 내부 HTTP, 타임아웃 3s/10s, 실패 시 기본 정책으로 강등)가 든다.
+
+### Q-33 S7 T5: 앱셸 ArchUnit 규칙에 `RuntimeConfigService` 하나만 예외로 둔다
+- 상태: 자체 결정(2026-11-25)
+- 묶음·태스크: S7 / 10 T5
+- 답: 자체 결정. admin `RuntimeConfigService`를 `NamedInterface("api")`로 공개하고 `HexagonalArchitectureTest`에 그 클래스만 예외로 둔다. 반대쪽: 포트 래퍼는 `interfaces_must_earn_their_keep` 위반이다.
+
+### Q-34 S7 T6·T10·T12 판정 범위
+- 상태: 자체 결정(2026-11-25)
+- 묶음·태스크: S7 / 10 T6·T10·T12
+- 답: ① T6 마감 리포트 창·당일 주문 반영 전 보관·재개 시 1주 미만 잔액은 판정에서 제외한다(응답 조립 때 데이터가 없다) → allowed여도 400이 날 수 있고 ui는 400 `detail`을 보인다. ② T10 `fieldErrors`는 `{field, detail}`(지침서 2-5, 초안의 `message`는 오류)이고 경고 `AVAILABLE_CASH_EXCEEDED`를 더했다. ③ T12 캔들 지표는 RAW 종가, DCA는 수정주가라 같은 코드·다른 입력이다. RSI 창은 250(`DcaIndicators.CLOSE_WINDOW`, DCA 수집과 같음).
+
 ## Fable 대기 작업 (2026-11-15 추가) — 2026-11-16 처리
 
 | 항목 | 결과 | 원본 |
