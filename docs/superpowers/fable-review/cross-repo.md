@@ -83,6 +83,14 @@ S7 api 완료분의 ui 후속(2026-11-25, 모두 추가만, 미배포 — N19 �
 - T11: 계좌 목록 `find` 대신 `GET /api/accounts/{id}`.
 - T12: `indicators.ts` 삭제·캔들 `sma*`/`rsi14` 사용(RAW 종가 기준), localStorage 쿨다운 삭제 → `reapplyAvailableAt`.
 
+S7 후속 C(ui `72ff7d9d`·`90432a39`)의 api 요청 처리(2026-11-25, 미배포 — 위 S7 묶음과 같이 api 먼저 배포):
+
+- 요청 1 수정 검증 derived 보강(`3b13d6c8f`): `POST /api/trading-cycles/{id}/update-validations`에 `newSeed`가 있으면 등록 검증과 같은 시드 미리보기로 `derived.basePrice`·`minSeed`·`skipReason`·`availableCash`를 채운다(PRIVACY 포함, 시세 실패는 fail-open으로 넷 다 null). INFINITE `minSeed`는 예전 의미(활성 버전 분할 수 기준) 그대로다. 입력 시드가 가용 예수금보다 크면 `warnings`에 `AVAILABLE_CASH_EXCEEDED`. PRIVACY 최소 시드 미만·`NO_PRIVACY_BASE`는 서버가 거절하지 않는다(Q-35) — ui가 derived로 막는다. `newSeed`가 없으면 derived는 전부 null.
+- 요청 2 금액 통화 기호(`3b13d6c8f`): `Currency.display`(USD `$1,234.50`, 그 외 `15,000원`)로 통일하고 가용 예수금 경고는 계좌 통화로 포맷한다. 지금 증권사(메리츠·토스·Mock)가 전부 USD라 KRW 계좌는 만들 수 없고 실제 문장은 바뀌지 않는다. `OrderPreviewWarning`·`InfiniteMinSeedGuard`는 USD 전용 경로라 USD 표기를 유지, `CapitalLedgerService`는 이미 계좌 통화였다.
+- 요청 3 `/api/runtime-config` 삭제(`5a6173d7c`): 컨트롤러·테스트·공개 경로 매처 삭제. `RuntimeConfigService`(메타 출처)와 관리자 `GET/PUT /api/admin/settings`는 그대로다. 메타 DTO `@Schema` 설명 문구도 바뀌었다.
+- 참고 Bean Validation 400 `fieldErrors`: 지침서 10 T7(로드맵 N6)이다. 선행(S5 P1)은 끝났지만 아직 착수하지 않았고 날짜는 정해지지 않았다. 착수하면 이 절에 적는다.
+- **ui가 할 일**: `gen:types` 재생성(runtime-config 경로 제거·메타 설명 변경 반영), 수정 화면(보유 0·시드 수정)에서 가용 예수금 힌트·25·50·75·100% 버튼(`derived.availableCash`), 기준가(`derived.basePrice`), PRIVACY 최소 시드 판정(`derived.minSeed`)·기준표 없음 차단(`derived.skipReason`)을 update-validations derived에 다시 연결, `AVAILABLE_CASH_EXCEEDED` 경고 표시는 등록과 같은 방식으로.
+
 **테스트 짝 확인**(ui 테스트를 지우기 전에 서버 테스트가 같은 케이스를 갖는지 대조한다. ui 07):
 
 | ui 테스트 | 서버 쪽 대응 |
