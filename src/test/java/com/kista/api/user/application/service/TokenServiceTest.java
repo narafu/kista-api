@@ -93,10 +93,27 @@ class TokenServiceTest {
         assertRetryReturnsSameSuccessor(Instant.now(clock).minusSeconds(30));
     }
 
-    // grace 없음: 회전 1일 뒤 재시도도 같은 후계
+    // 재시도 허용 창 경계: 정확히 AT_TTL 경과는 같은 후계 반환
     @Test
-    void refresh_rotatedOneDayAgo_stillReturnsSameSuccessor() {
+    void refresh_rotatedExactlyRetryWindowAgo_returnsSameSuccessor() {
         assertRetryReturnsSameSuccessor(Instant.now(clock).minus(Duration.ofDays(1)));
+    }
+
+    // AT_TTL+1초 경과 → 이 기기만 거부, 저장·폐기 없음
+    @Test
+    void refresh_rotatedBeyondRetryWindow_rejectsWithoutRevoke() {
+        String rawToken = "oldRotatedToken";
+        String hash = TokenService.sha256Hex(rawToken);
+        String successorHash = TokenService.sha256Hex(deriver.successorOf(rawToken));
+        given(refreshTokenPort.findByTokenHash(hash)).willReturn(
+                Optional.of(makeRt(hash, future(), Instant.now(clock).minus(Duration.ofDays(1)).minusSeconds(1))));
+        given(refreshTokenPort.findByTokenHash(successorHash))
+                .willReturn(Optional.of(makeRt(successorHash, future(), null)));
+
+        assertThatThrownBy(() -> tokenService.refresh(rawToken, "ua"))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+        verify(refreshTokenPort, never()).save(any());
+        verify(refreshTokenPort, never()).deleteAllByUserId(any());
     }
 
     private void assertRetryReturnsSameSuccessor(Instant rotatedAt) {

@@ -359,7 +359,7 @@ ui 코드 변경은 필요 없다. ui가 부르는 `/api/auth` 경로 6개(`kaka
 
 ## K. RT 갱신 재시도 안전화 (2026-11-25, 사용자 요청)
 
-api는 `TokenService.refresh`의 후계 RT를 결정적으로 유도해, 회전된 RT를 다시 내면 시각과 무관하게 같은 후계를 돌려준다(후계를 이미 쓴 뒤에만 전체 세션 폐기, 회전 후 60초 안 연속 회전은 체인을 따라가 미사용 후계 반환). 200·401·503의 뜻과 Set-Cookie 형식은 바뀌지 않았다. 규칙 → `docs/agents/modules/api/user.md` "Refresh Token 회전(RTR)".
+api는 `TokenService.refresh`의 후계 RT를 결정적으로 유도해, 회전된 RT를 다시 내면 회전 후 1일 안이면 같은 후계를 돌려준다(후계를 이미 쓴 뒤에만 전체 세션 폐기, 회전 후 60초 안 연속 회전은 체인을 따라가 미사용 후계 반환). 200·401·503의 뜻과 Set-Cookie 형식은 바뀌지 않았다. 규칙 → `docs/agents/modules/api/user.md` "Refresh Token 회전(RTR)".
 
 | # | 변경 | api | ui | 상태 |
 |---|---|---|---|---|

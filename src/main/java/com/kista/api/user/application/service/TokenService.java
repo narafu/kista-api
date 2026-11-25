@@ -32,6 +32,7 @@ public class TokenService {
     private static final Duration AT_TTL = TokenConstants.AT_TTL; // AT 수명 — 블랙리스트 등재 기간
     // 회전 직후 연속 회전 허용 창 — 이 안에서는 체인을 따라가 미사용 후계를 반환
     static final Duration RT_GRACE = Duration.ofSeconds(60);
+    private static final Duration RETRY_WINDOW = AT_TTL; // 회전 RT 재시도 허용 창 — 넘으면 이 기기만 거부(탈취 RT 노출 상한)
     private static final int MAX_CHAIN_WALK = 5; // grace 안 체인 따라가기 상한 — 넘으면 재사용 공격으로 간주
 
     private final RefreshTokenPort refreshTokenPort;
@@ -83,6 +84,11 @@ public class TokenService {
             throw new InvalidRefreshTokenException("유효하지 않은 refresh token");
         }
         if (successor.rotatedAt() == null) {
+            // 재시도 허용 창 초과 — 이 기기만 거부 (전체 폐기 없음)
+            if (rt.rotatedAt() != null && Duration.between(rt.rotatedAt(), now).compareTo(RETRY_WINDOW) > 0) {
+                log.warn("[userId={}] [RT] refresh 거부: 재시도 허용 창 초과", rt.userId());
+                throw new InvalidRefreshTokenException("유효하지 않은 refresh token");
+            }
             // 응답 유실 후 재시도 — 같은 후계 재반환 (재-insert 없음)
             return refreshResult(rt.userId(), successorRaw);
         }
