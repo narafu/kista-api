@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.domain.model;
 
+import com.kista.shared.kernel.Currency;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -40,10 +41,15 @@ class StrategyValidationTest {
     @Test
     @DisplayName("입력 예수금이 가용 예수금을 넘을 때만 경고하고, 둘 중 하나라도 모르면 경고하지 않는다")
     void depositWarnings_onlyWhenExceeded() {
-        assertThat(StrategyValidation.depositWarnings(new BigDecimal("1000.01"), new BigDecimal("1000")))
+        assertThat(StrategyValidation.depositWarnings(new BigDecimal("1000.01"), new BigDecimal("1000"), Currency.USD))
                 .extracting(StrategyValidation.Warning::code).containsExactly(StrategyValidation.Code.AVAILABLE_CASH_EXCEEDED);
-        assertThat(StrategyValidation.depositWarnings(new BigDecimal("1000"), new BigDecimal("1000"))).isEmpty();
-        assertThat(StrategyValidation.depositWarnings(null, new BigDecimal("1000"))).isEmpty();
-        assertThat(StrategyValidation.depositWarnings(new BigDecimal("5000"), null)).isEmpty();
+        assertThat(StrategyValidation.depositWarnings(new BigDecimal("1000"), new BigDecimal("1000"), Currency.USD)).isEmpty();
+        assertThat(StrategyValidation.depositWarnings(null, new BigDecimal("1000"), Currency.USD)).isEmpty();
+        assertThat(StrategyValidation.depositWarnings(new BigDecimal("5000"), null, Currency.USD)).isEmpty();
+        // 문장은 계좌 통화 표기를 따른다
+        assertThat(StrategyValidation.depositWarnings(new BigDecimal("2000"), new BigDecimal("1234.5"), Currency.USD))
+                .extracting(StrategyValidation.Warning::detail).singleElement().asString().contains("가용 예수금 $1,234.50보다");
+        assertThat(StrategyValidation.depositWarnings(new BigDecimal("20000"), new BigDecimal("15000"), Currency.KRW))
+                .extracting(StrategyValidation.Warning::detail).singleElement().asString().contains("가용 예수금 15,000원보다");
     }
 }

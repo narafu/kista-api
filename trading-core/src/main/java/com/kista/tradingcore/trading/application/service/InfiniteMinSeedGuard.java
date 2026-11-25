@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.broker.adapter.out.marketdata.MarketDataClient;
@@ -12,7 +13,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.util.Locale;
 
 // INFINITE 최소 시드 검사 — 등록·시드 수정·인출이 공유한다. 최소액 산출(전일종가 HTTP)과 비교를 나눈 이유: HTTP는 @Transactional 밖에서 먼저 하고 비교는 어디서든 한다
 @Component
@@ -44,8 +44,8 @@ class InfiniteMinSeedGuard {
     // min이 null(검사 건너뜀)이면 통과, 시드가 min 미만이면 거부
     static void requireAtLeast(BigDecimal min, BigDecimal seed) {
         if (min != null && seed.compareTo(min) < 0) {
-            // 금액 표기는 kista-ui fmtUsd와 같은 #,##0.00 (JVM 로케일 무관)
-            throw new IllegalArgumentException("최소 투자금 $%s 이상이 필요합니다.".formatted(String.format(Locale.US, "%,.2f", min)));
+            // INFINITE는 USD 종목 전용 — 표기는 Currency.display
+            throw new IllegalArgumentException("최소 투자금 %s 이상이 필요합니다.".formatted(Currency.USD.display(min)));
         }
     }
 }

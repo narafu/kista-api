@@ -23,7 +23,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -164,7 +163,7 @@ public class BacktestEngine {
 
     // 경고 문구용 달러 금액 표기 — 천 단위 구분 + 소수 2자리
     private static String usd(BigDecimal amount) {
-        return String.format(Locale.US, "$%,.2f", amount);
+        return Currency.USD.display(amount);
     }
 
     // --- VR 경로 ---

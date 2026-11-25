@@ -24,7 +24,7 @@
 ### 상태 플래그·검증 엔드포인트
 - 행위 판정 SSOT: `StrategyAction.supports(type)`(종류별 지원 동작)·`StrategyActionJudgment.of(detail)`(`allowedActions`/`blockedActions{action,reasonCode}`). 불변식 allowed ∪ blocked = 지원 전체. 서비스 가드(`requireSupportedType` 등)도 `supports()`를 쓴다. 미리보기 `warnings`는 `OrderPreviewWarning`
 - 한계: 마감 리포트 창·당일 주문 반영 전 보관·재개 시 1주 미만 잔액은 판정 밖이라 allowed여도 400 가능
-- 검증 POST `trading-cycle-validations`·`update-validations`·`vr-config-validations`: 통과·거절 모두 200 `{fieldErrors[{field,detail}], warnings[{code,detail}], derived}`. 등록·수정·재설정과 같은 `plan()`을 저장 없이 공유(거절 순서 동일). 경고 `AVAILABLE_CASH_EXCEEDED`
+- 검증 POST `trading-cycle-validations`·`update-validations`·`vr-config-validations`: 통과·거절 모두 200 `{fieldErrors[{field,detail}], warnings[{code,detail}], derived}`. 등록·수정·재설정과 같은 `plan()`을 저장 없이 공유(거절 순서 동일). 경고 `AVAILABLE_CASH_EXCEEDED`(금액은 계좌 통화 `Currency.display`). `update-validations`는 시드 수정(`newSeed`)이면 등록과 같은 시드 미리보기(fail-open)로 `basePrice`·`minSeed`·`skipReason`·`availableCash`를 싣는다(INFINITE `minSeed`는 활성 버전 분할 수 기준, PRIVACY 최소 시드·`NO_PRIVACY_BASE`는 거절하지 않음 — Q-35)
 
 ### Account ↔ Strategy 분리
 - 계좌(account 모듈)와 전략은 별도 aggregate다. `Account`에 type/status/ticker/multiple을 다시 두지 않는다 — 전략 속성은 `Strategy` 소유

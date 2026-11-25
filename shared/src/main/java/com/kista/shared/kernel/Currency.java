@@ -37,6 +37,11 @@ public enum Currency {
         return this == KRW ? number + "원" : number + " " + name();
     }
 
+    // 사용자 문장용 금액 표기 — USD는 kista-ui fmtUsd와 같은 "$1,234.50", 그 외는 format()("15,000원")
+    public String display(BigDecimal amount) {
+        return this == USD ? "$" + String.format(Locale.ROOT, "%,.2f", round(amount)) : format(amount);
+    }
+
     // 브로커 응답 통화 코드 → Currency 변환. 미등록 통화이면 empty 반환 (필터링 용도)
     public static Optional<Currency> tryParse(String code) {
         if (code == null) return Optional.empty();

@@ -11,7 +11,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -93,8 +92,8 @@ public record OrderPreviewWarning(
         return usd.setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
     }
 
-    // kista-ui fmtUsd와 같은 $#,##0.00 표기
+    // USD 전용 경로 — 표기는 Currency.display
     private static String usd(BigDecimal amount) {
-        return "$" + String.format(Locale.US, "%,.2f", cents(amount));
+        return Currency.USD.display(amount);
     }
 }

@@ -1,5 +1,7 @@
 package com.kista.tradingcore.trading.application.service;
 import static com.kista.shared.support.FixedClockTestConfig.FIXED;
+import com.kista.tradingcore.privacy.domain.model.PrivacyCurrentBase;
+import com.kista.tradingcore.support.StubBrokerApiException;
 
 import com.kista.tradingcore.trading.application.service.support.UnassignedCashCalculator;
 import com.kista.tradingcore.trading.domain.creation.VrRampInput;
@@ -3139,6 +3141,84 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
         verify(strategyPort, never()).updateCycleSeedTypeUnlessArchived(any(), any());
         verify(strategyCyclePort, never()).lockForUpdate(any());
         verify(strategyCyclePort, never()).updateStartAmount(any(), any());
+    }
+
+    // 수정 검증 시드 미리보기 — PRIVACY 전략 + 보유 0 최신 포지션 (writer 검사가 시드 수정을 허용하는 상태)
+    private void stubPrivacySeedUpdate() {
+        Strategy privacy = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
+                new BigDecimal("1000"), BigDecimal.ZERO, null, BigDecimal.ZERO, null, null);
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(privacy);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        lenient().when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(CYCLE);
+        lenient().when(cyclePositionPort.findLatestOne(CYCLE_ID)).thenReturn(Optional.of(latest));
+    }
+
+    @Test
+    @DisplayName("검증: PRIVACY 시드 수정은 등록 검증과 같은 시드 미리보기로 기준가·최소 시드·가용 예수금을 채우고 초과 경고를 준다(거절하지 않음)")
+    void validateUpdate_privacySeed_fillsSeedPreview() {
+        stubPrivacySeedUpdate();
+        when(privacyTradePort.findSeedPreviewBase())
+                .thenReturn(Optional.of(new PrivacyCurrentBase(StrategyTicker.SOXL, new BigDecimal("5000.00"), null)));
+        when(marginPort.getUsdBuyableAmount(any())).thenReturn(new BigDecimal("1234.5"));
+
+        StrategyValidation validation = strategyService.validateUpdate(STRATEGY_ID, USER_ID,
+                new UpdateStrategyCommand(null, new BigDecimal("2000")));
+
+        StrategyValidation.Derived derived = validation.derived();
+        assertThat(derived.basePrice()).isEqualByComparingTo("5000.00");
+        assertThat(derived.minSeed()).isEqualByComparingTo("2500.00"); // 최소 시드 미만이어도 서버는 거절하지 않는다(Q-35)
+        assertThat(derived.skipReason()).isNull();
+        assertThat(derived.availableCash()).isEqualByComparingTo("1234.5");
+        assertThat(validation.warnings()).extracting(StrategyValidation.Warning::code)
+                .containsExactly(StrategyValidation.Code.AVAILABLE_CASH_EXCEEDED);
+        assertThat(validation.warnings().getFirst().detail()).contains("$1,234.50");
+    }
+
+    @Test
+    @DisplayName("검증: PRIVACY 기준표가 없으면 skipReason=NO_PRIVACY_BASE만 내리고 거절하지 않는다")
+    void validateUpdate_privacyNoBase_skipReason() {
+        stubPrivacySeedUpdate();
+        when(privacyTradePort.findSeedPreviewBase()).thenReturn(Optional.empty());
+
+        StrategyValidation validation = strategyService.validateUpdate(STRATEGY_ID, USER_ID,
+                new UpdateStrategyCommand(null, new BigDecimal("2000")));
+
+        assertThat(validation.derived().skipReason()).isEqualTo("NO_PRIVACY_BASE");
+        assertThat(validation.derived().minSeed()).isNull();
+        assertThat(validation.derived().availableCash()).isNull();
+    }
+
+    @Test
+    @DisplayName("검증: INFINITE 시드 수정은 최소 시드를 활성 버전 분할 수 기준으로 유지하고 기준가·가용 예수금을 채운다")
+    void validateUpdate_infiniteSeed_keepsMinSeedAndFillsPreview() {
+        stubInfiniteSeedUpdate();
+        when(marketData.requireLatestClose(eq(StrategyTicker.SOXL))).thenReturn(new BigDecimal("60"));
+        when(marginPort.getUsdBuyableAmount(any())).thenReturn(new BigDecimal("10000"));
+
+        StrategyValidation validation = strategyService.validateUpdate(STRATEGY_ID, USER_ID,
+                new UpdateStrategyCommand(null, new BigDecimal("3000")));
+
+        assertThat(validation.fieldErrors()).isEmpty();
+        assertThat(validation.warnings()).isEmpty();
+        assertThat(validation.derived().minSeed()).isEqualByComparingTo("2400"); // 60 × 20분할 × 2
+        assertThat(validation.derived().basePrice()).isEqualByComparingTo("60");
+        assertThat(validation.derived().availableCash()).isEqualByComparingTo("10000");
+    }
+
+    @Test
+    @DisplayName("검증: 시드 수정 중 시세 조회가 실패하면 파생값을 비우고 거절하지 않는다(fail-open)")
+    void validateUpdate_priceFailure_failOpen() {
+        stubInfiniteSeedUpdate();
+        when(marketData.requireLatestClose(eq(StrategyTicker.SOXL))).thenThrow(new StubBrokerApiException("ALPACA", "시세 실패"));
+
+        StrategyValidation validation = strategyService.validateUpdate(STRATEGY_ID, USER_ID,
+                new UpdateStrategyCommand(null, new BigDecimal("3000")));
+
+        assertThat(validation.fieldErrors()).isEmpty();
+        assertThat(validation.warnings()).isEmpty();
+        assertThat(validation.derived()).isEqualTo(StrategyValidation.Derived.EMPTY);
     }
 
     @Test

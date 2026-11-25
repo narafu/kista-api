@@ -26,4 +26,10 @@ class CurrencyTest {
         assertThat(Currency.KRW.format(new BigDecimal("150000000"))).isEqualTo("150,000,000원");
         assertThat(Currency.KRW.format(new BigDecimal("5000"))).isEqualTo("5,000원");
     }
+
+    @Test
+    void displayUsesDollarForUsdAndFormatOtherwise() {
+        assertThat(Currency.USD.display(new BigDecimal("1234.5"))).isEqualTo("$1,234.50");
+        assertThat(Currency.KRW.display(new BigDecimal("15000"))).isEqualTo("15,000원");
+    }
 }

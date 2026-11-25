@@ -2,6 +2,7 @@ package com.kista.tradingcore.trading.application.service;
 
 import java.util.NoSuchElementException;
 import com.kista.shared.kernel.Currency;
+import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.trading.application.service.support.OwnedStrategy;
 import com.kista.tradingcore.trading.application.service.support.StrategyHistoryQueryService;
 
@@ -238,9 +239,25 @@ public class StrategyService {
         } catch (IllegalArgumentException | IllegalStateException e) {
             fieldErrors = List.of(StrategyValidation.FieldError.of(e));
         }
+        if (cmd.newSeed() == null) {
+            return new StrategyValidation(fieldErrors, List.of(), StrategyValidation.Derived.EMPTY);
+        }
+        // 시드 수정 — 등록 검증과 같은 시드 미리보기로 기준가·가용 예수금·PRIVACY 최소 시드·기준표 없음을 채운다(시세 실패는 fail-open)
+        OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
+        Strategy strategy = owned.strategy();
+        // 분할 수 0: INFINITE 최소 시드는 위 updateMinSeed(활성 버전 분할 수)를 쓰고, 다른 타입의 최소 시드 계산은 분할 수를 쓰지 않는다
+        StrategySeedPreview preview = BrokerCallGuard.tryGet("수정 검증용 시드 미리보기: strategyId=" + strategyId,
+                        () -> strategyHistoryQueryService.strategySeedPreview(owned.account(), strategy.type(), strategy.ticker(), 0))
+                .orElse(null);
         StrategyValidation.Derived derived = new StrategyValidation.Derived(
-                null, null, null, null, null, null, null, null, minSeed, null, null);
-        return new StrategyValidation(fieldErrors, List.of(), derived);
+                null, null, null, null, null, null, null,
+                preview != null ? preview.basePrice() : null,
+                strategy.isInfinite() || preview == null ? minSeed : preview.minSeed(),
+                preview != null ? preview.skipReason() : null,
+                preview != null ? preview.availableCash() : null);
+        List<StrategyValidation.Warning> warnings = preview != null
+                ? StrategyValidation.depositWarnings(cmd.newSeed(), preview.availableCash(), owned.currency()) : List.of();
+        return new StrategyValidation(fieldErrors, warnings, derived);
     }
 
     // INFINITE 시드 수정의 최소 시드 — HTTP 전에 싼 입력 검증부터(무효 시드로 시세 조회를 낭비하지 않는다), 조회 실패는 null(검사 건너뜀)

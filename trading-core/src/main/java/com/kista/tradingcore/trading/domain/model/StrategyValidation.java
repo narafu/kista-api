@@ -1,6 +1,7 @@
 package com.kista.tradingcore.trading.domain.model;
 
 import org.jspecify.annotations.Nullable;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.RecurringMode;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.trading.domain.creation.VrRampParams;
@@ -9,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Locale;
 
 // 등록·수정·VR 재설정 입력의 저장 없는 검증 결과 — 저장 경로와 같은 해석·검증 단계가 던진 첫 거절과 서버 파생값
 public record StrategyValidation(
@@ -59,13 +59,13 @@ public record StrategyValidation(
     }
 
     // 입력 예수금이 가용 예수금을 넘으면 경고 — 등록은 차단하지 않는다(StrategyCreationService 종목 중복 검사 주석). 둘 중 하나라도 모르면 경고 없음
-    public static List<Warning> depositWarnings(BigDecimal initialDeposit, BigDecimal availableCash) {
+    public static List<Warning> depositWarnings(BigDecimal initialDeposit, BigDecimal availableCash, Currency currency) {
         if (initialDeposit == null || availableCash == null || initialDeposit.compareTo(availableCash) <= 0) {
             return List.of();
         }
-        // 금액 표기는 InfiniteMinSeedGuard와 같은 #,##0.00
+        // 계좌 통화 표기(Currency.display)
         return List.of(new Warning(Code.AVAILABLE_CASH_EXCEEDED,
-                "입력 예수금이 가용 예수금 $%s보다 큽니다. 계좌 예수금이 부족하면 매수 주문이 거절될 수 있습니다."
-                        .formatted(String.format(Locale.US, "%,.2f", availableCash))));
+                "입력 예수금이 가용 예수금 %s보다 큽니다. 계좌 예수금이 부족하면 매수 주문이 거절될 수 있습니다."
+                        .formatted(currency.display(availableCash))));
     }
 }

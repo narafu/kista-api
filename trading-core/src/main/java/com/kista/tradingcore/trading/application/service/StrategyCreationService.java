@@ -112,7 +112,7 @@ class StrategyCreationService {
                         () -> seedPreviewQuery.strategySeedPreview(account, cmd.type(), resolved.ticker(), resolved.divisionCount()))
                 .orElse(null);
         return new StrategyValidation(fieldErrors,
-                preview != null ? StrategyValidation.depositWarnings(cmd.initialDeposit(), preview.availableCash()) : List.of(),
+                preview != null ? StrategyValidation.depositWarnings(cmd.initialDeposit(), preview.availableCash(), account.broker().getCurrency()) : List.of(),
                 derived(cmd, resolved, preview));
     }
 
