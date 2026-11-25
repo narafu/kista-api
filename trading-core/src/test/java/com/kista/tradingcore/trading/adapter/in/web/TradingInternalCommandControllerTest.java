@@ -26,8 +26,8 @@ import java.util.UUID;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// trade-corrections의 @Valid가 실제로 동작하는지 검증 — ManualTradeCorrectionCommand에
-// jakarta 검증 애노테이션이 없던 시절엔 @Valid가 no-op이라 잘못된 요청이 그대로 서비스까지 흘러가
+// trade-corrections의 @Valid가 실제로 동작하는지 검증 — 검증 대상은 TradeCorrectionRequest(shared.contract)다. 거기에
+// jakarta 검증 애노테이션이 없으면 @Valid가 no-op이라 잘못된 요청이 그대로 서비스까지 흘러가
 // 500(NPE 등)으로 뭉개졌다. 여기서는 필수 필드 누락 시 클린한 400을 확인한다.
 @WebMvcTest(TradingInternalCommandController.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class, FixedClockTestConfig.class})
