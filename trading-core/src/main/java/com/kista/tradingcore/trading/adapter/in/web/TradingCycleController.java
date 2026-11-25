@@ -113,6 +113,36 @@ public class TradingCycleController {
         return TradingCycleResponse.from(tradingCycle.getById(id, userId));
     }
 
+    // 등록 검증 전용 — 등록과 같은 body로 저장 없이 해석·검증만, 통과·거절 모두 200
+    @Operation(summary = "거래 사이클 등록 검증", description = "등록과 같은 해석·검증 경로를 저장 없이 태운다. 등록이 400·409로 거절할 입력은 fieldErrors로 돌려준다(소유권 실패는 403/404)")
+    @PostMapping("/api/accounts/{accountId}/trading-cycle-validations")
+    public StrategyValidationResponse validateRegistration(
+            @PathVariable UUID accountId,
+            @AuthenticationPrincipal UUID userId,
+            @Valid @RequestBody TradingCycleRequest request) {
+        return StrategyValidationResponse.from(tradingCycle.validateRegistration(userId, accountId, request.toRegisterCommand()));
+    }
+
+    // 수정 검증 전용 — PUT /api/trading-cycles/{id}와 같은 body
+    @Operation(summary = "거래 사이클 수정 검증")
+    @PostMapping("/api/trading-cycles/{id}/update-validations")
+    public StrategyValidationResponse validateUpdate(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId,
+            @RequestBody TradingCycleRequest request) {
+        return StrategyValidationResponse.from(tradingCycle.validateUpdate(id, userId, request.toUpdateCommand()));
+    }
+
+    // VR 재설정 검증 전용 — PUT /api/trading-cycles/{id}/vr-config와 같은 body, 현재가 조회 외 외부 호출·저장 없음
+    @Operation(summary = "VR 재설정 검증")
+    @PostMapping("/api/trading-cycles/{id}/vr-config-validations")
+    public StrategyValidationResponse validateVrConfig(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId,
+            @Valid @RequestBody VrConfigRequest request) {
+        return StrategyValidationResponse.from(vrReconfigure.validate(id, userId, request.toCommand()));
+    }
+
     // 진행 중 PRIVACY·INFINITE·DCA 사이클 투자금 추가 — 사이클 유지, 포지션 스냅샷 append
     @Operation(summary = "진행 중 사이클 투자금 추가")
     @PostMapping("/api/trading-cycles/{id}/capital-injection")

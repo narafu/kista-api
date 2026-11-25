@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.domain.creation;
 
+import com.kista.tradingcore.trading.domain.model.FieldRejectedException;
 import com.kista.shared.kernel.StrategyCreationSettings;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyTicker;
@@ -14,7 +15,7 @@ public class InfiniteCreationResolver implements StrategyCreationResolver {
     @Override
     public ResolvedCreation resolveTypeFields(StrategyCreationRequest request, StrategyCreationSettings settings, StrategyTicker ticker) {
         // primitive 0은 요청 생략 sentinel이므로 설정 기본값으로 치환한다.
-        int divisionCount = settings.divisionCount().resolve(request.divisionCount());
+        int divisionCount = FieldRejectedException.attribute("divisionCount", () -> settings.divisionCount().resolve(request.divisionCount()));
         return new ResolvedCreation(ticker, divisionCount, null, null, null);
     }
 }

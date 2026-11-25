@@ -15,6 +15,7 @@ import com.kista.tradingcore.trading.application.service.support.OwnedStrategy;
 import com.kista.tradingcore.trading.domain.model.CycleCapitalEvent;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.DepositAmounts;
+import com.kista.tradingcore.trading.domain.model.FieldRejectedException;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyAction;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
@@ -57,17 +58,7 @@ class StrategyUpdateWriter {
     public StrategyDetail update(UUID strategyId, UUID requesterId, UpdateStrategyCommand cmd, BigDecimal minSeed) {
         OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
         Strategy strategy = owned.strategy();
-        strategy.requireNotArchived();
-        // 시드 수정 미지원 종류(VR·DCA) — 지원 종류는 StrategyAction.supports가 SSOT, 문구는 종류별 대체 경로 안내
-        if (cmd.newSeed() != null && !StrategyAction.EDIT_SEED.supports(strategy.type())) {
-            throw new IllegalArgumentException(strategy.isVr()
-                    ? "VR 전략의 시작 예수금은 일반 수정으로 변경할 수 없습니다. VR 재설정을 이용해야 합니다."
-                    : "DCA 전략의 예수금은 일반 수정으로 변경할 수 없습니다. 투자금 추가·인출을 이용해야 합니다.");
-        }
-        // 연속 사이클 정책 미지원 전략(VR·DCA)은 NONE으로 고정된다
-        if (!strategy.supportsCycleSeed() && cmd.cycleSeedType() != null && cmd.cycleSeedType() != StrategyCycleSeedType.NONE) {
-            throw new IllegalArgumentException(strategy.type().getDescription() + " 전략의 연속 사이클 정책은 변경할 수 없습니다.");
-        }
+        requireUpdatable(strategy, cmd);
 
         StrategyCycleSeedType seedType = cmd.cycleSeedType() != null
                 ? cmd.cycleSeedType()
@@ -87,6 +78,36 @@ class StrategyUpdateWriter {
         return detailAssembler.toDetail(updated, owned.account().broker().getCurrency());
     }
 
+    // 수정 검증 전용 — update와 같은 검사를 같은 순서로 태우고 쓰기(조건부 갱신·행 잠금·이력·이벤트)는 하지 않는다
+    @Transactional(readOnly = true)
+    public void validate(UUID strategyId, UUID requesterId, UpdateStrategyCommand cmd, BigDecimal minSeed) {
+        OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
+        requireUpdatable(owned.strategy(), cmd);
+        if (cmd.newSeed() != null) {
+            FieldRejectedException.attribute("initialDeposit", () -> requireValidSeed(cmd.newSeed(), owned.currency()));
+            StrategyCycle cycle = strategyCyclePort.requireLatestByStrategyId(strategyId);
+            if (cycle.isEnded()) {
+                throw new IllegalStateException(ENDED_CYCLE);
+            }
+            requireSeedEditable(owned, cycle, cmd.newSeed(), minSeed);
+        }
+    }
+
+    // 요청 단위 검사 — 보관 전략, 시드 수정 미지원 종류, 연속 사이클 정책 미지원 종류 순
+    private static void requireUpdatable(Strategy strategy, UpdateStrategyCommand cmd) {
+        strategy.requireNotArchived();
+        // 시드 수정 미지원 종류(VR·DCA) — 지원 종류는 StrategyAction.supports가 SSOT, 문구는 종류별 대체 경로 안내
+        if (cmd.newSeed() != null && !StrategyAction.EDIT_SEED.supports(strategy.type())) {
+            throw new FieldRejectedException("initialDeposit", strategy.isVr()
+                    ? "VR 전략의 시작 예수금은 일반 수정으로 변경할 수 없습니다. VR 재설정을 이용해야 합니다."
+                    : "DCA 전략의 예수금은 일반 수정으로 변경할 수 없습니다. 투자금 추가·인출을 이용해야 합니다.");
+        }
+        // 연속 사이클 정책 미지원 전략(VR·DCA)은 NONE으로 고정된다
+        if (!strategy.supportsCycleSeed() && cmd.cycleSeedType() != null && cmd.cycleSeedType() != StrategyCycleSeedType.NONE) {
+            throw new FieldRejectedException("cycleSeedType", strategy.type().getDescription() + " 전략의 연속 사이클 정책은 변경할 수 없습니다.");
+        }
+    }
+
     // 시드 입력 검증 — 0 초과, 계좌 통화 자릿수 이하 (HTTP 전 선검증에도 쓴다)
     static void requireValidSeed(BigDecimal newSeed, Currency currency) {
         if (newSeed.signum() <= 0) {
@@ -98,7 +119,7 @@ class StrategyUpdateWriter {
     // 시드 수정: holdings=0 시작점에서만 허용 — 개장 평가(openAmount)는 그대로 두고 startAmount·최신 포지션 예수금을 in-place 보정하며 차액을 RESET 이력으로 남긴다
     private void updateSeed(OwnedStrategy owned, BigDecimal newSeed, BigDecimal minSeed) {
         UUID strategyId = owned.strategy().id();
-        requireValidSeed(newSeed, owned.currency());
+        FieldRejectedException.attribute("initialDeposit", () -> requireValidSeed(newSeed, owned.currency()));
         StrategyCycle first = strategyCyclePort.requireLatestByStrategyId(strategyId);
         if (first.isEnded()) {
             throw new IllegalStateException(ENDED_CYCLE); // 투자금 추가·인출의 종료 사이클 거절과 같은 예외
@@ -109,17 +130,7 @@ class StrategyUpdateWriter {
         if (cycle.isEnded() || !cycle.id().equals(first.id())) {
             throw new IllegalStateException("진행 중인 사이클이 바뀌어 예수금을 수정할 수 없습니다.");
         }
-        // 마감 리포트 창에는 in-place 예수금 변경이 리포트 append에 덮어써진다
-        if (CloseReportScope.inReportWindow(owned.strategy(), clock, batchRunPort, orderPort, marketCalendarPort)) {
-            throw new IllegalStateException("오늘 마감 리포트가 끝나기 전에는 예수금을 수정할 수 없습니다.");
-        }
-        CyclePosition latest = cyclePositionPort.findLatestOne(cycle.id())
-                .orElseThrow(() -> new NoSuchElementException("포지션 이력 없음: " + strategyId));
-
-        if (latest.holdings().signum() != 0) {
-            throw new IllegalArgumentException("보유 수량이 있는 사이클은 예수금을 수정할 수 없습니다.");
-        }
-        InfiniteMinSeedGuard.requireAtLeast(minSeed, newSeed); // INFINITE는 등록과 같은 최소 시드 미만 거부(기존 거절 사유 뒤)
+        CyclePosition latest = requireSeedEditable(owned, cycle, newSeed, minSeed);
 
         // openAmount(개장 평가)는 개장 시 1회만 기록 — 이후 변경은 RESET 이력으로 남겨 원금 = openAmount + Σ principalDelta를 유지
         strategyCyclePort.updateStartAmount(cycle.id(), newSeed);
@@ -131,5 +142,22 @@ class StrategyUpdateWriter {
                     delta, BigDecimal.ZERO, delta, Instant.now(clock)));
         }
         log.info("[strategyId={}] 시드 수정: newSeed={}, delta={}", strategyId, newSeed, delta);
+    }
+
+    // 사이클 확정 뒤 시드 수정 검사 — 마감 리포트 창, 보유 수량, INFINITE 최소 시드 순. 최신 포지션을 돌려준다
+    private CyclePosition requireSeedEditable(OwnedStrategy owned, StrategyCycle cycle, BigDecimal newSeed, BigDecimal minSeed) {
+        // 마감 리포트 창에는 in-place 예수금 변경이 리포트 append에 덮어써진다
+        if (CloseReportScope.inReportWindow(owned.strategy(), clock, batchRunPort, orderPort, marketCalendarPort)) {
+            throw new IllegalStateException("오늘 마감 리포트가 끝나기 전에는 예수금을 수정할 수 없습니다.");
+        }
+        CyclePosition latest = cyclePositionPort.findLatestOne(cycle.id())
+                .orElseThrow(() -> new NoSuchElementException("포지션 이력 없음: " + owned.strategy().id()));
+
+        if (latest.holdings().signum() != 0) {
+            throw new IllegalArgumentException("보유 수량이 있는 사이클은 예수금을 수정할 수 없습니다.");
+        }
+        // INFINITE는 등록과 같은 최소 시드 미만 거부(기존 거절 사유 뒤)
+        FieldRejectedException.attribute("initialDeposit", () -> InfiniteMinSeedGuard.requireAtLeast(minSeed, newSeed));
+        return latest;
     }
 }

@@ -1,6 +1,7 @@
 package com.kista.tradingcore.trading.domain.creation;
 
 import com.kista.shared.kernel.Currency;
+import com.kista.tradingcore.trading.domain.model.FieldRejectedException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
@@ -16,7 +17,7 @@ public final class VrRampValidator {
     // 리밸런싱 주기 1 이상 검증 (null 불가) — 등록·백테스트·램프 검증이 공용
     public static void requireIntervalWeeks(Integer intervalWeeks) {
         if (intervalWeeks == null || intervalWeeks <= 0) {
-            throw new IllegalArgumentException("VR 전략의 리밸런싱 주기는 1주 이상이어야 합니다.");
+            throw new FieldRejectedException("intervalWeeks", "VR 전략의 리밸런싱 주기는 1주 이상이어야 합니다.");
         }
     }
 
@@ -32,39 +33,39 @@ public final class VrRampValidator {
         BigDecimal poolLimitFloor = ramp.poolLimitFloor();
         requireIntervalWeeks(intervalWeeks);
         if (bandWidth == null || bandWidth.signum() <= 0) {
-            throw new IllegalArgumentException("VR 전략의 밴드 폭은 0보다 커야 합니다.");
+            throw new FieldRejectedException("bandWidth", "VR 전략의 밴드 폭은 0보다 커야 합니다.");
         }
         if (initialGradient <= 0) {
-            throw new IllegalArgumentException("VR 전략의 초기 gradient는 0보다 커야 합니다.");
+            throw new FieldRejectedException("initialGradient", "VR 전략의 초기 gradient는 0보다 커야 합니다.");
         }
         if (gStepWeeks < 0) {
-            throw new IllegalArgumentException("VR 전략의 gradient 단계주기는 0 이상이어야 합니다.");
+            throw new FieldRejectedException("gStepWeeks", "VR 전략의 gradient 단계주기는 0 이상이어야 합니다.");
         }
         if (gGraceWeeks < 0) {
-            throw new IllegalArgumentException("VR 전략의 gradient 유예 주수는 0 이상이어야 합니다.");
+            throw new FieldRejectedException("gGraceWeeks", "VR 전략의 gradient 유예 주수는 0 이상이어야 합니다.");
         }
         // gStepWeeks=0은 gradient 램프 비활성화 — 이때 gMax는 계산에 사용되지 않으므로 0을 허용
         if (gStepWeeks > 0 && gMax < initialGradient) {
-            throw new IllegalArgumentException("VR 전략의 gradient 상한은 초기 gradient 이상이어야 합니다.");
+            throw new FieldRejectedException("gMax", "VR 전략의 gradient 상한은 초기 gradient 이상이어야 합니다.");
         }
         if (pStepWeeks < 0) {
-            throw new IllegalArgumentException("VR 전략의 pool 한도율 단계주기는 0 이상이어야 합니다.");
+            throw new FieldRejectedException("pStepWeeks", "VR 전략의 pool 한도율 단계주기는 0 이상이어야 합니다.");
         }
         if (pGraceWeeks < 0) {
-            throw new IllegalArgumentException("VR 전략의 pool 한도율 유예 주수는 0 이상이어야 합니다.");
+            throw new FieldRejectedException("pGraceWeeks", "VR 전략의 pool 한도율 유예 주수는 0 이상이어야 합니다.");
         }
         if (initialPoolLimitRate.compareTo(BigDecimal.ONE) > 0) {
-            throw new IllegalArgumentException("VR 전략의 초기 pool 한도율은 1 이하여야 합니다.");
+            throw new FieldRejectedException("initialPoolLimitRate", "VR 전략의 초기 pool 한도율은 1 이하여야 합니다.");
         }
         // poolLimitFloor 범위는 pStepWeeks와 무관하게 항상 검증 — DB CHECK(pool_limit_floor <= initial_pool_limit_rate)와
         // 어긋나는 값이 여기서 걸러지지 않으면 INSERT 시 매핑되지 않은 DataIntegrityViolationException → 500으로 새는 것을 방지
         if (poolLimitFloor == null || poolLimitFloor.signum() < 0 || poolLimitFloor.compareTo(initialPoolLimitRate) > 0) {
-            throw new IllegalArgumentException(
+            throw new FieldRejectedException("poolLimitFloor",
                     "VR 전략의 pool 한도율 하한은 0 이상 초기 pool 한도율 이하여야 합니다.");
         }
         // pStepWeeks=0은 poolLimitRate 램프 비활성화(항상 initialPoolLimitRate 유지) — 이때는 poolLimitFloor=0도 허용
         if (pStepWeeks > 0 && poolLimitFloor.signum() <= 0) {
-            throw new IllegalArgumentException("VR 전략의 pool 한도율 램프를 쓰려면 pool 한도율 하한이 0보다 커야 합니다.");
+            throw new FieldRejectedException("poolLimitFloor", "VR 전략의 pool 한도율 램프를 쓰려면 pool 한도율 하한이 0보다 커야 합니다.");
         }
     }
 
@@ -77,13 +78,18 @@ public final class VrRampValidator {
             throw new IllegalArgumentException("VR 거치식/인출식은 초기 V값과 초기 예수금 중 하나는 0보다 커야 합니다.");
         }
         if (recurringAmount < 0) {
-            BigDecimal required = BigDecimal.valueOf(Math.abs((long) recurringAmount))
-                    .multiply(BigDecimal.valueOf(100))
-                    .multiply(BigDecimal.valueOf(4))
-                    .divide(BigDecimal.valueOf(intervalWeeks), Currency.USD.amountScale(), RoundingMode.HALF_UP);
+            BigDecimal required = requiredWithdrawalAssets(recurringAmount, intervalWeeks);
             if (requiredCheckAssets.compareTo(required) < 0) {
                 throw new IllegalArgumentException("인출식 VR 전략의 초기 자산은 %s 이상이어야 합니다.".formatted(required));
             }
         }
+    }
+
+    // 인출식 필요 최소 자산 = |인출액| × 100 × 4 / 주기 — 검증 전용 엔드포인트의 파생값도 이 식을 쓴다
+    public static BigDecimal requiredWithdrawalAssets(int recurringAmount, int intervalWeeks) {
+        return BigDecimal.valueOf(Math.abs((long) recurringAmount))
+                .multiply(BigDecimal.valueOf(100))
+                .multiply(BigDecimal.valueOf(4))
+                .divide(BigDecimal.valueOf(intervalWeeks), Currency.USD.amountScale(), RoundingMode.HALF_UP);
     }
 }

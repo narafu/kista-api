@@ -35,6 +35,7 @@ import com.kista.shared.kernel.UserStatus;
 import com.kista.tradingcore.account.domain.model.ApiKeyExpiry;
 import com.kista.tradingcore.trading.domain.model.NextOrdersPreview;
 import com.kista.tradingcore.trading.domain.model.OrderPreviewWarning;
+import com.kista.tradingcore.trading.domain.model.StrategyValidation;
 import com.kista.tradingcore.trading.domain.model.StrategyAction;
 
 import org.jspecify.annotations.Nullable;
@@ -99,7 +100,8 @@ public final class MetaEnumRegistry {
             new Spec<>("strategyActions", StrategyAction.class, StrategyAction::getLabel),
             new Spec<>("strategyActionBlockReasons", StrategyAction.BlockReason.class, StrategyAction.BlockReason::getLabel),
             new Spec<>("apiKeyExpiryStatuses", ApiKeyExpiry.Status.class, ApiKeyExpiry.Status::getLabel),
-            new Spec<>("orderPreviewWarningCodes", OrderPreviewWarning.Code.class, OrderPreviewWarning.Code::getLabel)
+            new Spec<>("orderPreviewWarningCodes", OrderPreviewWarning.Code.class, OrderPreviewWarning.Code::getLabel),
+            new Spec<>("strategyValidationWarningCodes", StrategyValidation.Code.class, StrategyValidation.Code::getLabel)
     );
 
     // 전용 DTO(StrategyTypeMeta·TickerMeta·BrokerMeta·DcaIndicatorMeta)로 싣는 enum — 필드 구조가 달라 SPECS 밖

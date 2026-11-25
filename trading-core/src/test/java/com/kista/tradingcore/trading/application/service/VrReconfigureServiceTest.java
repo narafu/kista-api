@@ -10,6 +10,7 @@ import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.trading.application.event.NewCycleStartedEvent;
 import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
 import com.kista.tradingcore.trading.domain.model.ReconfigureVrCommand;
+import com.kista.tradingcore.trading.domain.model.StrategyValidation;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
@@ -48,6 +49,7 @@ import java.util.UUID;
 import static com.kista.tradingcore.support.StrategyCommands.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -55,6 +57,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyStatus;
@@ -580,5 +583,50 @@ class VrReconfigureServiceTest {
         service.reconfigure(strategyId, requesterId, cmd);
 
         assertThat(captureReconfigureCall().newValue()).isEqualTo(new BigDecimal("1600.03"));
+    }
+
+    // --- 검증 전용(validate) — reconfigure와 대칭, 주문 취소·저장·이벤트 없음 ---
+
+    @Test
+    @DisplayName("검증: 인출 주식 수가 보유 수량 초과면 reconfigure와 같은 문장을 withdrawShares에 귀속하고 아무것도 쓰지 않는다")
+    void validate_withdrawSharesExceedsHoldings_symmetric() {
+        stubHappyPathChain();
+        ReconfigureVrCommand cmd = reconfigureVr().withdrawShares(11).build();
+        Throwable thrown = catchThrowable(() -> service.reconfigure(strategyId, requesterId, cmd));
+
+        StrategyValidation validation = service.validate(strategyId, requesterId, cmd);
+
+        assertThat(validation.fieldErrors()).containsExactly(new StrategyValidation.FieldError("withdrawShares", thrown.getMessage()));
+        verify(orderCancelService, never()).cancelByCycle(any(), any());
+        verifyNoInteractions(cycleSnapshotCreator, eventPublisher);
+    }
+
+    @Test
+    @DisplayName("검증: 램프 위반(gMax < initialGradient)은 reconfigure와 같은 문장을 gMax에 귀속한다")
+    void validate_rampInvalid_symmetric() {
+        stubHappyPathChain();
+        ReconfigureVrCommand cmd = reconfigureVr().vrRamp(new VrRampInput(30, null, null, 20, null, null, null, null)).build();
+        Throwable thrown = catchThrowable(() -> service.reconfigure(strategyId, requesterId, cmd));
+        assertThat(thrown).isInstanceOf(IllegalArgumentException.class);
+
+        StrategyValidation validation = service.validate(strategyId, requesterId, cmd);
+
+        assertThat(validation.fieldErrors()).containsExactly(new StrategyValidation.FieldError("gMax", thrown.getMessage()));
+    }
+
+    @Test
+    @DisplayName("검증: 통과 입력은 상속 반영 램프 실효값을 주고 주문 취소·저장·이벤트가 없다")
+    void validate_valid_returnsInheritedRampWithoutWrites() {
+        stubHappyPathChain();
+
+        StrategyValidation validation = service.validate(strategyId, requesterId, reconfigureVr().bandWidth("20.00").build());
+
+        assertThat(validation.fieldErrors()).isEmpty();
+        assertThat(validation.derived().bandWidth()).isEqualByComparingTo("20.00");
+        assertThat(validation.derived().intervalWeeks()).isEqualTo(currentDetail.intervalWeeks());
+        assertThat(validation.derived().ramp().gMax()).isEqualTo(currentDetail.gMax());
+        assertThat(validation.derived().requiredWithdrawalAssets()).isNull(); // 거치식
+        verify(orderCancelService, never()).cancelByCycle(any(), any());
+        verifyNoInteractions(cycleSnapshotCreator, eventPublisher);
     }
 }

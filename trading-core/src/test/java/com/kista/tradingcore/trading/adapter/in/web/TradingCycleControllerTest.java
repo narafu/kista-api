@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.in.web;
 
+import com.kista.tradingcore.trading.domain.model.StrategyValidation;
 import com.kista.shared.support.FixedClockTestConfig;
 import org.springframework.context.annotation.Import;
 import com.kista.shared.kernel.DcaFrequency;
@@ -773,5 +774,72 @@ class TradingCycleControllerTest {
                 .andExpect(jsonPath("$.warnings.length()").value(1))
                 .andExpect(jsonPath("$.warnings[0].code").value("LEDGER_SHORTFALL"))
                 .andExpect(jsonPath("$.warnings[0].detail").value("전략 원장 예수금이 부족해 매수가 접수되지 않습니다(원장 $50.00 / 필요 $100.00)."));
+    }
+
+    // --- 검증 전용 엔드포인트 — 통과·거절 모두 200 + {fieldErrors, warnings, derived} ---
+
+    @Test
+    void validateRegistration_returns200_withFieldErrorsWarningsAndDerived() throws Exception {
+        StrategyValidation result = new StrategyValidation(
+                List.of(new StrategyValidation.FieldError("scheduledStartDate", "시작예정일은 오늘 이후여야 합니다.")),
+                List.of(new StrategyValidation.Warning(StrategyValidation.Code.AVAILABLE_CASH_EXCEEDED, "경고 문장입니다.")),
+                new StrategyValidation.Derived(StrategyTicker.SOXL, 20, null, null, null, null, null,
+                        new BigDecimal("60"), new BigDecimal("2400"), null, new BigDecimal("1000")));
+        when(tradingCycle.validateRegistration(eq(USER_ID), eq(ACCOUNT_ID), any())).thenReturn(result);
+
+        mockMvc.perform(post("/api/accounts/{accountId}/trading-cycle-validations", ACCOUNT_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"type":"INFINITE","scheduledStartDate":"2000-01-01"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("scheduledStartDate"))
+                .andExpect(jsonPath("$.fieldErrors[0].detail").value("시작예정일은 오늘 이후여야 합니다."))
+                .andExpect(jsonPath("$.warnings[0].code").value("AVAILABLE_CASH_EXCEEDED"))
+                .andExpect(jsonPath("$.derived.ticker").value("SOXL"))
+                .andExpect(jsonPath("$.derived.minSeed").value(2400));
+
+        verify(tradingCycle).validateRegistration(eq(USER_ID), eq(ACCOUNT_ID),
+                argThat(cmd -> cmd.type() == StrategyType.INFINITE && LocalDate.of(2000, 1, 1).equals(cmd.scheduledStartDate())));
+        verify(tradingCycle, never()).register(any(), any(), any());
+    }
+
+    @Test
+    void validateUpdate_returns200_andPassesUpdateCommand() throws Exception {
+        when(tradingCycle.validateUpdate(eq(CYCLE_ID), eq(USER_ID), any()))
+                .thenReturn(new StrategyValidation(List.of(), List.of(), StrategyValidation.Derived.EMPTY));
+
+        mockMvc.perform(post("/api/trading-cycles/{id}/update-validations", CYCLE_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"type":"INFINITE","initialDeposit":3000}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fieldErrors").isEmpty())
+                .andExpect(jsonPath("$.warnings").isEmpty());
+
+        verify(tradingCycle).validateUpdate(eq(CYCLE_ID), eq(USER_ID),
+                argThat(cmd -> cmd.newSeed() != null && cmd.newSeed().compareTo(new BigDecimal("3000")) == 0));
+        verify(tradingCycle, never()).update(any(), any(), any());
+    }
+
+    @Test
+    void validateVrConfig_returns200_andDoesNotReconfigure() throws Exception {
+        when(vrReconfigure.validate(eq(CYCLE_ID), eq(USER_ID), any()))
+                .thenReturn(new StrategyValidation(List.of(new StrategyValidation.FieldError("gMax", "상한 오류입니다.")), List.of(),
+                        StrategyValidation.Derived.EMPTY));
+
+        mockMvc.perform(post("/api/trading-cycles/{id}/vr-config-validations", CYCLE_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"gMax":5}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("gMax"));
+
+        verify(vrReconfigure, never()).reconfigure(any(), any(), any());
     }
 }

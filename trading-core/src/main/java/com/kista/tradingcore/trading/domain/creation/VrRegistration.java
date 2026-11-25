@@ -1,6 +1,7 @@
 package com.kista.tradingcore.trading.domain.creation;
 
 import com.kista.tradingcore.trading.domain.creation.StrategyCreationResolver.ResolvedCreation;
+import com.kista.tradingcore.trading.domain.model.FieldRejectedException;
 import com.kista.tradingcore.trading.domain.model.RegisterStrategyCommand;
 
 import java.math.BigDecimal;
@@ -26,7 +27,7 @@ public record VrRegistration(BigDecimal vrValue, VrRampParams ramp) {
     private static BigDecimal resolveVrValue(RegisterStrategyCommand cmd, BigDecimal evaluatedStockValue) {
         BigDecimal explicit = cmd.initialVrValue();
         if (explicit != null && explicit.signum() < 0) {
-            throw new IllegalArgumentException("VR 전략의 초기 V값은 0 이상이어야 합니다.");
+            throw new FieldRejectedException("initialVrValue", "VR 전략의 초기 V값은 0 이상이어야 합니다.");
         }
         return explicit != null && explicit.signum() > 0 ? explicit : evaluatedStockValue;
     }

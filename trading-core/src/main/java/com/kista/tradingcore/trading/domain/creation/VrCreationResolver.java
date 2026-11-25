@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.domain.creation;
 
+import com.kista.tradingcore.trading.domain.model.FieldRejectedException;
 import com.kista.shared.kernel.RecurringMode;
 import com.kista.shared.kernel.StrategyCreationSettings;
 import com.kista.shared.kernel.StrategyDefaults;
@@ -17,9 +18,9 @@ public class VrCreationResolver implements StrategyCreationResolver {
 
     @Override
     public ResolvedCreation resolveTypeFields(StrategyCreationRequest request, StrategyCreationSettings settings, StrategyTicker ticker) {
-        int recurringAmount = resolveRecurringAmount(request, settings);
-        BigDecimal bandWidth = settings.bandWidth().resolve(request.bandWidth());
-        Integer intervalWeeks = settings.intervalWeeks().resolve(request.intervalWeeks());
+        int recurringAmount = FieldRejectedException.attribute("recurringAmount", () -> resolveRecurringAmount(request, settings));
+        BigDecimal bandWidth = FieldRejectedException.attribute("bandWidth", () -> settings.bandWidth().resolve(request.bandWidth()));
+        Integer intervalWeeks = FieldRejectedException.attribute("intervalWeeks", () -> settings.intervalWeeks().resolve(request.intervalWeeks()));
         return new ResolvedCreation(ticker, StrategyDefaults.DEFAULT_DIVISION_COUNT, intervalWeeks, bandWidth, recurringAmount);
     }
 

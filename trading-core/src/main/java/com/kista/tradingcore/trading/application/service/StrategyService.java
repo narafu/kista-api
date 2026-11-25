@@ -218,16 +218,38 @@ public class StrategyService {
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // INFINITE 최소 시드 검사의 전일종가 HTTP는 트랜잭션 밖 — 소유권·잠금·쓰기는 StrategyUpdateWriter 트랜잭션
     public StrategyDetail update(UUID strategyId, UUID requesterId, UpdateStrategyCommand cmd) {
+        return updateWriter.update(strategyId, requesterId, cmd, updateMinSeed(strategyId, requesterId, cmd));
+    }
+
+    // 등록 검증 — 저장·이벤트 없이 등록과 같은 해석·검증 경로만 태운다
+    @Transactional(propagation = Propagation.NOT_SUPPORTED) // 시세 HTTP 포함 — register와 같은 이유
+    public StrategyValidation validateRegistration(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
+        return creationService.validate(userId, accountId, cmd);
+    }
+
+    // 수정 검증 — update와 같은 사전 검사(updateMinSeed)와 StrategyUpdateWriter 검사를 쓰기 없이 태운다. 소유권 실패는 update와 같은 403/404
+    @Transactional(propagation = Propagation.NOT_SUPPORTED) // 최소 시드 전일종가 HTTP는 트랜잭션 밖 — 검사는 writer의 읽기 전용 트랜잭션
+    public StrategyValidation validateUpdate(UUID strategyId, UUID requesterId, UpdateStrategyCommand cmd) {
         BigDecimal minSeed = null;
-        if (cmd.newSeed() != null) {
-            OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
-            if (owned.strategy().isInfinite()) {
-                // HTTP 전에 싼 입력 검증부터 — 무효 시드로 시세 조회를 낭비하지 않는다
-                StrategyUpdateWriter.requireValidSeed(cmd.newSeed(), owned.currency());
-                minSeed = minSeedGuard.minSeed(owned.strategy()); // 조회 실패는 null(검사 건너뜀)
-            }
+        List<StrategyValidation.FieldError> fieldErrors = List.of();
+        try {
+            minSeed = updateMinSeed(strategyId, requesterId, cmd);
+            updateWriter.validate(strategyId, requesterId, cmd, minSeed);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            fieldErrors = List.of(StrategyValidation.FieldError.of(e));
         }
-        return updateWriter.update(strategyId, requesterId, cmd, minSeed);
+        StrategyValidation.Derived derived = new StrategyValidation.Derived(
+                null, null, null, null, null, null, null, null, minSeed, null, null);
+        return new StrategyValidation(fieldErrors, List.of(), derived);
+    }
+
+    // INFINITE 시드 수정의 최소 시드 — HTTP 전에 싼 입력 검증부터(무효 시드로 시세 조회를 낭비하지 않는다), 조회 실패는 null(검사 건너뜀)
+    private BigDecimal updateMinSeed(UUID strategyId, UUID requesterId, UpdateStrategyCommand cmd) {
+        if (cmd.newSeed() == null) return null;
+        OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
+        if (!owned.strategy().isInfinite()) return null;
+        FieldRejectedException.attribute("initialDeposit", () -> StrategyUpdateWriter.requireValidSeed(cmd.newSeed(), owned.currency()));
+        return minSeedGuard.minSeed(owned.strategy());
     }
 
     // ── 조회 전용 (stats에서 이관 — 전략 소유 read) ─────────────────────────────
