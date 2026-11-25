@@ -2,10 +2,10 @@
 
 Spring Modulith 앱셸 모듈, `Type.CLOSED`, NamedInterface 0개. 아무 모듈도 web을 참조하지 않는 sink다 (가드: `HexagonalArchitectureTest.web_must_stay_pure_inbound_sink` — `web → ..application.service../..adapter.out..` 금지, trading-core `tradingcore.web`과 대칭). **신규 파일이 단일 모듈만 소비하거나 모듈 의존이 없으면 web에 두지 말고 소유 모듈로 보낸다** — 여기엔 진짜 다중 모듈 fan-out과 순환 회피용 구현체만 둔다.
 
-- `RootSecurityPolicy`(`SecurityRoutePolicy`): root 고유 라우트 규칙. `SecurityConfig`가 공통 규칙(internal/admin) 뒤에 적용하므로 이 정책이 admin/internal을 permitAll로 열 수 없다. 공개 읽기 4경로(`POST /api/client-errors`·`GET /api/market/**`·`/api/meta`·`/api/runtime-config`)는 같은 매처 상수를 permitAll과 `anonymousFallbackMatchers()`(무효 토큰 익명 통과)가 공유한다. `/api/auth`는 로그인·갱신·로그아웃 POST만 공개로 적고 공유에서 뺀다.
+- `RootSecurityPolicy`(`SecurityRoutePolicy`): root 고유 라우트 규칙. `SecurityConfig`가 공통 규칙(internal/admin) 뒤에 적용하므로 이 정책이 admin/internal을 permitAll로 열 수 없다. 공개 읽기 3경로(`POST /api/client-errors`·`GET /api/market/**`·`/api/meta`)는 같은 매처 상수를 permitAll과 `anonymousFallbackMatchers()`(무효 토큰 익명 통과)가 공유한다. `/api/auth`는 로그인·갱신·로그아웃 POST만 공개로 적고 공유에서 뺀다.
 - `UserEventResubmitScheduler`: FAILED `UserDeletedEvent`·`UserNotifyProfileChangedEvent` publication을 10분마다 재발행한다. user에 두면 notify→user 의존과 순환이라 앱셸에 둔다. worker role이라 EPR 재발행 소유자 kista-worker에서만 돈다. trading-core 쪽 같은 이름 스케줄러와 골격이 같아도 `shared.platform`으로 추출하지 않는다(2곳뿐, 공통부가 상수 2개뿐).
 - `ApiExceptionReporter`가 애플리케이션 유일의 `ExceptionReporter`다(옛 trading-core `TradingExceptionReporter`는 합병으로 삭제).
-- `MetaController`(`GET /api/meta`): enum 메타 단일 번들(fan-out). 외부 호출 금지. enum 라벨은 등록부 `MetaEnumRegistry`(새 enum은 한 줄 추가, 가드 `MetaEnumCoverageTest`), 런타임 값(`enabled`·`fields`·`approvalRequired`·`benchmarkEtf`·VR `vrRampDefaults`=`VrRampInput.defaultsFor`)은 `RuntimeConfigService`(admin `NamedInterface("api")`, 앱셸 의존 금지의 유일 예외)가 주고 실패하면 기본 정책으로 강등한다. 런타임 값이 섞여 `no-store`. `/api/runtime-config`는 ui 전환 전까지 유지.
+- `MetaController`(`GET /api/meta`): enum 메타 단일 번들(fan-out). 외부 호출 금지. enum 라벨은 등록부 `MetaEnumRegistry`(새 enum은 한 줄 추가, 가드 `MetaEnumCoverageTest`), 런타임 값(`enabled`·`fields`·`approvalRequired`·`benchmarkEtf`·VR `vrRampDefaults`=`VrRampInput.defaultsFor`)은 `RuntimeConfigService`(admin `NamedInterface("api")`, 앱셸 의존 금지의 유일 예외)가 주고 실패하면 기본 정책으로 강등한다. 런타임 값이 섞여 `no-store`.
 - `AdminSchedulerController`(`/kbland-*`)는 worker role 전용이라 kista-web엔 빈이 없다(503 `WRONG_ROLE`).
 
 ### 예외 응답 자동 처리 (공용 advice)

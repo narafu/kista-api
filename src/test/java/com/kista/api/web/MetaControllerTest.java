@@ -146,7 +146,7 @@ class MetaControllerTest {
                 .andExpect(jsonPath("$.etfBenchmarkSymbols[?(@.code=='SPY')].description").value(org.hamcrest.Matchers.contains("SPDR S&P 500 ETF Trust")));
     }
 
-    // 런타임 값은 RuntimeConfigService 결과를 그대로 싣는다 — /api/runtime-config와 같은 출처
+    // 런타임 값은 RuntimeConfigService 결과를 그대로 싣는다 — RuntimeConfigService와 같은 출처
     @Test
     void getBundle_carriesRuntimeValuesAndVrRampDefaults() throws Exception {
         mockMvc.perform(get("/api/meta").with(authentication(userToken(DEV_USER_UUID))))

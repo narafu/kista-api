@@ -44,9 +44,9 @@ public record StrategyTypeMeta(
         List<String> conditionIndicators, // DCA 조건 지표 옵션
         @Schema(description = "등록 가능 증권사 name() 목록 (빈 목록이면 전체 허용)")
         List<String> supportedBrokers, // 등록 가능 증권사 — 빈 목록이면 전체 허용
-        @Schema(description = "신규 전략 생성 허용 여부 (/api/runtime-config strategies[type].enabled와 같은 값)")
+        @Schema(description = "신규 전략 생성 허용 여부 (RuntimeConfigService strategies[type].enabled와 같은 값)")
         boolean enabled,               // 신규 전략 생성 허용 여부
-        @Schema(description = "생성 필드별 허용값·기본값 (/api/runtime-config strategies[type].fields와 같은 값)")
+        @Schema(description = "생성 필드별 허용값·기본값 (RuntimeConfigService strategies[type].fields와 같은 값)")
         StrategyFieldsMeta fields,     // 생성 필드 정책
         @Schema(description = "VR 램프 기본값표 — 적립 모드(DEPOSIT·HOLD·WITHDRAW)별. VR 외 전략은 생략")
         @Nullable Map<RecurringMode, VrRampParams> vrRampDefaults // VR 전용 램프 기본값표

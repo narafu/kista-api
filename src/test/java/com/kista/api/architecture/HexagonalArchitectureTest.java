@@ -277,7 +277,7 @@ class HexagonalArchitectureTest {
         // com.kista.api.web·com.kista.tradingcore.web은 패키지에 adapter/application/domain 세그먼트가 없어
         // 위 도메인/application.service 규칙 와일드카드에 안 걸린다(미검사 표면) — 이 규칙으로 직접 강제한다.
         // tradingcore.web은 root web과 대칭인 trading-core 앱셸이라 같은 규칙을 적용한다.
-        // 예외: RuntimeConfigService — 메타 번들(MetaController)이 /api/runtime-config와 같은 경로(기본 정책 강등 포함)로
+        // 예외: RuntimeConfigService — 메타 번들(MetaController)이 RuntimeConfigService와 같은 경로(기본 정책 강등 포함)로
         // 런타임 값을 읽도록 admin이 NamedInterface("api")로 공개한 읽기 전용 조회 한 개(값 복제·강등 로직 두 벌 방지)
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("com.kista.api.web..", "com.kista.tradingcore.web..")
