@@ -229,7 +229,7 @@ class NotificationMessageSnapshotTest {
     }
 
     @Test
-    @DisplayName("notifyApiKeyExpiring — N일 후 만료, 추정 만료일 브로커(Toss)는 수정 안내 추가")
+    @DisplayName("notifyApiKeyExpiring — N일 후 만료, +1년 만료일 브로커(Toss)는 수정 안내 추가")
     void notifyApiKeyExpiringDaysLeftEstimated() {
         send(a -> a.notifyApiKeyExpiring(PROFILE, expiring(Broker.TOSS, 7)));
         assertSent("[내 &lt;계좌&gt; &amp; 1] 토스증권 API 키가 7일 후(2026-11-30) 만료됩니다. 실제 만료일과 다르면 계좌 설정에서 고칠 수 있습니다.",
@@ -238,7 +238,7 @@ class NotificationMessageSnapshotTest {
     }
 
     @Test
-    @DisplayName("notifyApiKeyExpiring — 오늘 만료 + 추정 만료일 브로커(TOSS)")
+    @DisplayName("notifyApiKeyExpiring — 오늘 만료 + +1년 만료일 브로커(TOSS)")
     void notifyApiKeyExpiringTodayEstimated() {
         send(a -> a.notifyApiKeyExpiring(PROFILE, expiring(Broker.TOSS, 0)));
         assertSent("[내 &lt;계좌&gt; &amp; 1] 토스증권 API 키가 오늘 만료됩니다. 키를 새로 발급해 교체해 주세요. 실제 만료일과 다르면 계좌 설정에서 고칠 수 있습니다.",

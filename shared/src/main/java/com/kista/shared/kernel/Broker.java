@@ -16,7 +16,7 @@ public enum Broker {
     private final String shortLabel; // UI 모바일 약칭
     private final Currency currency; // 계좌 기준 통화 (주문 금액 단위)
     private final boolean keyOnlyCredentials; // 계좌번호 없이 앱키가 계좌를 식별(중복 판정 키=appKey) — 메리츠
-    private final ApiKeyExpirySource apiKeyExpirySource; // API 키 만료일 출처 — 토스·메리츠는 추정(+1년)·사용자 입력
+    private final ApiKeyExpirySource apiKeyExpirySource; // API 키 만료일 출처 — 토스·메리츠는 +1년·사용자 입력
 
     // API 키 만료가 있는 거래소 여부
     public boolean isApiKeyExpiring() {

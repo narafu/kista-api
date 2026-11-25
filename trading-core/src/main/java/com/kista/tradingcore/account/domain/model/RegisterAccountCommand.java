@@ -11,5 +11,5 @@ public record RegisterAccountCommand(
         String appKey,       // 평문
         String secretKey,    // 평문
         Broker broker,   // null이면 서비스에서 MOCK 기본값 적용
-        @Nullable LocalDate apiKeyExpiresOn // 사용자 입력 만료일(KST) — null이면 추정·유지
+        @Nullable LocalDate apiKeyExpiresOn // 사용자 입력 만료일(KST) — null이면 +1년 계산·유지
 ) {}

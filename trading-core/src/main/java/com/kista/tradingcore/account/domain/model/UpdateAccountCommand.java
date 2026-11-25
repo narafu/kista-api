@@ -6,5 +6,5 @@ import java.time.LocalDate;
 
 public record UpdateAccountCommand(
         String nickname,
-        @Nullable LocalDate apiKeyExpiresOn // 사용자 입력 만료일(KST) — null이면 추정·유지
+        @Nullable LocalDate apiKeyExpiresOn // 사용자 입력 만료일(KST) — null이면 +1년 계산·유지
 ) {}

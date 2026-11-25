@@ -22,7 +22,7 @@ public record AccountRequest(
         @Nullable String secretKey,
         @Schema(description = "증권사 — null이면 MOCK 기본값 적용", example = "TOSS", allowableValues = {"TOSS", "MOCK", "MERITZ"})
         @Nullable Broker broker,
-        @Schema(description = "API 키 만료일(KST, 선택) — 토스·메리츠만, 비우면 등록·교체 시점 + 1년 추정", example = "2027-11-10")
+        @Schema(description = "API 키 만료일(KST, 선택) — 토스·메리츠만, 비우면 등록·교체 시점 + 1년(유효기간 1년)", example = "2027-11-10")
         @Nullable LocalDate apiKeyExpiresOn
 ) {
     public RegisterAccountCommand toRegisterCommand() {

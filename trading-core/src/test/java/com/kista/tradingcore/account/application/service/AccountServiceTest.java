@@ -517,7 +517,7 @@ class AccountServiceTest {
         verify(accountPort, never()).save(any());
     }
 
-    // ---- API 키 만료일 결정 (토스·메리츠 추정/사용자 입력) ----
+    // ---- API 키 만료일 결정 (토스·메리츠 +1년/사용자 입력) ----
 
     private static final String MANUAL_REJECTED = "이 거래소는 API 키 만료일을 직접 바꿀 수 없습니다.";
     private static final String PAST_REJECTED = "API 키 만료일은 내일 이후여야 합니다.";

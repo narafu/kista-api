@@ -8,5 +8,5 @@ import java.time.LocalDate;
 public record UpdateCredentialsCommand(
         String appKey,    // 새 앱 키
         String secretKey, // 새 앱 시크릿
-        @Nullable LocalDate apiKeyExpiresOn // 사용자 입력 만료일(KST) — null이면 추정·유지
+        @Nullable LocalDate apiKeyExpiresOn // 사용자 입력 만료일(KST) — null이면 +1년 계산·유지
 ) {}

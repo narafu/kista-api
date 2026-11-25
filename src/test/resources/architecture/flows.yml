@@ -709,7 +709,7 @@ flows:
         to: [broker]
         title: 증권사 계좌 검증
         desc: >-
-          저장하기 전에 증권사에서 자격증명과 계좌번호가 실제로 맞는지 확인한다. Toss는 계좌 목록에서 계좌 일련번호(accountSeq)를 받아 오며, MOCK은 검증할 것이 없고 메리츠는 계좌 식별자가 없다. 이 호출은 DB 트랜잭션 밖에서 한다. 토스·메리츠는 조회 API가 없어 입력한 만료일 또는 등록 시점 + 1년 추정값을 저장한다.
+          저장하기 전에 증권사에서 자격증명과 계좌번호가 실제로 맞는지 확인한다. Toss는 계좌 목록에서 계좌 일련번호(accountSeq)를 받아 오며, MOCK은 검증할 것이 없고 메리츠는 계좌 식별자가 없다. 이 호출은 DB 트랜잭션 밖에서 한다. 토스·메리츠는 조회 API가 없어 입력한 만료일 또는 등록 시점 + 1년 값을 저장한다.
         code: [TossAuthApi#verifyAccount, MockAuthApi#verifyAccount, MeritzAuthApi#verifyAccount]
         fail: 422(BROKER_CREDENTIAL_INVALID)로 화면에 "App Key, App Secret 또는 계좌번호를 다시 확인하세요"(Toss는 Client ID·Secret 안내)가 보이고 저장되지 않는다.
 
@@ -735,7 +735,7 @@ flows:
         title: API 키 교체
         desc: >-
           계좌 화면에서 새 키·시크릿을 입력하면 PUT /api/accounts/{id}/credentials가 소유권을 확인하고, 증권사 연결 테스트를 통과해야 저장한다.
-          Toss는 같은 계좌(accountSeq)인지까지 확인하고, 메리츠는 새 키가 다른 계좌에 이미 있으면 거부하며(토스·메리츠는 입력값 또는 교체 시점 + 1년 추정으로 키 만료일도 갱신한다).
+          Toss는 같은 계좌(accountSeq)인지까지 확인하고, 메리츠는 새 키가 다른 계좌에 이미 있으면 거부하며(토스·메리츠는 입력값 또는 교체 시점 + 1년으로 키 만료일도 갱신한다).
           저장 후 옛 키로 발급된 토큰 캐시(Meritz broker_tokens·Toss Redis canonical — 진행 중 발급은 generation 증가로 fence)를 지운다(Redis 실패는 로그만 남기고 TTL 만료에 맡긴다). 신규 등록이 꺼진 증권사도 키 교체는 할 수 있다. 모의계좌는 키가 없어 불가.
         code: [AccountController#updateCredentials, AccountService#updateCredentials, BrokerConnectionTesters#of, AccountTokenEvictionPort#evict]
         state: "accounts.app_key·secret_key·api_key_expires_at 갱신 · broker_tokens·Toss Redis 토큰 삭제"

@@ -89,7 +89,7 @@ public class AccountController {
     }
 
     // 계좌 API 키 교체 (소유권 검증 → 연결 테스트 통과 시 저장)
-    @Operation(summary = "계좌 API 키 수정", description = "새 앱 키·시크릿으로 증권사 연결을 검증한 뒤 저장하고 키 만료일(추정 또는 입력값)을 갱신. 모의계좌는 불가.")
+    @Operation(summary = "계좌 API 키 수정", description = "새 앱 키·시크릿으로 증권사 연결을 검증한 뒤 저장하고 키 만료일(교체 시점 + 1년 또는 입력값)을 갱신. 모의계좌는 불가.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "수정 성공"),
             @ApiResponse(responseCode = "400", description = "모의계좌이거나 다른 계좌의 키"),

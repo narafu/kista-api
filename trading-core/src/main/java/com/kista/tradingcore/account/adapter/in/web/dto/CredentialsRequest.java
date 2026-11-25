@@ -13,7 +13,7 @@ public record CredentialsRequest(
         @NotBlank(message = "앱 키는 필수입니다.") String appKey,
         @Schema(description = "새 API 앱 시크릿 (Toss Client Secret)")
         @NotBlank(message = "앱 시크릿은 필수입니다.") String secretKey,
-        @Schema(description = "API 키 만료일(KST, 선택) — 토스·메리츠만, 비우면 등록·교체 시점 + 1년 추정", example = "2027-11-10")
+        @Schema(description = "API 키 만료일(KST, 선택) — 토스·메리츠만, 비우면 등록·교체 시점 + 1년(유효기간 1년)", example = "2027-11-10")
         @Nullable LocalDate apiKeyExpiresOn
 ) {
     public UpdateCredentialsCommand toCommand() {
