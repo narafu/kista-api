@@ -63,7 +63,11 @@ public class UnassignedCashCalculator {
     }
 
     // 조회 실패는 예외로 전파, 증권사가 금액을 주지 않으면 null — 호출부가 정책(경고 생략/skip)을 정한다
-    public BigDecimal available(UUID accountId, BrokerAccountRef ref) {
-        return available(ref, reserved(seedHolders(accountId)));
+    // excludedStrategyId: 시드 수정 대상 전략 — 자기 원장은 그 시드로 다시 쓸 수 있어 reserved에서 뺀다(등록은 null)
+    public BigDecimal available(UUID accountId, BrokerAccountRef ref, @Nullable UUID excludedStrategyId) {
+        List<SeedHolder> others = seedHolders(accountId).stream()
+                .filter(h -> !h.strategy().id().equals(excludedStrategyId))
+                .toList();
+        return available(ref, reserved(others));
     }
 }

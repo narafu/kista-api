@@ -245,9 +245,10 @@ public class StrategyService {
         // 시드 수정 — 등록 검증과 같은 시드 미리보기로 기준가·가용 예수금·PRIVACY 최소 시드·기준표 없음을 채운다(시세 실패는 fail-open)
         OwnedStrategy owned = OwnedStrategy.load(strategyPort, accountPort, strategyId, requesterId);
         Strategy strategy = owned.strategy();
+        // 가용 예수금은 이 전략 자신의 원장을 빼지 않는다(그 시드로 쓸 수 있는 최대 현금)
         // 분할 수 0: INFINITE 최소 시드는 위 updateMinSeed(활성 버전 분할 수)를 쓰고, 다른 타입의 최소 시드 계산은 분할 수를 쓰지 않는다
         StrategySeedPreview preview = BrokerCallGuard.tryGet("수정 검증용 시드 미리보기: strategyId=" + strategyId,
-                        () -> strategyHistoryQueryService.strategySeedPreview(owned.account(), strategy.type(), strategy.ticker(), 0))
+                        () -> strategyHistoryQueryService.strategySeedPreview(owned.account(), strategy.type(), strategy.ticker(), 0, strategy.id()))
                 .orElse(null);
         StrategyValidation.Derived derived = new StrategyValidation.Derived(
                 null, null, null, null, null, null, null,

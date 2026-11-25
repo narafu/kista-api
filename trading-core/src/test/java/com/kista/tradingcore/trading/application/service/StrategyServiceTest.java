@@ -3177,6 +3177,26 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
     }
 
     @Test
+    @DisplayName("검증: 시드 수정의 가용 예수금은 이 전략 자신의 원장을 빼지 않는다 — 시드를 그대로 두면 초과 경고가 없다")
+    void validateUpdate_availableCash_includesOwnDeposit() {
+        stubPrivacySeedUpdate();
+        when(privacyTradePort.findSeedPreviewBase())
+                .thenReturn(Optional.of(new PrivacyCurrentBase(StrategyTicker.SOXL, new BigDecimal("5000.00"), null)));
+        Strategy self = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(self));
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(new CyclePosition(
+                UUID.randomUUID(), CYCLE_ID, new BigDecimal("1200"), BigDecimal.ZERO, null, BigDecimal.ZERO, null, null)));
+        when(marginPort.getUsdBuyableAmount(any())).thenReturn(new BigDecimal("1500")); // 이 전략 시드 1200 + 미배정 300
+
+        StrategyValidation validation = strategyService.validateUpdate(STRATEGY_ID, USER_ID,
+                new UpdateStrategyCommand(null, new BigDecimal("1200")));
+
+        assertThat(validation.derived().availableCash()).isEqualByComparingTo("1500");
+        assertThat(validation.warnings()).isEmpty();
+    }
+
+    @Test
     @DisplayName("검증: PRIVACY 기준표가 없으면 skipReason=NO_PRIVACY_BASE만 내리고 거절하지 않는다")
     void validateUpdate_privacyNoBase_skipReason() {
         stubPrivacySeedUpdate();

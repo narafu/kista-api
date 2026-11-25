@@ -22,6 +22,7 @@ import com.kista.tradingcore.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.StrategySeedPreview;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,11 +55,12 @@ public class StrategyHistoryQueryService {
     public StrategySeedPreview strategySeedPreview(
             UUID accountId, UUID requesterId,
             StrategyType type, StrategyTicker ticker, int divisionCount) {
-        return strategySeedPreview(accountPort.requireOwnedAccount(accountId, requesterId), type, ticker, divisionCount);
+        return strategySeedPreview(accountPort.requireOwnedAccount(accountId, requesterId), type, ticker, divisionCount, null);
     }
 
-    // 소유권 검증을 마친 계좌용 — 등록 검증(StrategyCreationService.validate)이 같은 계산을 공유한다
-    public StrategySeedPreview strategySeedPreview(Account account, StrategyType type, StrategyTicker ticker, int divisionCount) {
+    // 소유권 검증을 마친 계좌용 — 등록·수정 검증이 같은 계산을 공유한다. excludedStrategyId는 시드 수정 대상(가용 예수금에 자기 원장 포함), 등록은 null
+    public StrategySeedPreview strategySeedPreview(Account account, StrategyType type, StrategyTicker ticker, int divisionCount,
+                                                   @Nullable UUID excludedStrategyId) {
         // 1단계: 전략 타입별 capability 로드
         CycleOrderStrategy strategy = cycleStrategies.of(type);
 
@@ -83,15 +85,15 @@ public class StrategyHistoryQueryService {
                 : price;
         BigDecimal minSeed = strategy.minRequiredDeposit(price, privacyPlan, divisionCount);
 
-        return new StrategySeedPreview(ticker.name(), basePrice, minSeed, null, calcAvailableCash(account));
+        return new StrategySeedPreview(ticker.name(), basePrice, minSeed, null, calcAvailableCash(account, excludedStrategyId));
     }
 
     // 가용 예수금 = 계좌 미배정 현금(UnassignedCashCalculator, 계좌 통화) — 등록 차단이 아닌 폼 경고용
     // MOCK과 조회 실패는 미리보기를 막지 않고 null
-    private BigDecimal calcAvailableCash(Account account) {
+    private BigDecimal calcAvailableCash(Account account, @Nullable UUID excludedStrategyId) {
         if (!UnassignedCashCalculator.applies(account.broker())) return null;
         return BrokerCallGuard.tryGet("가용 예수금 조회: accountId=" + account.id(),
-                () -> unassignedCash.available(account.id(), account.toBrokerRef())).orElse(null);
+                () -> unassignedCash.available(account.id(), account.toBrokerRef(), excludedStrategyId)).orElse(null);
     }
 
     // 전략(사이클) 기준 거래 이력 조회 — 커서 기반 페이지네이션

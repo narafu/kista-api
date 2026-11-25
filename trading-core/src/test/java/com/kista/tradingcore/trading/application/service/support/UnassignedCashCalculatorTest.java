@@ -53,7 +53,7 @@ class UnassignedCashCalculatorTest {
         when(marginPort.getUsdBuyableAmount(any())).thenReturn(new BigDecimal("5000"));
 
         var ref = TradingFixtures.tradingAccount(accountId, UUID.randomUUID()).brokerRef();
-        assertThat(calc.available(accountId, ref)).isEqualByComparingTo("2801"); // 5000 − 1200 − 999
+        assertThat(calc.available(accountId, ref, null)).isEqualByComparingTo("2801"); // 5000 − 1200 − 999
     }
 
     @Test
@@ -68,7 +68,22 @@ class UnassignedCashCalculatorTest {
         when(marginPort.getUsdBuyableAmount(any())).thenReturn(new BigDecimal("5000"));
 
         var ref = TradingFixtures.tradingAccount(accountId, UUID.randomUUID()).brokerRef();
-        assertThat(calc.available(accountId, ref)).isEqualByComparingTo("3800"); // 5000 − 1200
+        assertThat(calc.available(accountId, ref, null)).isEqualByComparingTo("3800"); // 5000 − 1200
+    }
+
+    @Test
+    void available_keeps_excluded_strategy_deposit() {
+        UUID accountId = UUID.randomUUID();
+        Strategy self = strategy(accountId, StrategyType.PRIVACY);
+        Strategy other = strategy(accountId, StrategyType.INFINITE);
+        deposit(self, "1200");
+        deposit(other, "999");
+        when(strategyPort.findByAccountId(accountId)).thenReturn(List.of(self, other));
+        when(marginPort.getUsdBuyableAmount(any())).thenReturn(new BigDecimal("5000"));
+
+        var ref = TradingFixtures.tradingAccount(accountId, UUID.randomUUID()).brokerRef();
+        // 시드 수정 대상 자신의 원장은 그 시드로 다시 쓸 수 있어 빼지 않는다
+        assertThat(calc.available(accountId, ref, self.id())).isEqualByComparingTo("4001"); // 5000 − 999
     }
 
     @Test

@@ -109,7 +109,7 @@ class StrategyCreationService {
         }
         // 시드 미리보기는 GET strategy-seed-preview와 같은 계산 — 시세 실패는 등록을 막지 않으므로 파생값만 비운다(fail-open)
         StrategySeedPreview preview = BrokerCallGuard.tryGet("검증용 시드 미리보기: accountId=" + accountId,
-                        () -> seedPreviewQuery.strategySeedPreview(account, cmd.type(), resolved.ticker(), resolved.divisionCount()))
+                        () -> seedPreviewQuery.strategySeedPreview(account, cmd.type(), resolved.ticker(), resolved.divisionCount(), null))
                 .orElse(null);
         return new StrategyValidation(fieldErrors,
                 preview != null ? StrategyValidation.depositWarnings(cmd.initialDeposit(), preview.availableCash(), account.broker().getCurrency()) : List.of(),
