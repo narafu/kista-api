@@ -5,7 +5,7 @@ import com.kista.shared.kernel.Broker;
 import java.time.LocalDate;
 import java.util.UUID;
 
-// 거래소 API 키 만료 임박(30·7·0일 전) — 일일 점검 스케쥴러가 발행
+// 증권사 API 키 만료 임박(30·7·0일 전) — 일일 점검 스케쥴러가 발행
 public record ApiKeyExpiringEvent(
         UUID userId,            // 알림 수신자
         UUID accountId,         // 대상 계좌

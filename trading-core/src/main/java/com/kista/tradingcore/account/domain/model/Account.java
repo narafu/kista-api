@@ -18,7 +18,7 @@ public record Account(
         String brokerAccountCode, // 증권사 API 보조 식별자 — TOSS: accountSeq
         Broker broker,            // 증권사 (미지정 시 MOCK)
         Instant createdAt,        // DB created_at, 신규 등록 시 null
-        Instant apiKeyExpiresAt   // 거래소 API 키 만료 시각 — 토스·메리츠는 추정(+1년)·사용자 입력
+        Instant apiKeyExpiresAt   // 증권사 API 키 만료 시각 — 토스·메리츠는 추정(+1년)·사용자 입력
 ) {
     // 목록 표시용 증권사 순서 — 운영 중심(메리츠) 먼저, 목록에 없는 증권사는 맨 뒤
     private static final List<Broker> DISPLAY_BROKER_ORDER =

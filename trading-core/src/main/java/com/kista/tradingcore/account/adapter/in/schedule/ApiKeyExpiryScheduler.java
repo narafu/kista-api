@@ -16,7 +16,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Set;
 
-// 거래소 API 키 만료 일일 점검 — 30·7·0일 전에만 알림 이벤트 발행
+// 증권사 API 키 만료 일일 점검 — 30·7·0일 전에만 알림 이벤트 발행
 @Component
 @RequiredArgsConstructor
 @ConditionalOnWorkerRole // web role(kista-api)에서는 미등록 — 운영 DB·텔레그램 중복 실행 방지

@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 
-// 거래소 API 키 만료 판정 SSOT — 계좌 응답 apiKeyExpiry와 만료 알림 스케쥴러가 같이 쓴다. 날짜는 KST 기준
+// 증권사 API 키 만료 판정 SSOT — 계좌 응답 apiKeyExpiry와 만료 알림 스케쥴러가 같이 쓴다. 날짜는 KST 기준
 public record ApiKeyExpiry(
         Status status,       // 만료 상태
         @Nullable LocalDate expiresOn, // 만료일(KST) — 만료일 없으면 null

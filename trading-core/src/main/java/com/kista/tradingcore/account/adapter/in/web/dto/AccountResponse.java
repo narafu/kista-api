@@ -24,7 +24,7 @@ public record AccountResponse(
         String broker,
         @Schema(description = "계좌 기준 통화(증권사 파생)", example = "USD")
         String currency,
-        @Schema(description = "거래소 API 키 만료 시각 (토스·메리츠는 추정(+1년)·사용자 입력, 그 외 null)")
+        @Schema(description = "증권사 API 키 만료 시각 (토스·메리츠는 추정(+1년)·사용자 입력, 그 외 null)")
         @Nullable Instant apiKeyExpiresAt,
         @Schema(description = "API 키 만료 판정 (KST 날짜 기준 — 남은 일수 0 이하 EXPIRED, 30일 이내 EXPIRING, 만료일 없음 NONE)")
         ApiKeyExpiryResponse apiKeyExpiry
