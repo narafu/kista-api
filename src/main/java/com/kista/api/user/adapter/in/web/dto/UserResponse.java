@@ -6,6 +6,7 @@ import com.kista.shared.kernel.NotificationChannel;
 import com.kista.api.user.domain.model.UserSettings;
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -33,9 +34,11 @@ public record UserResponse(
         @Schema(description = "반려 사유 (REJECTED 상태에서만 의미, null 가능)")
         @Nullable String rejectReason,
         @Schema(description = "자산 등록 폼 운용전략 추천 목록")
-        List<String> strategySuggestions
+        List<String> strategySuggestions,
+        @Schema(description = "재신청 가능 시각 (쿨다운 중이면 해제 시각, 아니면 null)")
+        @Nullable Instant reapplyAvailableAt
 ) {
-    public static UserResponse from(User user, UserSettings settings) {
+    public static UserResponse from(User user, UserSettings settings, @Nullable Instant reapplyAvailableAt) {
         // notificationPrefs — enum key를 String으로 변환하여 JSON 직렬화
         Map<String, Boolean> prefs = settings.notificationPrefs().entrySet().stream()
                 .collect(Collectors.toMap(e -> e.getKey().name(), Map.Entry::getValue));
@@ -51,7 +54,8 @@ public record UserResponse(
                 user.notificationChannel(),
                 prefs,
                 maskedRejectReason,
-                settings.strategySuggestions()
+                settings.strategySuggestions(),
+                reapplyAvailableAt
         );
     }
 }

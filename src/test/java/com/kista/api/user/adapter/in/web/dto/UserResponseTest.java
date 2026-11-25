@@ -21,7 +21,7 @@ class UserResponseTest {
                 .withRejection("허위 정보 기재", Instant.now(FixedClockTestConfig.FIXED));
         UserSettings settings = UserSettings.defaultFor(userId);
 
-        UserResponse response = UserResponse.from(user, settings);
+        UserResponse response = UserResponse.from(user, settings, null);
 
         assertThat(response.rejectReason()).isEqualTo("허위 정보 기재");
     }
@@ -35,7 +35,7 @@ class UserResponseTest {
                 .withStatus(UserStatus.ACTIVE);
         UserSettings settings = UserSettings.defaultFor(userId);
 
-        UserResponse response = UserResponse.from(rejectedThenApproved, settings);
+        UserResponse response = UserResponse.from(rejectedThenApproved, settings, null);
 
         assertThat(response.rejectReason()).isNull();
     }
@@ -46,7 +46,7 @@ class UserResponseTest {
         User user = DomainFixtures.userWithStatus(userId, UserStatus.PENDING);
         UserSettings settings = UserSettings.defaultFor(userId);
 
-        UserResponse response = UserResponse.from(user, settings);
+        UserResponse response = UserResponse.from(user, settings, null);
 
         assertThat(response.rejectReason()).isNull();
     }
