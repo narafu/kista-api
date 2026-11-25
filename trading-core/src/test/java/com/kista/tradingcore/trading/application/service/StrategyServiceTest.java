@@ -3140,4 +3140,16 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
         verify(strategyCyclePort, never()).lockForUpdate(any());
         verify(strategyCyclePort, never()).updateStartAmount(any(), any());
     }
+
+    @Test
+    @DisplayName("검증: 평단가만 입력하고 수량이 없거나 0이면 등록 400과 같은 문장을 initialHoldings에 귀속한다")
+    void validateRegistration_avgPriceWithoutHoldings_symmetric() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        StrategyValidation.FieldError missing = assertRegistrationSymmetric(
+                infinite().ticker(StrategyTicker.SOXL).divisionCount(20).avgPrice(new BigDecimal("45.50")).build(), "initialHoldings");
+        assertThat(missing.detail()).isEqualTo("평단가를 입력하면 수량은 0보다 커야 합니다.");
+        assertRegistrationSymmetric(
+                infinite().ticker(StrategyTicker.SOXL).divisionCount(20).holdings(BigDecimal.ZERO).avgPrice(new BigDecimal("45.50")).build(), "initialHoldings");
+    }
 }

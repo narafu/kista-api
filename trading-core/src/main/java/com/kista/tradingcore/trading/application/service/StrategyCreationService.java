@@ -154,6 +154,10 @@ class StrategyCreationService {
         BigDecimal initialHoldings = FieldRejectedException.attribute("initialHoldings",
                 () -> BootstrapPosition.validate(cmd.initialHoldings(), cmd.initialAvgPrice()));
         boolean bootstrap = initialHoldings.signum() > 0;
+        // 평단가만 입력하고 수량이 없으면 평단가가 저장되지 않고 버려진다 — 입력 실수로 보고 거부(kista-ui 폼 규칙을 서버로 옮김)
+        if (!bootstrap && cmd.initialAvgPrice() != null && cmd.initialAvgPrice().signum() > 0) {
+            throw new FieldRejectedException("initialHoldings", "평단가를 입력하면 수량은 0보다 커야 합니다.");
+        }
         // 시작예정일 검증 — 기본값 오늘(KST), 과거 거부
         LocalDate scheduledStart = resolveScheduledStart(cmd);
 
