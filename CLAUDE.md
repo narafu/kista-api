@@ -29,7 +29,7 @@ Java 25 + Spring Boot 4, Hexagonal Architecture + Spring Modulith, Gradle 서브
 
 ## 작업 방식
 
-공통 작업 방식(서브에이전트, 커밋 전 검토, 자동 커밋, 모호하면 질문 등)은 전역 `~/.claude/CLAUDE.md`. 여기는 이 프로젝트 고유 규칙만.
+공통 작업 방식(서브에이전트, **Sonnet 작업 시 Opus `advisor` 필수(착수 전·완료 전)**, 커밋 전 검토, 자동 커밋, 모호하면 질문 등)은 전역 `~/.claude/CLAUDE.md`. 여기는 이 프로젝트 고유 규칙만.
 
 - **직접 확인 우선**: 확인할 수 있는 것은 추정·"미검증"으로 남기지 않는다 — 라이브러리 동작은 gradle 캐시의 sources jar로, 트랜잭션·이벤트(EPR)·Redis 경로는 실 DB/Redis 통합 테스트(`*IT`)로, 고친 테스트가 회귀를 잡는지는 변이 확인으로, 운영 상태는 읽기 전용 조회(`ssh kista-server` 후 SELECT·`docker logs`)로. "미검증"은 쓰기·실계좌 주문·배포가 필요한 것만, 이유와 함께 보고
 - **결정 기록 확인**: 구조 변경·리팩토링을 제안하기 전에 `docs/agents/decisions.md`를 대상 클래스·주제어로 grep한다. 유지·기각된 항목은 재제안하지 않는다
