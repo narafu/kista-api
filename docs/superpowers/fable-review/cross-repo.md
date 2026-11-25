@@ -380,4 +380,4 @@ api는 `TokenService.refresh`의 후계 RT를 결정적으로 유도해, 회전�
 
 | # | 변경 | api | ui | 상태 |
 |---|---|---|---|---|
-| K1 | 응답 유실 후 재시도가 안전해졌으니 세션 유지 범위를 넓힐 수 있다: `shared/lib/auth/refresh.ts`의 서버 쪽 timeout·연결 끊김·500·502도 `REFRESH_UNAVAILABLE`(세션 유지)로. 같은 파일 주석의 "60초 grace 뒤 전체 세션 폐기" 서술 갱신 | 완료(이 커밋) | 제안만 — api 배포 뒤 ui 세션에서 판단 | 후보 |
+| K1 | 응답 유실 후 재시도가 안전해졌으니 세션 유지 범위를 넓힐 수 있다: `shared/lib/auth/refresh.ts`의 서버 쪽 timeout·연결 끊김·500·502도 `REFRESH_UNAVAILABLE`(세션 유지)로. 같은 파일 주석의 "60초 grace 뒤 전체 세션 폐기" 서술 갱신 | 완료(이 커밋) | ui `456011ec` 완료(미push), api 배포 뒤 ui 배포. refresh 5xx·408·429·timeout·연결 끊김·200 본문 유실은 세션 유지, 그 밖의 4xx·요청 전 TypeError는 로그아웃. `clientFetch`는 refresh 401만 로그아웃하고 그 밖은 503 한 번(재시도 없음), Route Handler timeout 5초. 받아들인 위험: 같은 RT에 api가 계속 5xx면 자동 로그아웃 없이 재로그인 안내가 남는다 | api `3efb88645`·`1e9e55fd6` 배포·라이브 확인 → ui push(옛 api면 넓힌 재시도가 60초 뒤 전체 세션 폐기) |
