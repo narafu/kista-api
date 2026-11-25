@@ -78,6 +78,7 @@ S7 api 완료분의 ui 후속(2026-11-25, 모두 추가만, 미배포 — N19 �
 
 - T5: 메타 소비로 runtime-config 통합(`StrategyTypeMeta.enabled·fields·vrRampDefaults`, `BrokerMeta.enabled`, `approvalRequired`, `benchmarkEtf`), `RAMP_DEFAULTS_BY_MODE` 사본 삭제, `userStatuses` 라벨 사용. 메타가 `no-store`가 됐다. `/api/runtime-config`는 ui 전환 뒤 삭제 대상이다.
 - T6: `computeOrderReadiness`·`canWithdrawCapital`/`capitalAdjustment`·`apiKeyExpiryState`·`isScheduledStart` 재판정 삭제 → `allowedActions`/`blockedActions`(둘 다에 없으면 버튼 없음, blocked는 비활성 + 사유 라벨=메타), `apiKeyExpiry`, `warnings`. 서버 판정 밖 3건(마감 리포트 창·당일 주문 반영 전 보관·재개 시 1주 미만 잔액)은 서버 400 `detail`로 처리한다.
+- 계좌 API 키 만료일 직접 입력(토스 등 추정 증권사): 서버가 KST 오늘을 400으로 거부한다("API 키 만료일은 내일 이후여야 합니다.", Q-36). 날짜 입력 최솟값을 내일로 맞춘다.
 - T10: `strategyFormGuards`·`vrDerived`·`useTypeDefaults`·`useStrategySeedPreviewQuery` 삭제, 검증 엔드포인트 3개를 디바운스로 호출한다. 검증은 404(사용자 복제본 없음)·429/503(벤더)을 낼 수 있다. ui 규칙 사본 가운데 평단가만 입력(수량 없음)은 서버가 등록·검증에서 막는다(2026-11-25, 이 행의 후속 커밋). 나머지 4건은 서버가 검증하지 않으므로 `strategyFormGuards`에서 지우지 말고 남긴다: 비VR 예수금>0·PRIVACY 최소 시드(서버에 넣으면 지금 등록되는 null 예수금이 거절돼 사용자 결정 Q-35), NO_PRIVACY_BASE(기준표가 22:00Z 무렵 들어와 시점마다 결과가 달라 ui가 derived.skipReason으로 막는다), VR recurringMode≠HOLD인데 금액 0(폼 모드 개념). 메타가 런타임 값을 실어 `/api/meta`가 정책 조회(worker)에 묶인다 — worker 재기동 중에는 기본 정책이 내려가고 지연은 최대 10초다.
 - T11: 계좌 목록 `find` 대신 `GET /api/accounts/{id}`.
 - T12: `indicators.ts` 삭제·캔들 `sma*`/`rsi14` 사용(RAW 종가 기준), localStorage 쿨다운 삭제 → `reapplyAvailableAt`.

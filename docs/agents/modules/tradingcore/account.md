@@ -11,5 +11,5 @@ Spring Modulith 모듈(CLOSED) — 계좌 자격증명·브로커 연결. "domai
 
 ### API 키 만료 점검
 - `ApiKeyExpiryScheduler`(매일 10:00 KST, 락 `api-key-expiry` 30분)가 `broker.isApiKeyExpiring() && apiKeyExpiresAt != null` 계좌만 훑어 만료까지 30·7·0일 남은 날에만 `ApiKeyExpiringEvent`를 발행한다. 알림은 notify `ApiKeyExpiryNotifier` 소유.
-- `GET /api/accounts/{id}`: 소유 계좌 단건(`AccountService.getOwned`). 응답 `apiKeyExpiry{status,expiresOn,daysLeft}`는 `ApiKeyExpiry.of`가 SSOT(스케줄러와 공유). 등록 시 오늘 날짜 만료일은 KST 자정 저장 → 즉시 EXPIRED(기존 동작)
+- `GET /api/accounts/{id}`: 소유 계좌 단건(`AccountService.getOwned`). 응답 `apiKeyExpiry{status,expiresOn,daysLeft}`는 `ApiKeyExpiry.of`가 SSOT(스케줄러와 공유). 직접 입력 만료일은 KST 내일부터 받는다(당일은 남은 일수 0 = EXPIRED라 400)
 - 만료일 출처 `Broker.getApiKeyExpirySource()`: TOSS·MERITZ=`ESTIMATED`(사용자 입력 `apiKeyExpiresOn` 우선, 없으면 등록·교체 시점 + 1년 KST 추정 — 등록·키 교체·수정 세 경로, 수정은 입력이 있을 때만 갱신), MOCK=`NONE`. ESTIMATED 알림에는 "실제 만료일과 다르면 계좌 설정에서 고칠 수 있습니다." 문구가 붙는다.
