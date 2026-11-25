@@ -416,7 +416,7 @@ api 완료(미배포). 응답 모양이 바뀌므로 **ui와 같은 날 배포**
 | `GET …/transactions/budget-progress?type&mode&month` | `calcBudgetProgress`·`buildBudgetProgressTree`·`calcUnbudgetedCategories` | `{nodes, unbudgeted}`. `usageRatio` 소수 4자리 |
 | `GET /api/finance/bulk-register/preview?sourceMonth=` | `buildBulkRegisterItems` | `included`는 내려주지 않는다(ui 상태). 자산군·시장 정렬은 enum 선언 순서 |
 
-ui와 값이 다를 수 있는 곳(선행 테스트 1 "집계 대조"에서 보면 된다): ① 한 카테고리에 같은 기간 유효 예산이 둘 이상이면 서버는 `금액×유효개월`을 합산한다(ui는 Map 마지막 하나만 보였다 — 연간 모드에서 앞뒤로 이어진 두 예산이 해당). ② 부모가 선택 불가인 고아 카테고리는 ui 인덱스처럼 모든 집계에서 뺀다. ③ 삭제된 자산 카테고리의 루트 이름은 서버의 실제 이름(ui는 L1 라벨 상수). ④ 가나다 정렬은 `Collator(Locale.KOREAN)`. ⑤ 비율·퍼센트는 반올림된 값.
+ui와 값이 다를 수 있는 곳(선행 테스트 1 "집계 대조"에서 보면 된다): ① 한 카테고리에 같은 기간 유효 예산이 둘 이상이면 서버는 `금액×유효개월`을 합산한다(ui는 Map 마지막 하나만 보였다 — 연간 모드에서 앞뒤로 이어진 두 예산이 해당). 개인·그룹 예산이 같은 카테고리에 겹쳐도 합산한다 — 실적이 개인+그룹 합집합 범위라 배정도 같은 범위로 맞춘다(사용자 결정 2026-11-26). ② 부모가 선택 불가인 고아 카테고리는 ui 인덱스처럼 모든 집계에서 뺀다. ③ 삭제된 자산 카테고리의 루트 이름은 서버의 실제 이름(ui는 L1 라벨 상수). ④ 가나다 정렬은 `Collator(Locale.KOREAN)`. ⑤ 비율·퍼센트는 반올림된 값.
 
 테스트 짝: `aggregate.test.ts` → `AssetSnapshotAggregateTest`(isMonthClosed·formatAssetL1CategoryLabel 제외 — T6·메타 범위), `flowAggregate.test.ts`·`period.test.ts`(집계 규칙) → `FinanceFlowAggregateTest`·`FlowPeriodTest`(조회 윈도우 함수 `windowRange`·`displayWindow`·`autoAdjustedMonth`·`trendWindow`·`yearsRange`는 서버에 없음 — ui가 함께 지운다), `bulkRegisterPreview.test.ts`·`assetSort.test.ts`(compareAssetDetail) → `BulkRegisterPreviewTest`. web은 각 `*ControllerTest`.
 
