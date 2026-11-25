@@ -91,6 +91,7 @@ S7 후속 C(ui `72ff7d9d`·`90432a39`)의 api 요청 처리(2026-11-25, 미배�
 - 요청 3 `/api/runtime-config` 삭제(`5a6173d7c`): 컨트롤러·테스트·공개 경로 매처 삭제. `RuntimeConfigService`(메타 출처)와 관리자 `GET/PUT /api/admin/settings`는 그대로다. 메타 DTO `@Schema` 설명 문구도 바뀌었다.
 - 참고 Bean Validation 400 `fieldErrors`: 지침서 10 T7(로드맵 N6)이다. 선행(S5 P1)은 끝났지만 아직 착수하지 않았고 날짜는 정해지지 않았다. 착수하면 이 절에 적는다.
 - **ui가 할 일**: `gen:types` 재생성(runtime-config 경로 제거·메타 설명 변경 반영), 수정 화면(보유 0·시드 수정)에서 가용 예수금 힌트·25·50·75·100% 버튼(`derived.availableCash`), 기준가(`derived.basePrice`), PRIVACY 최소 시드 판정(`derived.minSeed`)·기준표 없음 차단(`derived.skipReason`)을 update-validations derived에 다시 연결, `AVAILABLE_CASH_EXCEEDED` 경고 표시는 등록과 같은 방식으로.
+- **ui 반영 완료**(ui `1cfbbb4f`, 미push): `gen:types` 재생성(typecheck 0건). 수정 화면은 이미 derived(가용 예수금 힌트·25~100% 버튼·기준가·`AVAILABLE_CASH_EXCEEDED`)를 쓰고 있었고 `6f897f0ad`로 수정 가용 예수금 값도 맞다. 시드를 실제로 바꾸는 수정(보유 0)에서만 PRIVACY 최소 시드·`NO_PRIVACY_BASE`를 ui가 막는다(시드를 그대로 두고 다른 설정만 바꾸는 저장은 막지 않음). 등록에서 `NO_PRIVACY_BASE`가 표시만 되고 제출되던 결함(`72ff7d9d`부터)도 고쳤다. **배포 순서**: api `3b13d6c8f`·`5a6173d7c`·`6f897f0ad` 먼저, ui는 그 뒤(K1 ui `456011ec`도 같은 원칙).
 
 **테스트 짝 확인**(ui 테스트를 지우기 전에 서버 테스트가 같은 케이스를 갖는지 대조한다. ui 07):
 
