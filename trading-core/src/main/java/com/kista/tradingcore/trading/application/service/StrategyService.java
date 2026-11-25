@@ -25,7 +25,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -179,9 +178,10 @@ public class StrategyService {
                 : latestCycle.endAmount();
         // 1주도 못 사는 원장으로 재개하면 0회차 매수가 원장 상한에 막혀 교착 — 거부
         if (closingPrice != null && seed.compareTo(closingPrice) < 0) {
-            throw new IllegalStateException(String.format(Locale.US,
-                    "남은 원장($%.2f)이 1주 가격($%.2f)보다 작아 재개할 수 없습니다. 전략을 삭제한 뒤 충분한 투자금으로 다시 등록해야 합니다.",
-                    seed, closingPrice));
+            // 1주 가격(USD)과 비교하는 원장이라 둘 다 USD 표기(Currency.display)
+            throw new IllegalStateException(
+                    "남은 원장(%s)이 1주 가격(%s)보다 작아 재개할 수 없습니다. 전략을 삭제한 뒤 충분한 투자금으로 다시 등록해야 합니다."
+                            .formatted(Currency.USD.display(seed), Currency.USD.display(closingPrice)));
         }
         cycleSnapshotCreator.createCycleAndSnapshot(strategy.id(), activeVersion.id(), seed, closingPrice);
         eventPublisher.publishEvent(new StrategyCapitalChangedEvent(requesterId)); // 새 사이클 생성 — stats 캐시 무효화

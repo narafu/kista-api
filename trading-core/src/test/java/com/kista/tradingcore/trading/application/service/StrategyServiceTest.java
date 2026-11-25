@@ -778,7 +778,7 @@ class StrategyServiceTest {
 
         assertThatThrownBy(() -> strategyService.resume(STRATEGY_ID, USER_ID))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageStartingWith("남은 원장($1000.00)이 1주 가격($1100.00)보다 작아");
+                .hasMessageStartingWith("남은 원장($1,000.00)이 1주 가격($1,100.00)보다 작아");
         verify(strategyCyclePort, never()).save(any());
         verify(strategyPort, never()).save(any());
     }
