@@ -67,8 +67,12 @@ public record FlowPeriod(YearMonth month, Mode mode) {
 
     // 가장 오래된 거래일이 속한 월/연도부터 선택 월/연도까지의 버킷 수(최소 1)
     public int bucketCountSince(LocalDate earliest) {
-        int years = month.getYear() - earliest.getYear();
-        int span = mode == Mode.YEARLY ? years + 1 : years * 12 + (month.getMonthValue() - earliest.getMonthValue()) + 1;
-        return Math.max(1, span);
+        // 입력 날짜가 극단값이어도 넘치지 않게 long으로 세고 MAX_ALL_BUCKETS로 자른다
+        long years = (long) month.getYear() - earliest.getYear();
+        long span = mode == Mode.YEARLY ? years + 1 : years * 12 + (month.getMonthValue() - earliest.getMonthValue()) + 1;
+        return (int) Math.clamp(span, 1, MAX_ALL_BUCKETS);
     }
+
+    // 전체 조회의 버킷 상한(월간 100년) — 거래 날짜·month 파라미터로 버킷 수를 무한정 키우지 못하게 한다
+    public static final int MAX_ALL_BUCKETS = 1200;
 }

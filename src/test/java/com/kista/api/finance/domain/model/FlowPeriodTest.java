@@ -87,4 +87,13 @@ class FlowPeriodTest {
         assertThat(new FlowPeriod(YearMonth.of(2026, 8), Mode.MONTHLY).bucketCountSince(earliest)).isEqualTo(30);
         assertThat(yearly("2026-08").bucketCountSince(earliest)).isEqualTo(3);
     }
+
+    @Test
+    @DisplayName("전체 조회 버킷 수는 극단 날짜에서도 넘치지 않고 상한으로 잘린다")
+    void bucketCountSince_capped() {
+        FlowPeriod monthly = new FlowPeriod(YearMonth.of(2026, 8), Mode.MONTHLY);
+        assertThat(monthly.bucketCountSince(LocalDate.of(1, 1, 1))).isEqualTo(FlowPeriod.MAX_ALL_BUCKETS);
+        assertThat(new FlowPeriod(YearMonth.of(999_999_999, 12), Mode.MONTHLY).bucketCountSince(LocalDate.MIN))
+                .isEqualTo(FlowPeriod.MAX_ALL_BUCKETS);
+    }
 }
