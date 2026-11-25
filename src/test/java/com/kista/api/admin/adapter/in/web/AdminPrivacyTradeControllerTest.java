@@ -81,7 +81,10 @@ class AdminPrivacyTradeControllerTest {
                 .andExpect(jsonPath("$[0].releaseDate").value("2026-06-10"))
                 .andExpect(jsonPath("$[0].tradeDate").doesNotExist())
                 .andExpect(jsonPath("$[0].ticker").value("SOXL"))
-                .andExpect(jsonPath("$[0].orders[0].direction").value("BUY"));
+                .andExpect(jsonPath("$[0].orders[0].direction").value("BUY"))
+                .andExpect(jsonPath("$[0].cash").value(-3262.30)) // 28.50 + 45.20 - 27.80*120
+                .andExpect(jsonPath("$[0].cycleBoundary").value(false))
+                .andExpect(jsonPath("$[0].yearlyReset").value(false));
         verify(adminQueryService).listPrivacyBases(30);
     }
 

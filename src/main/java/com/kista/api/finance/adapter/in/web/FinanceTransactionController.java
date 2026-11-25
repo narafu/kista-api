@@ -1,5 +1,10 @@
 package com.kista.api.finance.adapter.in.web;
 
+import com.kista.api.finance.adapter.in.web.dto.BudgetProgressResponse;
+import com.kista.api.finance.adapter.in.web.dto.FlowSummaryResponse;
+import com.kista.api.finance.adapter.in.web.dto.FlowTrendResponse;
+import com.kista.api.finance.domain.model.FinanceCategory;
+import com.kista.api.finance.domain.model.FlowPeriod;
 import com.kista.api.finance.adapter.in.web.dto.FinanceTransactionRequest;
 import com.kista.api.finance.adapter.in.web.dto.FinanceTransactionResponse;
 import com.kista.api.finance.application.service.FinanceTransactionService;
@@ -18,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
 
@@ -41,6 +47,49 @@ public class FinanceTransactionController {
         return financeTransactionService.list(userId, from, to, categoryId, filterUserId).stream()
                 .map(FinanceTransactionResponse::from)
                 .toList();
+    }
+
+    @Operation(summary = "거래 기간 요약", description = "수입·소비·저축 한 유형의 합계·건수·전월/전년 비교·월평균. 기준일은 서버 KST 오늘입니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "잘못된 파라미터(type=ASSET 등)")
+    })
+    @GetMapping("/summary")
+    public FlowSummaryResponse summary(
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam FinanceCategory.Type type,
+            @RequestParam FlowPeriod.Mode mode,
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM") YearMonth month) {
+        return FlowSummaryResponse.from(financeTransactionService.summary(userId, type, new FlowPeriod(month, mode)));
+    }
+
+    @Operation(summary = "거래 추이", description = "월간은 월별, 연간은 연도별 합계와 루트 카테고리별 합계. range 생략 시 가장 오래된 거래부터 전체.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "잘못된 파라미터(type=ASSET, range<1 등)")
+    })
+    @GetMapping("/trend")
+    public FlowTrendResponse trend(
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam FinanceCategory.Type type,
+            @RequestParam FlowPeriod.Mode mode,
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM") YearMonth month,
+            @RequestParam(required = false) Integer range) {
+        return FlowTrendResponse.from(financeTransactionService.trend(userId, type, new FlowPeriod(month, mode), range));
+    }
+
+    @Operation(summary = "예산 대비 실적", description = "예산 카테고리 트리(소계 포함)와 예산 없는 실적 카테고리.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "잘못된 파라미터(type=ASSET 등)")
+    })
+    @GetMapping("/budget-progress")
+    public BudgetProgressResponse budgetProgress(
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam FinanceCategory.Type type,
+            @RequestParam FlowPeriod.Mode mode,
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM") YearMonth month) {
+        return BudgetProgressResponse.from(financeTransactionService.budgetProgress(userId, type, new FlowPeriod(month, mode)));
     }
 
     @Operation(summary = "거래내역 등록")

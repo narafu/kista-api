@@ -48,7 +48,8 @@ class TradingStatsControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalRealizedPnl").value(50.00))
                 .andExpect(jsonPath("$.byType[0].type").value("INFINITE"))
-                .andExpect(jsonPath("$.byType[0].winRate").value(0.5));
+                .andExpect(jsonPath("$.byType[0].winRate").value(0.5))
+                .andExpect(jsonPath("$.totalActiveCycleCount").value(1));
     }
 
     @Test

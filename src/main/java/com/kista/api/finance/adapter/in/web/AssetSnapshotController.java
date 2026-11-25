@@ -1,5 +1,10 @@
 package com.kista.api.finance.adapter.in.web;
 
+import com.kista.api.finance.adapter.in.web.dto.AssetCheckResponse;
+import com.kista.api.finance.adapter.in.web.dto.AssetCompositionResponse;
+import com.kista.api.finance.adapter.in.web.dto.AssetSummaryResponse;
+import com.kista.api.finance.adapter.in.web.dto.AssetTrendResponse;
+import com.kista.api.finance.domain.model.AssetSnapshotAggregates;
 import com.kista.api.finance.adapter.in.web.dto.AssetSnapshotRequest;
 import com.kista.api.finance.adapter.in.web.dto.AssetSnapshotResponse;
 import com.kista.api.finance.domain.model.AssetSnapshot;
@@ -23,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
 
@@ -49,6 +55,54 @@ public class AssetSnapshotController {
         return assetSnapshotService.list(userId, from, to, filterUserId).stream()
                 .map(this::enrich)
                 .toList();
+    }
+
+    @Operation(summary = "자산 월 요약", description = "month 생략 시 가장 최근 기록 월. 직전 기록 월 요약(previous)을 함께 반환합니다.")
+    @ApiResponse(responseCode = "200", description = "조회 성공")
+    @GetMapping("/summary")
+    public AssetSummaryResponse summary(
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM") YearMonth month) {
+        return AssetSummaryResponse.from(assetSnapshotService.summary(userId, month));
+    }
+
+    @Operation(summary = "자산 추이", description = "기록 월 중 endMonth 이하의 최근 months개를 월 오름차순으로 반환합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "months가 1 미만")
+    })
+    @GetMapping("/trend")
+    public AssetTrendResponse trend(
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam(required = false) Integer months,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM") YearMonth endMonth) {
+        return AssetTrendResponse.from(assetSnapshotService.trend(userId, months, endMonth));
+    }
+
+    @Operation(summary = "자산 구성비", description = "basis=CATEGORY(대출 포함 L1) 또는 ASSET_CLASS(대출 제외 자산군)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "잘못된 basis 또는 months")
+    })
+    @GetMapping("/composition")
+    public AssetCompositionResponse composition(
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam AssetSnapshotAggregates.Basis basis,
+            @RequestParam(required = false) Integer months,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM") YearMonth endMonth) {
+        return AssetCompositionResponse.from(assetSnapshotService.composition(userId, basis, months, endMonth));
+    }
+
+    @Operation(summary = "월별 기록 점검", description = "누락 L1 카테고리·전월 대비 누락 계좌·기준일별 건수를 반환합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "month 누락 또는 형식 오류")
+    })
+    @GetMapping("/check")
+    public AssetCheckResponse check(
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM") YearMonth month) {
+        return AssetCheckResponse.from(assetSnapshotService.check(userId, month));
     }
 
     @Operation(summary = "자산 기록 등록")

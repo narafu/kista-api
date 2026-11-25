@@ -2,6 +2,7 @@ package com.kista.api.finance.adapter.in.web;
 
 import com.kista.api.finance.adapter.in.web.dto.BulkFinanceRegisterRequest;
 import com.kista.api.finance.adapter.in.web.dto.BulkFinanceRegisterResponse;
+import com.kista.api.finance.adapter.in.web.dto.BulkRegisterPreviewResponse;
 import com.kista.api.finance.domain.model.AssetSnapshotCommand;
 import com.kista.api.finance.domain.model.BulkFinanceRegisterResult;
 import com.kista.api.finance.domain.model.FinanceTransactionCommand;
@@ -13,12 +14,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
 
@@ -44,5 +47,14 @@ public class FinanceBulkController {
                 .map(BulkFinanceRegisterRequest.TransactionItem::toCommand).toList();
         BulkFinanceRegisterResult result = bulkFinanceRegisterService.register(userId, shareToGroup, assets, transactions);
         return BulkFinanceRegisterResponse.from(result);
+    }
+
+    @Operation(summary = "가계부 일괄 등록 미리보기", description = "소스월의 자산·수입·소비·저축 기록을 카테고리 계층 그룹 트리로 묶어 반환합니다.")
+    @ApiResponse(responseCode = "200", description = "조회 성공")
+    @GetMapping("/preview")
+    public BulkRegisterPreviewResponse preview(
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "복사 원본 월 (yyyy-MM)", example = "2026-07") @RequestParam YearMonth sourceMonth) {
+        return BulkRegisterPreviewResponse.from(bulkFinanceRegisterService.preview(userId, sourceMonth));
     }
 }

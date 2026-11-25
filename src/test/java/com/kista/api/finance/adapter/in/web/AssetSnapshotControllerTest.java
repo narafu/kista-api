@@ -19,8 +19,12 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.kista.api.finance.domain.model.AssetSnapshotAggregates.*;
+
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
 
@@ -250,5 +254,98 @@ class AssetSnapshotControllerTest {
                         .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.groupId").value(nullValue()));
+    }
+
+    @Test
+    void summary_returns200WithYearMonthStrings() throws Exception {
+        YearMonth aug = YearMonth.of(2026, 8);
+        MonthlyAssetSummary current = new MonthlyAssetSummary(aug, 7L, 10L, 3L,
+                new AssetClassAmount(AssetClass.EQUITY, 10L), 2,
+                List.of(new CategoryAmount(FinanceCategory.SYSTEM_LOAN_ID, 3L)),
+                List.of(new AssetClassAmount(AssetClass.EQUITY, 10L)));
+        when(assetSnapshotService.summary(USER_ID, aug))
+                .thenReturn(new AssetSummaryResult(aug, List.of(aug), current, null));
+
+        mockMvc.perform(get("/api/finance/asset-snapshots/summary").param("month", "2026-08")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.month").value("2026-08"))
+                .andExpect(jsonPath("$.availableMonths[0]").value("2026-08"))
+                .andExpect(jsonPath("$.current.netWorth").value(7))
+                .andExpect(jsonPath("$.current.largestAssetClass.assetClass").value("EQUITY"))
+                .andExpect(jsonPath("$.previous").value(nullValue()));
+    }
+
+    @Test
+    void summary_badMonth_returns400() throws Exception {
+        mockMvc.perform(get("/api/finance/asset-snapshots/summary").param("month", "2026-13")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void trend_returns200() throws Exception {
+        YearMonth aug = YearMonth.of(2026, 8);
+        when(assetSnapshotService.trend(USER_ID, 6, null)).thenReturn(List.of(
+                new TrendPoint(aug, 7L, 10L, List.of(new CategoryAmount(FinanceCategory.SYSTEM_LOAN_ID, 3L)),
+                        List.of(new AssetClassAmount(AssetClass.CASH, 0L)))));
+
+        mockMvc.perform(get("/api/finance/asset-snapshots/trend").param("months", "6")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.points[0].month").value("2026-08"))
+                .andExpect(jsonPath("$.points[0].byAssetClass[0].assetClass").value("CASH"));
+    }
+
+    @Test
+    void trend_badMonths_returns400() throws Exception {
+        mockMvc.perform(get("/api/finance/asset-snapshots/trend").param("months", "abc")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void composition_returns200() throws Exception {
+        YearMonth aug = YearMonth.of(2026, 8);
+        when(assetSnapshotService.composition(USER_ID, Basis.ASSET_CLASS, null, null)).thenReturn(List.of(
+                new CompositionColumn(aug, 100L, List.of(new CompositionEntry("EQUITY", 100L, new BigDecimal("100.00"))))));
+
+        mockMvc.perform(get("/api/finance/asset-snapshots/composition").param("basis", "ASSET_CLASS")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.columns[0].month").value("2026-08"))
+                .andExpect(jsonPath("$.columns[0].entries[0].item").value("EQUITY"))
+                .andExpect(jsonPath("$.columns[0].entries[0].percent").value(100.0));
+    }
+
+    @Test
+    void composition_badBasis_returns400() throws Exception {
+        mockMvc.perform(get("/api/finance/asset-snapshots/composition").param("basis", "NOPE")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void check_returns200() throws Exception {
+        YearMonth aug = YearMonth.of(2026, 8);
+        when(assetSnapshotService.check(USER_ID, aug)).thenReturn(new AssetCheckResult(aug, YearMonth.of(2026, 7),
+                List.of(FinanceCategory.SYSTEM_LOAN_ID),
+                List.of(new MissingAccount(null, "투자", AssetClass.EQUITY)),
+                List.of(new DateGroup(LocalDate.of(2026, 8, 1), 2))));
+
+        mockMvc.perform(get("/api/finance/asset-snapshots/check").param("month", "2026-08")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.previousMonth").value("2026-07"))
+                .andExpect(jsonPath("$.missingAccounts[0].accountName").value(nullValue()))
+                .andExpect(jsonPath("$.dateGroups[0].date").value("2026-08-01"))
+                .andExpect(jsonPath("$.dateGroups[0].count").value(2));
+    }
+
+    @Test
+    void check_missingMonth_returns400() throws Exception {
+        mockMvc.perform(get("/api/finance/asset-snapshots/check")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isBadRequest());
     }
 }

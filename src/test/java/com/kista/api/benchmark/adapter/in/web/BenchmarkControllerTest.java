@@ -219,6 +219,12 @@ class BenchmarkControllerTest {
                         "1100000000", "서울", LocalDate.of(2026, 1, 1),
                         new BigDecimal("10"), new BigDecimal("20"), new BigDecimal("40"),
                         new BigDecimal("80"), new BigDecimal("160"), new BigDecimal("6.5"),
+                        LocalDate.of(2026, 2, 15), Instant.parse("2026-02-16T00:00:00Z")),
+                new HousingBenchmarkPrice(
+                        HousingBenchmarkPrice.SOURCE_KBLAND, HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE,
+                        "1100000000", "서울", LocalDate.of(2027, 1, 1),
+                        new BigDecimal("20"), new BigDecimal("20"), new BigDecimal("40"),
+                        new BigDecimal("80"), new BigDecimal("160"), new BigDecimal("6.5"),
                         LocalDate.of(2026, 2, 15), Instant.parse("2026-02-16T00:00:00Z"))));
 
         mockMvc.perform(get("/api/stats/housing-benchmark/series").with(authentication(auth())))
@@ -227,6 +233,8 @@ class BenchmarkControllerTest {
                 .andExpect(jsonPath("$.points[0].baseMonth").value("2026-01-01"))
                 .andExpect(jsonPath("$.points[0].firstQuintilePrice").value(10))
                 .andExpect(jsonPath("$.points[0].fifthQuintilePrice").value(160))
+                .andExpect(jsonPath("$.quintileCagr.firstQuintile").value(1.0))
+                .andExpect(jsonPath("$.quintileCagr.secondQuintile").value(0.0))
                 .andExpect(jsonPath("$.sourceUpdatedDate").value("2026-02-15"));
     }
 
@@ -273,6 +281,10 @@ class BenchmarkControllerTest {
                 new HousingPriceIndex(
                         HousingPriceIndex.SOURCE_KBLAND, HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX,
                         "1100000000", "서울", LocalDate.of(2026, 1, 5), new BigDecimal("100.5"),
+                        LocalDate.of(2026, 2, 15), Instant.parse("2026-02-16T00:00:00Z")),
+                new HousingPriceIndex(
+                        HousingPriceIndex.SOURCE_KBLAND, HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX,
+                        "1100000000", "서울", LocalDate.of(2027, 1, 5), new BigDecimal("110.55"),
                         LocalDate.of(2026, 2, 15), Instant.parse("2026-02-16T00:00:00Z"))));
 
         mockMvc.perform(get("/api/stats/housing-benchmark/index-series").with(authentication(auth())))
@@ -280,6 +292,7 @@ class BenchmarkControllerTest {
                 .andExpect(header().string("Cache-Control", "max-age=3600, public"))
                 .andExpect(jsonPath("$.points[0].baseDate").value("2026-01-05"))
                 .andExpect(jsonPath("$.points[0].indexValue").value(100.5))
+                .andExpect(jsonPath("$.cagr").value(org.hamcrest.Matchers.closeTo(0.1, 0.001)))
                 .andExpect(jsonPath("$.sourceUpdatedDate").value("2026-02-15"));
     }
 
@@ -308,7 +321,8 @@ class BenchmarkControllerTest {
     @Test
     void ETF_가격_시계열을_반환한다() throws Exception {
         when(userStats.getEtfPriceSeries(null, null, EtfBenchmarkSymbol.SPY)).thenReturn(List.of(
-                new IndexPrice("SPY", LocalDate.of(2026, 1, 30), new BigDecimal("400.00"))));
+                new IndexPrice("SPY", LocalDate.of(2026, 1, 30), new BigDecimal("400.00")),
+                new IndexPrice("SPY", LocalDate.of(2027, 1, 30), new BigDecimal("440.00"))));
 
         mockMvc.perform(get("/api/stats/housing-benchmark/etf-series")
                         .param("symbol", "SPY")
@@ -316,7 +330,8 @@ class BenchmarkControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "max-age=3600, public"))
                 .andExpect(jsonPath("$.points[0].tradeDate").value("2026-01-30"))
-                .andExpect(jsonPath("$.points[0].close").value(400.00));
+                .andExpect(jsonPath("$.points[0].close").value(400.00))
+                .andExpect(jsonPath("$.cagr").value(org.hamcrest.Matchers.closeTo(0.1, 0.001)));
     }
 
     @Test

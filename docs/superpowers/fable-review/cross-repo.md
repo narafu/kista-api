@@ -68,7 +68,7 @@ ui 지침서: `kista-ui/docs/superpowers/fable-review/guides/`. api 태스크 �
 | T6 상태 플래그 — **api 완료(`8975b9296`, 미배포)** | ui 05 상태 재판정 삭제 | api 먼저 |
 | T7 오류 문구 — **api 완료(2026-11-25, 미배포, L절)** | ui 05 오류 문구 맵 삭제, 400 `fieldErrors`를 폼 필드에 연결 | **같은 날 배포**(필드 거절 400의 `detail`이 요약 문장으로 바뀐다) |
 | T3·T4 목록 규약(가계부 → 전략 주문·체결·이력 → 관리자) | ui 05 목록 페이지형, ui 06 DataList 페이지형 | **묶음별 같은 날 배포**(봉투가 바뀐다) |
-| T8 가계부 집계 | ui 05 가계부 집계 삭제 | api 먼저 |
+| T8 가계부 집계 — **api 완료(2026-11-26, 미배포, M절)** | ui 05 가계부 집계 삭제(태스크 6), 그 외 집계 필드 소비(태스크 7) | api 먼저(추가만) |
 | T10 검증 전용 엔드포인트 — **api 완료(`fb9f1d1b9`, 미배포)** | ui 05 규칙 사본 삭제, ui 04 태스크 6(전략 폼 통합, T5·T7도 필요) | api 먼저 |
 | T12 차트 지표, `reapplyAvailableAt` — **api 완료(`dc419a66b`, 미배포)** | ui 05 indicators.ts·localStorage 쿨다운 삭제 | api 먼저 |
 | 지침서 04 단계 A(KIS·업비트 삭제) | ui 05 KIS·업비트 전용 코드 삭제 | 같은 배포 묶음. api의 KIS 삭제는 완료(2026-11-15, 미배포). ui에는 KIS 언급이 41파일 남아 있다(예: `features/account/create-account/steps/AccountInfoStep.tsx:57`, `ConfirmStep.tsx:24`의 `data.broker \|\| 'KIS'`, `entities/meta/__fixtures__/testMeta.ts:10`, `e2e/ledger-budget.spec.ts:12`). 운영 secret에서 뺄 키는 없다(KIS 키는 `.env.example`·compose·deploy에 없음). **ui 제거 완료(b33118f1, 2026-11-15, 미push)** |
@@ -97,7 +97,7 @@ S7 후속 C(ui `72ff7d9d`·`90432a39`)의 api 요청 처리(2026-11-25, 미배�
 
 | ui 테스트 | 서버 쪽 대응 |
 |---|---|
-| `aggregate.test.ts`(346줄) 등 가계부 집계 케이스 | T8 서비스 테스트 |
+| `aggregate.test.ts`(346줄) 등 가계부 집계 케이스 | T8 서비스 테스트 — 짝은 M절 |
 | `computeOrderReadiness`·`canWithdrawCapital`·`apiKeyExpiryState` 케이스 | T6 도메인 테스트 |
 | `strategyFormGuards`·`vrDerived` 케이스 | T10 대칭 테스트 |
 
@@ -398,3 +398,36 @@ api 완료(미배포). 응답 모양이 바뀌므로 **ui와 같은 날 배포**
 
 **ui가 할 일**: ① 400 `fieldErrors`를 폼 필드에 붙인다(`field`의 `[0]`을 `.0`으로 바꿔 폼 이름과 대조, 맞는 필드가 없거나 `field`가 null이면 폼 버튼 위 한 줄) ② 전역 실패 토스트는 지금처럼 `detail`(요약 문장)을 그대로 띄운다 — 필드 문장을 토스트에 다시 넣지 않는다 ③ `strategy.md` "서버 검증(api T10)"의 "Bean Validation 위반은 400 ProblemDetail(`detail`만)로 와서 필드 없는 거절로 받는다"를 `fieldErrors` 처리로 바꾼다(실제 제출 400도 같은 경로) ④ 서버 문장을 다시 만드는 ui 오류 문구 맵이 있으면 지운다(ui 05). **배포 순서**: ui 커밋 준비를 사용자가 확인한 뒤 api·ui 같은 날.
 - **ui 반영 완료**(ui `d592b8dc`, 미push): ①~③ 반영(`useAppForm`이 마운트된 필드에 붙이고 안 맞거나 null이면 버튼 위 한 줄, 토스트는 요약 detail). ④ `BROKER_ERROR_MESSAGE`는 필드 거절과 무관해 ui 05 태스크 4로 남김 — 두 코드(`BROKER_PERMISSION_DENIED`·`BROKER_RATE_LIMITED`)는 서버가 고정 한국어 detail을 싣는다고 회신함. 실응답 확인·e2e는 로컬 api를 `490e8cf9b` 이후로 재기동해야 해 미검증. **push**: api `490e8cf9b`와 ui `d592b8dc`를 사용자 확인 뒤 같은 날.
+
+## M. 지침서 10 T8 — 가계부 집계 엔드포인트와 집계 필드 (2026-11-26, 로드맵 N6)
+
+명세는 ui `findings/j` 2-1절·11-3절(A2·A3·A5·A10·A17·A18·A19)이다. 모두 추가만이라 api를 먼저 내도 된다. 기준일은 서버 `Clock`(KST)이라 `today` 파라미터가 없다. 응답은 전부 객체다(T3 `Items` 전이라 최상위 배열을 피했다). 월은 `yyyy-MM`.
+
+**가계부(A2·A3·A5)** — ui가 지울 것: `entities/finance/lib/{aggregate,flowAggregate,bulkRegisterPreview}.ts`의 계산, `period.ts`의 집계 규칙, `widgets/finance-summary/financeSummaryCalc.ts`.
+
+| 엔드포인트 | 대체하는 ui 함수 | 모양 차이 |
+|---|---|---|
+| `GET /api/finance/asset-snapshots/summary?month=` | `calcMonthlySummary`·`calcCategoryBreakdown`·`calcAssetClassBreakdown`·`listAvailableMonths`·`previousMonthOf` | `{month, availableMonths, current, previous}`. month 생략 = 최근 기록 월. 전월 요약(`previous`)도 함께 준다 |
+| `GET …/asset-snapshots/trend?months=&endMonth=` | `calcMonthlyTrend` | mode·selector 없음. 각 점이 `netWorth`·`totalAssets`·`byCategory`(L1 4개)·`byAssetClass`(6개, 0 포함)를 모두 갖는다. months 생략 = 전체 |
+| `GET …/asset-snapshots/composition?basis=CATEGORY\|ASSET_CLASS&months=&endMonth=` | `calcCategoryComposition`·`calcAssetClassComposition` | `percent`는 소수 2자리 |
+| `GET …/asset-snapshots/check?month=` | `calcMissingCategories`·`calcMissingAccounts`·`calcDateGroups` | `missingAccounts`는 `{accountName, categoryName, assetClass}` 구조체. "계좌 미지정"·자산군 라벨 조립은 ui가 메타로 |
+| `GET /api/finance/transactions/summary?type&mode=MONTHLY\|YEARLY&month` | `calcFlowSummary`·`calcPreviousYearTotal`·`calcYearlyAverage`·`calcRemainingAmount`, `FinanceSummary`의 `incomeRatio` | `{total, count, previousTotal, previousYearTotal, yearlyAverage, remaining, incomeRatio}` |
+| `GET …/transactions/trend?type&mode&month&range=` | `calcFlowTrend` | range 1~120, 생략 = 전체. `byCategory`는 Record 대신 `[{categoryId, amount}]`(루트 정렬순) |
+| `GET …/transactions/budget-progress?type&mode&month` | `calcBudgetProgress`·`buildBudgetProgressTree`·`calcUnbudgetedCategories` | `{nodes, unbudgeted}`. `usageRatio` 소수 4자리 |
+| `GET /api/finance/bulk-register/preview?sourceMonth=` | `buildBulkRegisterItems` | `included`는 내려주지 않는다(ui 상태). 자산군·시장 정렬은 enum 선언 순서 |
+
+ui와 값이 다를 수 있는 곳(선행 테스트 1 "집계 대조"에서 보면 된다): ① 한 카테고리에 같은 기간 유효 예산이 둘 이상이면 서버는 `금액×유효개월`을 합산한다(ui는 Map 마지막 하나만 보였다 — 연간 모드에서 앞뒤로 이어진 두 예산이 해당). ② 부모가 선택 불가인 고아 카테고리는 ui 인덱스처럼 모든 집계에서 뺀다. ③ 삭제된 자산 카테고리의 루트 이름은 서버의 실제 이름(ui는 L1 라벨 상수). ④ 가나다 정렬은 `Collator(Locale.KOREAN)`. ⑤ 비율·퍼센트는 반올림된 값.
+
+테스트 짝: `aggregate.test.ts` → `AssetSnapshotAggregateTest`(isMonthClosed·formatAssetL1CategoryLabel 제외 — T6·메타 범위), `flowAggregate.test.ts`·`period.test.ts`(집계 규칙) → `FinanceFlowAggregateTest`·`FlowPeriodTest`(조회 윈도우 함수 `windowRange`·`displayWindow`·`autoAdjustedMonth`·`trendWindow`·`yearsRange`는 서버에 없음 — ui가 함께 지운다), `bulkRegisterPreview.test.ts`·`assetSort.test.ts`(compareAssetDetail) → `BulkRegisterPreviewTest`. web은 각 `*ControllerTest`.
+
+**그 외 집계 필드(A10·A17·A18·A19)** — ui 05 태스크 7:
+
+| 응답 | 추가 필드 | 대체하는 ui 코드 |
+|---|---|---|
+| `GET /api/daily-trades` | `byDate[{date, tradeCount, byCurrency[{currency, buyAmount, sellAmount, buyCount, sellCount}]}]` 날짜 오름차순 | `useDailyTradesRangeQuery.ts:32-56` |
+| `GET /api/stats/summary` | `totalActiveCycleCount` | `StatsKpiRow.tsx:13` |
+| `GET /api/stats/housing-benchmark/series` · `index-series` · `etf-series` | `quintileCagr{firstQuintile…fifthQuintile}` · `cagr` · `cagr` — **비율**(0.05 = 5%), 소수 6자리, 유효점 2개 미만이면 null | `housingBenchmarkChartFormatters.ts:76-110` |
+| `GET /api/admin/privacy-trade-bases`(목록) | 행별 `cash`(추정 현금 USD), `cycleBoundary`, `yearlyReset`. 단건 응답(POST·PATCH)은 뒤 둘이 null | `privacyChartSeries.ts`의 `cashOf`·경계·`yearlyResetFlags` |
+
+A19 보류: 누적 실현손익(`carry`)·연초 재설정 추정 손익·현금 비율은 종가가 필요해 서버가 주지 않는다(admin이 시세에 새로 의존해야 함). ui에 남고, ui는 서버의 `yearlyReset`을 그 계산에 쓰면 된다. `cycleBoundary`·`yearlyReset`은 조회 범위 안의 직전 행으로 판정하므로 `range`를 주면 첫 행이 false다 — ui는 range 없이 받으므로 지금은 같다. T4 관리자 묶음에서 페이지형으로 바꿀 때 이 두 값의 판정을 저장 쪽으로 옮겨야 한다.
+

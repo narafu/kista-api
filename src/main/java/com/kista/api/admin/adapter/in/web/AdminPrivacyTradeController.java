@@ -45,9 +45,7 @@ public class AdminPrivacyTradeController {
     public List<AdminPrivacyBaseResponse> listBases(@RequestParam(required = false) Integer range) {
         if (range != null && range < 30)
             throw new IllegalArgumentException("range는 30 이상이어야 합니다");
-        return adminQueryService.listPrivacyBases(range).stream()
-                .map(AdminPrivacyBaseResponse::from)
-                .toList();
+        return AdminPrivacyBaseResponse.fromList(adminQueryService.listPrivacyBases(range));
     }
 
     // FIDA 오류 대응 수동 등록 — executeFidaOrder와 동일 멱등 규칙(동일 내용 200, 다른 내용 409)

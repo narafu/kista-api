@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 // 3-state 소유축: system(userId·groupId 둘 다 null, 전 사용자 읽기전용) /
@@ -21,6 +22,13 @@ public record FinanceCategory(
     // 대출 L1 고정 UUID (V13 시드값과 동일) — 순자산/총부채 집계의 유일한 부채 판별자.
     // 구 AssetCategory.LOAN의 후계값.
     public static final UUID SYSTEM_LOAN_ID = UUID.fromString("f1000000-0000-4000-8000-000000000404");
+
+    // 자산 L1 고정 표시 순서: 투자·예적금·대출·부동산 (V13 시드 UUID). 집계 응답의 카테고리 순서 SSOT.
+    public static final List<UUID> ASSET_L1_DISPLAY_ORDER = List.of(
+            UUID.fromString("f1000000-0000-4000-8000-000000000403"),
+            UUID.fromString("f1000000-0000-4000-8000-000000000401"),
+            SYSTEM_LOAN_ID,
+            UUID.fromString("f1000000-0000-4000-8000-000000000402"));
 
     public boolean isSystem() {
         return userId == null;

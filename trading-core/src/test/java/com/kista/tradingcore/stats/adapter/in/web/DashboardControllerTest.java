@@ -95,6 +95,12 @@ class DashboardControllerTest {
                 .andExpect(jsonPath("$.items[0].tradeAmount").value(90000))
                 .andExpect(jsonPath("$.items[0].currency").value("KRW"))
                 .andExpect(jsonPath("$.items[0].tradeAmountUsd").doesNotExist())
-                .andExpect(jsonPath("$.summary").doesNotExist());
+                .andExpect(jsonPath("$.summary").doesNotExist())
+                .andExpect(jsonPath("$.byDate[0].date").value("2024-01-05"))
+                .andExpect(jsonPath("$.byDate[0].tradeCount").value(1))
+                .andExpect(jsonPath("$.byDate[0].byCurrency[0].currency").value("KRW"))
+                .andExpect(jsonPath("$.byDate[0].byCurrency[0].buyAmount").value(90000))
+                .andExpect(jsonPath("$.byDate[0].byCurrency[0].buyCount").value(1))
+                .andExpect(jsonPath("$.byDate[0].byCurrency[0].sellCount").value(0));
     }
 }

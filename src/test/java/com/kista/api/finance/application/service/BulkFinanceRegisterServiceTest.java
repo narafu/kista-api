@@ -6,7 +6,11 @@ import com.kista.api.finance.domain.model.BulkFinanceRegisterResult;
 import com.kista.api.finance.domain.model.FinanceTransactionCommand;
 import com.kista.api.finance.domain.model.Market;
 import com.kista.api.finance.domain.model.MonthlyClosing;
+import com.kista.api.finance.application.port.output.AssetSnapshotPort;
+import com.kista.api.finance.application.port.output.FinanceAccountPort;
+import com.kista.api.finance.application.port.output.FinanceCategoryPort;
 import com.kista.api.finance.application.port.output.FinanceGroupPort;
+import com.kista.api.finance.application.port.output.FinanceTransactionPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -43,7 +47,8 @@ class BulkFinanceRegisterServiceTest {
         assetSnapshotService = mock(AssetSnapshotService.class);
         financeTransactionService = mock(FinanceTransactionService.class);
         financeGroupPort = mock(FinanceGroupPort.class);
-        service = new BulkFinanceRegisterService(assetSnapshotService, financeTransactionService, financeGroupPort);
+        service = new BulkFinanceRegisterService(assetSnapshotService, financeTransactionService, financeGroupPort,
+                mock(AssetSnapshotPort.class), mock(FinanceTransactionPort.class), mock(FinanceCategoryPort.class), mock(FinanceAccountPort.class));
     }
 
     private AssetSnapshotCommand asset(String memo) {

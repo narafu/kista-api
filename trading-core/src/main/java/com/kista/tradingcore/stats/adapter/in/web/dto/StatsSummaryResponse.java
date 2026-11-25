@@ -13,6 +13,7 @@ public record StatsSummaryResponse(
         BigDecimal totalUnrealizedPnl,
         BigDecimal activePrincipal,
         List<TypeStats> byType,
+        int totalActiveCycleCount, // 전략 타입별 진행 중 사이클 수 합계
         List<Currency> availableCurrencies
 ) {
     public record TypeStats(
@@ -33,6 +34,7 @@ public record StatsSummaryResponse(
         return new StatsSummaryResponse(summary.totalRealizedPnl(), summary.totalUnrealizedPnl(),
                 summary.activePrincipal(),
                 summary.byType().stream().map(TypeStats::from).toList(),
+                summary.byType().stream().mapToInt(StrategyTypeStats::activeCycleCount).sum(),
                 summary.availableCurrencies());
     }
 }

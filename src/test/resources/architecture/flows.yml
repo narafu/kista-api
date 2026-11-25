@@ -1171,6 +1171,17 @@ flows:
         state: "항목별 거래·자산 행 생성"
         fail: 그룹 공유를 켰는데 소속 그룹이 없으면 전체를 400으로 거부한다. 항목 단위 실패는 응답의 실패 목록으로 알린다.
 
+      - id: aggregate
+        lane: web
+        to: [db]
+        title: 집계 조회
+        desc: >-
+          화면이 보여주는 합계·추이·구성비·기록 점검·예산 대비와 일괄 등록 미리보기(지난달 기록을 카테고리 트리로 묶은 것)를 서버가 계산해 준다.
+          조회 범위는 목록과 같은 내 기록 + 내 그룹 기록이고, 기준일은 서버 시각(KST)이다. 순자산은 대출 카테고리를 부채로 뺀다.
+        code: [AssetSnapshotService#summary, AssetSnapshotService#trend, AssetSnapshotService#composition, AssetSnapshotService#check, FinanceTransactionService#summary, FinanceTransactionService#trend, FinanceTransactionService#budgetProgress, BulkFinanceRegisterService#preview]
+        cond: 가계부 화면을 열거나 기간을 바꿀 때
+        fail: 유형이 자산이거나 기간 범위가 틀리면 400.
+
       - id: share
         lane: web
         to: [db]
