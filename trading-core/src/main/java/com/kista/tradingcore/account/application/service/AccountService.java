@@ -191,6 +191,12 @@ public class AccountService {
         return accountPort.findByUserId(userId);
     }
 
+    // 내 계좌 단건 조회 — 없으면 NoSuchElementException(404), 남의 계좌면 SecurityException(403)
+    @Transactional(readOnly = true)
+    public Account getOwned(UUID accountId, UUID requesterId) {
+        return accountPort.requireOwnedAccount(accountId, requesterId);
+    }
+
     // 등록 전 사전 검증 — 어느 계좌의 토큰 캐시도 건드리지 않는다. 실패 시 BrokerCredentialException throw
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 외부 API 호출 — 트랜잭션 불필요
     public void test(Broker requestedBroker, String appKey, String appSecret) {

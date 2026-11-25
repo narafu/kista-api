@@ -177,6 +177,25 @@ class AccountServiceTest {
     }
 
     @Test
+    @DisplayName("단건 조회는 소유권 검증된 계좌를 반환한다")
+    void getOwned_returns_owned_account() {
+        Account account = activeAccount(userId);
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
+
+        assertThat(accountService.getOwned(accountId, userId)).isSameAs(account);
+    }
+
+    @Test
+    @DisplayName("단건 조회 시 타 사용자 계좌는 SecurityException, 없는 계좌는 NoSuchElementException")
+    void getOwned_propagates_forbidden_and_not_found() {
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenThrow(new SecurityException("소유자가 아닙니다"));
+        assertThatThrownBy(() -> accountService.getOwned(accountId, userId)).isInstanceOf(SecurityException.class);
+
+        doThrow(new java.util.NoSuchElementException("계좌를 찾을 수 없습니다.")).when(accountPort).requireOwnedAccount(accountId, userId);
+        assertThatThrownBy(() -> accountService.getOwned(accountId, userId)).isInstanceOf(java.util.NoSuchElementException.class);
+    }
+
+    @Test
     @DisplayName("타 사용자 계좌 수정 시 SecurityException 발생 (→ 403)")
     void update_by_non_owner_throws_forbidden() {
         when(accountPort.requireOwnedAccount(accountId, userId))

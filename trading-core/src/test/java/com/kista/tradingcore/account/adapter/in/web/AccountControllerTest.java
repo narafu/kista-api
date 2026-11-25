@@ -61,6 +61,42 @@ class AccountControllerTest {
     }
 
     @Test
+    void get_account_returns_200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(accountService.getOwned(id, UUID.fromString(USER_ID)))
+                .thenReturn(com.kista.tradingcore.support.TradingFixtures.stockAccount(id, UUID.fromString(USER_ID)));
+
+        mockMvc.perform(get("/api/accounts/" + id)
+                        .with(authentication(userToken(UUID.fromString(USER_ID)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.toString()));
+    }
+
+    @Test
+    void get_account_not_owner_returns_403() throws Exception {
+        when(accountService.getOwned(any(), any())).thenThrow(new SecurityException("계좌에 대한 접근 권한이 없습니다"));
+
+        mockMvc.perform(get("/api/accounts/" + UUID.randomUUID())
+                        .with(authentication(userToken(UUID.fromString(USER_ID)))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void get_account_missing_returns_404() throws Exception {
+        when(accountService.getOwned(any(), any())).thenThrow(new java.util.NoSuchElementException("계좌를 찾을 수 없습니다."));
+
+        mockMvc.perform(get("/api/accounts/" + UUID.randomUUID())
+                        .with(authentication(userToken(UUID.fromString(USER_ID)))))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void get_account_anonymous_returns_401() throws Exception {
+        mockMvc.perform(get("/api/accounts/" + UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void testConnection_success_returns204() throws Exception {
         // void 메서드 — 기본 doNothing() stub, 성공 시 204 반환
         mockMvc.perform(post("/api/accounts/connection-tests")

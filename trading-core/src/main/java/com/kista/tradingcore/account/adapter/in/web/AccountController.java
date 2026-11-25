@@ -40,6 +40,21 @@ public class AccountController {
                 .toList();
     }
 
+    // 내 계좌 단건 조회 (소유권 검증, 목록과 같은 DTO)
+    @Operation(summary = "내 계좌 단건 조회", description = "계좌 ID로 내 계좌 1건 반환. 응답 형식은 목록 항목과 같다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
+            @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음")
+    })
+    @GetMapping("/{id}")
+    public AccountResponse get(
+            @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId) {
+        return AccountResponse.from(accountService.getOwned(id, userId), LocalDate.now(clock));
+    }
+
     // 계좌 등록 (AES-256 암호화 저장)
     @Operation(summary = "계좌 등록", description = "증권사 계좌 및 자격증명을 AES-256 암호화하여 저장.")
     @ApiResponses({
