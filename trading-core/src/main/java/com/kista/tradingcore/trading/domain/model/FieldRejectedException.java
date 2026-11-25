@@ -2,7 +2,7 @@ package com.kista.tradingcore.trading.domain.model;
 
 import java.util.function.Supplier;
 
-// 요청 필드 하나에 귀속되는 입력 거절 — IllegalArgumentException 하위라 HTTP 응답(400·detail)은 그대로이고, 검증 전용 엔드포인트만 field로 귀속한다
+// 요청 필드 하나에 귀속되는 입력 거절 — HTTP 400은 detail 요약 + fieldErrors[{field, detail}](TradingProblemDetails), 검증 전용 엔드포인트는 200 fieldErrors로 같은 {field, detail}을 싣는다
 public class FieldRejectedException extends IllegalArgumentException {
 
     private final String field; // 요청 JSON 필드 이름

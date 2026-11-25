@@ -13,13 +13,13 @@ import java.util.UUID;
 // 등록·수정 공용
 public record FinanceTransactionRequest(
         @Schema(description = "카테고리 ID")
-        @NotNull UUID categoryId,
+        @NotNull(message = "카테고리는 필수입니다.") UUID categoryId,
         @Schema(description = "거래 날짜", example = "2026-08-01")
-        @NotNull LocalDate transactionDate,
+        @NotNull(message = "거래 날짜는 필수입니다.") LocalDate transactionDate,
         @Schema(description = "금액 (원화 정수 절대값, 0 이상)", example = "344000")
-        @PositiveOrZero long amount,
+        @PositiveOrZero(message = "금액은 0 이상이어야 합니다.") long amount,
         @Schema(description = "메모 (선택)")
-        @Size(max = 255) @Nullable String memo
+        @Size(max = 255, message = "메모는 255자 이내여야 합니다.") @Nullable String memo
 ) {
     public FinanceTransactionCommand toCommand() {
         return new FinanceTransactionCommand(categoryId, transactionDate, amount, memo);

@@ -6,6 +6,6 @@ import jakarta.validation.constraints.NotBlank;
 // 텔레그램 설정 요청 body
 public record TelegramUpdateRequest(
         @Schema(description = "사용자 텔레그램 봇 토큰")
-        @NotBlank String botToken,
+        @NotBlank(message = "텔레그램 봇 토큰은 필수입니다.") String botToken,
         @Schema(description = "텔레그램 채팅 ID")
-        @NotBlank String chatId) {}
+        @NotBlank(message = "텔레그램 채팅 ID는 필수입니다.") String chatId) {}

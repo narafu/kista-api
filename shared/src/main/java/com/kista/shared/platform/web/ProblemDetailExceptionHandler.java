@@ -54,10 +54,10 @@ public class ProblemDetailExceptionHandler {
         }
     }
 
-    // 필드 오류 메시지 집계 — 공용 유틸 사용
+    // Bean Validation 위반 — detail은 요약 문장, 필드별 문장은 fieldErrors
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
-        return problem(HttpStatus.BAD_REQUEST, "Validation Failed", ProblemDetailMappings.validationMessage(ex));
+        return ProblemDetailMappings.fieldProblem("Validation Failed", ProblemDetailMappings.fieldErrors(ex));
     }
 
     // SSE 타임아웃·연결 종료는 이미 끝난 스트림에 별도 응답 본문을 쓰지 않고 종료 처리

@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -18,7 +19,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 // IAE·ISE 메시지는 GENERIC 매핑이 원문 그대로 ProblemDetail detail로 내보낸다(modules/api/web.md "ProblemDetail 응답 계약").
-// application·domain 패키지의 리터럴 메시지가 합쇼체 완전문장("~니다.")으로 끝나는지 소스 스캔으로 고정한다.
+// application·domain 패키지의 리터럴 메시지와 요청 DTO의 Bean Validation message가 합쇼체 완전문장("~니다.")으로 끝나는지 소스 스캔으로 고정한다.
 class ExceptionMessageFormatTest {
 
     // 스캔 대상 소스 루트(루트 test workingDir = 루트 프로젝트)
@@ -28,6 +29,12 @@ class ExceptionMessageFormatTest {
     private static final Path ALLOWLIST = Path.of("src/test/resources/architecture/exception-message-allowlist.txt");
     private static final Pattern THROW_SITE = Pattern.compile("new (IllegalArgumentException|IllegalStateException|FieldRejectedException)\\(");
     private static final Pattern LAYER_PATH = Pattern.compile("/(application|domain)/");
+    // 요청 DTO 위치 — 웹 어댑터 DTO와 프로세스 경계 wire 요청(shared.contract)
+    private static final Pattern REQUEST_DTO_PATH = Pattern.compile("/adapter/in/web/|/shared/contract/");
+    // jakarta.validation 기본 제약 — 위반 메시지가 400 fieldErrors[].detail로 그대로 나간다
+    private static final Pattern CONSTRAINT = Pattern.compile("@(NotNull|NotBlank|NotEmpty|Size|Min|Max|Positive|PositiveOrZero|Negative|NegativeOrZero"
+            + "|DecimalMin|DecimalMax|Digits|Pattern|Email|Past|PastOrPresent|Future|FutureOrPresent|AssertTrue|AssertFalse)\\b");
+    private static final Pattern MESSAGE_ARG = Pattern.compile("message\\s*=\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
 
     @Test
     void application_and_domain_exception_messages_end_with_formal_sentence() throws IOException {
@@ -65,16 +72,58 @@ class ExceptionMessageFormatTest {
         assertThat(violationsIn("throw new IllegalArgumentException(c ? \"정수여야 합니다.\"\n : \"소수여야 합니다\");")).hasSize(1);
     }
 
+    // Bean Validation 위반 메시지는 400 fieldErrors[].detail로 사용자에게 그대로 보인다 — 기본 메시지(로캘 의존 영어·번역투) 금지
+    @Test
+    void request_dto_bean_validation_messages_are_korean_sentences() throws IOException {
+        assertThat(scan(REQUEST_DTO_PATH, ExceptionMessageFormatTest::constraintViolationsIn))
+                .as("요청 DTO의 Bean Validation 제약은 message에 \"~니다.\"로 끝나는 한국어 문장을 준다")
+                .isEmpty();
+    }
+
+    // 검사기 자체 고정 — message 누락·마침표·괄호 안 문자열
+    @Test
+    void constraint_detector_judges_messages() {
+        assertThat(constraintViolationsIn("@NotNull(message = \"금액은 필수입니다.\") BigDecimal amount")).isEmpty();
+        assertThat(constraintViolationsIn("@Pattern(regexp = \"^\\\\d*$)\", message = \"숫자만 입력할 수 있습니다.\") String n")).isEmpty();
+        assertThat(constraintViolationsIn("@NotNull BigDecimal amount")).hasSize(1);
+        assertThat(constraintViolationsIn("Integer n; // DTO @NotNull 없이 서비스가 검증")).isEmpty();
+        assertThat(constraintViolationsIn("@Size(max = 10) String name")).hasSize(1);
+        assertThat(constraintViolationsIn("@Positive(message = \"must be positive\") int n")).hasSize(1);
+        assertThat(constraintViolationsIn("@NotBlank(message = \"이름은 필수입니다\") String name")).hasSize(1);
+        assertThat(constraintViolationsIn("@Valid @NotEmpty(message = \"하나 이상 입력해야 합니다.\") List<@Valid X> xs")).isEmpty();
+    }
+
     private static Set<String> scanViolations() throws IOException {
+        return scan(LAYER_PATH, ExceptionMessageFormatTest::violationsIn);
+    }
+
+    // 경로가 맞는 소스에서 검사기가 낸 위반을 "상대경로\t키"로 모은다
+    private static Set<String> scan(Pattern pathFilter, Function<String, List<String>> detector) throws IOException {
         Set<String> result = new TreeSet<>();
         for (Path root : SOURCE_ROOTS) {
             assertThat(root).isDirectory();
             try (Stream<Path> files = Files.walk(root)) {
                 files.filter(p -> p.toString().endsWith(".java"))
-                        .filter(p -> LAYER_PATH.matcher(p.toString().replace('\\', '/')).find())
-                        .forEach(p -> violationsIn(read(p)).forEach(msg ->
+                        .filter(p -> pathFilter.matcher(p.toString().replace('\\', '/')).find())
+                        .forEach(p -> detector.apply(read(p)).forEach(msg ->
                                 result.add(root.relativize(p).toString().replace('\\', '/') + "\t" + msg)));
             }
+        }
+        return result;
+    }
+
+    // 제약 애너테이션마다 message 인자가 "니다."로 끝나는 리터럴인지 본다 — 위반은 애너테이션 이름과 message 원문
+    private static List<String> constraintViolationsIn(String source) {
+        List<String> result = new ArrayList<>();
+        Matcher m = CONSTRAINT.matcher(source);
+        while (m.find()) {
+            // 같은 줄 앞에 // 가 있으면 주석 속 언급이라 건너뛴다
+            if (source.substring(source.lastIndexOf('\n', m.start()) + 1, m.start()).contains("//")) continue;
+            int open = m.end();
+            String args = open < source.length() && source.charAt(open) == '(' ? source.substring(open + 1, closingParen(source, open + 1)) : "";
+            Matcher msg = MESSAGE_ARG.matcher(args);
+            if (!msg.find()) result.add(m.group() + " message 없음");
+            else if (!msg.group(1).endsWith("니다.")) result.add(m.group() + " " + msg.group(1));
         }
         return result;
     }

@@ -13,6 +13,7 @@ import com.kista.tradingcore.trading.domain.model.FieldRejectedException;
 import com.kista.tradingcore.trading.domain.model.OrderCancelException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -82,8 +83,8 @@ class ExceptionResponseTableTest {
             new Row("Security", () -> new SecurityException("본인 계좌가 아닙니다."), 403, "Access Denied", "ACCESS_DENIED", "본인 계좌가 아닙니다.", false),
             new Row("IllegalState", () -> new IllegalStateException("상태가 맞지 않습니다."), 400, "Invalid State", null, "상태가 맞지 않습니다.", false),
             new Row("IllegalArgument", () -> new IllegalArgumentException("값이 틀렸습니다."), 400, "Invalid Request", null, "값이 틀렸습니다.", false),
-            // 필드 귀속 IAE 하위 예외 — 검증 전용 엔드포인트만 field를 쓰고 HTTP 응답은 IAE와 같다
-            new Row("FieldRejected", () -> new FieldRejectedException("ticker", "값이 틀렸습니다."), 400, "Invalid Request", null, "값이 틀렸습니다.", false),
+            // 필드 귀속 IAE 하위 예외 — detail은 요약 문장, 필드 문장은 fieldErrors(아래 field_rejection_… 테스트)
+            new Row("FieldRejected", () -> new FieldRejectedException("ticker", "값이 틀렸습니다."), 400, "Invalid Request", null, "입력값을 확인해 주세요.", false),
             new Row("NoSuchElement", () -> new NoSuchElementException("id=abc"), 404, "Resource Not Found", null, "요청한 정보를 찾을 수 없습니다.", false),
             new Row("DateTimeParse", () -> {
                 try { LocalDate.parse("2026-13-01"); return null; } catch (Exception e) { return e; }
@@ -107,12 +108,40 @@ class ExceptionResponseTableTest {
         assertThat(events.stream(AppErrorRaisedEvent.class).count()).isEqualTo(row.reported() ? 1 : 0);
     }
 
+    // 필드 1개 — detail은 요약 문장, 필드 문장은 fieldErrors에만(토스트와 필드에 같은 문장이 두 번 나오지 않게)
     @Test
-    void validation_failure_maps_to_400_with_field_messages() throws Exception {
-        ResultActions result = mockMvc.perform(post("/test/validate").contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"\"}"));
+    void validation_failure_with_one_field_puts_sentence_only_in_field_errors() throws Exception {
+        ResultActions result = mockMvc.perform(post("/test/validate").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"\",\"items\":[{\"price\":\"1\"}]}"));
 
-        expectProblem(result, 400, "Validation Failed", null, "[name: 이름은 필수입니다.]");
+        expectProblem(result, 400, "Validation Failed", null, "입력값을 확인해 주세요.");
+        result.andExpect(jsonPath("$.fieldErrors.length()").value(1))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("name"))
+                .andExpect(jsonPath("$.fieldErrors[0].detail").value("이름은 필수입니다."));
         assertThat(events.stream(AppErrorRaisedEvent.class).count()).isZero();
+    }
+
+    // 여러 필드 — 중첩 경로는 Spring 표기(items[0].price) 그대로
+    @Test
+    void validation_failure_with_many_fields_lists_each_with_spring_path() throws Exception {
+        ResultActions result = mockMvc.perform(post("/test/validate").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"\",\"items\":[{\"price\":\"\"}]}"));
+
+        expectProblem(result, 400, "Validation Failed", null, "입력값을 확인해 주세요.");
+        result.andExpect(jsonPath("$.fieldErrors.length()").value(2))
+                .andExpect(jsonPath("$.fieldErrors[?(@.field == 'name')].detail").value("이름은 필수입니다."))
+                .andExpect(jsonPath("$.fieldErrors[?(@.field == 'items[0].price')].detail").value("가격은 필수입니다."));
+    }
+
+    // 필드를 지목한 도메인 거절도 같은 모양 — 필드 없는 IAE(IllegalArgument 행)는 detail 원문 그대로
+    @Test
+    void field_rejection_puts_sentence_only_in_field_errors() throws Exception {
+        Row row = ROWS.stream().filter(r -> r.name().equals("FieldRejected")).findFirst().orElseThrow();
+
+        mockMvc.perform(get("/test/throw/{index}", ROWS.indexOf(row)))
+                .andExpect(jsonPath("$.fieldErrors.length()").value(1))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("ticker"))
+                .andExpect(jsonPath("$.fieldErrors[0].detail").value("값이 틀렸습니다."));
     }
 
     @Test
@@ -153,7 +182,9 @@ class ExceptionResponseTableTest {
     @RestController
     static class ThrowingController {
 
-        record Body(@NotBlank(message = "이름은 필수입니다.") String name) {}
+        record Body(@NotBlank(message = "이름은 필수입니다.") String name, @NotEmpty(message = "항목을 하나 이상 입력해야 합니다.") List<@Valid Item> items) {}
+
+        record Item(@NotBlank(message = "가격은 필수입니다.") String price) {}
 
         @GetMapping("/test/throw/{index}")
         void throwRow(@PathVariable int index) throws Exception {

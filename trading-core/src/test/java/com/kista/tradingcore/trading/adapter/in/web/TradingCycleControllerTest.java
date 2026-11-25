@@ -555,7 +555,7 @@ class TradingCycleControllerTest {
                                  "orderType":"MOC","frequency":"MONTHLY","conditions":[]}}
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value("rules는 필수입니다."));
+                .andExpect(jsonPath("$.detail").value("DCA 규칙은 필수입니다."));
         mockMvc.perform(put("/api/trading-cycles/{id}/dca-config", CYCLE_ID)
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)

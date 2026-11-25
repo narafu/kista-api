@@ -11,11 +11,11 @@ import org.jspecify.annotations.Nullable;
 // 진행 중 사이클 투자금 추가 요청 — 예수금·주식 중 최소 하나 필수(서비스에서 검증), 주식은 수량·단가 동시 지정
 public record CapitalInjectionRequest(
         @Schema(description = "추가할 예수금 (USD, null=추가 없음)", example = "500.00")
-        @Positive @Digits(integer = 13, fraction = 2) @Nullable BigDecimal depositAmount,
+        @Positive(message = "추가 예수금은 0보다 커야 합니다.") @Digits(integer = 13, fraction = 2, message = "추가 예수금은 정수 13자리, 소수 2자리 이내여야 합니다.") @Nullable BigDecimal depositAmount,
         @Schema(description = "추가할 주식 수 (null=추가 없음, sharePrice와 함께 지정)", example = "10")
-        @Positive @Nullable Integer shares,
+        @Positive(message = "추가할 주식 수는 0보다 커야 합니다.") @Nullable Integer shares,
         @Schema(description = "추가할 주식의 매수단가 (shares와 함께 지정)", example = "45.50")
-        @Positive @Nullable BigDecimal sharePrice
+        @Positive(message = "매수 단가는 0보다 커야 합니다.") @Nullable BigDecimal sharePrice
 ) {
     public InjectCapitalCommand toCommand() {
         return new InjectCapitalCommand(depositAmount, shares, sharePrice);

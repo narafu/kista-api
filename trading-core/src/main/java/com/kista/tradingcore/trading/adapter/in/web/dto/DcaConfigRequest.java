@@ -14,8 +14,8 @@ public record DcaConfigRequest(
         List<@Valid @Nullable DcaRuleRequest> rules // 규칙 목록
 ) {
     public DcaStrategyConfig toDomain() {
-        // @NotNull 대신 여기서 확인 — 검증 실패 형식([field: message]) 대신 사용자 문구 그대로 400
-        if (rules == null) throw new IllegalArgumentException("rules는 필수입니다.");
+        // @NotNull 대신 여기서 확인 — 필드 거절(fieldErrors)이 아니라 detail에 문구를 그대로 싣는 400
+        if (rules == null) throw new IllegalArgumentException("DCA 규칙은 필수입니다.");
         if (rules.stream().anyMatch(Objects::isNull)) throw new IllegalArgumentException("규칙 항목이 비어 있습니다.");
         return new DcaStrategyConfig(rules.stream().map(DcaRuleRequest::toDomain).toList());
     }

@@ -24,7 +24,7 @@ class DcaConfigRequestTest {
     @Test
     void rulesAreRequired() {
         assertThatThrownBy(() -> new DcaConfigRequest(null).toDomain())
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("rules는 필수입니다.");
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("DCA 규칙은 필수입니다.");
         assertThatThrownBy(() -> new DcaConfigRequest(Arrays.asList((DcaRuleRequest) null)).toDomain())
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new DcaConfigRequest(List.of()).toDomain()).isInstanceOf(IllegalArgumentException.class);

@@ -1,9 +1,11 @@
 package com.kista.shared.platform.web;
 
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -11,6 +13,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
@@ -26,6 +29,11 @@ public final class ProblemDetailMappings {
     }
 
     public static final String CODE_PROPERTY = "code"; // ProblemDetail 확장 프로퍼티 키 — kista-ui 계약
+    public static final String FIELD_ERRORS_PROPERTY = "fieldErrors"; // 필드별 거절 확장 프로퍼티 키 — kista-ui 계약
+    public static final String FIELD_ERRORS_SUMMARY = "입력값을 확인해 주세요."; // fieldErrors가 있는 응답의 detail(토스트) — 필드 문장은 fieldErrors에만
+
+    // 필드 하나의 거절 — field는 요청 바디 경로 Spring 표기(orders[0].price), 특정 필드가 아닌 거절은 null
+    public record FieldRejection(@Nullable String field, String detail) {}
 
     // 두 프로세스에 모두 던져질 수 있는 순수 JDK/Spring 프레임워크 예외 매핑 — 도메인 전용 예외는 각 advice가 자기 테이블에 추가한다
     public static final Map<Class<? extends Exception>, Mapping> GENERIC = Map.of(
@@ -92,11 +100,17 @@ public final class ProblemDetailMappings {
         return problem;
     }
 
-    // 필드 오류 메시지 집계 — "[field: message, ...]" 형식
-    public static String validationMessage(MethodArgumentNotValidException ex) {
-        return ex.getBindingResult().getFieldErrors().stream()
-                .map(e -> e.getField() + ": " + e.getDefaultMessage())
-                .toList()
-                .toString();
+    // 필드 거절 400 — detail은 요약 문장 고정, 필드별 문장은 fieldErrors에만 싣는다(같은 문장이 토스트와 필드에 두 번 나오지 않게)
+    public static ProblemDetail fieldProblem(String title, List<FieldRejection> fieldErrors) {
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, title, FIELD_ERRORS_SUMMARY);
+        problem.setProperty(FIELD_ERRORS_PROPERTY, fieldErrors);
+        return problem;
+    }
+
+    // Bean Validation 위반 → 필드 거절 목록 — 필드 오류는 경로 그대로, 클래스 수준 오류는 field null
+    public static List<FieldRejection> fieldErrors(MethodArgumentNotValidException ex) {
+        return ex.getBindingResult().getAllErrors().stream()
+                .map(e -> new FieldRejection(e instanceof FieldError f ? f.getField() : null, e.getDefaultMessage()))
+                .toList();
     }
 }

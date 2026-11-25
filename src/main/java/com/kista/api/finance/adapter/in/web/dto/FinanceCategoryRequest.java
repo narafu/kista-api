@@ -9,7 +9,7 @@ import jakarta.validation.constraints.Size;
 
 import java.util.UUID;
 
-// 등록·수정 공용 — parentId/type은 수정 시 무시되지만(카테고리 계층·타입 불변) 등록 시 필수라 @NotNull을 걸지 않는다.
+// 등록·수정 공용 — parentId/type은 수정 시 무시되지만(카테고리 계층·타입 불변) 등록 시 필수라 null 불허 검증을 걸지 않는다.
 // (수정 요청은 정말로 type 없이 온다 — update()가 request.type()을 무시하므로.
 // 등록 시 type 누락 검증은 FinanceCategoryController.create()에서 명시적으로 한다.)
 public record FinanceCategoryRequest(
@@ -20,7 +20,7 @@ public record FinanceCategoryRequest(
         // finance_categories.name 컬럼 길이(50)와 일치 — 미검증 시 초과분이 DB 제약 위반(DataIntegrityViolationException)으로
         // 떨어져 FinanceCategoryPersistenceAdapter.save()의 catch-all이 "이름 중복" 409로 오분류한다.
         @Schema(description = "카테고리명", example = "식비")
-        @NotBlank @Size(max = 50) String name,
+        @NotBlank(message = "카테고리명은 필수입니다.") @Size(max = 50, message = "카테고리명은 50자 이내여야 합니다.") String name,
         @Schema(description = "정렬 순서", example = "10")
         int sortOrder
 ) {

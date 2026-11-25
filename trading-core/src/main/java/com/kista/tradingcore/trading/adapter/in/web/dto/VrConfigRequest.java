@@ -33,13 +33,13 @@ public record VrConfigRequest(
         @Schema(description = "램프: poolLimitRate 하한 — 미지정 시 현재값 유지", example = "0.50")
         @Nullable BigDecimal poolLimitFloor,
         @Schema(description = "투자금 추가: 매수단가 편입할 주식 수 (null=추가 없음)", example = "10")
-        @Min(0) @Nullable Integer injectShares,
+        @Min(value = 0, message = "추가할 주식 수는 0 이상이어야 합니다.") @Nullable Integer injectShares,
         @Schema(description = "투자금 추가: 위 주식의 매수단가 (injectShares>0이면 필수)", example = "45.50")
         @Nullable BigDecimal injectSharePrice,
         @Schema(description = "투자금 추가: 추가 예수금 (USD, null/0=추가 없음)", example = "500.00")
         @Nullable BigDecimal injectDeposit,
         @Schema(description = "투자금 인출: 보유 수량에서 차감할 주식 수 (null=인출 없음, 보유 수량 초과 불가)", example = "5")
-        @Min(0) @Nullable Integer withdrawShares,
+        @Min(value = 0, message = "인출할 주식 수는 0 이상이어야 합니다.") @Nullable Integer withdrawShares,
         @Schema(description = "투자금 인출: 예수금 차감액 (USD, null/0=인출 없음, 보유 예수금 초과 불가)", example = "200.00")
         @Nullable BigDecimal withdrawDeposit
 ) {

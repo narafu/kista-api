@@ -6,6 +6,6 @@ import jakarta.validation.constraints.NotBlank;
 // FCM 토큰 등록 요청 body
 public record FcmTokenRequest(
         @Schema(description = "FCM 디바이스 토큰")
-        @NotBlank String token,
+        @NotBlank(message = "FCM 토큰은 필수입니다.") String token,
         @Schema(description = "디바이스 플랫폼", example = "android")
-        @NotBlank String platform) {}
+        @NotBlank(message = "디바이스 플랫폼은 필수입니다.") String platform) {}

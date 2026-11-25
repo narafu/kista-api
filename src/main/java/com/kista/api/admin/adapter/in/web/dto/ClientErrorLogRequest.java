@@ -10,10 +10,10 @@ import java.util.Map;
 // kista-ui 오류 바운더리(error.tsx/global-error.tsx)가 보고하는 클라이언트 오류 요청 body
 public record ClientErrorLogRequest(
         @Schema(description = "오류 유형 (error.name)")
-        @NotBlank @Size(max = 255) String errorType,
+        @NotBlank(message = "오류 유형은 필수입니다.") @Size(max = 255, message = "오류 유형은 255자 이내여야 합니다.") String errorType,
         @Schema(description = "오류 메시지")
-        @Size(max = 2000) @Nullable String message,
+        @Size(max = 2000, message = "오류 메시지는 2000자 이내여야 합니다.") @Nullable String message,
         @Schema(description = "스택트레이스")
-        @Size(max = 8000) @Nullable String stackTrace,
+        @Size(max = 8000, message = "스택트레이스는 8000자 이내여야 합니다.") @Nullable String stackTrace,
         @Schema(description = "발생 위치 메타 (pathname, digest 등)")
         @Nullable Map<String, String> context) {}

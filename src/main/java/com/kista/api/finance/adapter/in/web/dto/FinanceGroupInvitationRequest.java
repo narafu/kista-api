@@ -5,5 +5,5 @@ import jakarta.validation.constraints.Positive;
 
 public record FinanceGroupInvitationRequest(
         @Schema(description = "초대 유효 시간 (시간 단위)", example = "72")
-        @Positive long expiresInHours
+        @Positive(message = "초대 유효 시간은 0보다 커야 합니다.") long expiresInHours
 ) {}

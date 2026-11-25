@@ -16,7 +16,7 @@ import org.jspecify.annotations.Nullable;
 
 public record TradingCycleRequest(
         @Schema(description = "전략 종류 (등록 시 필수)", example = "INFINITE")
-        @NotNull StrategyType type,
+        @NotNull(message = "전략 종류는 필수입니다.") StrategyType type,
         @Schema(description = "거래 종목 (null이면 런타임 기본값, PRIVACY=SOXL/VR=TQQQ 외 명시값은 400)", example = "TQQQ")
         @Nullable StrategyTicker ticker,
         @Schema(description = "초기 입금액 (PRIVACY: 배수 자동 산출 기준, VR: 예수금=초기 pool, DCA: 시작 원장 예수금 — 계좌 통화, 0 이상, 생략=0)", example = "2000.00")
@@ -29,7 +29,7 @@ public record TradingCycleRequest(
         @Nullable BigDecimal initialHoldings,
         @Schema(description = "중간부터 시작 — 등록 시점 기존 평단가 (initialHoldings>0이면 필수)", example = "45.50")
         @Nullable BigDecimal initialAvgPrice,
-        // VR 전용 필드 (비VR 등록 시 null — @NotNull 없음, 서비스 검증)
+        // VR 전용 필드 (비VR 등록 시 null — 필수 제약 없음, 서비스 검증)
         @Schema(description = "VR: 리밸런싱 주기 (주 단위, 1 이상)", example = "4")
         @Nullable Integer intervalWeeks,
         @Schema(description = "VR: 매수·매도 사다리 밴드 폭 (%, 예: 15.00)", example = "15.00")

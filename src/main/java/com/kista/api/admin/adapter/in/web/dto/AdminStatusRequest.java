@@ -11,4 +11,4 @@ public record AdminStatusRequest(
         @Schema(description = "변경할 계정 상태", example = "ACTIVE")
         @Nullable UserStatus status,
         @Schema(description = "반려 사유 (status=REJECTED일 때만 사용, ACTIVE면 무시)")
-        @Size(max = 500) @Nullable String reason) {}
+        @Size(max = 500, message = "반려 사유는 500자 이내여야 합니다.") @Nullable String reason) {}

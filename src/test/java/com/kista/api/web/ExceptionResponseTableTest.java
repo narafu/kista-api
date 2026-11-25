@@ -16,6 +16,7 @@ import com.kista.api.user.domain.model.User;
 import com.kista.shared.kernel.AppErrorRaisedEvent;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -133,12 +134,29 @@ class ExceptionResponseTableTest {
         assertThat(events.stream(AppErrorRaisedEvent.class).count()).isZero();
     }
 
+    // 필드 1개 — detail은 요약 문장, 필드 문장은 fieldErrors에만(토스트와 필드에 같은 문장이 두 번 나오지 않게)
     @Test
-    void validation_failure_maps_to_400_with_field_messages() throws Exception {
-        ResultActions result = mockMvc.perform(post("/test/validate").contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"\"}"));
+    void validation_failure_with_one_field_puts_sentence_only_in_field_errors() throws Exception {
+        ResultActions result = mockMvc.perform(post("/test/validate").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"\",\"items\":[{\"price\":\"1\"}]}"));
 
-        expectProblem(result, 400, "Validation Failed", null, "[name: 이름은 필수입니다.]");
+        expectProblem(result, 400, "Validation Failed", null, "입력값을 확인해 주세요.");
+        result.andExpect(jsonPath("$.fieldErrors.length()").value(1))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("name"))
+                .andExpect(jsonPath("$.fieldErrors[0].detail").value("이름은 필수입니다."));
         assertThat(events.stream(AppErrorRaisedEvent.class).count()).isZero();
+    }
+
+    // 여러 필드 — 중첩 경로는 Spring 표기(items[0].price) 그대로
+    @Test
+    void validation_failure_with_many_fields_lists_each_with_spring_path() throws Exception {
+        ResultActions result = mockMvc.perform(post("/test/validate").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"\",\"items\":[{\"price\":\"\"}]}"));
+
+        expectProblem(result, 400, "Validation Failed", null, "입력값을 확인해 주세요.");
+        result.andExpect(jsonPath("$.fieldErrors.length()").value(2))
+                .andExpect(jsonPath("$.fieldErrors[?(@.field == 'name')].detail").value("이름은 필수입니다."))
+                .andExpect(jsonPath("$.fieldErrors[?(@.field == 'items[0].price')].detail").value("가격은 필수입니다."));
     }
 
     @Test
@@ -164,7 +182,9 @@ class ExceptionResponseTableTest {
     @RestController
     static class ThrowingController {
 
-        record Body(@NotBlank(message = "이름은 필수입니다.") String name) {}
+        record Body(@NotBlank(message = "이름은 필수입니다.") String name, @NotEmpty(message = "항목을 하나 이상 입력해야 합니다.") List<@Valid Item> items) {}
+
+        record Item(@NotBlank(message = "가격은 필수입니다.") String price) {}
 
         @GetMapping("/test/throw/{index}")
         void throwRow(@PathVariable int index) throws Exception {

@@ -66,7 +66,7 @@ ui 지침서: `kista-ui/docs/superpowers/fable-review/guides/`. api 태스크 �
 | T11 단건 조회 — **api 완료(`198992106`, 2026-11-25, 미배포)**: `GET /api/accounts/{id}` | ui 02의 "목록을 받아 find" 쿼리 삭제 | api 먼저 |
 | T5 메타 통합 — **api 완료(`e13afa115`, 미배포)** | ui 05 메타 소비·runtime-config 통합 | api 먼저(추가만이라 안전) |
 | T6 상태 플래그 — **api 완료(`8975b9296`, 미배포)** | ui 05 상태 재판정 삭제 | api 먼저 |
-| T7 오류 문구 | ui 05 오류 문구 맵 삭제 | api 먼저 |
+| T7 오류 문구 — **api 완료(2026-11-25, 미배포, L절)** | ui 05 오류 문구 맵 삭제, 400 `fieldErrors`를 폼 필드에 연결 | **같은 날 배포**(필드 거절 400의 `detail`이 요약 문장으로 바뀐다) |
 | T3·T4 목록 규약(가계부 → 전략 주문·체결·이력 → 관리자) | ui 05 목록 페이지형, ui 06 DataList 페이지형 | **묶음별 같은 날 배포**(봉투가 바뀐다) |
 | T8 가계부 집계 | ui 05 가계부 집계 삭제 | api 먼저 |
 | T10 검증 전용 엔드포인트 — **api 완료(`fb9f1d1b9`, 미배포)** | ui 05 규칙 사본 삭제, ui 04 태스크 6(전략 폼 통합, T5·T7도 필요) | api 먼저 |
@@ -89,7 +89,7 @@ S7 후속 C(ui `72ff7d9d`·`90432a39`)의 api 요청 처리(2026-11-25, 미배�
   - 후속(ui 요청, `6f897f0ad`): 수정 검증의 `availableCash`는 대상 전략 자신의 원장을 빼지 않는다("이 시드로 쓸 수 있는 최대 현금" = 미배정 현금 + 이 전략 원장). 경고도 같은 값과 비교한다. 등록 검증은 그대로다.
 - 요청 2 금액 통화 기호(`3b13d6c8f`): `Currency.display`(USD `$1,234.50`, 그 외 `15,000원`)로 통일하고 가용 예수금 경고는 계좌 통화로 포맷한다. 지금 증권사(메리츠·토스·Mock)가 전부 USD라 KRW 계좌는 만들 수 없고 실제 문장은 바뀌지 않는다. `OrderPreviewWarning`·`InfiniteMinSeedGuard`는 USD 전용 경로라 USD 표기를 유지, `CapitalLedgerService`는 이미 계좌 통화였다.
 - 요청 3 `/api/runtime-config` 삭제(`5a6173d7c`): 컨트롤러·테스트·공개 경로 매처 삭제. `RuntimeConfigService`(메타 출처)와 관리자 `GET/PUT /api/admin/settings`는 그대로다. 메타 DTO `@Schema` 설명 문구도 바뀌었다.
-- 참고 Bean Validation 400 `fieldErrors`: 지침서 10 T7(로드맵 N6)이다. 선행(S5 P1)은 끝났지만 아직 착수하지 않았고 날짜는 정해지지 않았다. 착수하면 이 절에 적는다.
+- 참고 Bean Validation 400 `fieldErrors`: 지침서 10 T7(로드맵 N6)로 api 완료(2026-11-25, 미배포) → L절. 검증 POST 3종의 200 `fieldErrors`와 같은 `{field, detail}` 모양이다.
 - **ui가 할 일**: `gen:types` 재생성(runtime-config 경로 제거·메타 설명 변경 반영), 수정 화면(보유 0·시드 수정)에서 가용 예수금 힌트·25·50·75·100% 버튼(`derived.availableCash`), 기준가(`derived.basePrice`), PRIVACY 최소 시드 판정(`derived.minSeed`)·기준표 없음 차단(`derived.skipReason`)을 update-validations derived에 다시 연결, `AVAILABLE_CASH_EXCEEDED` 경고 표시는 등록과 같은 방식으로.
 - **ui 반영 완료**(ui `1cfbbb4f`, 미push): `gen:types` 재생성(typecheck 0건). 수정 화면은 이미 derived(가용 예수금 힌트·25~100% 버튼·기준가·`AVAILABLE_CASH_EXCEEDED`)를 쓰고 있었고 `6f897f0ad`로 수정 가용 예수금 값도 맞다. 시드를 실제로 바꾸는 수정(보유 0)에서만 PRIVACY 최소 시드·`NO_PRIVACY_BASE`를 ui가 막는다(시드를 그대로 두고 다른 설정만 바꾸는 저장은 막지 않음). 등록에서 `NO_PRIVACY_BASE`가 표시만 되고 제출되던 결함(`72ff7d9d`부터)도 고쳤다. **배포 순서**: api `3b13d6c8f`·`5a6173d7c`·`6f897f0ad` 먼저, ui는 그 뒤(K1 ui `456011ec`도 같은 원칙).
 
@@ -383,3 +383,17 @@ api는 `TokenService.refresh`의 후계 RT를 결정적으로 유도해, 회전�
 | # | 변경 | api | ui | 상태 |
 |---|---|---|---|---|
 | K1 | 응답 유실 후 재시도가 안전해졌으니 세션 유지 범위를 넓힐 수 있다: `shared/lib/auth/refresh.ts`의 서버 쪽 timeout·연결 끊김·500·502도 `REFRESH_UNAVAILABLE`(세션 유지)로. 같은 파일 주석의 "60초 grace 뒤 전체 세션 폐기" 서술 갱신 | 완료(이 커밋) | ui `456011ec` 완료(미push), api 배포 뒤 ui 배포. refresh 5xx·408·429·timeout·연결 끊김·200 본문 유실은 세션 유지, 그 밖의 4xx·요청 전 TypeError는 로그아웃. `clientFetch`는 refresh 401만 로그아웃하고 그 밖은 503 한 번(재시도 없음), Route Handler timeout 5초. 받아들인 위험: 같은 RT에 api가 계속 5xx면 자동 로그아웃 없이 재로그인 안내가 남는다 | api `3efb88645`·`1e9e55fd6` 배포·라이브 확인 → ui push(옛 api면 넓힌 재시도가 60초 뒤 전체 세션 폐기) |
+
+## L. 지침서 10 T7 — 필드 거절 400 `fieldErrors`·Bean Validation 한국어화 (2026-11-25, 로드맵 N6)
+
+api 완료(미배포). 응답 모양이 바뀌므로 **ui와 같은 날 배포**한다(로드맵 9-4, 사용자 지시). G절 표의 "api가 먼저 내도 안전"은 이 결정으로 대체한다 — 필드 거절의 `detail`이 요약 문장으로 바뀌어 ui가 `fieldErrors`를 붙이기 전에는 어느 필드가 틀렸는지 화면에서 사라진다.
+
+- **Bean Validation 위반 400**(`title` "Validation Failed"): `detail`은 "입력값을 확인해 주세요."로 고정, 확장 속성 `fieldErrors[{field, detail}]`. `field`는 Spring 경로 표기(`name`, `dca.rules[0].amount`), 클래스 수준 제약은 `field: null`. 예전 `"[field: message, ...]"` 조립 detail은 없어졌다.
+- **필드를 지목한 도메인 거절 400**(`FieldRejectedException`, `title` "Invalid Request"): 같은 모양. 예: 등록에서 시작예정일이 오늘 이전이면 `detail` "입력값을 확인해 주세요." + `fieldErrors[{field: "scheduledStartDate", detail: "시작예정일은 오늘 이후여야 합니다."}]`. 검증 POST 3종(`trading-cycle-validations`·`update-validations`·`vr-config-validations`)의 200 `fieldErrors`와 같은 `{field, detail}`·같은 field 이름이다.
+- **바뀌지 않는 것**: 필드를 지목하지 않는 거절(일반 IAE/ISE·409 등)은 `detail`에 원문 문장 그대로이고 `fieldErrors` 키가 없다. `code`·`ErrorCode` 상수·상태 코드는 그대로다.
+- 요청 DTO의 Bean Validation `message`는 전부 "~니다." 한국어 문장이다(약 125개, 가드: `ExceptionMessageFormatTest`). 필드 이름 영문·Hibernate 기본 메시지는 더 나가지 않는다. DCA `rules` 누락 detail도 "DCA 규칙은 필수입니다."로 바뀌었다(필드 없는 400).
+- 관리자 PRIVACY 주문 추가·FIDA 주문의 "매수 주문은 수량이 필요합니다."(`@AssertTrue`)는 `field: "buyQuantityValid"`로 온다(검사 메서드 이름). 폼 필드와 맞지 않으니 하단 한 줄로 보이면 된다.
+- 백테스트(GET 쿼리 파라미터)의 VR 주기 거절은 `field: "intervalWeeks"`로 온다(파라미터 이름은 `vrIntervalWeeks`). 이름이 맞지 않는 `fieldErrors`라 ui 규약대로 폼 하단 한 줄로 보이면 된다.
+- OpenAPI에는 오류 응답 스키마가 없어(`ErrorCode`만 독립 스키마) `fieldErrors`도 생성 타입에 나오지 않는다. ui는 ProblemDetail 수기 타입에 `fieldErrors?: {field: string | null; detail: string}[]`를 더한다.
+
+**ui가 할 일**: ① 400 `fieldErrors`를 폼 필드에 붙인다(`field`의 `[0]`을 `.0`으로 바꿔 폼 이름과 대조, 맞는 필드가 없거나 `field`가 null이면 폼 버튼 위 한 줄) ② 전역 실패 토스트는 지금처럼 `detail`(요약 문장)을 그대로 띄운다 — 필드 문장을 토스트에 다시 넣지 않는다 ③ `strategy.md` "서버 검증(api T10)"의 "Bean Validation 위반은 400 ProblemDetail(`detail`만)로 와서 필드 없는 거절로 받는다"를 `fieldErrors` 처리로 바꾼다(실제 제출 400도 같은 경로) ④ 서버 문장을 다시 만드는 ui 오류 문구 맵이 있으면 지운다(ui 05). **배포 순서**: ui 커밋 준비를 사용자가 확인한 뒤 api·ui 같은 날.

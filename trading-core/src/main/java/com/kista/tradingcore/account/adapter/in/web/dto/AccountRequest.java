@@ -12,9 +12,9 @@ import org.jspecify.annotations.Nullable;
 
 public record AccountRequest(
         @Schema(description = "계좌 별명", example = "내 메인 계좌")
-        @NotBlank String nickname,
+        @NotBlank(message = "계좌 별명은 필수입니다.") String nickname,
         @Schema(description = "계좌번호 — Toss: XXX-XX-XXXXXX (예: 131-01-001931), MOCK: 생략 가능(서버 자동 생성), MERITZ: 받지 않음(오면 무시)", example = "131-01-001931")
-        @Pattern(regexp = "\\d{8}-\\d{2}|\\d{3}-\\d{2}-\\d{6}", message = "계좌번호는 XXXXXXXX-XX 또는 XXX-XX-XXXXXX 형식이어야 합니다")
+        @Pattern(regexp = "\\d{8}-\\d{2}|\\d{3}-\\d{2}-\\d{6}", message = "계좌번호는 XXXXXXXX-XX 또는 XXX-XX-XXXXXX 형식이어야 합니다.")
         @Nullable String accountNo,
         @Schema(description = "API 앱 키 (Toss Client ID / 메리츠 App Key)", example = "PSxxxxxxxxxx")
         @Nullable String appKey,

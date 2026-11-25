@@ -14,21 +14,21 @@ import java.util.UUID;
 // 등록·수정 공용
 public record AssetSnapshotRequest(
         @Schema(description = "카테고리 ID (type=ASSET)")
-        @NotNull UUID categoryId,
+        @NotNull(message = "카테고리는 필수입니다.") UUID categoryId,
         @Schema(description = "계좌 ID (선택 — 전세임차보증금 등 계좌 없는 자산은 null)")
         @Nullable UUID accountId,
         @Schema(description = "기준 날짜", example = "2026-08-01")
-        @NotNull LocalDate entryDate,
+        @NotNull(message = "기준 날짜는 필수입니다.") LocalDate entryDate,
         @Schema(description = "자산군", example = "EQUITY")
-        @NotNull AssetClass assetClass,
+        @NotNull(message = "자산군은 필수입니다.") AssetClass assetClass,
         @Schema(description = "시장", example = "GLOBAL")
-        @NotNull Market market,
+        @NotNull(message = "시장은 필수입니다.") Market market,
         @Schema(description = "운용전략 (자유 입력, 선택 — 실제 자동매매 전략과 무관한 개인 메모)", example = "VR")
         @Nullable String strategy,
         @Schema(description = "메모 (선택)")
         @Nullable String memo,
         @Schema(description = "금액 (원화 정수, 0 이상)", example = "1000000")
-        @PositiveOrZero long amount
+        @PositiveOrZero(message = "금액은 0 이상이어야 합니다.") long amount
 ) {
     public AssetSnapshotCommand toCommand() {
         return new AssetSnapshotCommand(categoryId, accountId, entryDate, assetClass, market, strategy, memo, amount);

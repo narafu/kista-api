@@ -26,11 +26,11 @@ import java.util.Map;
 // 관리자 전체 런타임 설정 갱신 요청
 public record AdminSettingsRequest(
         @Schema(description = "가입 승인 정책 설정")
-        @NotNull @Valid AuthRequest auth,
+        @NotNull(message = "가입 승인 정책 설정은 필수입니다.") @Valid AuthRequest auth,
         @Schema(description = "증권사별 신규 등록/연결 테스트 활성화 설정 (key=Broker, 생략한 증권사는 현재 값 유지)")
-        @NotNull Map<Broker, @Valid BrokerRequest> brokers,
+        @NotNull(message = "증권사별 설정은 필수입니다.") Map<Broker, @Valid BrokerRequest> brokers,
         @Schema(description = "전략별 신규 생성 정책 설정 (key=StrategyType)")
-        @NotNull Map<StrategyType, @Valid StrategyRequest> strategies,
+        @NotNull(message = "전략별 설정은 필수입니다.") Map<StrategyType, @Valid StrategyRequest> strategies,
         @Schema(description = "ETF 벤치마크 비교 자산 설정 (생략 시 기존 값 유지)")
         @Valid @Nullable BenchmarkRequest benchmarks
 ) {
@@ -63,19 +63,19 @@ public record AdminSettingsRequest(
 
     public record AuthRequest(
             @Schema(description = "신규 가입 승인 필요 여부")
-            @NotNull Boolean approvalRequired) { // 가입 승인 관리자 입력
+            @NotNull(message = "가입 승인 필요 여부는 필수입니다.") Boolean approvalRequired) { // 가입 승인 관리자 입력
     }
 
     public record BrokerRequest(
             @Schema(description = "증권사 신규 계좌 등록/연결 테스트 허용 여부")
-            @NotNull Boolean enabled) { // 증권사 활성화 관리자 입력
+            @NotNull(message = "증권사 활성화 여부는 필수입니다.") Boolean enabled) { // 증권사 활성화 관리자 입력
     }
 
     public record StrategyRequest(
             @Schema(description = "신규 전략 생성 허용 여부")
-            @NotNull Boolean enabled,
+            @NotNull(message = "전략 생성 허용 여부는 필수입니다.") Boolean enabled,
             @Schema(description = "전략별 생성 필드 설정")
-            @NotNull @Valid FieldRequests fields
+            @NotNull(message = "전략별 생성 필드 설정은 필수입니다.") @Valid FieldRequests fields
     ) { // 전략 생성 관리자 입력
         StrategyCreationSettings toDomain(StrategyType type) {
             FieldRequests value = require(fields, type.name() + " fields");
@@ -130,11 +130,11 @@ public record AdminSettingsRequest(
 
     public record FieldRequest<T>(
             @Schema(description = "사용자 입력 허용 여부")
-            @NotNull Boolean customizable,
+            @NotNull(message = "사용자 입력 허용 여부는 필수입니다.") Boolean customizable,
             @Schema(description = "허용 값 목록")
-            @NotNull List<@NotNull T> allowedValues,
+            @NotNull(message = "허용 값 목록은 필수입니다.") List<@NotNull(message = "허용 값은 비워 둘 수 없습니다.") T> allowedValues,
             @Schema(description = "신규 생성 기본값")
-            @NotNull T defaultValue
+            @NotNull(message = "기본값은 필수입니다.") T defaultValue
     ) { // 개별 생성 필드 관리자 입력
         StrategyFieldSettings<T> toDomain() {
             return new StrategyFieldSettings<>(customizable, allowedValues, defaultValue);
@@ -143,7 +143,7 @@ public record AdminSettingsRequest(
 
     public record BenchmarkRequest(
             @Schema(description = "ETF 벤치마크 비교 자산 설정")
-            @NotNull @Valid BenchmarkFieldRequest<EtfBenchmarkSymbol> etf
+            @NotNull(message = "ETF 벤치마크 설정은 필수입니다.") @Valid BenchmarkFieldRequest<EtfBenchmarkSymbol> etf
     ) { // 벤치마크 비교 자산 관리자 입력 — EtfBenchmarkSymbol enum 직결로 시세 동기화 대상 밖 심볼 저장을 막는다
         BenchmarkSettings toDomain() {
             return new BenchmarkSettings(new BenchmarkFieldSettings<>(
@@ -153,9 +153,9 @@ public record AdminSettingsRequest(
 
     public record BenchmarkFieldRequest<T>(
             @Schema(description = "허용 값 목록")
-            @NotNull List<@NotNull T> allowedValues,
+            @NotNull(message = "허용 값 목록은 필수입니다.") List<@NotNull(message = "허용 값은 비워 둘 수 없습니다.") T> allowedValues,
             @Schema(description = "비교 기본값")
-            @NotNull T defaultValue
+            @NotNull(message = "기본값은 필수입니다.") T defaultValue
     ) { // 개별 벤치마크 필드 관리자 입력
     }
 }

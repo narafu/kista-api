@@ -15,17 +15,17 @@ import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-// DCA 규칙 요청 1건 — 검증은 DcaRule(IAE→400), null 필수값은 @NotNull(400)
+// DCA 규칙 요청 1건 — 검증은 DcaRule(IAE→400), null 필수값은 NotNull 제약(400)
 public record DcaRuleRequest(
         @Schema(description = "규칙 키 — 신규 null, 수정 시 기존 값 재전송(현재 버전에 없으면 400)")
         @Nullable String ruleKey,                     // 규칙 식별자
-        @NotNull OrderDirection direction,  // 매수/매도
-        @NotNull DcaFrequency frequency,    // 주기
+        @NotNull(message = "매매 방향은 필수입니다.") OrderDirection direction,  // 매수/매도
+        @NotNull(message = "주기는 필수입니다.") DcaFrequency frequency,    // 주기
         @Nullable DayOfWeek dayOfWeek,                // WEEKLY 전용
         @Nullable Integer dayOfMonth,                 // MONTHLY 전용, null=말일
-        @NotNull OrderType orderType,       // MOO | MOC
-        @NotNull @Valid DcaSizingRequest sizing, // 규모
-        @NotNull DcaShortfallPolicy shortfall,   // 가용 부족 정책
+        @NotNull(message = "주문 유형은 필수입니다.") OrderType orderType,       // MOO | MOC
+        @NotNull(message = "규모는 필수입니다.") @Valid DcaSizingRequest sizing, // 규모
+        @NotNull(message = "가용 부족 정책은 필수입니다.") DcaShortfallPolicy shortfall,   // 가용 부족 정책
         @Nullable List<@Nullable DcaConditionRequest> conditions     // 추가 조건(AND) — null이면 빈 목록
 ) {
     DcaRule toDomain() {
