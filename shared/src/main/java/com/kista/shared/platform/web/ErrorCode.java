@@ -5,7 +5,7 @@ package com.kista.shared.platform.web;
 public enum ErrorCode {
     BROKER_UNAVAILABLE,          // 503 증권사 API 장애
     BROKER_CREDENTIAL_INVALID,   // 422 증권사 API 키 오류
-    BROKER_PERMISSION_DENIED,    // 422 거래소 API 키 권한 부족 (메리츠)
+    BROKER_PERMISSION_DENIED,    // 422 증권사 API 키 권한 부족 (메리츠)
     BROKER_RATE_LIMITED,         // 429 증권사 API 호출 한도 초과
     DUPLICATE_ACCOUNT,           // 409 이미 등록된 증권 계좌
     ALREADY_ORDERED_TODAY,       // 409 발행처 없음(2026-11 바로 주문 삭제), kista-ui 계약상 보존
