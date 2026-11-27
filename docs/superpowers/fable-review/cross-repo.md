@@ -63,18 +63,18 @@ ui 지침서: `kista-ui/docs/superpowers/fable-review/guides/`. api 태스크 �
 |---|---|---|
 | T1 required 표기, T2 BigDecimal plain number — **T1·T2 완료(2026-11-13, api `1915ba682`), ui 01 시작 가능** | ui 01 타입 SSOT(생성 타입 직접 사용) | api 먼저, ui는 타입 재생성 후 |
 | (없음) | ui 02 데이터 층(openapi-fetch, `resolveUpstream` 한 함수) ← ui 01 | ui 단독 |
-| T11 단건 조회 — **api 완료(`198992106`, 2026-11-25, 미배포)**: `GET /api/accounts/{id}` | ui 02의 "목록을 받아 find" 쿼리 삭제 | api 먼저 |
-| T5 메타 통합 — **api 완료(`e13afa115`, 미배포)** | ui 05 메타 소비·runtime-config 통합 | api 먼저(추가만이라 안전) |
-| T6 상태 플래그 — **api 완료(`8975b9296`, 미배포)** | ui 05 상태 재판정 삭제 | api 먼저 |
-| T7 오류 문구 — **api 완료(2026-11-25, 미배포, L절)** | ui 05 오류 문구 맵 삭제, 400 `fieldErrors`를 폼 필드에 연결 | **같은 날 배포**(필드 거절 400의 `detail`이 요약 문장으로 바뀐다) |
+| T11 단건 조회 — **api 완료(`198992106`, 2026-11-25, 2026-11-28 배포)**: `GET /api/accounts/{id}` | ui 02의 "목록을 받아 find" 쿼리 삭제 | api 먼저 |
+| T5 메타 통합 — **api 완료(`e13afa115`, 2026-11-28 배포)** | ui 05 메타 소비·runtime-config 통합 | api 먼저(추가만이라 안전) |
+| T6 상태 플래그 — **api 완료(`8975b9296`, 2026-11-28 배포)** | ui 05 상태 재판정 삭제 | api 먼저 |
+| T7 오류 문구 — **api 완료(2026-11-25, 2026-11-28 배포·운영 화면 확인 미완, L절)** | ui 05 오류 문구 맵 삭제, 400 `fieldErrors`를 폼 필드에 연결 | **같은 날 배포**(필드 거절 400의 `detail`이 요약 문장으로 바뀐다) |
 | T3·T4 목록 규약(가계부 → 전략 주문·체결·이력 → 관리자) | ui 05 목록 페이지형, ui 06 DataList 페이지형 | **묶음별 같은 날 배포**(봉투가 바뀐다) |
-| T8 가계부 집계 — **api 완료(2026-11-26, 미배포, M절)** | ui 05 가계부 집계 삭제(태스크 6), 그 외 집계 필드 소비(태스크 7) | api 먼저(추가만) |
-| T10 검증 전용 엔드포인트 — **api 완료(`fb9f1d1b9`, 미배포)** | ui 05 규칙 사본 삭제, ui 04 태스크 6(전략 폼 통합, T5·T7도 필요) | api 먼저 |
-| T12 차트 지표, `reapplyAvailableAt` — **api 완료(`dc419a66b`, 미배포)** | ui 05 indicators.ts·localStorage 쿨다운 삭제 | api 먼저 |
+| T8 가계부 집계 — **api 완료(2026-11-26, 2026-11-28 배포, M절)** | ui 05 가계부 집계 삭제(태스크 6), 그 외 집계 필드 소비(태스크 7) | api 먼저(추가만) |
+| T10 검증 전용 엔드포인트 — **api 완료(`fb9f1d1b9`, 2026-11-28 배포)** | ui 05 규칙 사본 삭제, ui 04 태스크 6(전략 폼 통합, T5·T7도 필요) | api 먼저 |
+| T12 차트 지표, `reapplyAvailableAt` — **api 완료(`dc419a66b`, 2026-11-28 배포)** | ui 05 indicators.ts·localStorage 쿨다운 삭제 | api 먼저 |
 | 지침서 04 단계 A(KIS·업비트 삭제) | ui 05 KIS·업비트 전용 코드 삭제 | 같은 배포 묶음. api의 KIS 삭제는 완료(2026-11-15, 미배포). ui에는 KIS 언급이 41파일 남아 있다(예: `features/account/create-account/steps/AccountInfoStep.tsx:57`, `ConfirmStep.tsx:24`의 `data.broker \|\| 'KIS'`, `entities/meta/__fixtures__/testMeta.ts:10`, `e2e/ledger-budget.spec.ts:12`). 운영 secret에서 뺄 키는 없다(KIS 키는 `.env.example`·compose·deploy에 없음). **ui 제거 완료(b33118f1, 2026-11-15, 미push)** |
 | T9 원칙 문서를 `docs/agents/ui-api-contract.md`로 이동 | ui 08 태스크 10(루트 CLAUDE.md가 그 경로를 가리킴) | 문서 |
 
-S7 api 완료분의 ui 후속(2026-11-25, 모두 추가만, 미배포 — N19 관찰 뒤 api 먼저 배포, ui는 `gen:types` 재생성부터):
+S7 api 완료분의 ui 후속(2026-11-25, 모두 추가만, 2026-11-28 배포 완료(api `9ffa48504`·ui `bb282a50`, 운영 화면 확인 미완) — N19 관찰 뒤 api 먼저 배포, ui는 `gen:types` 재생성부터):
 
 - T5: 메타 소비로 runtime-config 통합(`StrategyTypeMeta.enabled·fields·vrRampDefaults`, `BrokerMeta.enabled`, `approvalRequired`, `benchmarkEtf`), `RAMP_DEFAULTS_BY_MODE` 사본 삭제, `userStatuses` 라벨 사용. 메타가 `no-store`가 됐다. `/api/runtime-config`는 ui 전환 뒤 삭제 대상이다.
 - T6: `computeOrderReadiness`·`canWithdrawCapital`/`capitalAdjustment`·`apiKeyExpiryState`·`isScheduledStart` 재판정 삭제 → `allowedActions`/`blockedActions`(둘 다에 없으면 버튼 없음, blocked는 비활성 + 사유 라벨=메타), `apiKeyExpiry`, `warnings`. 서버 판정 밖 3건(마감 리포트 창·당일 주문 반영 전 보관·재개 시 1주 미만 잔액)은 서버 400 `detail`로 처리한다.
@@ -83,13 +83,13 @@ S7 api 완료분의 ui 후속(2026-11-25, 모두 추가만, 미배포 — N19 �
 - T11: 계좌 목록 `find` 대신 `GET /api/accounts/{id}`.
 - T12: `indicators.ts` 삭제·캔들 `sma*`/`rsi14` 사용(RAW 종가 기준), localStorage 쿨다운 삭제 → `reapplyAvailableAt`.
 
-S7 후속 C(ui `72ff7d9d`·`90432a39`)의 api 요청 처리(2026-11-25, 미배포 — 위 S7 묶음과 같이 api 먼저 배포):
+S7 후속 C(ui `72ff7d9d`·`90432a39`)의 api 요청 처리(2026-11-25, 2026-11-28 배포 완료(api `9ffa48504`·ui `bb282a50`) — 위 S7 묶음과 같이 api 먼저 배포):
 
 - 요청 1 수정 검증 derived 보강(`3b13d6c8f`): `POST /api/trading-cycles/{id}/update-validations`에 `newSeed`가 있으면 등록 검증과 같은 시드 미리보기로 `derived.basePrice`·`minSeed`·`skipReason`·`availableCash`를 채운다(PRIVACY 포함, 시세 실패는 fail-open으로 넷 다 null). INFINITE `minSeed`는 예전 의미(활성 버전 분할 수 기준) 그대로다. 입력 시드가 가용 예수금보다 크면 `warnings`에 `AVAILABLE_CASH_EXCEEDED`. PRIVACY 최소 시드 미만·`NO_PRIVACY_BASE`는 서버가 거절하지 않는다(Q-35) — ui가 derived로 막는다. `newSeed`가 없으면 derived는 전부 null.
   - 후속(ui 요청, `6f897f0ad`): 수정 검증의 `availableCash`는 대상 전략 자신의 원장을 빼지 않는다("이 시드로 쓸 수 있는 최대 현금" = 미배정 현금 + 이 전략 원장). 경고도 같은 값과 비교한다. 등록 검증은 그대로다.
 - 요청 2 금액 통화 기호(`3b13d6c8f`): `Currency.display`(USD `$1,234.50`, 그 외 `15,000원`)로 통일하고 가용 예수금 경고는 계좌 통화로 포맷한다. 지금 증권사(메리츠·토스·Mock)가 전부 USD라 KRW 계좌는 만들 수 없고 실제 문장은 바뀌지 않는다. `OrderPreviewWarning`·`InfiniteMinSeedGuard`는 USD 전용 경로라 USD 표기를 유지, `CapitalLedgerService`는 이미 계좌 통화였다.
-- 요청 3 `/api/runtime-config` 삭제(`5a6173d7c`): 컨트롤러·테스트·공개 경로 매처 삭제. `RuntimeConfigService`(메타 출처)와 관리자 `GET/PUT /api/admin/settings`는 그대로다. 메타 DTO `@Schema` 설명 문구도 바뀌었다.
-- 참고 Bean Validation 400 `fieldErrors`: 지침서 10 T7(로드맵 N6)로 api 완료(2026-11-25, 미배포) → L절. 검증 POST 3종의 200 `fieldErrors`와 같은 `{field, detail}` 모양이다.
+- 요청 3 `/api/runtime-config` 삭제(`5a6173d7c`): 컨트롤러·테스트·공개 경로 매처 삭제. `RuntimeConfigService`(메타 출처)와 관리자 `GET/PUT /api/admin/settings`는 그대로다. 메타 DTO `@Schema` 설명 문구도 바뀌었다. 배포 순서(2026-11-28): 운영 ui가 아직 호출해서 이 삭제는 1단계 api 배포(`9ffa48504`)에서 되돌려 두었고(`82bfc5735`), ui `bb282a50` 라이브 확인(login의 runtime-config 요청 0건) 뒤 `09f5c3588`로 다시 삭제해 배포했다.
+- 참고 Bean Validation 400 `fieldErrors`: 지침서 10 T7(로드맵 N6)로 api 완료(2026-11-25, 2026-11-28 배포) → L절. 검증 POST 3종의 200 `fieldErrors`와 같은 `{field, detail}` 모양이다.
 - **ui가 할 일**: `gen:types` 재생성(runtime-config 경로 제거·메타 설명 변경 반영), 수정 화면(보유 0·시드 수정)에서 가용 예수금 힌트·25·50·75·100% 버튼(`derived.availableCash`), 기준가(`derived.basePrice`), PRIVACY 최소 시드 판정(`derived.minSeed`)·기준표 없음 차단(`derived.skipReason`)을 update-validations derived에 다시 연결, `AVAILABLE_CASH_EXCEEDED` 경고 표시는 등록과 같은 방식으로.
 - **ui 반영 완료**(ui `1cfbbb4f`, 미push): `gen:types` 재생성(typecheck 0건). 수정 화면은 이미 derived(가용 예수금 힌트·25~100% 버튼·기준가·`AVAILABLE_CASH_EXCEEDED`)를 쓰고 있었고 `6f897f0ad`로 수정 가용 예수금 값도 맞다. 시드를 실제로 바꾸는 수정(보유 0)에서만 PRIVACY 최소 시드·`NO_PRIVACY_BASE`를 ui가 막는다(시드를 그대로 두고 다른 설정만 바꾸는 저장은 막지 않음). 등록에서 `NO_PRIVACY_BASE`가 표시만 되고 제출되던 결함(`72ff7d9d`부터)도 고쳤다. **배포 순서**: api `3b13d6c8f`·`5a6173d7c`·`6f897f0ad` 먼저, ui는 그 뒤(K1 ui `456011ec`도 같은 원칙).
 
@@ -386,7 +386,7 @@ api는 `TokenService.refresh`의 후계 RT를 결정적으로 유도해, 회전�
 
 ## L. 지침서 10 T7 — 필드 거절 400 `fieldErrors`·Bean Validation 한국어화 (2026-11-25, 로드맵 N6)
 
-api 완료(미배포). 응답 모양이 바뀌므로 **ui와 같은 날 배포**한다(로드맵 9-4, 사용자 지시). G절 표의 "api가 먼저 내도 안전"은 이 결정으로 대체한다 — 필드 거절의 `detail`이 요약 문장으로 바뀌어 ui가 `fieldErrors`를 붙이기 전에는 어느 필드가 틀렸는지 화면에서 사라진다.
+api 완료(2026-11-28 배포 완료, api `9ffa48504`·ui `bb282a50`, 운영 화면 확인 미완). 응답 모양이 바뀌므로 **ui와 같은 날 배포**한다(로드맵 9-4, 사용자 지시, 2026-11-28 완료). G절 표의 "api가 먼저 내도 안전"은 이 결정으로 대체한다 — 필드 거절의 `detail`이 요약 문장으로 바뀌어 ui가 `fieldErrors`를 붙이기 전에는 어느 필드가 틀렸는지 화면에서 사라진다.
 
 - **Bean Validation 위반 400**(`title` "Validation Failed"): `detail`은 "입력값을 확인해 주세요."로 고정, 확장 속성 `fieldErrors[{field, detail}]`. `field`는 Spring 경로 표기(`name`, `dca.rules[0].amount`), 클래스 수준 제약은 `field: null`. 예전 `"[field: message, ...]"` 조립 detail은 없어졌다.
 - **필드를 지목한 도메인 거절 400**(`FieldRejectedException`, `title` "Invalid Request"): 같은 모양. 예: 등록에서 시작예정일이 오늘 이전이면 `detail` "입력값을 확인해 주세요." + `fieldErrors[{field: "scheduledStartDate", detail: "시작예정일은 오늘 이후여야 합니다."}]`. 검증 POST 3종(`trading-cycle-validations`·`update-validations`·`vr-config-validations`)의 200 `fieldErrors`와 같은 `{field, detail}`·같은 field 이름이다.
