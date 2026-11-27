@@ -80,7 +80,7 @@ public record MetaBundle(
         List<EnumMeta> orderPreviewWarningCodes, // 미리보기 경고 코드 목록
         @Schema(description = "전략 입력 검증 경고 코드 목록 (검증 전용 엔드포인트 warnings[].code 코드값)")
         List<EnumMeta> strategyValidationWarningCodes, // 전략 입력 검증 경고 코드 목록
-        @Schema(description = "가입 승인 필수 여부 (RuntimeConfigService auth.approvalRequired와 같은 값)")
+        @Schema(description = "가입 승인 필수 여부 (/api/runtime-config auth.approvalRequired와 같은 값)")
         boolean approvalRequired,              // 가입 승인 필수 여부
         @Schema(description = "ETF 벤치마크 비교 자산 허용값·기본값")
         BenchmarkEtfMeta benchmarkEtf          // ETF 벤치마크 설정

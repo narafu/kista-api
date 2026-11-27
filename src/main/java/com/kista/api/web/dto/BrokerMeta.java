@@ -15,7 +15,7 @@ public record BrokerMeta(
         String currency,    // Currency name()
         @Schema(description = "API 키 만료일 출처 (NONE·ESTIMATED)", example = "ESTIMATED")
         String apiKeyExpirySource, // ApiKeyExpirySource name()
-        @Schema(description = "신규 계좌 등록 허용 여부 (RuntimeConfigService brokers[broker].enabled와 같은 값)")
+        @Schema(description = "신규 계좌 등록 허용 여부 (/api/runtime-config brokers[broker].enabled와 같은 값)")
         boolean enabled // 증권사 신규 등록 허용 여부
 ) {
     public static BrokerMeta from(Broker b, boolean enabled) {

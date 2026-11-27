@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
 
-// 전략 생성 필드별 허용값·기본값 — RuntimeConfigService strategies[type].fields와 같은 모양. 적용 안 되는 필드는 null
+// 전략 생성 필드별 허용값·기본값 — /api/runtime-config strategies[type].fields와 같은 모양. 적용 안 되는 필드는 null
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record StrategyFieldsMeta(
         @Schema(description = "종목 생성 설정 (customizable/allowedValues/defaultValue)")

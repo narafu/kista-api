@@ -11,7 +11,7 @@ Spring Modulith 모듈(CLOSED) — 관리자 조회·정정·재정렬·감사�
 - 감사·앱오류·런타임 설정 엔티티는 플랫폼 공통 테이블이라 `@Table(schema="public")`를 유지한다.
 
 ### 런타임 설정 API 규칙
-- 공개 런타임 설정은 메타 번들 `GET /api/meta`가 `RuntimeConfigService`로 싣는다(`no-store`, trading-core 정책 조회 실패 시 `TradingPolicySettings.defaults()`로 강등). 옛 `GET /api/runtime-config`는 ui 전환 뒤 삭제했다.
+- `GET /api/runtime-config`는 로그인 전 UI가 가입·계좌·전략 생성 정책을 읽는 공개 엔드포인트다. 동적 설정이므로 `Cache-Control: no-store`. trading-core 정책 조회 실패 시 `TradingPolicySettings.defaults()`로 강등한다(`RuntimeConfigService`).
 - `GET|PUT /api/admin/settings`는 ADMIN 전용, 응답 모두 `no-store`. 조회는 엄격하다(trading-core 장애가 그대로 오류로 드러나야 기본값을 실제 설정으로 오인하지 않는다). PUT은 전체 설정을 검증한 뒤 한 번에 교체하며 부분 갱신 API가 아니다.
 - 갱신 순서는 trading 정책 PUT → root 저장 → 감사 로그이고 트랜잭션은 없다(HTTP를 DB 트랜잭션에 두지 않기 위함). 후자가 실패하면 정책만 바뀌지만 PUT이 멱등이라 재시도하면 수렴한다.
 - PUT의 brokers는 부분 맵을 허용한다(생략한 증권사 키는 현재 값 유지 — 신규 증권사를 모르는 구 관리자 화면 호환). MERITZ·DCA는 기본 비활성.

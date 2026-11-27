@@ -32,7 +32,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MetaController {
 
-    private final RuntimeConfigService runtimeConfigService; // 런타임 설정 — RuntimeConfigService 경로(기본 정책 강등 포함)
+    private final RuntimeConfigService runtimeConfigService; // 런타임 설정 — /api/runtime-config와 같은 경로(기본 정책 강등 포함)
 
     @Operation(summary = "전체 메타 번들 조회")
     @GetMapping
@@ -53,7 +53,7 @@ public class MetaController {
         values.put("benchmarkEtf", new BenchmarkEtfMeta(
                 settings.runtime().benchmarks().etf().allowedValues(), settings.runtime().benchmarks().etf().defaultValue()));
 
-        // 런타임 값이 섞여 있어 서버·브라우저 모두 캐시하지 않는다 (런타임 설정 조회와 같은 방식)
+        // 런타임 값이 섞여 있어 서버·브라우저 모두 캐시하지 않는다 (runtime-config와 같은 방식)
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(MetaBundle.assemble(values));
     }
 }

@@ -22,6 +22,7 @@ public class RootSecurityPolicy implements SecurityRoutePolicy {
     static final RequestMatcher CLIENT_ERRORS = PATHS.matcher(HttpMethod.POST, "/api/client-errors"); // UI 오류 리포트 — 로그인 전 화면도 호출 가능해야 함
     static final RequestMatcher MARKET = PATHS.matcher(HttpMethod.GET, "/api/market/**"); // 비인증 대시보드용 공개 엔드포인트
     static final RequestMatcher META = PATHS.matcher(HttpMethod.GET, "/api/meta"); // enum SSOT — 레이아웃 로드 시 인증 불필요
+    static final RequestMatcher RUNTIME_CONFIG = PATHS.matcher(HttpMethod.GET, "/api/runtime-config"); // 동적 가입·생성 설정 — 로그인 전 조회 허용
 
     @Override
     public void contribute(AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry registry) {
@@ -31,12 +32,12 @@ public class RootSecurityPolicy implements SecurityRoutePolicy {
         registry.requestMatchers(HttpMethod.POST, "/api/auth/kakao/callback", "/api/auth/refresh", "/api/auth/logout").permitAll();
         // DevAuthController(local 프로파일 전용) — 그 밖의 프로파일에는 핸들러가 없어 404
         registry.requestMatchers(HttpMethod.POST, "/api/auth/dev-*", "/api/auth/dev-approve/*").permitAll();
-        registry.requestMatchers(MARKET, META).permitAll();
+        registry.requestMatchers(MARKET, META, RUNTIME_CONFIG).permitAll();
     }
 
     // 공개 인증 경로(로그인·갱신·로그아웃)는 넣지 않는다 — 무효 토큰은 계속 401(TOKEN_* body)
     @Override
     public List<RequestMatcher> anonymousFallbackMatchers() {
-        return List.of(CLIENT_ERRORS, MARKET, META);
+        return List.of(CLIENT_ERRORS, MARKET, META, RUNTIME_CONFIG);
     }
 }
