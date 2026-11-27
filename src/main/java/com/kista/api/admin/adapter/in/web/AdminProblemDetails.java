@@ -23,7 +23,7 @@ class AdminProblemDetails implements ProblemDetailMappingContributor {
                 AdminBrokerCredentialException.class,     new Mapping(HttpStatus.UNPROCESSABLE_CONTENT, "Invalid Broker Credentials", ErrorCode.BROKER_CREDENTIAL_INVALID),
                 AdminBrokerRateLimitException.class,      new Mapping(HttpStatus.TOO_MANY_REQUESTS, "Broker Rate Limit", ErrorCode.BROKER_RATE_LIMITED),
                 AdminPrivacyTradeConflictException.class, new Mapping(HttpStatus.CONFLICT, "Conflict"),
-                // trading-core 정책 API 도달 실패 — 관리자 설정 조회·갱신은 503으로 드러낸다(공개 runtime-config는 서비스가 기본값으로 강등)
+                // trading-core 정책 API 도달 실패 — 관리자 설정 조회·갱신은 503으로 드러낸다(공개 메타 번들은 RuntimeConfigService가 기본값으로 강등)
                 TradingPolicyUnavailableException.class,  new Mapping(HttpStatus.SERVICE_UNAVAILABLE, "Trading Core Unavailable", ErrorCode.TRADING_CORE_UNAVAILABLE));
     }
 }
