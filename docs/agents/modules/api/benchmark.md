@@ -8,4 +8,4 @@ Spring Modulith 모듈(CLOSED) — 주택/ETF 벤치마크 비교와 KB Land/Alp
 - `currentExchangeRate`는 요청마다 실시간 조회하는 정보성 필드일 뿐 수익률·공통월·summary에 반영하지 않는다. 조회 실패는 `CurrentExchangeRateHttpAdapter`가 warn 후 null로 흡수해 비교 응답이 200으로 유지된다(내부 API 응답은 bare `BigDecimal`이라 contract 대상 아님).
 - KB Land 수집 실패는 `BenchmarkAlertRaisedEvent`를 발행하고(notify `AlertNotifier` 구독), `MarketIndexPriceSyncService`는 심볼별 실패를 격리해 순회한 뒤 실패가 있으면 `IllegalStateException`을 던진다(이벤트 없음).
 - 스케줄러 3종(`KbLandHousingBenchmarkScheduler`/`KbLandPriceIndexScheduler`/`MarketIndexPriceSyncScheduler`)은 "schedule"로 공개되고 `web.AdminSchedulerController`가 수동 트리거용으로 주입한다. `MarketIndexPriceSyncScheduler`는 비거래일에 Alpaca가 빈 배열을 줘 무해한 no-op이라 요일 조건이 없다.
-- Alpaca 빈 이름은 `alpacaRestClient`. KB Land는 아파트 5분위 매매평균가격(월간)과 주간 매매가격지수를 수집한다.
+- Alpaca 빈 이름은 `alpacaRestClient`. `AlpacaIndexPriceAdapter`는 `feed=sip`(공식 종가 — iex 종가는 다르다)을 end 없이 받아(무료 키는 최근 15분에 걸린 end면 403) to 이하이면서 확정된 봉만 남긴다. 뉴욕 오늘 봉은 16:16 전이면 버린다(조기 마감일도 같은 시각, 다음 동기화가 받는다). KB Land는 아파트 5분위 매매평균가격(월간)과 주간 매매가격지수를 수집한다.

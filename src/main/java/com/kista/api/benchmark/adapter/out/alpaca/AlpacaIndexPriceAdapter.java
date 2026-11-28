@@ -11,8 +11,10 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 @Slf4j
@@ -20,25 +22,23 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AlpacaIndexPriceAdapter implements IndexPriceFeedPort {
 
+    private static final LocalTime BAR_SETTLED_AT = LocalTime.of(16, 16); // 뉴욕 시각 — 정규 마감 16:00 + 통합 시세 지연 15분 뒤라야 당일 봉이 확정
 
     private final RestClient alpacaRestClient;
     private final AlpacaProperties alpacaProperties;
+    private final Clock clock; // 당일 봉 확정 여부 판단 기준 — 테스트에서 Clock.fixed 주입
 
     // Alpaca Market Data /v2/stocks/{symbol}/bars — 일봉 limit 10000이면 약 40년치라 페이지네이션 불필요
-    // feed=iex 사용 — 무료 플랜에서 feed=sip은 end가 최소 15분 이전 시점이어야만 허용된다(실측 확인:
-    // end=오늘 날짜로 조회 시 403 "subscription does not permit querying recent SIP data").
-    // 이 메서드는 매일 end=오늘 날짜로 증분 동기화(MarketIndexPriceSyncService)에 쓰이므로 sip 사용 불가.
-    // 과거 구간(2016-01-04~2020-07-27 sip, 그 이전 상장일까지 Yahoo Finance)은 1회성 스크립트로
-    // 이미 DB에 백필했다 — end가 항상 과거인 백필에서만 sip이 유효하다.
+    // feed=sip(통합 종가) — iex 종가는 공식 종가와 다르다. 무료 플랜은 최근 15분에 걸린 end를 주면 sip이 403이라
+    // end 없이 받고 to 이하·확정된 봉만 코드에서 고른다(MarketDataClient와 같은 방식)
     @Override
     public List<IndexPrice> fetchDailyCloses(String symbol, LocalDate from, LocalDate to) {
         String url = UriComponentsBuilder
                 .fromUriString(alpacaProperties.dataBaseUrl() + "/v2/stocks/" + symbol + "/bars")
                 .queryParam("timeframe", "1Day")
                 .queryParam("start", from.toString())
-                .queryParam("end", to.toString())
                 .queryParam("adjustment", "split")
-                .queryParam("feed", "iex")
+                .queryParam("feed", "sip")
                 .queryParam("limit", 10000)
                 .toUriString();
 
@@ -50,11 +50,17 @@ public class AlpacaIndexPriceAdapter implements IndexPriceFeedPort {
                 .body(BarsResponse.class);
         List<Bar> bars = response != null && response.bars() != null ? response.bars() : List.of();
         log.info("{} 지수 종가 {}건 수신 ({} ~ {})", symbol, bars.size(), from, to);
+        // 뉴욕 오늘 봉은 16:16 전이면 진행 중이라 버린다 — 조기 마감일도 보수적으로 같은 시각을 쓰고, 버린 날은 다음 동기화(from=최대일+1)가 받는다
+        Instant now = clock.instant();
+        LocalDate nyToday = LocalDate.ofInstant(now, TimeZones.NY);
+        boolean todayUnsettled = now.isBefore(nyToday.atTime(BAR_SETTLED_AT).atZone(TimeZones.NY).toInstant());
         return bars.stream()
                 .map(bar -> new IndexPrice(
                         symbol,
                         Instant.parse(bar.t()).atZone(TimeZones.NY).toLocalDate(),
                         bar.c()))
+                .filter(price -> !price.tradeDate().isAfter(to))
+                .filter(price -> !(todayUnsettled && price.tradeDate().equals(nyToday)))
                 .toList();
     }
 
