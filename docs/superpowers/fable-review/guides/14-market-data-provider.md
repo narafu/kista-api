@@ -351,3 +351,8 @@ T3 실행 결과(2026-11-20, N19):
 - **토스 계좌 현재가**: 처음에는 Alpaca `latestPrices`(Q-13 대체 경로)로 갔다가, 2026-11-21 운영 토스 계좌 키로 읽기 전용 1회 호출(토큰 200, `/api/v1/prices` 200 — 계좌 헤더 유무 모두)을 확인하고 계좌 토큰 `/api/v1/prices`로 바꿨다(`TossPriceApi.currentPrices`). 계좌 토큰 경로는 429를 재시도하지 않는다(그 계좌만 빠지고 알림).
 - **T5 주의(2026-11-21)**: 메리츠는 `currentPrices`를 override하지 않고 `BrokerPricePort`의 default(`getPrices` 위임 → `MeritzPriceApi` 종목별 단건)를 탄다. T5에서 옛 메서드를 지울 때 default를 없애고 `MeritzBrokerAdapter.currentPrices`를 명시적으로 둔다. 실패 모양도 맞춘다(토스는 빠진 종목만 키 없음, 메리츠는 한 종목 예외면 계좌 전체 실패).
 - Mock은 확정 일봉이 없으면 `getExecutions`가 예외를 던진다(현재가 대체 삭제).
+
+T5 실행 결과(2026-11-28, N19 — T5a·T5b로 나눔):
+
+- **T5a(`adaa4ab1f`)**: 4-4절 중 관리자 키와 무관한 것만 지웠다(옛 `BrokerPricePort` 메서드, 관리자 시세 체인, 토스 캔들, `TossPriceApi`·`MeritzPriceApi`의 현재가 외 전부, `CandlePort`). `MeritzBrokerAdapter.currentPrices`는 옛 default와 같은 위임으로 명시 구현했다. 실패 모양(메리츠는 한 종목 예외면 계좌 전체 실패)은 동작 보존을 위해 맞추지 않았다.
+- **T5b(T4 뒤)**: 환율(`BenchmarkService` → `BrokerStatisticsService` → `TossHoldingsApi.getExchangeRate`, 토스 잔고 원화 환산)이 아직 관리자 토큰 `getCommon`을 쓴다. T4로 `ExchangeRatePort`를 Frankfurter로 바꾼 뒤 관리자 토큰·`getCommon`·`UsdKrwRateCache`·`BrokerStatisticsPort(s)`·`toss.admin-*`/`TOSS_ADMIN_*`를 지우고, 배포 뒤 G8을 infra에 알린다.
