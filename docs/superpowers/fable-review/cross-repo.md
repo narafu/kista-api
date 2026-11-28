@@ -66,7 +66,7 @@ ui 지침서: `kista-ui/docs/superpowers/fable-review/guides/`. api 태스크 �
 | T11 단건 조회 — **api 완료(`198992106`, 2026-11-25, 2026-11-28 배포)**: `GET /api/accounts/{id}` | ui 02의 "목록을 받아 find" 쿼리 삭제 | api 먼저 |
 | T5 메타 통합 — **api 완료(`e13afa115`, 2026-11-28 배포)** | ui 05 메타 소비·runtime-config 통합 | api 먼저(추가만이라 안전) |
 | T6 상태 플래그 — **api 완료(`8975b9296`, 2026-11-28 배포)** | ui 05 상태 재판정 삭제 | api 먼저 |
-| T7 오류 문구 — **api 완료(2026-11-25, 2026-11-28 배포·운영 화면 확인 미완, L절)** | ui 05 오류 문구 맵 삭제, 400 `fieldErrors`를 폼 필드에 연결 | **같은 날 배포**(필드 거절 400의 `detail`이 요약 문장으로 바뀐다) |
+| T7 오류 문구 — **api 완료(2026-11-25, 2026-11-28 배포·운영 화면 확인 완료(ui 세션 2026-11-28: T7 fieldErrors·S7 A·B·C 폼·K1 통과, 쓰기는 가드로 차단), L절)** | ui 05 오류 문구 맵 삭제, 400 `fieldErrors`를 폼 필드에 연결 | **같은 날 배포**(필드 거절 400의 `detail`이 요약 문장으로 바뀐다) |
 | T3·T4 목록 규약(가계부 → 전략 주문·체결·이력 → 관리자) | ui 05 목록 페이지형, ui 06 DataList 페이지형 | **묶음별 같은 날 배포**(봉투가 바뀐다) |
 | T8 가계부 집계 — **api 완료(2026-11-26, 2026-11-28 배포, M절)** | ui 05 가계부 집계 삭제(태스크 6), 그 외 집계 필드 소비(태스크 7) | api 먼저(추가만) |
 | T10 검증 전용 엔드포인트 — **api 완료(`fb9f1d1b9`, 2026-11-28 배포)** | ui 05 규칙 사본 삭제, ui 04 태스크 6(전략 폼 통합, T5·T7도 필요) | api 먼저 |
@@ -74,7 +74,7 @@ ui 지침서: `kista-ui/docs/superpowers/fable-review/guides/`. api 태스크 �
 | 지침서 04 단계 A(KIS·업비트 삭제) | ui 05 KIS·업비트 전용 코드 삭제 | 같은 배포 묶음. api의 KIS 삭제는 완료(2026-11-15, 미배포). ui에는 KIS 언급이 41파일 남아 있다(예: `features/account/create-account/steps/AccountInfoStep.tsx:57`, `ConfirmStep.tsx:24`의 `data.broker \|\| 'KIS'`, `entities/meta/__fixtures__/testMeta.ts:10`, `e2e/ledger-budget.spec.ts:12`). 운영 secret에서 뺄 키는 없다(KIS 키는 `.env.example`·compose·deploy에 없음). **ui 제거 완료(b33118f1, 2026-11-15, 미push)** |
 | T9 원칙 문서를 `docs/agents/ui-api-contract.md`로 이동 | ui 08 태스크 10(루트 CLAUDE.md가 그 경로를 가리킴) | 문서 |
 
-S7 api 완료분의 ui 후속(2026-11-25, 모두 추가만, 2026-11-28 배포 완료(api `9ffa48504`·ui `bb282a50`, 운영 화면 확인 미완) — N19 관찰 뒤 api 먼저 배포, ui는 `gen:types` 재생성부터):
+S7 api 완료분의 ui 후속(2026-11-25, 모두 추가만, 2026-11-28 배포 완료(api `9ffa48504`·ui `bb282a50`, 운영 화면 확인 완료(ui 세션 2026-11-28: T7 fieldErrors·S7 A·B·C 폼·K1 통과, 쓰기는 가드로 차단)) — N19 관찰 뒤 api 먼저 배포, ui는 `gen:types` 재생성부터):
 
 - T5: 메타 소비로 runtime-config 통합(`StrategyTypeMeta.enabled·fields·vrRampDefaults`, `BrokerMeta.enabled`, `approvalRequired`, `benchmarkEtf`), `RAMP_DEFAULTS_BY_MODE` 사본 삭제, `userStatuses` 라벨 사용. 메타가 `no-store`가 됐다. `/api/runtime-config`는 ui 전환 뒤 삭제 대상이다.
 - T6: `computeOrderReadiness`·`canWithdrawCapital`/`capitalAdjustment`·`apiKeyExpiryState`·`isScheduledStart` 재판정 삭제 → `allowedActions`/`blockedActions`(둘 다에 없으면 버튼 없음, blocked는 비활성 + 사유 라벨=메타), `apiKeyExpiry`, `warnings`. 서버 판정 밖 3건(마감 리포트 창·당일 주문 반영 전 보관·재개 시 1주 미만 잔액)은 서버 400 `detail`로 처리한다.
@@ -386,7 +386,7 @@ api는 `TokenService.refresh`의 후계 RT를 결정적으로 유도해, 회전�
 
 ## L. 지침서 10 T7 — 필드 거절 400 `fieldErrors`·Bean Validation 한국어화 (2026-11-25, 로드맵 N6)
 
-api 완료(2026-11-28 배포 완료, api `9ffa48504`·ui `bb282a50`, 운영 화면 확인 미완). 응답 모양이 바뀌므로 **ui와 같은 날 배포**한다(로드맵 9-4, 사용자 지시, 2026-11-28 완료). G절 표의 "api가 먼저 내도 안전"은 이 결정으로 대체한다 — 필드 거절의 `detail`이 요약 문장으로 바뀌어 ui가 `fieldErrors`를 붙이기 전에는 어느 필드가 틀렸는지 화면에서 사라진다.
+api 완료(2026-11-28 배포 완료, api `9ffa48504`·ui `bb282a50`, 운영 화면 확인 완료(ui 세션 2026-11-28: T7 fieldErrors·S7 A·B·C 폼·K1 통과, 쓰기는 가드로 차단)). 응답 모양이 바뀌므로 **ui와 같은 날 배포**한다(로드맵 9-4, 사용자 지시, 2026-11-28 완료). G절 표의 "api가 먼저 내도 안전"은 이 결정으로 대체한다 — 필드 거절의 `detail`이 요약 문장으로 바뀌어 ui가 `fieldErrors`를 붙이기 전에는 어느 필드가 틀렸는지 화면에서 사라진다.
 
 - **Bean Validation 위반 400**(`title` "Validation Failed"): `detail`은 "입력값을 확인해 주세요."로 고정, 확장 속성 `fieldErrors[{field, detail}]`. `field`는 Spring 경로 표기(`name`, `dca.rules[0].amount`), 클래스 수준 제약은 `field: null`. 예전 `"[field: message, ...]"` 조립 detail은 없어졌다.
 - **필드를 지목한 도메인 거절 400**(`FieldRejectedException`, `title` "Invalid Request"): 같은 모양. 예: 등록에서 시작예정일이 오늘 이전이면 `detail` "입력값을 확인해 주세요." + `fieldErrors[{field: "scheduledStartDate", detail: "시작예정일은 오늘 이후여야 합니다."}]`. 검증 POST 3종(`trading-cycle-validations`·`update-validations`·`vr-config-validations`)의 200 `fieldErrors`와 같은 `{field, detail}`·같은 field 이름이다.
