@@ -45,6 +45,11 @@ class MarketIndexPriceEntity extends BaseCreatedAtEntity {
         return entity;
     }
 
+    // 같은 거래일 재수신 시 종가 덮어쓰기
+    void changeClose(BigDecimal close) {
+        this.closePrice = close;
+    }
+
     IndexPrice toDomain() {
         return new IndexPrice(symbol, tradeDate, closePrice);
     }

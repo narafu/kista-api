@@ -2,6 +2,7 @@ package com.kista.api.benchmark.adapter.out.persistence.marketindex;
 
 import com.kista.shared.support.DataJpaTestBase;
 import com.kista.api.benchmark.domain.model.IndexPrice;
+import com.kista.api.benchmark.domain.model.SplitAdjustment;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -74,5 +75,49 @@ class MarketIndexPricePersistenceAdapterTest extends DataJpaTestBase {
     @Test
     void findMaxTradeDate_returnsEmptyWhenNoDataForSymbol() {
         assertThat(adapter.findMaxTradeDate("TQQQ")).isEmpty();
+    }
+
+    @Test
+    void saveAll_sameDateOverwritesCloseAndInsertsNewDates() {
+        LocalDate base = LocalDate.of(2026, 7, 1);
+        adapter.saveAll(List.of(new IndexPrice("QLD", base, new BigDecimal("63.62"))));
+
+        adapter.saveAll(List.of(
+                new IndexPrice("QLD", base, new BigDecimal("63.52")),
+                new IndexPrice("QLD", base.plusDays(1), new BigDecimal("64.00"))));
+
+        assertThat(adapter.findBySymbolAndRange("QLD", base, base.plusDays(1)))
+                .extracting(IndexPrice::close)
+                .containsExactly(new BigDecimal("63.52"), new BigDecimal("64.00"));
+    }
+
+    @Test
+    void applySplit_scalesOnlyRowsThroughDateOfThatSymbolAndRounds() {
+        LocalDate base = LocalDate.of(2026, 10, 1);
+        adapter.saveAll(List.of(
+                new IndexPrice("ETHA", base, new BigDecimal("20.37")),
+                new IndexPrice("ETHA", base.plusDays(1), new BigDecimal("20.11")),
+                new IndexPrice("ETHA", base.plusDays(4), new BigDecimal("61.29")),  // 분할 뒤 — 그대로
+                new IndexPrice("IBIT", base, new BigDecimal("50.00"))));             // 다른 종목 — 그대로
+
+        int updated = adapter.applySplit("ETHA", new SplitAdjustment(base.plusDays(1), 3, 1));
+        adapter.applySplit("IBIT", new SplitAdjustment(base.minusDays(1), 1, 3)); // through 이전 행 없음
+
+        assertThat(updated).isEqualTo(2);
+        assertThat(adapter.findBySymbolAndRange("ETHA", base, base.plusDays(4)))
+                .extracting(IndexPrice::close)
+                .containsExactly(new BigDecimal("61.11"), new BigDecimal("60.33"), new BigDecimal("61.29"));
+        assertThat(adapter.findBySymbolAndRange("IBIT", base, base).getFirst().close()).isEqualByComparingTo("50.00");
+    }
+
+    @Test
+    void applySplit_divisionRoundsHalfUpToTwoDecimals() {
+        LocalDate base = LocalDate.of(2026, 10, 1);
+        adapter.saveAll(List.of(new IndexPrice("SPY", base, new BigDecimal("100.01"))));
+
+        adapter.applySplit("SPY", new SplitAdjustment(base, 1, 3));
+
+        // 100.01 / 3 = 33.3366… → 33.34
+        assertThat(adapter.findBySymbolAndRange("SPY", base, base).getFirst().close()).isEqualByComparingTo("33.34");
     }
 }
