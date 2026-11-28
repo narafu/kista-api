@@ -122,7 +122,7 @@ class OrderPreviewWarningTest {
 
     private static NextOrdersPreview preview(List<PlannedOrder> orders, List<Order> todayOrders, LedgerCheckPreview ledger,
                                              AccountCashCheckPreview cash, AccountHoldingsCheckPreview holdings) {
-        return new NextOrdersPreview(DATE, null, orders, null, todayOrders, BigDecimal.ZERO, ledger, cash, holdings);
+        return new NextOrdersPreview(DATE, null, orders, null, todayOrders, BigDecimal.ZERO, ledger, cash, holdings, false);
     }
 
     private static AccountCashCheckPreview cash(String available, String required, String correction, boolean sufficient) {

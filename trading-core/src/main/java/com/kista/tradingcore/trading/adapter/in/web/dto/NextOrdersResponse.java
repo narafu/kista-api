@@ -22,13 +22,13 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 public record NextOrdersResponse(
-        @Schema(description = "다음 매매 예정일 (KST 기준)")
+        @Schema(description = "다음 매매 예정일 (KST 기준) — 다음 거래일이 휴장이면 그다음 개장일")
         LocalDate tradeDate,
         @Schema(description = "INFINITE 전략 포지션 스냅샷 (PRIVACY 전략 또는 skip 시 null)")
         @Nullable PositionSnapshot position,                    // PRIVACY/skip 시 null
         @Schema(description = "생성 예정 주문 목록")
         List<OrderItem> orders,
-        @Schema(description = "주문 생성 skip 사유 (정상이면 null, MARKET_CLOSED=다음 거래일 휴장)", example = "NO_PRIVACY_BASE")
+        @Schema(description = "주문 생성 skip 사유 (정상이면 null, MARKET_CLOSED=다음 거래일부터 개장일을 찾지 못함 — 시장 캘린더 미적재)", example = "NO_PRIVACY_BASE")
         NextOrdersPreview.@Nullable SkipReason skipReason,      // 정상이면 null
         @Schema(description = "오늘 이미 등록된 PLANNED·PLACED 주문 목록")
         List<TodayOrderItem> todayOrders,             // 오늘 이미 등록된 PLANNED·PLACED 주문
@@ -41,7 +41,9 @@ public record NextOrdersResponse(
         @Schema(description = "계좌 보유(판매 가능) 수량 대비 오늘 SELL 경고 — (계좌, 종목) 단위(같은 종목 전략 동일 값), 조회 시점 추정, 경고 전용. MOCK·필요 SELL 없음·증권사 조회 실패면 null")
         @Nullable AccountHoldingsCheckSummary accountHoldingsCheck,
         @Schema(description = "서버 판정 경고 목록 (원장 부족·계좌 예수금 부족/부분 부족·보유 수량 부족·방향별 미접수 순, 없으면 빈 목록) — ledgerCheck·accountCashCheck·accountHoldingsCheck와 주문 목록에서 파생")
-        List<Warning> warnings
+        List<Warning> warnings,
+        @Schema(description = "true면 다음 거래일(KST)이 휴장이라 tradeDate를 그다음 개장일로 넘겨 계산한 예상 주문")
+        boolean marketClosedToday
 ) {
     // 미리보기 경고 하나 — 코드 라벨은 메타 orderPreviewWarningCodes. OpenAPI 스키마 이름은 다른 Warning 레코드와 겹치지 않게 명시
     @Schema(name = "NextOrderWarning")
@@ -201,7 +203,8 @@ public record NextOrdersResponse(
                 result.ledgerCheck() == null ? null : LedgerCheckSummary.from(result.ledgerCheck()),
                 result.accountCashCheck() == null ? null : AccountCashCheckSummary.from(result.accountCashCheck()),
                 result.accountHoldingsCheck() == null ? null : AccountHoldingsCheckSummary.from(result.accountHoldingsCheck()),
-                OrderPreviewWarning.of(result).stream().map(w -> new Warning(w.code(), w.detail())).toList()
+                OrderPreviewWarning.of(result).stream().map(w -> new Warning(w.code(), w.detail())).toList(),
+                result.marketClosedToday()
         );
     }
 }

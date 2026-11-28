@@ -61,11 +61,11 @@ class TradingPreviewService {
     private final TradingPriceFetcher priceFetcher; // 배치 미리보기 전일종가 일괄 조회(공용 시세)
     private final MarginPort marginPort; // 계좌 실제 주문가능 USD 조회 — 경고 전용, 매매 판정에는 쓰지 않는다
     private final SellableQuantityPort sellableQuantityPort; // 종목 실제 판매 가능 수량 조회 — 경고 전용, 매매 판정에는 쓰지 않는다
-    private final MarketCalendarPort marketCalendarPort; // 휴장 거래일 판정 — 미리보기 today 기준 1회
+    private final MarketCalendarPort marketCalendarPort; // 휴장 거래일 판정·다음 개장일 탐색
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // execute()와 동일한 잔고 출처(CyclePosition) 및 전략 분기로 미리보기
-    // 휴장 여부는 무시하고 항상 강제 계산 — DB 저장 없음
+    // 다음 거래일이 휴장이면 그다음 개장일 기준으로 계산 — DB 저장 없음
     // 내부적으로 previewBatch()에 위임한다 — 단건과 배치를 별도 코드 경로로 유지할 이유가 없다.
     @Transactional(readOnly = true)
     NextOrdersPreview preview(UUID strategyId, UUID requesterId) {
@@ -94,10 +94,14 @@ class TradingPreviewService {
         // 소유권 검증은 Account 애그리게이트로 끝내고, 이후 프리뷰 경로는 투영(TradingAccount)만 사용
         Account ownedAccount = accountPort.requireOwnedAccount(accountId, requesterId);
         TradingAccount account = TradingAccount.from(ownedAccount);
-        // today는 그 거래일 실제 마감 30분 전 경계(SessionTradeDates) — 단순 KST 날짜를 쓰면 PRIVACY findTodayTrade() 날짜가 1일 어긋난다
-        LocalDate today = SessionTradeDates.nextTradeDate(ZonedDateTime.now(clock), marketCalendarPort);
-        // 휴장 거래일이면 계획 계산·브로커 호출 없이 전 전략을 MARKET_CLOSED로 skip — today 기준 1회만 판정
-        boolean marketClosed = !marketCalendarPort.isMarketOpen(today);
+        // 다음 거래일은 그 거래일 실제 마감 30분 전 경계(SessionTradeDates) — 단순 KST 날짜를 쓰면 PRIVACY findTodayTrade() 날짜가 1일 어긋난다
+        LocalDate sessionDate = SessionTradeDates.nextTradeDate(ZonedDateTime.now(clock), marketCalendarPort);
+        // 휴장이면 그다음 개장일 기준으로 계산한다 — 휴장 사이엔 세션이 없어 종가·원장이 그대로라 그 개장일 계획과 같다
+        Optional<LocalDate> openDate = SessionTradeDates.firstOpenOnOrAfter(sessionDate, marketCalendarPort);
+        boolean marketClosedToday = openDate.filter(sessionDate::equals).isEmpty();
+        // 탐색 범위 안에 개장일이 없으면(연도 캘린더 미적재) 계획 계산·브로커 호출 없이 전 전략을 MARKET_CLOSED로 skip
+        boolean noOpenDate = openDate.isEmpty();
+        LocalDate today = openDate.orElse(sessionDate); // 이하 미리보기 기준 거래일 — 당일 주문·PLANNED 합계·계획 계산 모두 이 날짜
         List<Strategy> strategies = strategyPort.findByAccountId(accountId).stream().filter(s -> !s.isArchived()).toList(); // 보관 전략은 미리보기 제외
 
         // 전략 목록의 현재 사이클을 1회 배치 조회 (전략마다 개별 조회하던 것을 축소)
@@ -120,7 +124,7 @@ class TradingPreviewService {
 
         // 계좌 내 종목별 전일종가를 공용 시세에서 1회 일괄 조회 — 전략마다 개별 시세 왕복을 생략
         List<StrategyTicker> tickers = strategies.stream()
-                .filter(s -> cyclesByStrategyId.containsKey(s.id()) && !marketClosed)
+                .filter(s -> cyclesByStrategyId.containsKey(s.id()) && !noOpenDate)
                 .map(Strategy::ticker)
                 .distinct()
                 .toList();
@@ -147,7 +151,7 @@ class TradingPreviewService {
                         new StrategyOrderPlanBuilder.PlanResult(null, NextOrdersPreview.SkipReason.SCHEDULED_START_NOT_REACHED));
                 continue;
             }
-            if (marketClosed) {
+            if (noOpenDate) {
                 // 종료·시작예정일 미도래 판정 뒤, 계산 skip(NO_PRIVACY_BASE 등)보다 앞에서 걸러 plan 계산 자체를 생략한다
                 planResultsByStrategyId.put(strategy.id(),
                         new StrategyOrderPlanBuilder.PlanResult(null, NextOrdersPreview.SkipReason.MARKET_CLOSED));
@@ -185,10 +189,11 @@ class TradingPreviewService {
                 }
             }
             previews.put(strategy.id(), buildPreview(strategy, cycle, today,
-                    todayOrdersByStrategyId.get(strategy.id()), latestPositions.get(cycle.id()), planResult, totalAccountPlannedBuy, freshBuyByStrategyId, freshSellByStrategyId, freshCorrectionByStrategyId));
+                    todayOrdersByStrategyId.get(strategy.id()), latestPositions.get(cycle.id()), planResult, totalAccountPlannedBuy, freshBuyByStrategyId, freshSellByStrategyId, freshCorrectionByStrategyId,
+                    marketClosedToday));
         }
-        // 휴장 skip은 필요 주문이 없으므로 브로커 경고 조회·첨부를 생략한다
-        if (marketClosed) return previews;
+        // 개장일 미발견 skip은 필요 주문이 없으므로 브로커 경고 조회·첨부를 생략한다
+        if (noOpenDate) return previews;
         attachAccountCashCheck(previews, account, totalAccountPlannedBuy, freshBuyByStrategyId, freshCorrectionByStrategyId);
         return attachAccountHoldingsCheck(previews, strategies, account, today, freshSellByStrategyId);
     }
@@ -262,7 +267,8 @@ class TradingPreviewService {
                                             List<Order> todayOrders, CyclePosition latestPosition,
                                             StrategyOrderPlanBuilder.PlanResult planResult,
                                             BigDecimal totalAccountPlannedBuy, Map<UUID, BigDecimal> freshBuyByStrategyId,
-                                            Map<UUID, Integer> freshSellByStrategyId, Map<UUID, BigDecimal> freshCorrectionByStrategyId) {
+                                            Map<UUID, Integer> freshSellByStrategyId, Map<UUID, BigDecimal> freshCorrectionByStrategyId,
+                                            boolean marketClosedToday) {
         BigDecimal thisStrategyPlannedBuy = todayOrders.stream()
                 .filter(o -> o.direction() == OrderDirection.BUY)
                 .map(Order::amount)
@@ -271,7 +277,7 @@ class TradingPreviewService {
 
         // 종료 사이클·시작예정일 미도래는 사전계산 루프가 skip 결과(planResult)로 채워 두므로 여기서 다시 판정하지 않는다
         if (planResult.isSkip()) {
-            return new NextOrdersPreview(today, null, List.of(), planResult.skipReason(), todayOrders, otherStrategiesPlannedBuyUsd, null, null, null);
+            return new NextOrdersPreview(today, null, List.of(), planResult.skipReason(), todayOrders, otherStrategiesPlannedBuyUsd, null, null, null, marketClosedToday);
         }
         CycleOrderStrategy.OrderPlan plan = planResult.plan();
 
@@ -300,6 +306,6 @@ class TradingPreviewService {
                     .sum());
         }
 
-        return new NextOrdersPreview(today, plan.displayPosition(), plan.orders(), null, todayOrders, otherStrategiesPlannedBuyUsd, ledgerCheck, null, null);
+        return new NextOrdersPreview(today, plan.displayPosition(), plan.orders(), null, todayOrders, otherStrategiesPlannedBuyUsd, ledgerCheck, null, null, marketClosedToday);
     }
 }

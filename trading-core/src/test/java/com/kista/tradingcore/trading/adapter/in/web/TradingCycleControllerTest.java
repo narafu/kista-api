@@ -245,7 +245,7 @@ class TradingCycleControllerTest {
         UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
         var preview = new com.kista.tradingcore.trading.domain.model.NextOrdersPreview(
                 java.time.LocalDate.of(2026, 1, 5), null, List.of(),
-                null, List.of(), BigDecimal.ZERO, null, null, null);
+                null, List.of(), BigDecimal.ZERO, null, null, null, false);
         when(tradingExecution.previewBatch(eq(ACCOUNT_ID), any()))
                 .thenReturn(java.util.Map.of(strategyId, preview));
 
@@ -766,7 +766,7 @@ class TradingCycleControllerTest {
         var preview = new com.kista.tradingcore.trading.domain.model.NextOrdersPreview(
                 LocalDate.of(2026, 1, 5), null, List.of(buy), null, List.of(), BigDecimal.ZERO,
                 new com.kista.tradingcore.trading.domain.model.LedgerCheckPreview(new BigDecimal("50"), new BigDecimal("100"), false, false),
-                null, null);
+                null, null, false);
         when(tradingExecution.preview(eq(CYCLE_ID), any())).thenReturn(preview);
 
         mockMvc.perform(get("/api/trading-cycles/{id}/preview", CYCLE_ID).with(authentication(userToken(USER_ID))))

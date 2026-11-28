@@ -18,14 +18,15 @@ public record NextOrdersPreview(
         BigDecimal otherStrategiesPlannedBuyUsd,          // 계좌 내 타 전략 당일 PLANNED BUY 합계
         LedgerCheckPreview ledgerCheck,                   // 전략 원장 대비 BUY 경고 (DCA·신규 BUY 없음·skip이면 null)
         AccountCashCheckPreview accountCashCheck,         // 계좌 주문가능 USD 대비 BUY 경고 — 계좌 단위·조회 시점 추정·경고 전용, 해당 없음/조회 실패면 null
-        AccountHoldingsCheckPreview accountHoldingsCheck  // 계좌 보유 수량 대비 SELL 경고 — (계좌, 종목) 단위·조회 시점 추정·경고 전용, 해당 없음/조회 실패면 null
+        AccountHoldingsCheckPreview accountHoldingsCheck, // 계좌 보유 수량 대비 SELL 경고 — (계좌, 종목) 단위·조회 시점 추정·경고 전용, 해당 없음/조회 실패면 null
+        boolean marketClosedToday                         // 다음 거래일이 휴장이라 tradeDate를 그다음 개장일로 넘겨 계산했으면 true
 ) {
     public NextOrdersPreview withAccountCashCheck(AccountCashCheckPreview check) {
-        return new NextOrdersPreview(tradeDate, position, orders, skipReason, todayOrders, otherStrategiesPlannedBuyUsd, ledgerCheck, check, accountHoldingsCheck);
+        return new NextOrdersPreview(tradeDate, position, orders, skipReason, todayOrders, otherStrategiesPlannedBuyUsd, ledgerCheck, check, accountHoldingsCheck, marketClosedToday);
     }
 
     public NextOrdersPreview withAccountHoldingsCheck(AccountHoldingsCheckPreview check) {
-        return new NextOrdersPreview(tradeDate, position, orders, skipReason, todayOrders, otherStrategiesPlannedBuyUsd, ledgerCheck, accountCashCheck, check);
+        return new NextOrdersPreview(tradeDate, position, orders, skipReason, todayOrders, otherStrategiesPlannedBuyUsd, ledgerCheck, accountCashCheck, check, marketClosedToday);
     }
 
     @Getter
@@ -36,7 +37,7 @@ public record NextOrdersPreview(
         SCHEDULED_START_NOT_REACHED("시작예정일 미도래"), // 사이클 시작예정일 미도래
         CYCLE_ENDED("사이클 종료"),               // 최신 사이클이 종료됨 (청산 후 재등록 미완료) — 재등록/수동 개입 필요
         PRIVACY_BASE_BLOCKED("기준매매표 점검 이슈로 차단"),      // PRIVACY 기준매매표 점검 이슈로 오늘 신규 주문 차단
-        MARKET_CLOSED("휴장일");              // 다음 거래일이 미국 시장 휴장일 — 계획 계산 없이 skip
+        MARKET_CLOSED("휴장일");              // 다음 거래일부터 탐색 범위 안에 개장일이 없음(캘린더 미적재) — 계획 계산 없이 skip
 
         private final String label; // 한국어 표시 이름 (메타 번들)
     }

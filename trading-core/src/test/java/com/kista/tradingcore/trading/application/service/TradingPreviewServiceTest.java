@@ -24,6 +24,7 @@ import com.kista.tradingcore.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -224,9 +225,44 @@ class TradingPreviewServiceTest {
         verify(planBuilder, never()).build(any(), any(), any(), any(), any());
     }
 
-    // 휴장 거래일 — 계산 skip보다 먼저 MARKET_CLOSED, 브로커·plan 호출 없음, 판정은 1회
+    // 다음 거래일 휴장 — 그다음 개장일 기준으로 당일 주문·PLANNED 합계·계획을 계산하고 브로커 경고도 붙인다
     @Test
-    void preview_returnsMarketClosed_withoutPlanOrBrokerCalls_whenMarketClosed() {
+    void preview_computesNextOpenDatePlan_whenNextTradeDateClosed() {
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(false, true); // 다음 거래일 휴장, 그다음 날 개장
+        stubPlan(STRATEGY, STRATEGY_CYCLE, buyOrder(StrategyTicker.SOXL, 8, "38.04"));
+        when(marginPort.getUsdBuyableAmount(TRADING_ACCOUNT.brokerRef())).thenReturn(new BigDecimal("300.00"));
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        ArgumentCaptor<LocalDate> dates = ArgumentCaptor.forClass(LocalDate.class);
+        verify(marketCalendarPort, times(2)).isMarketOpen(dates.capture());
+        LocalDate closedDate = dates.getAllValues().get(0);
+        LocalDate openDate = dates.getAllValues().get(1);
+        assertThat(openDate).isEqualTo(closedDate.plusDays(1));
+        assertThat(result.tradeDate()).isEqualTo(openDate);
+        assertThat(result.marketClosedToday()).isTrue();
+        assertThat(result.skipReason()).isNull();
+        assertThat(result.orders()).hasSize(1);
+        verify(planBuilder).build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), eq(openDate), any());
+        verify(orderPort).findPlannedOrPlacedByCycleIdsAndDate(any(), eq(openDate));
+        verify(orderPort).sumPlannedBuyByAccountAndDate(any(), eq(openDate));
+        assertThat(result.accountCashCheck().sufficient()).isFalse();
+    }
+
+    // 개장일이면 marketClosedToday=false, tradeDate는 다음 거래일 그대로
+    @Test
+    void preview_marketClosedTodayFalse_whenNextTradeDateOpen() {
+        stubPlan(STRATEGY, STRATEGY_CYCLE);
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        assertThat(result.marketClosedToday()).isFalse();
+        verify(marketCalendarPort, times(1)).isMarketOpen(result.tradeDate());
+    }
+
+    // 탐색 범위 안에 개장일이 없으면(캘린더 미적재) MARKET_CLOSED skip — 브로커·plan 호출 없음
+    @Test
+    void preview_returnsMarketClosed_withoutPlanOrBrokerCalls_whenNoOpenDateWithinLookahead() {
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(false);
 
         NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
@@ -235,7 +271,7 @@ class TradingPreviewServiceTest {
         assertThat(result.orders()).isEmpty();
         verify(planBuilder, never()).build(any(), any(), any(), any(), any());
         verifyNoInteractions(priceFetcher);
-        verify(marketCalendarPort, times(1)).isMarketOpen(any());
+        verify(marketCalendarPort, times(10)).isMarketOpen(any()); // 탐색 상한에서 멈춘다
     }
 
     // 개장일 — 기존 동작 유지(plan 계산 진행, skip 없음)
@@ -249,9 +285,9 @@ class TradingPreviewServiceTest {
         verify(planBuilder).build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), any());
     }
 
-    // 다전략 배치에서도 휴장 판정은 1회, 저장된 SELL이 있어도 브로커 경고 조회는 없다
+    // 다전략 배치에서도 개장일 탐색은 1회, 개장일이 없으면 저장된 SELL이 있어도 브로커 경고 조회는 없다
     @Test
-    void previewBatch_marketClosed_checksCalendarOnce_andSkipsBrokerWarnings_evenWithStoredSell() {
+    void previewBatch_noOpenDate_searchesCalendarOnce_andSkipsBrokerWarnings_evenWithStoredSell() {
         Strategy sibling = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle siblingCycle = new StrategyCycle(UUID.randomUUID(), sibling.id(), UUID.randomUUID(),
@@ -271,7 +307,7 @@ class TradingPreviewServiceTest {
             assertThat(p.accountHoldingsCheck()).isNull();
             assertThat(p.accountCashCheck()).isNull();
         });
-        verify(marketCalendarPort, times(1)).isMarketOpen(any());
+        verify(marketCalendarPort, times(10)).isMarketOpen(any());
         verifyNoInteractions(sellableQuantityPort, marginPort);
     }
 
