@@ -72,7 +72,7 @@ ui 지침서: `kista-ui/docs/superpowers/fable-review/guides/`. api 태스크 �
 | T10 검증 전용 엔드포인트 — **api 완료(`fb9f1d1b9`, 2026-11-28 배포)** | ui 05 규칙 사본 삭제, ui 04 태스크 6(전략 폼 통합, T5·T7도 필요) | api 먼저 |
 | T12 차트 지표, `reapplyAvailableAt` — **api 완료(`dc419a66b`, 2026-11-28 배포)** | ui 05 indicators.ts·localStorage 쿨다운 삭제 | api 먼저 |
 | 지침서 04 단계 A(KIS·업비트 삭제) | ui 05 KIS·업비트 전용 코드 삭제 | 같은 배포 묶음. api의 KIS 삭제는 완료(2026-11-15, 미배포). ui에는 KIS 언급이 41파일 남아 있다(예: `features/account/create-account/steps/AccountInfoStep.tsx:57`, `ConfirmStep.tsx:24`의 `data.broker \|\| 'KIS'`, `entities/meta/__fixtures__/testMeta.ts:10`, `e2e/ledger-budget.spec.ts:12`). 운영 secret에서 뺄 키는 없다(KIS 키는 `.env.example`·compose·deploy에 없음). **ui 제거 완료(b33118f1, 2026-11-15, 미push)** |
-| T9 원칙 문서를 `docs/agents/ui-api-contract.md`로 이동 — **api 완료(2026-11-28). ui 08 태스크 10 요청함.** 컬렉션 반환 가드는 T4 끝으로 미룸 | ui 08 태스크 10(루트 CLAUDE.md가 그 경로를 가리킴) | 문서(배포 제약 없음) |
+| T9 원칙 문서를 `docs/agents/ui-api-contract.md`로 이동 — **api 완료(2026-11-28, `bab931f1c` push). ui 08 태스크 10 완료(2026-11-28, kista-ui `1d7fc271`, 미push).** 컬렉션 반환 가드는 T4 끝으로 미룸 | ui 08 태스크 10(루트 CLAUDE.md가 그 경로를 가리킴) | 문서(배포 제약 없음) |
 
 S7 api 완료분의 ui 후속(2026-11-25, 모두 추가만, 2026-11-28 배포 완료(api `9ffa48504`·ui `bb282a50`, 운영 화면 확인 완료(ui 세션 2026-11-28: T7 fieldErrors·S7 A·B·C 폼·K1 통과, 쓰기는 가드로 차단)) — N19 관찰 뒤 api 먼저 배포, ui는 `gen:types` 재생성부터):
 
