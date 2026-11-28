@@ -136,7 +136,7 @@
 ### 알림·예외 문구 속 `orderId=`, `FinanceAccountService`의 `accountId`는 접두사로 바꾸지 않는다
 이유: 금융 accountId와 trading accountId를 혼동하지 않게 하기 위해서다. 재검토 조건: 없음. (cc6db1e64)
 
-### warn 로그 2곳(`AccountTokenEvictionAdapter`·`MeritzPriceApi`)은 그대로 둔다
+### warn 로그(`AccountTokenEvictionAdapter`)는 그대로 둔다
 이유: 스택이 필요할 가능성이 있어 판정을 보류했다. 재검토 조건: 없음. (cc6db1e64)
 
 ### 토스 `getCommon` 429 재시도는 호출 람다(`retryOnTooManyRequests`) 안에 둔다

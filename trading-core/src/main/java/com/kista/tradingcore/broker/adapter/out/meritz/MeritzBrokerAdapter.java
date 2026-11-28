@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -19,7 +20,7 @@ public class MeritzBrokerAdapter implements BrokerCapabilitiesPort {
 
     private final MeritzTradingApi tradingApi; // 잔고/주문가능/판매가능/체결
     private final MeritzOrderApi orderApi;     // 주문·취소
-    private final MeritzPriceApi priceApi;     // 현재가/전일종가/확정종가
+    private final MeritzPriceApi priceApi;     // 현재가
 
     @Override
     public Broker supports() {
@@ -57,42 +58,7 @@ public class MeritzBrokerAdapter implements BrokerCapabilitiesPort {
     }
 
     @Override
-    public BigDecimal getPrice(StrategyTicker ticker, BrokerAccountRef account) {
-        return priceApi.getPrice(ticker, account);
-    }
-
-    @Override
-    public Map<StrategyTicker, BigDecimal> getPrices(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        return priceApi.getPrices(tickers, account);
-    }
-
-    @Override
-    public PriceSnapshot getPriceSnapshot(StrategyTicker ticker, BrokerAccountRef account) {
-        return priceApi.getPriceSnapshot(ticker, account);
-    }
-
-    @Override
-    public Map<StrategyTicker, PriceSnapshot> getPriceSnapshots(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        return priceApi.getPriceSnapshots(tickers, account);
-    }
-
-    @Override
-    public BigDecimal getPrevClose(StrategyTicker ticker, BrokerAccountRef account) {
-        return priceApi.getPrevClose(ticker, account);
-    }
-
-    @Override
-    public Map<StrategyTicker, BigDecimal> getPrevCloses(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        return priceApi.getPrevCloses(tickers, account);
-    }
-
-    @Override
-    public BigDecimal getClosingPrice(StrategyTicker ticker, LocalDate tradeDate, BrokerAccountRef account) {
-        return priceApi.getClosingPrice(ticker, tradeDate, account);
-    }
-
-    @Override
-    public Map<StrategyTicker, BigDecimal> getClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
-        return priceApi.getClosingPrices(tickers, tradeDate, account);
+    public Map<StrategyTicker, BigDecimal> currentPrices(BrokerAccountRef account, Collection<StrategyTicker> tickers) {
+        return priceApi.getPrices(List.copyOf(tickers), account);
     }
 }

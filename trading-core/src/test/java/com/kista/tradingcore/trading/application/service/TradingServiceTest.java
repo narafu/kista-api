@@ -163,7 +163,7 @@ class TradingServiceTest {
             currents.put(t, snap.current());
             prevCloses.put(t, snap.prevClose());
         });
-        lenient().when(tossPricePort.getPrices(anyList(), eq(ref))).thenReturn(currents);
+        lenient().when(tossPricePort.currentPrices(eq(ref), anyCollection())).thenReturn(currents);
         lenient().when(marketData.closesBefore(anyCollection(), any(LocalDate.class))).thenReturn(prevCloses);
     }
 
@@ -192,7 +192,6 @@ class TradingServiceTest {
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(tossPricePort, marketData, marketCalendarPort,
                 new TradingParallelRunner(0), eventPublisher, privacyTradePort);
         // 계좌 현재가는 default 구현(getPrices 위임)을 그대로 타게 해 기존 getPrices 스텁을 재사용한다
-        lenient().when(tossPricePort.currentPrices(any(), any())).thenCallRealMethod();
         // KST 거래일 → 미국 세션일(전날) — 공용 시세 날짜 인자
         lenient().when(marketCalendarPort.usSessionDateOf(any())).thenAnswer(inv -> inv.<LocalDate>getArgument(0).minusDays(1));
         StrategyLedgerBudget ledgerBudget = new StrategyLedgerBudget(cycleHistoryPort, orderPort, mock(TradingBatchRunPort.class), cycleStrategies);
@@ -270,7 +269,7 @@ class TradingServiceTest {
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_NORMAL_BUY");
 
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(startPrice, new BigDecimal("19.00"))));
-        lenient().when(tossPricePort.getPrices(anyList(), eq(ACCOUNT_REF)))
+        lenient().when(tossPricePort.currentPrices(eq(ACCOUNT_REF), anyCollection()))
                 .thenReturn(Map.of(StrategyTicker.SOXL, startPrice));
         lenient().when(marketData.confirmedBars(anyCollection(), any(LocalDate.class)))
                 .thenReturn(bars(Map.of(StrategyTicker.SOXL, PRICE)));
@@ -310,7 +309,7 @@ class TradingServiceTest {
 
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(startPrice, prevClose))); // 시작가+전일종가
         // 접수 직전 재조회 — 시작가와 동일값으로 스텁해 기존 캡 판단 결과를 그대로 유지
-        when(tossPricePort.getPrices(anyList(), eq(ACCOUNT_REF)))
+        when(tossPricePort.currentPrices(eq(ACCOUNT_REF), anyCollection()))
                 .thenReturn(Map.of(StrategyTicker.SOXL, startPrice));
         when(marketData.confirmedBars(anyCollection(), any(LocalDate.class)))
                 .thenReturn(bars(Map.of(StrategyTicker.SOXL, PRICE))); // 종가
@@ -337,10 +336,8 @@ class TradingServiceTest {
         assertThat(savedInLock).isTrue();
         verify(marketCalendarPort).isMarketOpen(any());
         verify(cycleHistoryPort).findLatestOneByStrategyId(STRATEGY.id());
-        verify(tossPricePort, never()).getPrevCloses(any(), any()); // 전일종가는 공용 시세만
-        verify(tossPricePort, never()).getPrice(any(), any());         // 단건 fallback 없음
         verify(marketData).closesBefore(anyCollection(), any(LocalDate.class)); // 전일종가(Phase A) 1회
-        verify(tossPricePort, times(2)).getPrices(anyList(), eq(ACCOUNT_REF)); // 시작가(Phase A) + 접수 직전 재조회(Placement) 각 1회
+        verify(tossPricePort, times(2)).currentPrices(eq(ACCOUNT_REF), anyCollection()); // 시작가(Phase A) + 접수 직전 재조회(Placement) 각 1회
         verify(marketData).confirmedBars(anyCollection(), any(LocalDate.class));         // 종가(PostClose) 1회
         verify(orderPort).saveAll(anyList());
         verify(orderPort, atLeastOnce()).findPlannedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any());
@@ -392,8 +389,7 @@ class TradingServiceTest {
 
         verify(marketCalendarPort).isMarketOpen(any());
         verify(eventPublisher).publishEvent(new MarketClosedEvent());
-        verify(tossPricePort, never()).getPrices(anyList(), any()); // 휴장 시 Toss 가격 조회 생략
-        verify(tossPricePort, never()).getPrice(any(), any());
+        verify(tossPricePort, never()).currentPrices(any(), any()); // 휴장 시 Toss 가격 조회 생략
         verify(cycleHistoryPort, never()).findLatestOneByStrategyId(any());
         verify(orderPort, never()).saveAll(any());
         verify(eventPublisher, never()).publishEvent(any(TradingReportReadyEvent.class));
@@ -709,7 +705,7 @@ class TradingServiceTest {
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.TQQQ, new PriceSnapshot(new BigDecimal("100.00"), new BigDecimal("95.00"))));
         // 개장 대기 이후 재조회한 최신가=80.00 → cap=84.00으로 좁아짐 (Task 3 reloadPlacementPrices와 동일 메커니즘)
         // 첫 호출은 배치 시작 스냅샷(100.00), 두 번째가 접수 직전 재조회(80.00)
-        when(tossPricePort.getPrices(anyList(), eq(ACCOUNT_REF)))
+        when(tossPricePort.currentPrices(eq(ACCOUNT_REF), anyCollection()))
                 .thenReturn(Map.of(StrategyTicker.TQQQ, new BigDecimal("100.00")))
                 .thenReturn(Map.of(StrategyTicker.TQQQ, new BigDecimal("80.00")));
         when(cycleHistoryPort.findLatestOneByStrategyId(vr.id())).thenReturn(Optional.of(vrHistory));
@@ -811,7 +807,7 @@ class TradingServiceTest {
     private void stubOpenBatchBasics(BrokerAccountRef ref) {
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         stubStartSnapshots(ref, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        lenient().when(tossPricePort.getPrices(anyList(), eq(ref))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
+        lenient().when(tossPricePort.currentPrices(eq(ref), anyCollection())).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(brokerOrderPort.place(any(), eq(ref))).thenReturn(brokerResult("ORD-DCA"));
     }
 
@@ -1540,7 +1536,7 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_fetchesPricesThreeTimes_startPlacementAndClose_notPerCycle() throws InterruptedException {
-        // 두 전략이 같은 ticker → getPriceSnapshots() 1회(시작가), getPrices() 1회(접수 직전 재조회), getClosingPrices() 1회(종가), 단건 fallback 없음
+        // 두 전략이 같은 ticker → currentPrices() 2회(시작가, 접수 직전 재조회), 확정 일봉 confirmedBars() 1회(종가)
         Strategy strategy2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(),
                 StrategyType.INFINITE, StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
@@ -1550,7 +1546,7 @@ class TradingServiceTest {
         Order existingSecond = placedOrder(ACCOUNT, cycle2);
 
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        when(tossPricePort.getPrices(anyList(), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
+        when(tossPricePort.currentPrices(eq(ACCOUNT_REF), anyCollection())).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(marketData.confirmedBars(anyCollection(), any(LocalDate.class))).thenReturn(bars(Map.of(StrategyTicker.SOXL, PRICE)));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
@@ -1568,10 +1564,8 @@ class TradingServiceTest {
         ), PAST_DST);
 
         verify(marketData).closesBefore(anyCollection(), any(LocalDate.class)); // 전일종가(Phase A) 1회
-        verify(tossPricePort, times(2)).getPrices(anyList(), eq(ACCOUNT_REF)); // 시작가(Phase A) + 접수 직전 재조회(Placement) 각 1회 — ticker당 1회, 사이클별 아님
+        verify(tossPricePort, times(2)).currentPrices(eq(ACCOUNT_REF), anyCollection()); // 시작가(Phase A) + 접수 직전 재조회(Placement) 각 1회 — ticker당 1회, 사이클별 아님
         verify(marketData).confirmedBars(anyCollection(), any(LocalDate.class));         // 종가(PostClose) 1회
-        verify(tossPricePort, never()).getPrice(any(), any());
-        verify(tossPricePort, never()).getPriceSnapshot(any(), any());
     }
 
     @Test
@@ -1595,7 +1589,7 @@ class TradingServiceTest {
 
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(startPrice, prevClose)));
         // 첫 호출은 배치 시작 스냅샷(startPrice), 두 번째가 접수 직전 재조회(placementPrice)
-        when(tossPricePort.getPrices(anyList(), eq(ACCOUNT_REF)))
+        when(tossPricePort.currentPrices(eq(ACCOUNT_REF), anyCollection()))
                 .thenReturn(Map.of(StrategyTicker.SOXL, startPrice))
                 .thenReturn(Map.of(StrategyTicker.SOXL, placementPrice));
         when(marketData.confirmedBars(anyCollection(), any(LocalDate.class)))
@@ -1614,7 +1608,7 @@ class TradingServiceTest {
         service.executeBatch(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
 
         // 시작 스냅샷 1회 + ticker당 접수 직전 재조회 1회
-        verify(tossPricePort, times(2)).getPrices(anyList(), eq(ACCOUNT_REF));
+        verify(tossPricePort, times(2)).currentPrices(eq(ACCOUNT_REF), anyCollection());
         // cap 보정이 시작가(50.00×1.05=52.50)가 아닌 재조회된 현재가(10.00×1.05=10.50) 기준으로 수행됨
         verify(infiniteStrategy).buildCappedBuyOrders(any(), any(), anyList(), eq(new BigDecimal("10.50")));
     }
@@ -1677,14 +1671,13 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_getPricesFails_cycleFailsAndNotifiesAdmin() throws InterruptedException {
-        when(tossPricePort.getPrices(anyList(), eq(ACCOUNT_REF))).thenThrow(new RuntimeException("API 오류"));
+        when(tossPricePort.currentPrices(eq(ACCOUNT_REF), anyCollection())).thenThrow(new RuntimeException("API 오류"));
         // 계좌 현재가 실패 → 대체 없이 snapshot 제외 → price=null + prevClosePrice=null → holdings=0 → IllegalStateException
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(FRESH_HISTORY));
 
         service.executeBatch(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
 
-        verify(tossPricePort, never()).getPrice(any(), any()); // 단건 fallback 없음
         verify(marketData, never()).latestPrices(any()); // 다른 출처로 대체하지 않는다
         // 시세 조회 실패 알림 1건 + 사이클 실패 알림 1건
         verify(eventPublisher, times(2)).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee

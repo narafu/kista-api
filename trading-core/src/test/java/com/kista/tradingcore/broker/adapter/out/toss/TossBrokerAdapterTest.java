@@ -4,15 +4,12 @@ import com.kista.tradingcore.broker.application.port.output.BrokerAdapterPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.application.port.output.BrokerStatisticsPort;
-import com.kista.tradingcore.broker.application.port.output.CandlePort;
 import com.kista.tradingcore.broker.application.port.output.ExchangeRatePort;
 import com.kista.tradingcore.broker.application.port.output.ExecutionPort;
 import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.broker.application.port.output.PortfolioPort;
 import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
-import com.kista.tradingcore.broker.domain.model.BrokerCandle;
 import com.kista.tradingcore.broker.domain.model.ExchangeRateQuote;
-import com.kista.tradingcore.broker.domain.model.toss.TossCandle;
 import com.kista.tradingcore.broker.domain.model.toss.TossExchangeRate;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.StrategyTicker;
@@ -31,7 +28,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,11 +47,8 @@ class TossBrokerAdapterTest {
     @Mock
     private TossPriceApi tossPriceApi;
 
-    @Mock
-    private TossCandleApi tossCandleApi;
-
     private TossBrokerAdapter adapter() {
-        return new TossBrokerAdapter(tossHoldingsApi, tossOrderApi, tossPriceApi, tossCandleApi);
+        return new TossBrokerAdapter(tossHoldingsApi, tossOrderApi, tossPriceApi);
     }
 
     @Test
@@ -93,12 +86,9 @@ class TossBrokerAdapterTest {
     }
 
     @Test
-    @DisplayName("Toss 전용 2개 Capability Port를 모두 구현한다")
+    @DisplayName("Toss 전용 Capability Port(환율)를 구현한다")
     void implementsAllTossOnlyCapabilityPorts() {
-        TossBrokerAdapter adapter = adapter();
-
-        assertThat(adapter).isInstanceOf(CandlePort.class);
-        assertThat(adapter).isInstanceOf(ExchangeRatePort.class);
+        assertThat(adapter()).isInstanceOf(ExchangeRatePort.class);
     }
 
     @Test
@@ -110,15 +100,8 @@ class TossBrokerAdapterTest {
     @Test
     @DisplayName("Toss 응답 타입을 벤더 중립 타입으로 변환해 노출한다")
     void statisticsPortConvertsTossTypesToNeutralTypes() {
-        LocalDate day = LocalDate.of(2026, 1, 2);
-        when(tossCandleApi.getCandles("SOXL", "1D", day, day)).thenReturn(List.of(
-                new TossCandle(day, BigDecimal.ONE, BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.TWO, 7L)));
         when(tossHoldingsApi.getExchangeRate()).thenReturn(new TossExchangeRate(new BigDecimal("1380.5"), new BigDecimal("1375")));
 
-        TossBrokerAdapter adapter = adapter();
-
-        assertThat(adapter.getCandles("SOXL", "1D", day, day))
-                .containsExactly(new BrokerCandle(day, BigDecimal.ONE, BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.TWO, 7L));
-        assertThat(adapter.getExchangeRate()).isEqualTo(new ExchangeRateQuote(new BigDecimal("1380.5"), new BigDecimal("1375")));
+        assertThat(adapter().getExchangeRate()).isEqualTo(new ExchangeRateQuote(new BigDecimal("1380.5"), new BigDecimal("1375")));
     }
 }

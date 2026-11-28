@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -32,10 +33,10 @@ class MeritzBrokerAdapterTest {
         BrokerAccountRef account = mock(BrokerAccountRef.class);
         OrderInstruction order = mock(OrderInstruction.class);
         CancelInstruction cancel = mock(CancelInstruction.class);
-        when(priceApi.getPrice(StrategyTicker.SOXL, account)).thenReturn(BigDecimal.TEN);
+        when(priceApi.getPrices(List.of(StrategyTicker.SOXL), account)).thenReturn(Map.of(StrategyTicker.SOXL, BigDecimal.TEN));
 
         assertThat(adapter.supports()).isEqualTo(Broker.MERITZ);
-        assertThat(adapter.getPrice(StrategyTicker.SOXL, account)).isEqualByComparingTo("10");
+        assertThat(adapter.currentPrices(account, List.of(StrategyTicker.SOXL)).get(StrategyTicker.SOXL)).isEqualByComparingTo("10");
         adapter.place(order, account);
         adapter.cancel(cancel, account);
         verify(orderApi).place(order, account);

@@ -4,7 +4,6 @@ import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.adapter.out.internal.CallIntervalGate;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
-import com.kista.tradingcore.broker.domain.model.PriceSnapshot;
 import com.kista.tradingcore.broker.domain.model.meritz.MeritzApiException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,7 +17,6 @@ import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,47 +57,13 @@ class MeritzPriceApiTest {
                 .andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON).body(body));
     }
 
-    private void expectCandles(String body) {
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE + "/market/v1/overseas/candles/days")))
-                .andExpect(queryParam("mrkt_div_code", "OV"))
-                .andExpect(queryParam("mrkt_cls_code", "AX"))
-                .andExpect(queryParam("iscd", "SOXL"))
-                .andExpect(queryParam("dely_rltm_cls_code", "0"))
-                .andExpect(queryParam("mod_stpr_cls_code", "1"))
-                .andExpect(queryParam("from", "20261022"))
-                .andExpect(queryParam("to", "20261022"))
-                .andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON).body(body));
-    }
-
     @Test
-    void price_reads_prpr_and_prev_close() {
+    void price_reads_prpr() {
         expectPrice(PRICE);
 
-        PriceSnapshot s = api.getPriceSnapshot(StrategyTicker.SOXL, ACCOUNT);
+        BigDecimal price = api.getPrice(StrategyTicker.SOXL, ACCOUNT);
 
-        assertThat(s.current()).isEqualByComparingTo("82.1100");
-        assertThat(s.prevClose()).isEqualByComparingTo("103.2400");
-        server.verify();
-    }
-
-    @Test
-    void closing_price_uses_us_session_bar() {
-        expectCandles("{\"rsp_cd\":\"0000\",\"data\":[{\"date\":\"20261022\",\"prpr\":\"82.11\"}]}");
-
-        BigDecimal close = api.getClosingPrice(StrategyTicker.SOXL, LocalDate.of(2026, 10, 23), ACCOUNT);
-
-        assertThat(close).isEqualByComparingTo("82.11");
-        server.verify();
-    }
-
-    @Test
-    void closing_price_falls_back_to_live_when_bar_date_mismatch() {
-        expectCandles("{\"rsp_cd\":\"0000\",\"data\":[{\"date\":\"20261021\",\"prpr\":\"103.24\"}]}");
-        expectPrice(PRICE);
-
-        BigDecimal close = api.getClosingPrice(StrategyTicker.SOXL, LocalDate.of(2026, 10, 23), ACCOUNT);
-
-        assertThat(close).isEqualByComparingTo("82.1100");
+        assertThat(price).isEqualByComparingTo("82.1100");
         server.verify();
     }
 

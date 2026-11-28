@@ -12,15 +12,15 @@ Spring Modulith 모듈(CLOSED) — Meritz/Toss/Mock 증권사 연동. "domain"·
 ### BrokerRouter
 - 공통 6개 Port(Portfolio/Margin/SellableQuantity/BrokerOrderCorrection/Execution/BrokerPrice)를 `account.broker()`로 위임한다. `BrokerCapabilitiesPort`/`BrokerAdapterPort`는 구현하지 않는다(구현하면 자기 자신이 `List<BrokerCapabilitiesPort>`에 수집된다).
 - 소비처는 Port 인터페이스를 그대로 주입한다 — `@Primary`가 Router를 고른다. 신규 브로커는 `BrokerCapabilitiesPort` 구현체 1개만 추가하면 되고 Router·switch는 고치지 않는다. 미등록 브로커는 400.
-- 주문 경로의 현재가는 `BrokerPricePort.currentPrices(account, tickers)` 하나다. `BrokerRouter`가 관리자 시세를 거치지 않고 그 계좌 증권사로 보낸다(Mock 계좌만 공용 시세 `latestPrices` — Mock은 증권사가 없다. Toss는 계좌 토큰 `/api/v1/prices`, `vendors/toss.md`). 옛 `getPrice(s)`·`getPrevClose(s)`·`getClosingPrice(s)`와 `AdminMarketPricePort`(`TossAdminPriceSource`) 우선 체인은 T3로 운영 소비처가 모두 `MarketDataClient`·`currentPrices`로 옮겨져 쓰이지 않으며, 토스 관리자 키를 폐기하는 T5에서 삭제한다. `BrokerCredentialException`은 항상 전파한다.
+- 주문 경로의 현재가는 `BrokerPricePort.currentPrices(account, tickers)` 하나다. `BrokerRouter`가 그 계좌 증권사로만 보낸다(Mock 계좌만 공용 시세 `latestPrices` — Mock은 증권사가 없다. Toss는 계좌 토큰 `/api/v1/prices`, `vendors/toss.md`). 토스 관리자 키는 환율에만 쓴다(T4 Frankfurter 전환 뒤 T5b에서 제거). `BrokerCredentialException`은 항상 전파한다.
 - 공용 시세 `MarketDataClient`(`adapter/out/marketdata`, 타입 단위 NamedInterface `marketdata`, 인터페이스 없음, 공급자 Alpaca): `latestPrices`(iex·지연 통합 중 더 늦은 체결)·`latestCloses`/`requireLatestClose`(전일 종가)·`confirmedBars`/`requireConfirmedClose`(확정 일봉)·`closesBefore`·`dailyCandles`(`DailyCandleQuery`, 조정 RAW·SPLIT·ALL). 날짜 인자는 미국 세션일(KST 거래일 변환은 호출부의 `MarketCalendarPort.usSessionDateOf`). `closesBefore`는 뉴욕 16:16 전에는 그 뉴욕 당일 봉을 고르지 않고(미정산 봉 제외) 결과를 정산 시각까지만 캐시한다. 전송 오류는 `MarketDataApiException`(`BrokerApiException` 하위, 라벨 "시세")이라 503 `BROKER_UNAVAILABLE`로 나간다. 소비처: 전일 종가·확정 종가·등록·미리보기·롤오버·DCA 지표(`adjustment=all`)·차트(RAW, 개수 1~600)·백테스트(SPLIT)·통계 `GET /prices`·원장 합산. 예외: 리버스모드 별지점은 일봉 종가를 쓴다(실패 시 원장 행 평균, `trading-formulas.md` 1-7).
-- 통계 capability(Candle/ExchangeRate)는 `BrokerStatisticsPort`로 묶여 Toss만 구현한다. 미지원 증권사는 `BrokerStatisticsPorts.find`가 빈 Optional을 주고 400 사유는 소비자가 정한다.
+- 통계 capability는 `BrokerStatisticsPort`(`ExchangeRatePort`뿐)이며 Toss만 구현한다. 미지원 증권사는 `BrokerStatisticsPorts.find`가 빈 Optional을 주고 400 사유는 소비자가 정한다.
 
 ### 어댑터 메모
 - `MockSimulationDataPort`는 데이터를 필요로 하는 broker가 정의하고 가진 trading이 구현하는 포트 역전이다(broker는 trading 타입을 참조할 수 없다).
 - Mock 체결 판정은 trading `FillSimulator`를 재구현한 것이다(broker→trading 참조 불가). 시세는 공용 시세(`MarketDataClient`)와 `usSessionDateOf`를 쓰며, 확정 일봉이 없으면 `getExecutions`가 예외를 던진다(현재가로 대체하지 않는다).
 - 토큰 제거(`AccountTokenEvictionPort`)는 브로커 무관 호출이다. `broker_tokens`(Meritz) DB 삭제는 호출자 트랜잭션에 합류하고 Toss Redis `invalidate`는 afterCommit, 실패는 warn 후 진행한다(구현이 toss 패키지인 이유: `TossTokenStore` package-private).
-- `adapter/out/internal`: 더블체크락(`DbTokenCoordinator`)·전일종가 캐시·확정종가 폴백·`getClosingPrices` 순회는 공용 유틸 없이 각 소비자에 인라인돼 있다. 공용 유틸 추출은 호출부가 2곳 이상일 때만 한다.
-- `adapter/in/web/CandleInternalController`(`/api/internal/broker/candles/latest`, X-Internal-Token): root market이 `CandlePort`/`BrokerCandle`을 참조하지 않도록 `contract.broker.DailyCandleResponse`로 매핑해 노출한다.
+- `adapter/out/internal`: 더블체크락(`DbTokenCoordinator`)은 공용 유틸 없이 각 소비자에 인라인돼 있다. 공용 유틸 추출은 호출부가 2곳 이상일 때만 한다.
+- `adapter/in/web/CandleInternalController`(`/api/internal/broker/candles/latest`, X-Internal-Token): `MarketDataClient` 일봉을 `contract.broker.DailyCandleResponse`로 매핑해 노출한다.
 - DCA 규칙: 일봉 페이징·Toss 캡가/0.01 → `vendors/toss.md`.
 - 브로커별 분기가 필요하면 `account.broker() == Broker.TOSS`처럼 직접 비교한다

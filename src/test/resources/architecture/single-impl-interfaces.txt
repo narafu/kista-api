@@ -42,10 +42,8 @@ com.kista.api.user.application.port.output.UserSettingsPort
 com.kista.api.user.application.port.output.UserSummaryPort
 com.kista.tradingcore.account.application.port.output.AccountPort
 com.kista.tradingcore.broker.application.port.output.AccountTokenEvictionPort
-com.kista.tradingcore.broker.application.port.output.AdminMarketPricePort
 com.kista.tradingcore.broker.application.port.output.BrokerStatisticsPort
 com.kista.tradingcore.broker.application.port.output.BrokerTokenCachePort
-com.kista.tradingcore.broker.application.port.output.CandlePort
 com.kista.tradingcore.broker.application.port.output.ExchangeRatePort
 com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort
 com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarRefreshPort

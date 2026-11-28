@@ -1,47 +1,41 @@
 package com.kista.tradingcore.broker.adapter.out.toss;
 
-import com.kista.shared.support.FixedClockTestConfig;
-import com.kista.tradingcore.broker.domain.model.PriceSnapshot;
+import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.StrategyTicker;
+import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.toss.TossApiException;
-import com.kista.tradingcore.broker.domain.model.toss.TossCandle;
 import org.junit.jupiter.api.BeforeEach;
-import org.springframework.core.ParameterizedTypeReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.ParameterizedTypeReference;
+
 import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("TossPriceApi 단위 테스트")
 class TossPriceApiTest {
 
     @Mock TossHttpClient tossHttpClient;
-    @Mock TossCandleApi tossCandleApi; // TossPriceApi 생성자 주입 의존성 (TossCandlePort 삭제됨)
     TossPriceApi tossPriceApi;
+    BrokerAccountRef account = new BrokerAccountRef(UUID.randomUUID(), "key", "secret", "12345678", null, Broker.TOSS);
 
     @BeforeEach
     void setUp() {
-        tossPriceApi = new TossPriceApi(tossHttpClient, tossCandleApi, FixedClockTestConfig.FIXED);
+        tossPriceApi = new TossPriceApi(tossHttpClient);
     }
 
     // Toss API 응답: TossResult<List<PriceItem>> 래퍼 헬퍼
@@ -50,22 +44,8 @@ class TossPriceApiTest {
     }
 
     @Test
-    @DisplayName("복수 종목 현재가 정상 파싱")
-    void getPrices_multipleSymbols_success() {
-        var item = new TossPriceApi.PriceItem("SOXL", "25.50");
-        when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(wrap(item));
-
-        Map<StrategyTicker, BigDecimal> result = tossPriceApi.getPrices(List.of(StrategyTicker.SOXL));
-
-        assertThat(result).containsEntry(StrategyTicker.SOXL, new BigDecimal("25.50"));
-    }
-
-    @Test
     @DisplayName("계좌 토큰 현재가는 get(계좌)으로 호출하고 getCommon을 쓰지 않으며 누락 종목은 키가 없다")
     void currentPrices_usesAccountTokenAndOmitsMissing() {
-        var account = new com.kista.tradingcore.broker.domain.model.BrokerAccountRef(
-                java.util.UUID.randomUUID(), "key", "secret", "12345678", null, com.kista.shared.kernel.Broker.TOSS);
         when(tossHttpClient.get(eq("/api/v1/prices"), eq(account), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrap(new TossPriceApi.PriceItem("SOXL", "33.14")));
 
@@ -78,286 +58,31 @@ class TossPriceApiTest {
     }
 
     @Test
-    @DisplayName("요청 티커가 응답에 없으면 예외 (미등록 종목만 응답 — 부분 실패)")
-    void getPrices_requestedTickerMissingFromResponse_throws() {
-        var item = new TossPriceApi.PriceItem("AAPL", "180.00");
-        when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(wrap(item));
-
-        assertThatThrownBy(() -> tossPriceApi.getPrices(List.of(StrategyTicker.SOXL)))
-                .isInstanceOf(TossApiException.class);
-    }
-
-    @Test
-    @DisplayName("fetchPricesPartial: 일부 종목 누락이어도 예외 없이 있는 것만 반환")
-    void fetchPricesPartial_missingTicker_returnsPartial() {
-        when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(wrap(new TossPriceApi.PriceItem("SOXL", "25.50")));
-
-        Map<StrategyTicker, BigDecimal> result =
-                tossPriceApi.fetchPricesPartial(List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ));
-
-        assertThat(result).containsOnlyKeys(StrategyTicker.SOXL);
-    }
-
-    @Test
-    @DisplayName("fetchPricesPartial: lastPrice null·비숫자·0 이하인 종목만 건너뛰고 나머지는 반환")
-    void fetchPricesPartial_badLastPrice_skipsOnlyThatTicker() {
-        when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
+    @DisplayName("lastPrice null·비숫자·0 이하인 종목만 건너뛰고 나머지는 반환")
+    void currentPrices_badLastPrice_skipsOnlyThatTicker() {
+        when(tossHttpClient.get(eq("/api/v1/prices"), eq(account), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrap(new TossPriceApi.PriceItem("SOXL", "abc"),
                     new TossPriceApi.PriceItem("TQQQ", "30.10"),
                     new TossPriceApi.PriceItem("UPRO", null),
                     new TossPriceApi.PriceItem("QLD", "0")));
 
-        Map<StrategyTicker, BigDecimal> result = tossPriceApi.fetchPricesPartial(
-                List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ, StrategyTicker.UPRO, StrategyTicker.QLD));
+        Map<StrategyTicker, BigDecimal> result = tossPriceApi.currentPrices(account, List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ));
 
         assertThat(result).containsOnlyKeys(StrategyTicker.TQQQ);
     }
 
     @Test
-    @DisplayName("getPrices: 종목 하나가 파싱 실패면 기존 누락 예외")
-    void getPrices_unparsableLastPrice_throwsMissing() {
-        when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(wrap(new TossPriceApi.PriceItem("SOXL", "abc")));
-
-        assertThatThrownBy(() -> tossPriceApi.getPrices(List.of(StrategyTicker.SOXL)))
-                .isInstanceOf(TossApiException.class)
-                .hasMessageContaining("누락=[SOXL]");
-    }
-
-    @Test
-    @DisplayName("getPrice: 응답에 티커가 없으면 예외 (0 반환 금지)")
-    void getPrice_missingFromResponse_throws() {
-        when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(wrap()); // 빈 목록
-
-        assertThatThrownBy(() -> tossPriceApi.getPrice(StrategyTicker.SOXL))
-                .isInstanceOf(TossApiException.class);
-    }
-
-    @Test
-    @DisplayName("PriceSnapshot: 캔들 조회 실패 시 prevClose가 current로 fallback")
-    void getPriceSnapshot_candleFails_prevCloseFallsBackToCurrent() {
-        var item = new TossPriceApi.PriceItem("SOXL", "25.50");
-        when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(wrap(item));
-        when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.empty());
-
-        PriceSnapshot snapshot = tossPriceApi.getPriceSnapshot(StrategyTicker.SOXL);
-
-        assertThat(snapshot.current()).isEqualByComparingTo("25.50");
-        assertThat(snapshot.prevClose()).isEqualByComparingTo(snapshot.current());
-    }
-
-    @Test
-    @DisplayName("같은 종목·같은 날짜 재조회 시 캔들 API 1회만 호출 (캐시 히트)")
-    void getPriceSnapshot_sameSymbolSameDay_callsCandleApiOnce() {
-        var item = new TossPriceApi.PriceItem("SOXL", "25.50");
-        when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
-                .thenReturn(wrap(item));
-        TossCandle candle = new TossCandle(LocalDate.now(FixedClockTestConfig.FIXED).minusDays(1), new BigDecimal("23.00"),
-                new BigDecimal("23.50"), new BigDecimal("22.50"), new BigDecimal("23.20"), 900L);
-        when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.of(candle));
-
-        tossPriceApi.getPriceSnapshot(StrategyTicker.SOXL);
-        tossPriceApi.getPriceSnapshot(StrategyTicker.SOXL);
-
-        verify(tossCandleApi, times(1)).getCandleBefore(eq("SOXL"), eq("1d"), any());
-    }
-
-    @Test
-    @DisplayName("확정 종가 캔들이 있으면 그대로 prevClose로 사용")
-    void fetchPrevCloseUncached_returnsCandleClose() {
-        TossCandle candle = new TossCandle(LocalDate.of(2026, 7, 13), new BigDecimal("90.00"),
-                new BigDecimal("91.00"), new BigDecimal("88.50"), new BigDecimal("89.20"), 1200L);
-        when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.of(candle));
-
-        Optional<BigDecimal> result = tossPriceApi.fetchPrevCloseUncached("SOXL", Instant.now(FixedClockTestConfig.FIXED));
-
-        assertThat(result).isPresent();
-        assertThat(result.get()).isEqualByComparingTo("89.20");
-    }
-
-    @Test
-    @DisplayName("getClosingPrice: KST 거래일 D의 확정 종가 = US 세션 D-1 봉의 종가 (라이브 현재가 아님)")
-    void getClosingPrice_returnsUsSessionCloseForKstTradeDate() {
-        // 운영 사례: KST 거래일 09-04 롤오버가 US 09-03 세션(=72.03)이 아닌 라이브 폴백값(71.96)을 썼음
-        LocalDate kstTradeDate = LocalDate.of(2026, 9, 4);
-        LocalDate usSessionDate = LocalDate.of(2026, 9, 3);
-        TossCandle candle = new TossCandle(usSessionDate, new BigDecimal("71.50"),
-                new BigDecimal("72.40"), new BigDecimal("71.10"), new BigDecimal("72.03"), 5000L);
-        when(tossCandleApi.getCandles(eq("TQQQ"), eq("1d"), eq(usSessionDate), eq(usSessionDate)))
-                .thenReturn(List.of(candle));
-
-        BigDecimal result = tossPriceApi.getClosingPrice(StrategyTicker.TQQQ, kstTradeDate);
-
-        assertThat(result).isEqualByComparingTo("72.03");
-        verify(tossCandleApi, never()).getCandles(eq("TQQQ"), eq("1d"), eq(kstTradeDate), eq(kstTradeDate));
-    }
-
-    @Test
-    @DisplayName("fetchConfirmedCandle: KST 거래일 D → US 세션 D-1 봉의 OHLC를 반환")
-    void fetchConfirmedCandle_returnsOhlcOfUsSession() {
-        LocalDate usSessionDate = LocalDate.of(2026, 9, 3);
-        TossCandle candle = new TossCandle(usSessionDate, new BigDecimal("71.50"),
-                new BigDecimal("72.40"), new BigDecimal("71.10"), new BigDecimal("72.03"), 5000L);
-        when(tossCandleApi.getCandles(eq("TQQQ"), eq("1d"), eq(usSessionDate), eq(usSessionDate)))
-                .thenReturn(List.of(candle));
-
-        var result = tossPriceApi.fetchConfirmedCandle(StrategyTicker.TQQQ, LocalDate.of(2026, 9, 4));
-
-        assertThat(result).isPresent();
-        assertThat(result.get().open()).isEqualByComparingTo("71.50");
-        assertThat(result.get().high()).isEqualByComparingTo("72.40");
-        assertThat(result.get().low()).isEqualByComparingTo("71.10");
-        assertThat(result.get().close()).isEqualByComparingTo("72.03");
-    }
-
-    @Test
-    @DisplayName("getClosingPrice: US 세션 봉이 없으면 현재가로 폴백")
-    void getClosingPrice_noCandleForUsSession_fallsBackToLivePrice() {
-        LocalDate kstTradeDate = LocalDate.of(2026, 8, 24); // US 세션 08-23은 토요일 — 봉 없음
-        LocalDate usSessionDate = LocalDate.of(2026, 8, 23);
-        when(tossCandleApi.getCandles(eq("TQQQ"), eq("1d"), eq(usSessionDate), eq(usSessionDate)))
-                .thenReturn(List.of());
-        var item = new TossPriceApi.PriceItem("TQQQ", "69.09");
-        when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
-                .thenReturn(wrap(item));
-
-        BigDecimal result = tossPriceApi.getClosingPrice(StrategyTicker.TQQQ, kstTradeDate);
-
-        assertThat(result).isEqualByComparingTo("69.09");
-    }
-
-    @Test
-    @DisplayName("캔들이 없으면 empty 반환 (호출부에서 current로 fallback)")
-    void fetchPrevCloseUncached_noCandle_returnsEmpty() {
-        when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.empty());
-
-        Optional<BigDecimal> result = tossPriceApi.fetchPrevCloseUncached("SOXL", Instant.now(FixedClockTestConfig.FIXED));
-
-        assertThat(result).isEmpty();
-    }
-
-    @Test
     @DisplayName("null 응답 시 예외 (전체 실패)")
-    void getPrices_nullResponse_throws() {
-        when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(null);
+    void currentPrices_nullResponse_throws() {
+        when(tossHttpClient.get(any(), any(), any(), any(ParameterizedTypeReference.class))).thenReturn(null);
 
-        assertThatThrownBy(() -> tossPriceApi.getPrices(List.of(StrategyTicker.SOXL)))
+        assertThatThrownBy(() -> tossPriceApi.currentPrices(account, List.of(StrategyTicker.SOXL)))
                 .isInstanceOf(TossApiException.class);
-    }
-
-    @Test
-    @DisplayName("복수 스냅샷: 캔들 조회 실패한 종목은 prevClose가 current로 fallback")
-    void getPriceSnapshots_candleFails_prevCloseFallsBackToCurrent() {
-        when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(wrap(
-                new TossPriceApi.PriceItem("SOXL", "25.50"),
-                new TossPriceApi.PriceItem("TQQQ", "50.00")
-            ));
-        when(tossCandleApi.getCandleBefore(any(), eq("1d"), any())).thenReturn(Optional.empty());
-
-        Map<StrategyTicker, PriceSnapshot> snapshots = tossPriceApi.getPriceSnapshots(List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ));
-
-        assertThat(snapshots).hasSize(2);
-        snapshots.forEach((ticker, snap) ->
-            assertThat(snap.prevClose()).isEqualByComparingTo(snap.current()));
     }
 
     @Test
     @DisplayName("빈 tickers 목록 요청 시 HTTP 미호출 후 빈 Map 반환")
-    void getPrices_emptyTickers_returnsEmptyMapWithoutHttpCall() {
-        Map<StrategyTicker, BigDecimal> result = tossPriceApi.getPrices(List.of());
-
-        assertThat(result).isEmpty();
-    }
-
-    @Test
-    @DisplayName("getPrevCloses: 캔들 API만 호출, 현재가 API(/api/v1/prices)는 호출하지 않음")
-    void getPrevCloses_callsOnlyCandleApi_notCurrentPriceApi() {
-        TossCandle candle = new TossCandle(LocalDate.of(2026, 7, 13), new BigDecimal("90.00"),
-                new BigDecimal("91.00"), new BigDecimal("88.50"), new BigDecimal("89.20"), 1200L);
-        when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.of(candle));
-
-        Map<StrategyTicker, BigDecimal> result = tossPriceApi.getPrevCloses(List.of(StrategyTicker.SOXL));
-
-        assertThat(result).containsEntry(StrategyTicker.SOXL, new BigDecimal("89.20"));
-        verify(tossHttpClient, never())
-                .getCommon(any(), any(), any(ParameterizedTypeReference.class));
-    }
-
-    @Test
-    @DisplayName("getPrevCloses: 캔들 조회 실패 종목만 현재가 API로 fallback")
-    void getPrevCloses_fallsBackToCurrentPriceOnlyForFailedCandle() {
-        when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.empty());
-        var item = new TossPriceApi.PriceItem("SOXL", "25.50");
-        when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
-                .thenReturn(wrap(item));
-
-        Map<StrategyTicker, BigDecimal> result = tossPriceApi.getPrevCloses(List.of(StrategyTicker.SOXL));
-
-        assertThat(result).containsEntry(StrategyTicker.SOXL, new BigDecimal("25.50"));
-        verify(tossHttpClient, times(1)).getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class));
-    }
-
-    @Test
-    @DisplayName("getPrevClose: 캔들 조회도, 현재가 fallback도 모두 실패하면 예외 (0 반환 금지)")
-    void getPrevClose_candleAndPriceFallbackBothFail_throws() {
-        when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.empty());
-        when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
-                .thenReturn(wrap()); // 빈 목록 — 현재가 fallback도 SOXL 못 찾음
-
-        assertThatThrownBy(() -> tossPriceApi.getPrevClose(StrategyTicker.SOXL))
-                .isInstanceOf(TossApiException.class);
-    }
-
-    // resolveMarketSessionAt: 시각 주입 시드 — DstInfo와 동일 KST/DST 시각표 검증
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-
-    @Test
-    @DisplayName("resolveMarketSessionAt: DST 기간 정규장 진행 중(당일 개장)")
-    void resolveMarketSessionAt_dst_regularSessionActive_sameDayOpen() {
-        ZonedDateTime nowKst = ZonedDateTime.of(LocalDate.of(2026, 7, 15), LocalTime.of(23, 0), KST); // 수요일, DST
-
-        TossPriceApi.MarketSessionInfo session = TossPriceApi.resolveMarketSessionAt(nowKst);
-
-        assertThat(session.regularSessionActive()).isTrue();
-        assertThat(session.lastSessionOpenInstant())
-                .isEqualTo(ZonedDateTime.of(LocalDate.of(2026, 7, 15), LocalTime.of(22, 30), KST).toInstant());
-    }
-
-    @Test
-    @DisplayName("resolveMarketSessionAt: 자정 이후~개장 전 구간은 전날 저녁 개장을 가리킴 (날짜 롤백)")
-    void resolveMarketSessionAt_dst_beforeMarketOpen_rollsBackToPreviousDayOpen() {
-        ZonedDateTime nowKst = ZonedDateTime.of(LocalDate.of(2026, 7, 15), LocalTime.of(1, 0), KST); // 수요일 새벽, DST
-
-        TossPriceApi.MarketSessionInfo session = TossPriceApi.resolveMarketSessionAt(nowKst);
-
-        assertThat(session.regularSessionActive()).isTrue();
-        assertThat(session.lastSessionOpenInstant())
-                .isEqualTo(ZonedDateTime.of(LocalDate.of(2026, 7, 14), LocalTime.of(22, 30), KST).toInstant());
-    }
-
-    @Test
-    @DisplayName("resolveMarketSessionAt: 주말은 시각과 무관하게 BLOCKED")
-    void resolveMarketSessionAt_weekend_blocked() {
-        ZonedDateTime nowKst = ZonedDateTime.of(LocalDate.of(2026, 7, 18), LocalTime.of(23, 0), KST); // 토요일
-
-        TossPriceApi.MarketSessionInfo session = TossPriceApi.resolveMarketSessionAt(nowKst);
-
-        assertThat(session.regularSessionActive()).isFalse();
-    }
-
-    @Test
-    @DisplayName("resolveMarketSessionAt: 비-DST 기간 [장마감, 프리마켓시작) 구간은 BLOCKED")
-    void resolveMarketSessionAt_nonDst_afterCloseBeforePremarket_blocked() {
-        ZonedDateTime nowKst = ZonedDateTime.of(LocalDate.of(2026, 1, 14), LocalTime.of(10, 0), KST); // 수요일, 비-DST
-
-        TossPriceApi.MarketSessionInfo session = TossPriceApi.resolveMarketSessionAt(nowKst);
-
-        assertThat(session.regularSessionActive()).isFalse();
+    void currentPrices_emptyTickers_returnsEmptyMapWithoutHttpCall() {
+        assertThat(tossPriceApi.currentPrices(account, List.of())).isEmpty();
     }
 }

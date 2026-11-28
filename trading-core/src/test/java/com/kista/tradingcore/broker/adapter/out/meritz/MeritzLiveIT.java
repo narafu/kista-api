@@ -23,11 +23,11 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -75,12 +75,8 @@ class MeritzLiveIT {
         authApi.verifyCredentials(appKey, secret);
         authApi.verifyAccount(appKey, secret, null);
 
-        BigDecimal price = adapter.getPrice(TICKER, account);
-        BigDecimal prevClose = adapter.getPrevClose(TICKER, account);
-        BigDecimal closing = adapter.getClosingPrice(TICKER, previousWeekday(), account);
+        BigDecimal price = price(TICKER);
         assertThat(price).isPositive();
-        assertThat(prevClose).isPositive();
-        assertThat(closing).isPositive();
 
         var sellable = adapter.getSellableQuantity(TICKER, account);
         var buyable = adapter.getUsdBuyableAmount(account);
@@ -92,8 +88,13 @@ class MeritzLiveIT {
         assertThat(present).isNotNull();
         assertThat(executions).isNotEmpty(); // 실계좌에 체결 이력이 있다 — 비면 조회 결함
 
-        System.out.printf("[MeritzLive] price=%s prevClose=%s closing=%s sellable=%d buyable=%s executions30d=%d%n",
-                price, prevClose, closing, sellable.quantity(), buyable, executions.size());
+        System.out.printf("[MeritzLive] price=%s sellable=%d buyable=%s executions30d=%d%n",
+                price, sellable.quantity(), buyable, executions.size());
+    }
+
+    // 계좌 증권사 현재가 단건 조회
+    private BigDecimal price(StrategyTicker ticker) {
+        return adapter.currentPrices(account, List.of(ticker)).get(ticker);
     }
 
     @Test
@@ -111,7 +112,7 @@ class MeritzLiveIT {
     void sell_unheld_ticker_reports_rejection_code() {
         assumeTrue("1".equals(System.getenv("MERITZ_LIVE_REJECT")));
         StrategyTicker unheld = StrategyTicker.QLD;
-        BigDecimal farPrice = adapter.getPrice(unheld, account).multiply(new BigDecimal("2")).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal farPrice = price(unheld).multiply(new BigDecimal("2")).setScale(2, RoundingMode.HALF_UP);
         expectRejection(new OrderInstruction(unheld, OrderDirection.SELL, OrderType.LIMIT, 1, farPrice), "미보유 매도");
     }
 
@@ -120,7 +121,7 @@ class MeritzLiveIT {
     void buy_over_buyable_amount_reports_rejection_code() {
         assumeTrue("1".equals(System.getenv("MERITZ_LIVE_REJECT_BUY")));
         BigDecimal buyable = adapter.getUsdBuyableAmount(account);
-        BigDecimal farPrice = adapter.getPrice(TICKER, account).multiply(new BigDecimal("0.5")).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal farPrice = price(TICKER).multiply(new BigDecimal("0.5")).setScale(2, RoundingMode.HALF_UP);
         // 주문 금액 = 주문가능 금액 × 2 이상, 최소 1주
         int quantity = Math.max(1, buyable.multiply(new BigDecimal("2")).divide(farPrice, 0, RoundingMode.CEILING).intValueExact());
         System.out.printf("[MeritzLive] 초과 매수 시도 buyable=%s price=%s quantity=%d%n", buyable, farPrice, quantity);
@@ -145,7 +146,7 @@ class MeritzLiveIT {
     // 현재가 절반 1주 매수 → 당일 목록 반영 대기 → 취소 → 취소 가능 수량 0 확인 (체결 불가 가격)
     private void placeAndCancel(OrderType type) throws InterruptedException {
         assumeTrue("1".equals(System.getenv("MERITZ_LIVE_ORDER")));
-        BigDecimal farPrice = adapter.getPrice(TICKER, account).multiply(new BigDecimal("0.5")).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal farPrice = price(TICKER).multiply(new BigDecimal("0.5")).setScale(2, RoundingMode.HALF_UP);
         long start = System.currentTimeMillis();
         OrderResult placed = adapter.place(new OrderInstruction(TICKER, OrderDirection.BUY, type, 1, farPrice), account);
         String orderNo = placed.externalOrderId();
@@ -190,13 +191,6 @@ class MeritzLiveIT {
     private static boolean cancelReflected(MeritzOrderApi.OrderRow r) {
         String q = r.todayCancelable();
         return q != null && !q.isBlank() && MeritzResponse.wholeQuantity(q) == 0;
-    }
-
-    // KST 오늘 기준 직전 평일 — 휴장일이면 값이 없을 수 있어 단순 평일 계산만 한다
-    private static LocalDate previousWeekday() {
-        LocalDate d = LocalDate.now(ZoneId.of("Asia/Seoul")).minusDays(1);
-        while (d.getDayOfWeek() == DayOfWeek.SATURDAY || d.getDayOfWeek() == DayOfWeek.SUNDAY) d = d.minusDays(1);
-        return d;
     }
 
     // BrokerTokenCachePort 메모리 구현

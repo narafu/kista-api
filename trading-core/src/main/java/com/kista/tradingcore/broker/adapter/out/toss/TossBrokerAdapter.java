@@ -3,7 +3,6 @@ package com.kista.tradingcore.broker.adapter.out.toss;
 import com.kista.tradingcore.broker.domain.model.*;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.StrategyTicker;
-import com.kista.tradingcore.broker.domain.model.toss.*;
 import com.kista.tradingcore.broker.application.port.output.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -11,19 +10,17 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-// Toss 증권사 어댑터 — 공통 6개(BrokerCapabilitiesPort) + 통계 2개(BrokerStatisticsPort, 벤더 중립 타입으로 변환해 노출) Port 구현
+// Toss 증권사 어댑터 — 공통 6개(BrokerCapabilitiesPort) + 통계 1개(BrokerStatisticsPort, 벤더 중립 타입으로 변환해 노출) Port 구현
 @Component
 @RequiredArgsConstructor
 public class TossBrokerAdapter implements BrokerCapabilitiesPort, BrokerStatisticsPort {
 
     private final TossHoldingsApi tossHoldingsApi;  // portfolio/margin/sellable/exchangeRate/account
     private final TossOrderApi tossOrderApi;          // cancel/place/execution
-    private final TossPriceApi tossPriceApi;          // price/snapshot
-    private final TossCandleApi tossCandleApi;         // candle
+    private final TossPriceApi tossPriceApi;          // 현재가
 
     @Override
     public Broker supports() {
@@ -65,76 +62,15 @@ public class TossBrokerAdapter implements BrokerCapabilitiesPort, BrokerStatisti
     // --- 통계 Capability (Toss 응답을 벤더 중립 타입으로 변환) ---
 
     @Override
-    public List<BrokerCandle> getCandles(String symbol, String interval, LocalDate from, LocalDate to) {
-        return tossCandleApi.getCandles(symbol, interval, from, to).stream().map(TossCandle::toBrokerCandle).toList();
-    }
-
-    @Override
-    public List<BrokerCandle> getLatestCandles(String symbol, String interval, int count) {
-        return tossCandleApi.getLatestCandles(symbol, interval, count).stream().map(TossCandle::toBrokerCandle).toList();
-    }
-
-    @Override
-    public List<BrokerCandle> getDailyCandlesBefore(String symbol, LocalDate beforeUsSession, int count) {
-        return tossCandleApi.getDailyCandlesBefore(symbol, beforeUsSession, count).stream().map(TossCandle::toBrokerCandle).toList();
-    }
-
-    @Override
     public ExchangeRateQuote getExchangeRate() {
         return tossHoldingsApi.getExchangeRate().toExchangeRateQuote();
     }
 
-    // --- BrokerPricePort (공통 API — account 불필요) ---
-
-    @Override
-    public BigDecimal getPrice(StrategyTicker ticker, BrokerAccountRef account) {
-        return tossPriceApi.getPrice(ticker); // 공통 API — account 불필요
-    }
-
-    @Override
-    public Map<StrategyTicker, BigDecimal> getPrices(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        return tossPriceApi.getPrices(tickers); // 공통 API — account 불필요
-    }
+    // --- BrokerPricePort ---
 
     // 주문 경로 현재가 — 계좌 토큰 /api/v1/prices (Q-13 운영 확인 2026-11-21)
     @Override
     public Map<StrategyTicker, BigDecimal> currentPrices(BrokerAccountRef account, Collection<StrategyTicker> tickers) {
         return tossPriceApi.currentPrices(account, tickers);
     }
-
-    @Override
-    public PriceSnapshot getPriceSnapshot(StrategyTicker ticker, BrokerAccountRef account) {
-        return tossPriceApi.getPriceSnapshot(ticker); // 공통 API — account 불필요
-    }
-
-    @Override
-    public Map<StrategyTicker, PriceSnapshot> getPriceSnapshots(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        return tossPriceApi.getPriceSnapshots(tickers); // 공통 API — account 불필요
-    }
-
-    @Override
-    public BigDecimal getPrevClose(StrategyTicker ticker, BrokerAccountRef account) {
-        return tossPriceApi.getPrevClose(ticker); // 공통 API — account 불필요
-    }
-
-    @Override
-    public Map<StrategyTicker, BigDecimal> getPrevCloses(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        return tossPriceApi.getPrevCloses(tickers); // 공통 API — account 불필요
-    }
-
-    // tradeDate 일봉 확정 종가 — 라이브 현재가 아님 (TossCandleApi.getCandles 경유, TossPriceApi.getClosingPrice)
-    @Override
-    public BigDecimal getClosingPrice(StrategyTicker ticker, LocalDate tradeDate, BrokerAccountRef account) {
-        return tossPriceApi.getClosingPrice(ticker, tradeDate); // 공통 API — account 불필요
-    }
-
-    @Override
-    public Map<StrategyTicker, BigDecimal> getClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
-        Map<StrategyTicker, BigDecimal> result = new LinkedHashMap<>();
-        for (StrategyTicker ticker : tickers) {
-            result.put(ticker, tossPriceApi.getClosingPrice(ticker, tradeDate));
-        }
-        return result;
-    }
-
 }

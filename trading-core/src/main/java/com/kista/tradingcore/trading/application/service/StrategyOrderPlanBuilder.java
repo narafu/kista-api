@@ -51,7 +51,7 @@ class StrategyOrderPlanBuilder {
     }
 
     // prevCloseCache: 배치 미리보기(TradingPreviewService.previewBatch) 전용 — 계좌 내 종목별 전일종가를
-    // 1회 일괄 조회(getPrevCloses)해 넘기면 전략마다 개별 시세 호출을 생략한다. 캐시에 없는 종목은
+    // 1회 일괄 조회(TradingPriceFetcher.fetchPrevCloses)해 넘기면 전략마다 개별 시세 호출을 생략한다. 캐시에 없는 종목은
     // 기존과 동일하게 단건 라이브 조회로 폴백한다. 호출부가 항상 previewBatch 경로를 거치므로 이제 필수 인자다.
     PlanResult build(Strategy strategy, TradingAccount account, StrategyCycle currentCycle, LocalDate today,
                       Map<StrategyTicker, BigDecimal> prevCloseCache) {

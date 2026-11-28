@@ -6,7 +6,7 @@
 
 `com.kista.tradingcore.broker.adapter.out.meritz` 구성:
 
-adapter/out/meritz/ ← MeritzHttpClient(본문 `rsp_cd` 기반 응답 판정 — HTTP 500도 본문 파싱, 토큰 거절 `EGW00121`/`EGW00123` 1회 재발급·재시도, GET만 한도 백오프, 앱키별 호출 간격 게이트)/MeritzAuthApi(`BrokerConnectionTestPort`·토큰 발급, 만료는 `expires_date` 기준)/MeritzPriceApi/MeritzTradingApi/MeritzOrderApi(주문·취소, 경고 `warn_cls_code` 1/3은 `warn_cnfr_yn=Y` 1회 재전송, 취소는 당일 주문체결내역에서 원주문 조회)/MeritzExchangeRegistry/MeritzConfig/MeritzBrokerAdapter(공통 6개 Port) — 계좌번호 없음(앱키가 계좌 식별), 상세 → `docs/agents/vendors/meritz.md`
+adapter/out/meritz/ ← MeritzHttpClient(본문 `rsp_cd` 기반 응답 판정 — HTTP 500도 본문 파싱, 토큰 거절 `EGW00121`/`EGW00123` 1회 재발급·재시도, GET만 한도 백오프, 앱키별 호출 간격 게이트)/MeritzAuthApi(`BrokerConnectionTestPort`·토큰 발급, 만료는 `expires_date` 기준)/MeritzPriceApi(현재가만)/MeritzTradingApi/MeritzOrderApi(주문·취소, 경고 `warn_cls_code` 1/3은 `warn_cnfr_yn=Y` 1회 재전송, 취소는 당일 주문체결내역에서 원주문 조회)/MeritzExchangeRegistry/MeritzConfig/MeritzBrokerAdapter(공통 6개 Port) — 계좌번호 없음(앱키가 계좌 식별), 상세 → `docs/agents/vendors/meritz.md`
 
 ### 기본 사실
 - 문서: 웹 [해외주식 주문](https://openapi.imeritz.com/apiservice?group_id=7f77b304-4970-4fc7-bc6c-82e8030925a5&api_id=b64fd90f-daa1-4512-9633-b517fe7837a2)(JS 렌더링이라 WebFetch로 본문이 안 보이고, 왼쪽 메뉴에서 다른 챕터로 이동한다). 전체 챕터 원본은 `https://openapi.imeritz.com/api-spec/download/json`(약 950k자, 에이전트는 이걸 읽는다)·`/api-spec/download/excel`.
@@ -14,7 +14,7 @@ adapter/out/meritz/ ← MeritzHttpClient(본문 `rsp_cd` 기반 응답 판정 �
 - 계좌번호가 없다: 앱키에 계좌 1개가 묶이며 요청에 `acno`·`asno`·`acnt_pwd`를 넣으면 실패한다. `accountNo=null`, appKey가 식별자(`Account.dedupeKeyOf`)다.
 - 토큰: `POST /oauth2/token`(form `grant_type=client_credentials&client_id&client_secret&scope=login`) → `access_token`, `expires_in`(43200), `expires_date`. 만료 전 재발급은 같은 토큰·같은 `expires_date`를 돌려준다(멱등). 만료는 **`expires_date`(KST) 기준**으로 잡는다 — `expires_in`은 상대값이 아니라 캐시가 최대 12시간 늦게 만료돼 `EGW00123`이 폭주한다. `oauth2/revoke`는 같은 앱키의 유일한 토큰을 끊으므로 호출 금지. 토큰 저장은 `broker_tokens` + `BrokerTokenCachePort`, 조정은 `DbTokenCoordinator`(Toss와 공용).
 - 숫자 필드는 문자열/숫자 혼재(`"417.0000000000"`, `36`) — 파서는 둘 다 받는다(수량을 `Integer.parseInt`하면 잔고 조회 전체가 실패).
-- 날짜(`date`, `oder_date`, `oder_sta_date`/`oder_fin_date`, `from`/`to`)는 **미국 거래일**. KST↔US 변환은 `UsTradeDates`만 쓰며 `MeritzPriceApi`·`MeritzTradingApi`가 allowlist에 있다 → constraints.md "시간 기준 정책".
+- 날짜(`date`, `oder_date`, `oder_sta_date`/`oder_fin_date`, `from`/`to`)는 **미국 거래일**. KST↔US 변환은 `UsTradeDates`만 쓰며 `MeritzTradingApi`가 allowlist에 있다 → constraints.md "시간 기준 정책".
 
 ### 응답 판정 (HTTP 상태코드 아님)
 모든 업무 오류가 HTTP 500으로 오고(`EGW00103`만 403 가능), 성공도 500일 수 있다. `MeritzHttpClient`는 본문을 먼저 파싱한다.
@@ -30,8 +30,7 @@ adapter/out/meritz/ ← MeritzHttpClient(본문 `rsp_cd` 기반 응답 판정 �
 ### 엔드포인트
 | 용도 | 호출 | 주요 필드 |
 |---|---|---|
-| 현재가 | `GET /market/v1/overseas/prices`(`iscd`, `mrkt_div_code=OV`, `mrkt_cls_code`, `dely_rltm_cls_code=0`) | `prpr`, `prdy_clpr` |
-| 일봉(확정 종가) | `GET /market/v1/overseas/candles/days`(`mod_stpr_cls_code` 필수, `from`/`to` US) | `date`, `prpr`(종가) |
+| 현재가 | `GET /market/v1/overseas/prices`(`iscd`, `mrkt_div_code=OV`, `mrkt_cls_code`, `dely_rltm_cls_code=0`) | `prpr` |
 | 잔고 | `GET /accounts/v1/me/overseas/holdings`(연속조회, 잔고구분 `rmnd_clcd` 1일반/2소수/3대출별 행 — 같은 종목이 여러 행일 수 있어 보유 현황은 종목별 합산·수량 가중 평단, 판매가능수량은 정수 주문 대상인 일반 행만) | `ovrs_stck_symb_iscd`, `rmnd_dqty`(판매가능수량 포트도 이 값 — `seln_able_dqty`는 미체결 매도 차감 순수량이라 쓰지 않음, `SellableQuantityPort` 계약. 2026-10-28 실측: SOXL 미체결 매도 1주 중 `rmnd_dqty=345`·`seln_able_dqty=344`), `avrg_unpr`, `psnt_prc`, `frcr_vltn_amt` |
 | 외화잔고 | `GET /accounts/v1/me/overseas/currencies` | USD `frcr_amt`(예수금), `estm_frcr_amt` |
 | 주문가능금액 | `GET /trading/v1/overseas/orders/estimate` | 전 통화 행 `oder_crnc_oder_able_camt` 합(행마다 USD 환산값 — 원화는 주문 시 자동 환전되며 KRW 행은 예수금 95% ÷ 환율, 2026-10-30 실측) |

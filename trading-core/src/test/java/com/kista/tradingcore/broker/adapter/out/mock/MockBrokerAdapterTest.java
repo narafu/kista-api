@@ -412,31 +412,11 @@ class MockBrokerAdapterTest {
     // --- BrokerPricePort 위임 ---
 
     @Test
-    @DisplayName("getPrice는 account와 무관하게 공용 현재가로 위임한다")
-    void getPriceDelegatesToPriceFeed() {
-        when(marketData.latestPrices(List.of(StrategyTicker.TQQQ))).thenReturn(Map.of(StrategyTicker.TQQQ, new BigDecimal("123.45")));
-
-        BigDecimal price = adapter().getPrice(StrategyTicker.TQQQ, ACCOUNT);
-
-        assertThat(price).isEqualByComparingTo("123.45");
-    }
-
-    @Test
     @DisplayName("currentPrices는 공용 현재가다")
     void currentPrices는_공용_현재가() {
         when(marketData.latestPrices(List.of(StrategyTicker.TQQQ))).thenReturn(Map.of(StrategyTicker.TQQQ, new BigDecimal("77.00")));
 
         assertThat(adapter().currentPrices(ACCOUNT, List.of(StrategyTicker.TQQQ)).get(StrategyTicker.TQQQ)).isEqualByComparingTo("77.00");
-    }
-
-    @Test
-    @DisplayName("getPrevClose는 account와 무관하게 공용 전일 종가로 위임한다")
-    void getPrevCloseDelegatesToPriceFeed() {
-        when(marketData.requireLatestClose(StrategyTicker.TQQQ)).thenReturn(new BigDecimal("120.00"));
-
-        BigDecimal prevClose = adapter().getPrevClose(StrategyTicker.TQQQ, ACCOUNT);
-
-        assertThat(prevClose).isEqualByComparingTo("120.00");
     }
 
     // --- 스모크: getPresentBalance ---

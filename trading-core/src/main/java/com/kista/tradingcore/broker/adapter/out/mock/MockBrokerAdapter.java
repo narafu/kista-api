@@ -15,7 +15,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -55,68 +54,18 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
     }
 
     // --- BrokerPricePort (account 파라미터 무시 — 모의계좌는 계좌 시세가 없어 공용 시세(Alpaca) 사용) ---
-    // 단건은 값이 없으면 대체 없이 예외, 다건은 값이 없는 종목의 키가 빠진다(호출부가 키 부재를 처리)
-
-    @Override
-    public BigDecimal getPrice(StrategyTicker ticker, BrokerAccountRef account) {
-        BigDecimal price = marketData.latestPrices(List.of(ticker)).get(ticker);
-        if (price == null) throw new IllegalStateException(ticker.name() + " 현재가를 조회하지 못했습니다.");
-        return price;
-    }
-
-    @Override
-    public Map<StrategyTicker, BigDecimal> getPrices(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        return marketData.latestPrices(tickers);
-    }
+    // 값이 없는 종목은 키가 빠진다(호출부가 키 부재를 처리)
 
     @Override
     public Map<StrategyTicker, BigDecimal> currentPrices(BrokerAccountRef account, Collection<StrategyTicker> tickers) {
         return marketData.latestPrices(tickers);
     }
 
-    @Override
-    public PriceSnapshot getPriceSnapshot(StrategyTicker ticker, BrokerAccountRef account) {
-        PriceSnapshot snapshot = getPriceSnapshots(List.of(ticker), account).get(ticker);
-        if (snapshot == null) throw new IllegalStateException(ticker.name() + " 시세를 조회하지 못했습니다.");
-        return snapshot;
-    }
-
-    // 현재가와 전일 종가가 둘 다 있는 종목만 담는다
-    @Override
-    public Map<StrategyTicker, PriceSnapshot> getPriceSnapshots(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        Map<StrategyTicker, BigDecimal> prices = marketData.latestPrices(tickers);
-        Map<StrategyTicker, BigDecimal> closes = marketData.latestCloses(tickers);
-        Map<StrategyTicker, PriceSnapshot> result = new LinkedHashMap<>();
-        for (StrategyTicker ticker : tickers) {
-            if (prices.containsKey(ticker) && closes.containsKey(ticker)) {
-                result.put(ticker, new PriceSnapshot(prices.get(ticker), closes.get(ticker)));
-            }
-        }
-        return result;
-    }
-
-    @Override
-    public BigDecimal getPrevClose(StrategyTicker ticker, BrokerAccountRef account) {
-        return marketData.requireLatestClose(ticker);
-    }
-
-    @Override
-    public Map<StrategyTicker, BigDecimal> getPrevCloses(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        return marketData.latestCloses(tickers);
-    }
-
-    // tradeDate(KST 거래일)의 확정 종가 — 확정 일봉이 없으면 현재가로 대신하지 않고 예외
-    @Override
-    public BigDecimal getClosingPrice(StrategyTicker ticker, LocalDate tradeDate, BrokerAccountRef account) {
-        return marketData.requireConfirmedClose(ticker, marketCalendarPort.usSessionDateOf(tradeDate));
-    }
-
-    @Override
-    public Map<StrategyTicker, BigDecimal> getClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
-        Map<StrategyTicker, BigDecimal> result = new LinkedHashMap<>();
-        marketData.confirmedBars(tickers, marketCalendarPort.usSessionDateOf(tradeDate))
-                .forEach((ticker, bar) -> result.put(ticker, bar.close()));
-        return result;
+    // 단건 현재가 — 값이 없으면 대체 없이 예외(잔고 평가용)
+    private BigDecimal latestPrice(StrategyTicker ticker) {
+        BigDecimal price = marketData.latestPrices(List.of(ticker)).get(ticker);
+        if (price == null) throw new IllegalStateException(ticker.name() + " 현재가를 조회하지 못했습니다.");
+        return price;
     }
 
     // --- SellableQuantityPort ---
@@ -218,7 +167,7 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
             PositionView position = latest.get();
             totalDeposit = totalDeposit.add(position.deposit());
             if (position.holdings() > 0 && position.avgPrice() != null) {
-                BigDecimal currentPrice = getPrice(strategy.ticker(), account);
+                BigDecimal currentPrice = latestPrice(strategy.ticker());
                 holdings.add(new PresentBalanceResult.TossHolding(strategy.ticker(), position.holdings(), position.avgPrice(), currentPrice));
             }
         }

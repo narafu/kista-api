@@ -1,14 +1,9 @@
 package com.kista.tradingcore.broker.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.shared.kernel.TimeZones;
-import com.kista.shared.platform.time.UsTradeDates;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
-import com.kista.tradingcore.broker.domain.model.BrokerCandle;
-import com.kista.tradingcore.broker.domain.model.PriceSnapshot;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.domain.model.toss.TossApiException;
-import com.kista.tradingcore.broker.domain.model.toss.TossCandle;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
@@ -17,20 +12,11 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
 import java.math.BigDecimal;
-import java.time.Clock;
-import java.time.DayOfWeek;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.ZonedDateTime;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -45,35 +31,6 @@ public class TossPriceApi {
             new ParameterizedTypeReference<>() {};
 
     private final TossHttpClient tossHttpClient;
-    private final TossCandleApi tossCandleApi; // 전일종가 캔들 조회
-    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
-    // 전일종가(prevClose) 캐시 — 종목+거래일(KST)+정규장 진행여부 버킷 단위로 하루 내 재조회 방지.
-    // 만료 로직 없음 — 날짜가 바뀌면 키가 자연히 달라지고, 종목 수가 적어(4개) 메모리 증가는 무시 가능.
-    private record PrevCloseCacheKey(String symbol, LocalDate date, String bucket) {}
-    private final ConcurrentMap<PrevCloseCacheKey, Optional<BigDecimal>> prevCloseCache = new ConcurrentHashMap<>();
-
-    public Map<StrategyTicker, BigDecimal> getPrices(List<StrategyTicker> tickers) {
-        if (tickers.isEmpty()) return Map.of();
-
-        Map<StrategyTicker, BigDecimal> result = fetchPricesPartial(tickers);
-
-        // 요청 티커 중 응답에 없는 종목이 있는 부분 실패 — 0 대체 대신 예외로 알려 호출부가 잘못된 값으로 계산하지 않게 함
-        List<StrategyTicker> missing = tickers.stream().filter(t -> !result.containsKey(t)).toList();
-        if (!missing.isEmpty()) {
-            throw new TossApiException("Toss 가격 조회 응답 누락(부분 실패): 요청=" + tickers + ", 누락=" + missing, null);
-        }
-
-        return result;
-    }
-
-    // 현재가 HTTP 조회 + 파싱 — 응답에 없는 종목은 결과에서 빠질 뿐 예외 아님(관리자 시세 소스가 누락분을 다음 단계로 넘김)
-    // package-private — TossAdminPriceSource, 테스트
-    Map<StrategyTicker, BigDecimal> fetchPricesPartial(List<StrategyTicker> tickers) {
-        if (tickers.isEmpty()) return Map.of();
-
-        // 공통 API — 관리자 토큰 사용
-        return parsePrices(tossHttpClient.getCommon(PRICES_PATH, symbolsParam(tickers), PRICES_TYPE), tickers);
-    }
 
     // 계좌 토큰 현재가 — 계좌별 값이라 캐시하지 않는다. 응답에 없는 종목은 키 부재(= 그 종목 실패), 응답 자체가 없으면 예외
     public Map<StrategyTicker, BigDecimal> currentPrices(BrokerAccountRef account, Collection<StrategyTicker> tickers) {
@@ -88,7 +45,7 @@ public class TossPriceApi {
         return params;
     }
 
-    // 응답 파싱 — 관리자·계좌 경로 공용
+    // 응답 파싱
     private static Map<StrategyTicker, BigDecimal> parsePrices(TossResult<List<PriceItem>> wrapper, Collection<StrategyTicker> tickers) {
         List<PriceItem> items = wrapper != null ? wrapper.result() : null;
 
@@ -114,152 +71,6 @@ public class TossPriceApi {
             log.warn("Toss 현재가 파싱 실패 — 종목 건너뜀: symbol={}, lastPrice={}", item.symbol(), item.lastPrice());
         }
         return result;
-    }
-
-    public BigDecimal getPrice(StrategyTicker ticker) {
-        // 단건도 getPrices 재사용 — HTTP 호출 횟수 동일. 요청 티커가 응답에 없으면 getPrices가 예외 전파
-        return getPrices(List.of(ticker)).get(ticker);
-    }
-
-    public PriceSnapshot getPriceSnapshot(StrategyTicker ticker) {
-        BigDecimal price = getPrice(ticker);
-        return new PriceSnapshot(price, fetchPrevCloseCached(ticker.name()).orElse(price));
-    }
-
-    public Map<StrategyTicker, PriceSnapshot> getPriceSnapshots(List<StrategyTicker> tickers) {
-        return getPrices(tickers).entrySet().stream()
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        e -> new PriceSnapshot(e.getValue(), fetchPrevCloseCached(e.getKey().name()).orElseGet(() -> {
-                            log.warn("Toss {} 전일종가 없음 — prevClose=current 사용", e.getKey());
-                            return e.getValue();
-                        }))));
-    }
-
-    // 전일종가만 필요한 경우 — 현재가 API(/api/v1/prices) 미호출, 캔들 API만 호출
-    // 캔들 조회가 실패한 종목만 현재가로 fallback (드문 경우라 별도 배치 호출로 보충)
-    public BigDecimal getPrevClose(StrategyTicker ticker) {
-        // 캔들·현재가 폴백 모두 실패하면 getPrevCloses/getPrices가 예외 전파
-        return getPrevCloses(List.of(ticker)).get(ticker);
-    }
-
-    public Map<StrategyTicker, BigDecimal> getPrevCloses(List<StrategyTicker> tickers) {
-        if (tickers.isEmpty()) return Map.of();
-
-        Map<StrategyTicker, BigDecimal> result = new LinkedHashMap<>();
-        List<StrategyTicker> needsFallback = new ArrayList<>();
-        for (StrategyTicker ticker : tickers) {
-            fetchPrevCloseCached(ticker.name())
-                    .ifPresentOrElse(
-                            prevClose -> result.put(ticker, prevClose),
-                            () -> needsFallback.add(ticker));
-        }
-        if (!needsFallback.isEmpty()) {
-            log.warn("전일종가 캔들 조회 실패 종목 — 현재가로 fallback: tickers={}", needsFallback);
-            result.putAll(getPrices(needsFallback));
-        }
-        return result;
-    }
-
-    // count=1 + before로 확정 종가 캔들 1개만 조회 — 정규장 진행 중이면 진행 중인 봉을 배제하기 위해
-    // before를 가장 최근 개장 시각 직전으로, 그 외(프리마켓·장마감 후)는 지금 시각으로 잡음
-    // 같은 (symbol, KST 날짜, 정규장 진행 여부) 재조회는 캐시 히트 — 정규장 진행 여부를 버킷으로 분리해
-    // 정규장 종료로 확정 종가가 바뀌는 순간에는 캐시를 재사용하지 않고 새로 조회하도록 함
-    // 실패(empty)도 캐싱되어 같은 버킷 내 재시도하지 않음(허용된 트레이드오프)
-    Optional<BigDecimal> fetchPrevCloseCached(String symbol) {
-        ZonedDateTime now = ZonedDateTime.now(clock); // 세션 판정·before·캐시 키가 같은 시각을 공유
-        MarketSessionInfo session = resolveMarketSessionAt(now);
-        Instant before = session.regularSessionActive()
-                ? session.lastSessionOpenInstant().minusMillis(1)  // 진행 중인 봉 배제
-                : now.toInstant();                                 // 이미 확정된 봉만 존재
-        String bucket = session.regularSessionActive() ? "ACTIVE" : "CLOSED";
-        PrevCloseCacheKey key = new PrevCloseCacheKey(symbol, now.toLocalDate(), bucket);
-        return prevCloseCache.computeIfAbsent(key, k -> fetchPrevCloseUncached(symbol, before));
-    }
-
-    // ── trading DstInfo.isRegularSessionActiveAt()/lastSessionOpenInstantAt() 복제 ──────────────
-    // 스케쥴러 오케스트레이션(waitUntilOrderTime 등)과 무관한 "정규장 진행 여부 + 마지막 개장 시각"
-    // 순수 KST/DST 계산만 필요하므로 DstInfo 전체를 참조하지 않고 이 2개 계산만 좁게 복제한다
-    // (common/ 승격 대상 아님 — trading 스케쥴링 도메인 클래스 전체를 끌어오는 것이 과함)
-
-
-    // 미국 뉴욕 기준 DST 여부에 따른 개장/마감/프리마켓 시각(KST) — DstInfo와 동일 시각표
-    private static LocalTime marketOpenTime(boolean isDst)     { return isDst ? LocalTime.of(22, 30) : LocalTime.of(23, 30); }
-    private static LocalTime marketCloseTime(boolean isDst)    { return isDst ? LocalTime.of(5, 0)   : LocalTime.of(6, 0); }
-    private static LocalTime premarketStartTime(boolean isDst) { return isDst ? LocalTime.of(17, 0)  : LocalTime.of(18, 0); }
-
-    // 정규장 진행 여부 + 가장 최근 개장 시각을 한 번에 계산한 결과
-    // package-private — 테스트에서 시각 주입 시드로 직접 호출 (private record는 같은 패키지 테스트에서도 참조 불가)
-    record MarketSessionInfo(boolean regularSessionActive, Instant lastSessionOpenInstant) {}
-
-    // 주어진 KST 시각 기준 정규장 진행 여부 + 가장 최근 개장 시각 계산 — DstInfo의 isRegularSessionActiveAt()/lastSessionOpenInstantAt() 패턴과 동일
-    static MarketSessionInfo resolveMarketSessionAt(ZonedDateTime nowKst) {
-        boolean isDst = TimeZones.NY.getRules().isDaylightSavings(nowKst.toInstant());
-        DayOfWeek day = nowKst.getDayOfWeek();
-        LocalTime time = nowKst.toLocalTime();
-
-        // 주말이거나 [장마감, 프리마켓시작) 구간이면 BLOCKED — 정규장 진행 중일 수 없음
-        boolean blocked = day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY
-                || (!time.isBefore(marketCloseTime(isDst)) && time.isBefore(premarketStartTime(isDst)));
-        // marketOpen~자정~marketClose 래핑 구간만 정규장 진행 중 (그 외 DIRECT 구간은 프리마켓)
-        boolean regularSessionActive = !blocked
-                && (!time.isBefore(marketOpenTime(isDst)) || time.isBefore(marketCloseTime(isDst)));
-
-        // 가장 최근 개장 시각 — 자정~개장 전(00:00~marketOpen)이면 전날 저녁 개장을 가리켜야 함(날짜 롤백)
-        LocalDate sessionDate = time.isBefore(marketOpenTime(isDst))
-                ? nowKst.toLocalDate().minusDays(1)
-                : nowKst.toLocalDate();
-        Instant lastSessionOpenInstant = sessionDate.atTime(marketOpenTime(isDst)).atZone(TimeZones.KST).toInstant();
-
-        return new MarketSessionInfo(regularSessionActive, lastSessionOpenInstant);
-    }
-
-    // 특정 거래일 확정 종가 — 일봉 캔들에서 해당 날짜 봉의 종가를 직접 조회 (라이브 현재가와 무관)
-    // 실패/미발행 시 현재가로 폴백 
-    public BigDecimal getClosingPrice(StrategyTicker ticker, LocalDate tradeDate) {
-        return fetchConfirmedClose(ticker, tradeDate).orElseGet(() -> {
-            log.warn("Toss {} 확정 종가 없음 — 현재가로 폴백: tradeDate={}", ticker, tradeDate);
-            return getPrice(ticker);
-        });
-    }
-
-    // 확정 종가 — 확정 일봉(fetchConfirmedCandle)의 종가
-    Optional<BigDecimal> fetchConfirmedClose(StrategyTicker ticker, LocalDate tradeDate) {
-        return fetchConfirmedCandle(ticker, tradeDate).map(BrokerCandle::close);
-    }
-
-    // Toss 캔들 date()는 US 세션일 기준이라 KST 거래일 D → US 세션 D-1로 변환
-    // 봉 날짜가 기대 US 세션일과 다르면(미발행 등) filter에서 탈락 → Optional.empty()
-    // public — 모의계좌(MockBrokerAdapter)가 OHLC 체결 판정에 사용
-    public Optional<BrokerCandle> fetchConfirmedCandle(StrategyTicker ticker, LocalDate tradeDate) {
-        LocalDate usSessionDate = UsTradeDates.toUsTradeDate(tradeDate);
-        try {
-            Optional<BrokerCandle> candle = tossCandleApi.getCandles(ticker.name(), "1d", usSessionDate, usSessionDate).stream()
-                    .filter(c -> c.date().equals(usSessionDate))
-                    .findFirst()
-                    .map(TossCandle::toBrokerCandle);
-            if (candle.isEmpty()) {
-                log.warn("Toss {} 확정 종가 캔들 없음(기대 US세션일={}): tradeDate={}", ticker, usSessionDate, tradeDate);
-            }
-            return candle;
-        } catch (Exception e) {
-            log.warn("Toss {} 확정 종가 조회 실패: tradeDate={}, error={}", ticker, tradeDate, e.getMessage());
-            return Optional.empty();
-        }
-    }
-
-    // package-private — 테스트에서 before 시각 직접 주입 (DstInfo.calculate(nowKst) 현재 시각 의존 우회)
-    Optional<BigDecimal> fetchPrevCloseUncached(String symbol, Instant before) {
-        try {
-            Optional<TossCandle> candle = tossCandleApi.getCandleBefore(symbol, "1d", before);
-            if (candle.isPresent()) {
-                return Optional.of(candle.get().close());
-            }
-            log.warn("Toss 전일종가 캔들 없음: symbol={}", symbol);
-        } catch (Exception e) {
-            log.warn("Toss 전일종가 조회 실패: symbol={}, error={}", symbol, e.getMessage());
-        }
-        return Optional.empty();
     }
 
     // ── 내부 응답 record ──────────────────────────────────────────────────────

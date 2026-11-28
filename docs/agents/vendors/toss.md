@@ -8,11 +8,10 @@
 
 클래스 구성(아래). `TossHttpClient`는 package-private 공통 헤더 처리이고 `TossConfig`의 `tossRestClient` 빈을 쓴다.
 
-- 구성: adapter/out/toss/   ← TossHttpClient/TossConfig/TossAuthApi/TossCandleApi/TossHoldingsApi/TossOrderApi/TossPriceApi/TossResponseParser/TossResult/UsdKrwRateCache
+- 구성: adapter/out/toss/   ← TossHttpClient/TossConfig/TossAuthApi/TossHoldingsApi/TossOrderApi/TossPriceApi/TossResponseParser/TossResult/UsdKrwRateCache
 - TossDistributedTokenCoordinator + TossRedisTokenStore(계좌·관리자 Redis canonical token; TTL owner lease+원자적 generation INCR; generation counter/canonical generation 비교 Lua fencing CAS; owner-safe unlock; SHA-256 최근 발급 fingerprint 2초 TTL) — 관리자 토큰은 Account가 없어 TokenCoordinator 범위 밖 별도 public 메서드(TossTokenStore)
-- `TossAdminPriceSource`(관리자 시세 — T3로 소비처가 없어졌고 T5에서 삭제 예정. TossPriceApi의 대체값 없는 package-private 변형 사용)
-- TossBrokerAdapter(공통 6개 + 통계 5개 Port 구현 — Toss 응답 record를 벤더 중립 타입으로 변환해 노출)
-- DCA 일봉 조회는 T3로 공용 시세(`MarketDataClient.dailyCandles`, Alpaca `adjustment=all`)로 옮겼다. 옛 Toss `adjusted=true` 값과 조금 다를 수 있다.
+- TossBrokerAdapter(공통 6개 + 환율 Port 구현 — Toss 응답 record를 벤더 중립 타입으로 변환해 노출)
+- 관리자 키(`toss.admin-client-id/secret`)는 환율(`getExchangeRate`)에만 쓴다. T4(Frankfurter) 뒤 T5b에서 관리자 토큰·`getCommon`과 함께 제거한다. DCA 일봉은 공용 시세(`MarketDataClient.dailyCandles`)다.
 - DCA 주문 가격: Toss: 매수는 캡가(지정가) 기준으로 보정하고, 매도는 0.01 규칙을 적용한다.
 
 ### 계좌번호 포맷
@@ -30,7 +29,7 @@
 - **`forceReissue` 에스컬레이션**: `reusableToken()`은 `forceReissue=true`로 호출되면 지문 보호 재사용 분기를 건너뛰고(`null` 반환) lease 획득 → 실제 OAuth 재발급 경로로 강제 진입한다. `TossHttpClient`는 **같은 rejectedToken이 연속으로 다시 거절되면**(직전 지문 보호 대기가 전파 지연을 해소하지 못했다는 뜻) 이 플래그를 세운다 — 진짜 불량 토큰이 지문 보호 구간(2초) 내내 재시도만 소진하고 확정 실패하던 문제를 막는다. `TokenCoordinator` 공유 인터페이스(Meritz와 공유)는 건드리지 않고 `TossDistributedTokenCoordinator`/`TossAuthApi`의 `recover(...,forceReissue)` 전용 오버로드로만 존재한다.
 - lease 해제는 owner 값이 일치할 때만 삭제하는 Lua compare-delete다. 만료된 owner가 successor lease를 삭제할 수 없다. Redis read/script 오류, malformed hash, polling 소진 시 JVM-local·PostgreSQL fallback 없이 `TossApiException`(503)으로 fail-closed 한다.
 - `TossHttpClient`는 **매 401마다** 코디네이터에 복구를 재조회한다(백오프 300ms→600ms→900ms, 누적 1800ms, 최대 3회 재시도) — 갓 재발급된 토큰이 Toss 리소스 서버에 즉시 반영되지 않아 재시도 직후에도 401이 나는 경우에 대응. 직전에 복구를 시도했던 rejectedToken 값을 기억해뒀다가 같은 토큰이 다시 거절되면 위 `forceReissue`로 승격한다. 헤더 빌더 내부에서 토큰을 재조회하지 말고, `executeWithRetry`가 고정한 시도별 토큰을 사용해야 한다.
-- `getCommon`(관리자 토큰 공통 시세 API, 멱등 GET)만 **429 `rate-limit-exceeded`를 최대 2회 재시도**한다(백오프 500ms→1000ms) — 기간 캔들 페이징처럼 연속 호출이 순간 한도를 넘는 경우 대응. 계좌 API(`get`/`post` — 주문 등)는 429를 재시도하지 않는다. 재시도 후에도 남은 429는 `executeWithBackoffRetry`가 `BrokerRateLimitException`(429, 확정 거절)으로 변환한다(백오프 대기 중 인터럽트는 확정 거절 `TossApiException`)
+- `getCommon`(관리자 토큰 공통 시세 API, 멱등 GET)만 **429 `rate-limit-exceeded`를 최대 2회 재시도**한다(백오프 500ms→1000ms) — 연속 호출이 순간 한도를 넘는 경우 대응. 계좌 API(`get`/`post` — 주문 등)는 429를 재시도하지 않는다. 재시도 후에도 남은 429는 `executeWithBackoffRetry`가 `BrokerRateLimitException`(429, 확정 거절)으로 변환한다(백오프 대기 중 인터럽트는 확정 거절 `TossApiException`)
 - 복구 API는 `RecoveredToken(accessToken, freshlyIssued)`를 반환한다. 이미 다른 인스턴스가 저장해 둔 canonical 토큰을 Redis 읽기만으로 재사용한 경우(`freshlyIssued=false`)엔 전파 지연 위험이 없어 `TossHttpClient`가 300ms 백오프를 생략한다 — 실제 신규 발급이거나 최근 발급 지문 보호 구간 재사용인 경우, 또는 forceReissue로 강제 재발급된 경우(모두 `freshlyIssued=true`)에만 대기한다.
 - 관리자 경로(`getCommon`)도 동일한 Redis fencing 세대 보호·`forceReissue` 에스컬레이션과 백오프(300ms/600ms/900ms)·최대 3회 재시도 정책을 적용한다. lease는 OAuth 발급만 조정하며 정상 리소스 API 호출은 직렬화하지 않는다. 401 재시도 경로 자체의 지연·부하는 이전보다 늘었다(코디네이터 호출이 매 401마다 발생, forceReissue는 실제 lease 획득+OAuth 재발급을 유발할 수 있음) — 정상 응답 경로에는 영향 없음.
 
@@ -39,8 +38,7 @@
 - `TossOrderApi.fetchExecutions()`: Toss는 **주문 접수일(KST)** 기준 날짜 필터링 — 변환 없이 KST 날짜 그대로 전달
 - **`queryFrom = from - 1일`**: 거래일 D 주문은 D-1 저녁에 접수되므로 1일 앞당겨 조회한 뒤, 체결의 거래일로 재필터링
 - **체결 거래일 = `filledAt`의 뉴욕 일자 + 1일**(`UsTradeDates.toKstTradeDate`, 메리츠와 같은 규칙): KST 경계는 서머타임 13:00 / 표준시 14:00이라 프리마켓~애프터마켓 체결이 모두 같은 거래일에 묶인다. KST 달력일을 쓰면 D-1 22:00 이후 장중 체결이 D-1로 잡혀 `getExecutions(D, D)`에서 빠졌다. 한계: 토스 주간거래(KST 낮) 체결도 같은 규칙으로 분류되지만 kista 주문은 DAY/CLS만 써서 해당 없음. 실계좌 `filledAt` 오프셋 표기는 미실측
-- **예외 — 일봉 캔들**: `TossCandleApi`의 `TossCandle.date()`는 timestamp(ISO8601 UTC)에서 파생한 **US 세션일**이다. `TossPriceApi.getClosingPrice(ticker, kstTradeDate)`는 KST 거래일 D의 확정 종가로 US 세션 D-1 봉을 조회해야 하므로 `UsTradeDates.toUsTradeDate` 변환 후 `date().equals(usSessionDate)` 필터 — 봉 없으면 현재가 폴백.
-- **Toss API**: 주문 접수일(KST) 기준, 변환 없음. `TossOrderApi.fetchExecutions()`는 전날 저녁 선접수 대응으로 `queryFrom = from - 1일` 조회 후, `filledAt`의 뉴욕 일자(US 세션일)를 `UsTradeDates.toKstTradeDate`로 바꾼 KST 거래일로 재필터(KST 달력일을 쓰면 D-1 22:00 이후 장중 체결이 D에서 빠진다). 예외: 일봉 캔들 `date()`는 US 세션일이라 `TossPriceApi.getClosingPrice`가 KST 거래일 D를 US 세션 D-1로 변환한다
+- **Toss API**: 주문 접수일(KST) 기준, 변환 없음. `TossOrderApi.fetchExecutions()`는 전날 저녁 선접수 대응으로 `queryFrom = from - 1일` 조회 후, `filledAt`의 뉴욕 일자(US 세션일)를 `UsTradeDates.toKstTradeDate`로 바꾼 KST 거래일로 재필터(KST 달력일을 쓰면 D-1 22:00 이후 장중 체결이 D에서 빠진다).
 
 ### 판매 가능 수량 — 보유 수량 사용
 - `SellableQuantityPort` 계약은 "미체결 매도를 빼지 않은 보유 수량"(Mock 최신 포지션과 동일)이고, 소비처(수동 SELL 검증 등 — 주식 DCA는 원장 기준이라 더는 쓰지 않음)가 DB PLANNED/SUBMITTING/PLACED SELL 예약을 직접 뺀다
@@ -52,26 +50,9 @@
 - 주문 목록·상세 응답(`Order` 스키마)에는 `clientOrderId`가 없어 사후 조회가 안 된다 — 잔류 SUBMITTING 대사(`OrderSubmissionReconciler`)는 선점 후 2~9분 창에서만 같은 키 재요청으로 원 주문번호를 회수한다(workflow-orders.md "PLANNED 상태 전이 경합")
 - 2026-10-17 실계좌 실측: 같은 키·같은 내용 재요청 → 같은 `orderId` 재반환(200), 같은 키·다른 내용 → 422 `idempotency-key-conflict`(본문 gzip). 409 `request-in-progress`는 공식 openapi.json 응답 예시로 확인
 
-### 가격 조회 API 3분리 — TossPriceApi
+### 현재가 — TossPriceApi
 
-Toss는 현재가(`/api/v1/prices`)와 전일종가(캔들 API)가 **완전히 분리된 HTTP 호출**이므로, 필요한 값만 조회하도록 메서드를 3그룹으로 분리했다 :
-
-- `getPrice`/`getPrices` — 현재가만, `/api/v1/prices` 1회 호출
-- `getPrevClose`/`getPrevCloses` — 전일종가만, 캔들 API만 호출(**현재가 API 미호출**). 캔들 조회 실패 종목만 현재가로 fallback(별도 배치 호출)
-- `getPriceSnapshot`/`getPriceSnapshots` — 현재가+전일종가 둘 다 필요할 때만 사용하는 조합(위 두 API를 순차 호출) — "기본으로 쓰는 API"가 아니라 소수 케이스 전용
-
-**소비처 선택 기준**: 실제 주문가 예측/계산(전략 생성 기준가, 다음 주문 미리보기, 매매 실행 시작가)은 `getPrevClose(s)`만 필요 — `getPriceSnapshot`을 쓰면 쓰지도 않는 현재가 API 호출이 낭비된다.
-
-**관리자 시세 1단계(`TossAdminPriceSource`)는 T3 이후 쓰이지 않는다**(T5 삭제 대기). 주문 경로·배치는 `BrokerPricePort.currentPrices`와 공용 시세를 쓴다(`workflow-ledger-price.md` "시세 출처"). 아래 `TossPriceApi` public 메서드의 폴백 동작은 삭제 전까지 그대로다.
-
-### 전일종가(prevClose) 조회 상세 — TossPriceApi.fetchPrevCloseCached()
-
-- `/api/v1/prices`에는 전일종가 필드가 없음(현재가만 제공) — 반드시 `TossCandleApi.getCandleBefore(symbol, "1d", before)`(캔들 `count=1`)로 별도 조회
 - **토스 계좌의 현재가는 계좌 토큰 `/api/v1/prices`다**(`TossPriceApi.currentPrices`, 계좌 헤더 `X-Tossinvest-Account` 전송, 캐시 없음). Q-13: 2026-11-21 운영에서 계좌 토큰으로 읽기 전용 확인 — 토큰 200, `GET /api/v1/prices?symbols=SOXL,TQQQ` 200(계좌 헤더 유무 모두). 응답 `{"result":[{"symbol","timestamp","lastPrice","currency"}]}`. 응답에 없는 종목은 결과 Map에서 빠진다(키 부재 = 그 종목 실패).
-- `before` 시각 계산이 핵심: `TossPriceApi.resolveMarketSessionAt(nowKst)`의 `regularSessionActive`가 true(정규장 진행 중)면 그 세션의 봉이 아직 미확정이므로 `lastSessionOpenInstant().minusMillis(1)`을 `before`로 사용해 배제, false면 이미 확정된 봉만 있으므로 캡처한 `now`
-- 개장 시각은 "오늘 날짜" 고정값이 아니라 `lastSessionOpenInstant`(날짜 롤백 처리)를 써야 한다 — 고정값은 자정~개장 전(00:00~22:30 KST) 호출 시 진행 중인 세션(전날 저녁 개장)이 아닌 미래 시각을 가리킨다
-- `TossPriceApi.prevCloseCache` 키에 세션 버킷(`"ACTIVE"`/`"CLOSED"`) 포함 — 정규장 종료로 확정 종가가 바뀌는 순간 같은 KST 날짜 내에서도 캐시를 재사용하지 않고 재조회
-- 캔들 배열 인덱스로 확정 종가를 추측하지 말 것 — `count=1`+`before` 방식만 사용 (인덱스 추측은 장마감 후 최신 캔들 오인·프리마켓 구간 stale 버그를 냈음)
 
 ### 잔고 부족 거절 분류
 - 주문 POST가 HTTP 422 + `error.code = insufficient-buying-power`이면 `TossApiException.isInsufficientFunds()`=true(확정 거절의 하위 분류, `TossHttpClient`가 판정). 출처: 공식 문서 `openapi.tossinvest.com/openapi-docs/overview.md`.

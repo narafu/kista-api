@@ -10,7 +10,6 @@ import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchCondition;
-import com.tngtech.archunit.lang.conditions.ArchConditions;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
@@ -139,19 +138,16 @@ class HexagonalArchitectureTest {
     }
 
     @Test
-    @DisplayName("UsTradeDates는 5개 Toss/Meritz/캘린더 어댑터에서만 사용한다 — 시간 기준 정책 allowlist 강제")
+    @DisplayName("UsTradeDates는 3개 Toss/Meritz/캘린더 어댑터에서만 사용한다 — 시간 기준 정책 allowlist 강제")
     void usTradeDates_must_only_be_used_by_allowlisted_adapters() {
-        // constraints.md "시간 기준 정책"의 UsTradeDates 허용 규칙을 강제 — 허용 클래스 목록은 이 테스트가 SSOT, US 거래일 변환은 이 5개 클래스 내부
+        // constraints.md "시간 기준 정책"의 UsTradeDates 허용 규칙을 강제 — 허용 클래스 목록은 이 테스트가 SSOT, US 거래일 변환은 이 3개 클래스 내부
         // 전용, 도메인·서비스·orders persistence에서 사용 금지. 클래스 단위 allowlist(메서드 단위 아님) —
-        // TossPriceApi는 getClosingPrice 메서드만 실사용하지만 메서드 단위 강제는 ArchUnit 복잡도
-        // 대비 이득이 낮음. ClassFileImporter가 테스트 클래스도 import하므로(DoNotIncludeTests 미지정),
+        // ClassFileImporter가 테스트 클래스도 import하므로(DoNotIncludeTests 미지정),
         // 향후 어댑터 테스트가 기대값 계산에 UsTradeDates를 직접 쓰면 이 규칙이 함께 걸린다 —
         // 그때는 allowlist에 추가할지 검토할 것.
         ArchRule rule = noClasses()
                 .that().doNotHaveFullyQualifiedName("com.kista.shared.platform.time.UsTradeDates")
-                .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.broker.adapter.out.toss.TossPriceApi")
                 .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.broker.adapter.out.toss.TossOrderApi")
-                .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.broker.adapter.out.meritz.MeritzPriceApi")
                 .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.broker.adapter.out.meritz.MeritzTradingApi")
                 .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.marketcalendar.adapter.out.persistence.MarketCalendarPersistenceAdapter")
                 .should().dependOnClassesThat()
@@ -262,7 +258,7 @@ class HexagonalArchitectureTest {
     @Test
     @DisplayName("broker 밖에서는 벤더 전용 도메인 모델(domain.model.toss/meritz)을 참조하지 않는다 — 벤더 타입 침투 차단")
     void vendor_models_must_not_leak_outside_broker() {
-        // Toss 전용 타입(TossApiException/TossCandle 등)은 broker 어댑터 전용이다 — 소비자는 벤더 중립 타입
+        // Toss 전용 타입(TossApiException/TossExchangeRate 등)은 broker 어댑터 전용이다 — 소비자는 벤더 중립 타입
         // (BrokerApiException/BrokerCandle 등)만 안다. 신규 브로커 추가가 "구현체 1개 추가"로 끝나도록 잠근다.
         ArchRule rule = noClasses()
                 .that().resideOutsideOfPackage("com.kista.tradingcore.broker..")

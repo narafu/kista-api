@@ -129,8 +129,6 @@ class TradingPriceFetcherTest {
 
         assertThat(priceCtx.startPriceSnapshots()).isEmpty();
         verify(marketData, never()).latestPrices(any());
-        verify(pricePort, never()).getPrices(any(), any());
-        verify(pricePort, never()).getPrice(any(), any());
     }
 
     @Test
