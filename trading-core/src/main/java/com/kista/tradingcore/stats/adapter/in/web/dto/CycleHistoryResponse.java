@@ -11,7 +11,7 @@ public record CycleHistoryResponse(
         String createdAt,        // ISO-8601 문자열
         @Schema(description = "종목 코드", example = "TQQQ")
         @Nullable String ticker,           // 종목 코드 (TQQQ, SOXL 등)
-        @Schema(description = "전략 유형 (전략 삭제 등으로 알 수 없으면 null) — DCA는 투자금을 점유하지 않아 deposit이 항상 0", example = "INFINITE")
+        @Schema(description = "전략 유형 (전략 삭제 등으로 알 수 없으면 null) — DCA도 원장 예수금 기준이다(원장 전환 전 행과 전환 전 등록 후 투자금 추가가 없는 사이클은 deposit 0)", example = "INFINITE")
         @Nullable String strategyType,     // 전략 유형 (INFINITE/PRIVACY/VR/DCA)
         @Schema(description = "보유 수량")
         BigDecimal holdings,     // 보유 수량
