@@ -1,6 +1,6 @@
 # 07. API 목록·집계·메타·오류 현황 전수 (읽기 전용 조사)
 
-조사 2026-11-11. 기준 문서 `../ui-api-principles.md`. 컨트롤러 52개, 매핑 176개(GET/POST/PUT/PATCH/DELETE) 중 컬렉션 반환 GET(+조회형 POST)만 표에 올렸다. 경로의 `internal` 표시는 `/api/internal/**`(root↔trading-core 서버 간 호출, UI 무관).
+조사 2026-11-11. 기준 문서 `docs/agents/ui-api-contract.md`(옛 `ui-api-principles.md`). 컨트롤러 52개, 매핑 176개(GET/POST/PUT/PATCH/DELETE) 중 컬렉션 반환 GET(+조회형 POST)만 표에 올렸다. 경로의 `internal` 표시는 `/api/internal/**`(root↔trading-core 서버 간 호출, UI 무관).
 
 ## A. 컬렉션 반환 엔드포인트
 

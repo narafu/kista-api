@@ -62,8 +62,8 @@
 - 로그는 `[strategyId={}]`·`[accountId={}]`·`[orderId={}]`·`[userId={}]` 접두사로 시작(중간 `key=` 금지). id가 범위에 없으면 기존 키·범주 태그(`[DCA]`)를 쓰고 새 형식을 만들지 않는다
 - `log.error`는 예외를 마지막 인자로, `log.warn`은 `e.getMessage()`만
 
-### 모듈 문서가 SSOT인 규칙
-Account ↔ Strategy 분리·원장 상한·런타임 매매 정책 → `modules/tradingcore/trading.md`, 매매·VR 공식 → `trading-formulas.md`(바꾸면 문서와 테스트를 함께), 런타임 설정 API → `modules/api/admin.md`.
+### 문서가 SSOT인 규칙
+Account ↔ Strategy 분리·원장 상한·런타임 매매 정책 → `modules/tradingcore/trading.md`, 매매·VR 공식 → `trading-formulas.md`(바꾸면 문서와 테스트를 함께), 런타임 설정 API → `modules/api/admin.md`, UI·API 책임 분담(목록 봉투·집계·상태 판정) → `ui-api-contract.md`.
 
 ### 아키텍처 맵 flows.yml 동기화
 `src/test/resources/architecture/flows.yml`은 수기 원본이고 `ArchitectureMapTest`는 `code:` 존재와 enum 집합만 본다. 흐름 동작(`desc`·`cond`·`state`·`fail`), 통신 경로(`lane`·`to`), 상태 전이(`lifecycles`), 기능 추가·삭제(`flows`·`landscape`)를 바꾸면 같은 작업에서 갱신한다. 클래스 삭제·개명은 그 커밋에서 `code:`를 고친다. "아키텍처 맵 최신화" 점검은 마지막 수정 이후 `git log`로 대조한다.

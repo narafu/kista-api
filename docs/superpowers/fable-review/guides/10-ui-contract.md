@@ -2,7 +2,7 @@
 
 > **실행 세션은 먼저 맨 끝의 8절 "실행 전 보정"과 `00-roadmap.md` 9절(공통 규칙)을 읽는다.** 본문과 다르면 그쪽이 우선한다. (2026-11-14)
 
-작성 2026-11-11 (Fable). 기준: `ui-api-principles.md`. 근거 측정: `findings/07-list-endpoints.md`, `cross-repo.md` B절. kista-ui 지침서 01·05가 이 지침서의 T1~T2, T5~T7에 의존한다.
+작성 2026-11-11 (Fable). 기준: `ui-api-principles.md`(T9로 `docs/agents/ui-api-contract.md`로 이동). 근거 측정: `findings/07-list-endpoints.md`, `cross-repo.md` B절. kista-ui 지침서 01·05가 이 지침서의 T1~T2, T5~T7에 의존한다.
 
 ## 1. 현재 구조와 문제
 
@@ -111,7 +111,7 @@
 | T6 | 상태 플래그: 전략 `allowedActions`·`blockedActions`, 계좌 `apiKeyExpiry`, 미리보기 `warnings`. 판정 로직은 도메인에 두고 단위 테스트로 고정 | Opus | 도메인 테스트 통과 |
 | T7 | 오류 문구: Bean Validation 한국어화, `fieldErrors` 확장(2-5절: `fieldErrors`가 있으면 `detail`은 요약 문장 고정, `field`는 Spring 경로 표기), `ExceptionMessageFormatTest` 범위 확대 | Sonnet | 테스트 통과(필드 1개짜리 검증 실패에서 `detail`이 요약 문장인지 포함) |
 | T8 | 가계부 집계 엔드포인트(fable-ui 명세 수신 후) | Opus(명세), Sonnet(구현) | 서비스·web 테스트 |
-| T9 | `ui-api-principles.md`를 `docs/agents/ui-api-contract.md`로 옮겨 상시 규칙화, `constraints.md`에서 가리킨다. 가드: 컬렉션을 반환하는 컨트롤러 메서드는 `Items`/`CursorPage`만 반환(ArchUnit) | Sonnet | 가드 통과 |
+| T9 | `ui-api-principles.md`를 `docs/agents/ui-api-contract.md`로 옮겨 상시 규칙화, `constraints.md`에서 가리킨다. 가드: 컬렉션을 반환하는 컨트롤러 메서드는 `Items`/`CursorPage`만 반환(ArchUnit) — **문서 이동 완료(2026-11-28). 가드는 미룸: T3·T4 미착수라 `Items`·`CursorPage` 타입이 없어 규칙을 쓸 수 없다. T4 마지막 묶음(③ 관리자) 커밋에서 넣는다** | Sonnet | 가드 통과 |
 
 | T10 | **검증 전용 엔드포인트.** `POST /api/accounts/{accountId}/trading-cycle-validations`(등록과 같은 body), 수정·VR 재설정도 같은 형태. 응답 `{fieldErrors[], warnings[], derived{...}}`. `derived`는 서버가 채울 기본값·파생값(램프 실효값, 필요 인출 자산, 시드 미리보기 등). 등록 서비스와 **같은 resolver 경로**를 저장 없이 태운다(검증 로직을 한 벌 더 만들지 않는다). 기존 `GET .../strategy-seed-preview`는 `derived`로 흡수 | Opus | resolver 단위 테스트 + web 테스트. 등록이 거절하는 입력은 검증도 같은 `fieldErrors`를 낸다는 대칭 테스트 |
 | T11 | 단건 조회 `GET /api/accounts/{id}`, `GET /api/trading-cycles/{id}`. 지금은 UI가 목록을 받아 찾는다 | Sonnet | web 테스트(소유권 포함) |
@@ -157,7 +157,7 @@ T1·T2는 다른 태스크와 독립이고 UI 01의 차단 조건이라 **가장
 - 커서 응답이 둘(`CycleHistoryPageResponse`가 trading·stats에 같은 이름)이다. 공용 타입으로 옮길 때 스키마 이름이 바뀌면 `cross-repo.md`에 적는다. 이름 충돌 가드(`OpenApiSchemaNameCollisionTest`)에 걸리면 한쪽을 지우는 것이 답이고 `@Schema(name)`로 둘을 살리지 않는다.
 - T5의 캐시: 메타 응답은 서버에서 캐시하지 않는다(enum에서 바로 만든다). 관리자 설정처럼 런타임에 바뀌는 값이 섞이면 응답에 `Cache-Control: no-store`를 붙인다.
 - T10의 `derived`에 넣는 값은 지금 `strategy-seed-preview`가 주는 값과 등록 resolver(`*CreationResolver`)가 채우는 기본값까지다. 그 밖의 값은 kista-ui의 fable-review 지침서 05가 요구한 목록에 있을 때만 더한다. 목록을 확인할 수 없으면 더하지 않는다.
-- T9의 "컬렉션 반환은 `Items`·`CursorPage`만" 가드는 T4의 묶음 전환이 전부 끝난 뒤에 넣는다. 그 전에 넣으면 기존 메서드가 전부 위반이다.
+- T9의 "컬렉션 반환은 `Items`·`CursorPage`만" 가드는 T4의 묶음 전환이 전부 끝난 뒤에 넣는다. 그 전에 넣으면 기존 메서드가 전부 위반이다. (2026-11-28 T9 실행 시 T3부터 미착수라 가드를 넣지 않았다. 허용 목록 방식(로드맵 9-3)도 대상 타입이 없어 쓸 수 없다. T4 ③ 묶음을 끝내는 커밋에서 넣는다)
 - T8(가계부 집계) 명세 확정(2026-11-14, fable-ui 회신): 다른 명세는 없고 kista-ui 지침서 05의 2-1절 입출력을 그대로 쓴다. 아래는 그 문서를 읽을 수 없을 때의 규칙이다.
 - T8(가계부 집계)의 명세가 끝내 오지 않으면 `ui-api-principles.md`와 kista-ui 쪽 문서의 2-1절 입출력을 그대로 쓴다(5절 대응표). 그것도 읽을 수 없으면 T8은 하지 않는다.
 - T4의 묶음 ④(내부 API)는 하지 않는다. 05 단계 X에서 내부 API가 사라진다.

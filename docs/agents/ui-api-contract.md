@@ -1,6 +1,6 @@
 # UI·API 책임 분담 원칙
 
-작성 2026-11-11 (Fable, 사용자 지시). kista-api와 kista-ui 공통 기준이다. 검토가 끝나면 이 문서를 `kista-api/docs/agents/ui-api-contract.md`로 옮겨 상시 규칙으로 쓰고, kista-ui 루트 `CLAUDE.md`가 그 경로를 가리킨다(지침서 09에서 처리).
+kista-api와 kista-ui 공통 기준이다(2026-11-11 사용자 지시로 작성, 2026-11-28 상시 규칙화). kista-ui 루트 `CLAUDE.md`가 이 경로를 가리킨다. 서버 쪽 오류 응답 형식의 SSOT는 `modules/api/web.md` "ProblemDetail 계약"이다.
 
 ## 기본 원칙
 
@@ -20,7 +20,7 @@
 | 업무 규칙 검증 | 전부. 유일한 관문이다 | 입력 형식 검증(필수, 숫자, 범위)만. 범위·기본값은 메타에서 받는다 |
 | 상태 판정(주문 가능 여부, 만료, 수정 가능 여부) | 응답에 플래그와 사유 코드로 내려준다 | 플래그를 읽어 표시한다. 다시 판정하지 않는다 |
 | enum 라벨·설명·기본값·허용 범위 | `/api/meta` | 메타를 읽는다. 코드값·라벨을 하드코딩하지 않는다 |
-| 오류 문구 | ProblemDetail `detail`(사용자용 한국어 문장)과 `ErrorCode` | `detail`을 그대로 보여준다. `ErrorCode`는 동작 분기(재로그인, 필드 강조)에만 쓴다 |
+| 오류 문구 | ProblemDetail `detail`·`fieldErrors`·`ErrorCode`(형식은 `modules/api/web.md` "ProblemDetail 계약") | `detail`을 그대로 보여주고 `fieldErrors`는 폼 필드에 붙인다. `ErrorCode`는 동작 분기(재로그인, 필드 강조)에만 쓴다 |
 | 와이어 타입 | OpenAPI 스펙이 원본. required·nullable·숫자 형식을 정확히 내보낸다 | 생성 타입을 그대로 쓴다. 수기 재선언·정규화 함수를 두지 않는다 |
 | 날짜·거래일 | KST 거래일 기준으로 계산해 내려준다 | 표시 형식과 "3분 전" 같은 상대 표시만 |
 | 권한·소유권 | 전부 | 메뉴 숨김 같은 화면 편의만. 보안 수단으로 쓰지 않는다 |
@@ -28,8 +28,10 @@
 
 ### 목록 엔드포인트 규약
 
-- **전량형**: 상한이 구조적으로 작은 것만(사용자의 계좌 목록, 전략 목록, enum성 목록). 엔드포인트 문서에 "전량형"과 상한 근거를 적는다. 배열을 그대로 반환한다.
-- **페이지형**: 시간이 지나면 늘어나는 것 전부(주문·체결 이력, 사이클 이력, 가계부 거래내역, 로그, 알림 이력). 요청·응답 형식은 하나로 통일한다(커서 또는 page/size 중 하나, 정렬 파라미터 형식 포함. 지침서 02에서 확정).
+- 모든 컬렉션 응답은 객체 봉투다. 배열을 그대로 반환하지 않는다. 엔드포인트의 `@Operation` 설명 첫머리에 `[전량형: <상한 근거>]` 또는 `[페이지형]`을 적는다.
+- **전량형**: 상한이 구조적으로 작은 것만(사용자의 계좌 목록, 전략 목록, enum성 목록). 응답 `{ "items": [...] }`(`Items<T>`).
+- **페이지형**: 시간이 지나면 늘어나는 것 전부(주문·체결 이력, 사이클 이력, 가계부 거래내역, 로그, 알림 이력). 커서(keyset) 한 형식: 요청 `?cursor=<불투명 문자열>&size=<기본 50, 최대 200>`, 응답 `{ "items": [...], "nextCursor": "...", "hasMore": true }`(`CursorPage<T>`). 전체 건수는 싣지 않는다(총계는 집계 엔드포인트가 준다).
+- 봉투 타입과 기존 목록의 전환은 진행 중이다(fable-review 지침서 10 T3·T4). 전환 전 엔드포인트는 배열을 반환하며, 전환이 끝나면 "컬렉션 반환은 `Items`·`CursorPage`만" ArchUnit 가드를 넣는다.
 - **기간 상한이 있는 전량형 시계열**: 차트용 시계열은 기간 파라미터로 범위를 정하고 서버가 상한을 강제한다. 받은 범위 안의 기간 토글은 UI가 한다.
 - 페이지형을 UI가 전부 받아 놓고 클라이언트에서 자르지 않는다. 전량형에 서버 페이징 파라미터를 붙이지 않는다.
 - 페이지형에서 사용자 선택 정렬·필터·검색이 필요하면 서버 파라미터로 받는다(`sort=<필드>,<asc|desc>`, 필터는 필드명 그대로). 커서는 정렬 키를 포함한 불투명 문자열이다.
@@ -62,7 +64,7 @@ fable-ui가 올린 후보(`kista-ui/docs/superpowers/fable-review/findings/j-ui-
 | 차트 기간 토글(1년치를 받아 화면에서 자름) | UI 소유(예외 아님) | "기간 상한이 있는 전량형 시계열" 안의 즉시 필터 |
 | 차트 덧그림 지표(이동평균·RSI) | **API로 이전** | 같은 지표를 서버가 DCA 조건 판정에 쓴다. 계산이 두 벌이면 화면의 값과 판정에 쓰인 값이 어긋날 수 있다. 시계열 응답에 지표를 실어 준다 |
 | 재신청 쿨다운을 localStorage로 판정 | **API로 이전** | 서버에 쿨다운이 이미 있다(429 `COOLDOWN_ACTIVE`, `retryAfter`). 사용자 상태 응답에 `reapplyAvailableAt`을 싣고 UI는 그것만 본다 |
-| 제출 가능 여부 계산, VR 파생값 placeholder | **API로 이전** | 검증 전용 엔드포인트(지침서 10 T10)가 `fieldErrors`·`warnings`·`derived`를 준다. UI는 디바운스로 부른다 |
+| 제출 가능 여부 계산, VR 파생값 placeholder | **API로 이전** | 검증 전용 엔드포인트가 `fieldErrors`·`warnings`·`derived`를 준다. UI는 디바운스로 부른다 |
 
 ## 운영
 
@@ -70,7 +72,7 @@ fable-ui가 올린 후보(`kista-ui/docs/superpowers/fable-review/findings/j-ui-
 - 코드 리뷰에서 다음을 위반으로 본다: UI의 합계·비율 계산, UI의 코드값→라벨 맵, UI의 수기 응답 타입, 페이지형 목록의 클라이언트 페이징, API 응답에 없는 상태를 UI가 여러 필드로 추론.
 - 위반을 고칠 때는 API를 먼저 바꾸고 UI를 줄인다. 두 레포 변경은 `cross-repo.md`에 짝으로 적는다.
 
-## 현재 어긋난 곳
+## 현재 어긋난 곳 (fable-review 실행 중 — 끝나면 이 절을 지운다)
 
 - UI 쪽 전수: `kista-ui/docs/superpowers/fable-review/findings/j-ui-api-principle-violations.md`. API가 바뀌면 사라질 UI 코드는 약 1,800~2,000줄(중복 제거 후). 필요한 API 변경은 같은 문서 11-3절 A1~A20.
-- API 쪽 현황: `findings/07-list-endpoints.md`. 실행은 지침서 10.
+- API 쪽 현황: `docs/superpowers/fable-review/findings/07-list-endpoints.md`. 실행은 지침서 10.

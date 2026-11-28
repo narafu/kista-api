@@ -34,7 +34,7 @@ kista-infra 검토는 지침서 기준으로 끝났다(실행은 별도 세션).
 
 **T1·T2 완료, ui 01 시작 가능** (2026-11-13, api `1915ba682`). 생성 스펙 변화: `@NullMarked` 범위 record는 non-null 컴포넌트가 required, null 가능 컴포넌트는 optional + nullable(스칼라 `type:[x,"null"]`, enum은 `enum`에 null 포함, 객체 `$ref`는 `oneOf[$ref,{type:null}]`). BigDecimal은 전역 plain number(`1E+2` → `100`). 스키마명 `OrderLine`(관리자 PRIVACY 기준표 주문 행) → `AdminPrivacyBaseOrderLine`. 요청 스키마는 `@NotNull` 없는 primitive 11개(`MonthlyClosingRequest.completed`, `NotificationPrefRequest.enabled`, 가계부 금액 등)가 required로 바뀐다. `BenchmarkComparisonResponse.currentExchangeRate`는 키가 항상 오지만 스펙상 optional+nullable(규칙 일관성).
 
-책임 분담 기준은 `ui-api-principles.md`(사용자 지시로 작성). api 쪽 실행은 지침서 10.
+책임 분담 기준은 `docs/agents/ui-api-contract.md`(사용자 지시로 작성, 옛 `ui-api-principles.md` — T9로 이동). api 쪽 실행은 지침서 10.
 
 - 측정에서 확인: kista-ui는 전략·계좌·통계를 root를 거치지 않고 trading-core로 직접 프록시한다(`kista-ui/app/api/trading-cycles/[[...path]]/route.ts:3-5`). 프로세스 통합·분리 재검토(주제 05) 결론에 따라 ui 프록시 라우트 구조가 바뀐다.
 
@@ -72,7 +72,7 @@ ui 지침서: `kista-ui/docs/superpowers/fable-review/guides/`. api 태스크 �
 | T10 검증 전용 엔드포인트 — **api 완료(`fb9f1d1b9`, 2026-11-28 배포)** | ui 05 규칙 사본 삭제, ui 04 태스크 6(전략 폼 통합, T5·T7도 필요) | api 먼저 |
 | T12 차트 지표, `reapplyAvailableAt` — **api 완료(`dc419a66b`, 2026-11-28 배포)** | ui 05 indicators.ts·localStorage 쿨다운 삭제 | api 먼저 |
 | 지침서 04 단계 A(KIS·업비트 삭제) | ui 05 KIS·업비트 전용 코드 삭제 | 같은 배포 묶음. api의 KIS 삭제는 완료(2026-11-15, 미배포). ui에는 KIS 언급이 41파일 남아 있다(예: `features/account/create-account/steps/AccountInfoStep.tsx:57`, `ConfirmStep.tsx:24`의 `data.broker \|\| 'KIS'`, `entities/meta/__fixtures__/testMeta.ts:10`, `e2e/ledger-budget.spec.ts:12`). 운영 secret에서 뺄 키는 없다(KIS 키는 `.env.example`·compose·deploy에 없음). **ui 제거 완료(b33118f1, 2026-11-15, 미push)** |
-| T9 원칙 문서를 `docs/agents/ui-api-contract.md`로 이동 | ui 08 태스크 10(루트 CLAUDE.md가 그 경로를 가리킴) | 문서 |
+| T9 원칙 문서를 `docs/agents/ui-api-contract.md`로 이동 — **api 완료(2026-11-28). ui 08 태스크 10 요청함.** 컬렉션 반환 가드는 T4 끝으로 미룸 | ui 08 태스크 10(루트 CLAUDE.md가 그 경로를 가리킴) | 문서(배포 제약 없음) |
 
 S7 api 완료분의 ui 후속(2026-11-25, 모두 추가만, 2026-11-28 배포 완료(api `9ffa48504`·ui `bb282a50`, 운영 화면 확인 완료(ui 세션 2026-11-28: T7 fieldErrors·S7 A·B·C 폼·K1 통과, 쓰기는 가드로 차단)) — N19 관찰 뒤 api 먼저 배포, ui는 `gen:types` 재생성부터):
 
