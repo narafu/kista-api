@@ -3,6 +3,7 @@ package com.kista.api.finance.adapter.in.web;
 import com.kista.api.finance.adapter.in.web.dto.FinanceAccountRequest;
 import com.kista.api.finance.adapter.in.web.dto.FinanceAccountResponse;
 import com.kista.api.finance.application.service.FinanceAccountService;
+import com.kista.shared.platform.page.Items;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -16,7 +17,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
-import java.util.List;
 import java.util.UUID;
 
 @Tag(name = "재무")
@@ -27,14 +27,14 @@ public class FinanceAccountController {
 
     private final FinanceAccountService financeAccountService;
 
-    @Operation(summary = "계좌 목록 조회")
+    @Operation(summary = "계좌 목록 조회", description = "[전량형: 사용자 가계부 계좌 수]")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping
-    public List<FinanceAccountResponse> list(
+    public Items<FinanceAccountResponse> list(
             @AuthenticationPrincipal UUID userId) {
-        return financeAccountService.list(userId).stream()
+        return Items.of(financeAccountService.list(userId).stream()
                 .map(FinanceAccountResponse::from)
-                .toList();
+                .toList());
     }
 
     @Operation(summary = "계좌 등록", description = "같은 그룹 안에서도 계좌명 중복이 허용됩니다.")

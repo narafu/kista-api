@@ -18,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -60,17 +61,62 @@ class AssetSnapshotServiceTest {
         return new FinanceCategory(categoryId, null, null, userId, FinanceCategory.Type.ASSET, "투자", 0, null);
     }
 
+    private AssetSnapshot snapshotOf(UUID category, AssetClass assetClass, Market market) {
+        return new AssetSnapshot(UUID.randomUUID(), null, category, null, userId,
+                LocalDate.of(2026, 8, 15), assetClass, market, null, null, 1_000L, null);
+    }
+
+    private FinanceCategory assetCategory(UUID id, UUID parentId) {
+        return new FinanceCategory(id, null, parentId, null, FinanceCategory.Type.ASSET, "c", 0, null);
+    }
+
     @Test
-    @DisplayName("list는 findCurrentGroupId로 얻은 currentGroupId로 조회")
-    void list_queriesWithCurrentGroupId() {
+    @DisplayName("list는 month 범위(1일~말일)로 포트를 조회하고 필터 없으면 그대로 반환")
+    void list_queriesWithMonthRange() {
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
-        when(assetSnapshotPort.findMyScope(userId, groupId, null, null, null))
+        when(assetSnapshotPort.findMyScope(userId, groupId, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), null))
                 .thenReturn(List.of(personalSnapshot()));
 
-        List<AssetSnapshot> result = assetSnapshotService.list(userId, null, null, null);
+        List<AssetSnapshot> result = assetSnapshotService.list(userId, YearMonth.of(2026, 8), null, null, null, null);
 
         assertThat(result).hasSize(1);
-        verify(assetSnapshotPort).findMyScope(userId, groupId, null, null, null);
+        verifyNoInteractions(financeCategoryPort);
+    }
+
+    @Test
+    @DisplayName("list는 categoryId 하위 트리를 포함하고 형제 카테고리는 제외")
+    void list_categoryFilter_includesSubtreeExcludesSibling() {
+        UUID l2 = UUID.randomUUID();
+        UUID l3 = UUID.randomUUID();
+        UUID sibling = UUID.randomUUID();
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        when(financeCategoryPort.findSelectable(userId, groupId, FinanceCategory.Type.ASSET))
+                .thenReturn(List.of(assetCategory(categoryId, null), assetCategory(l2, categoryId),
+                        assetCategory(l3, l2), assetCategory(sibling, null)));
+        AssetSnapshot self = snapshotOf(categoryId, AssetClass.CASH, Market.DOMESTIC);
+        AssetSnapshot child = snapshotOf(l3, AssetClass.CASH, Market.DOMESTIC);
+        when(assetSnapshotPort.findMyScope(any(), any(), any(), any(), any()))
+                .thenReturn(List.of(self, child, snapshotOf(sibling, AssetClass.CASH, Market.DOMESTIC)));
+
+        List<AssetSnapshot> result = assetSnapshotService.list(userId, YearMonth.of(2026, 8), categoryId, null, null, null);
+
+        assertThat(result).containsExactly(self, child);
+    }
+
+    @Test
+    @DisplayName("list는 assetClass·market으로 메모리 필터링")
+    void list_assetClassAndMarketFilter() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        AssetSnapshot match = snapshotOf(categoryId, AssetClass.EQUITY, Market.GLOBAL);
+        when(assetSnapshotPort.findMyScope(any(), any(), any(), any(), any()))
+                .thenReturn(List.of(match,
+                        snapshotOf(categoryId, AssetClass.CASH, Market.GLOBAL),
+                        snapshotOf(categoryId, AssetClass.EQUITY, Market.DOMESTIC)));
+
+        List<AssetSnapshot> result = assetSnapshotService.list(userId, YearMonth.of(2026, 8), null,
+                AssetClass.EQUITY, Market.GLOBAL, null);
+
+        assertThat(result).containsExactly(match);
     }
 
     @Test

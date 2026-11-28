@@ -10,6 +10,13 @@ import com.kista.api.finance.domain.model.FlowTrendPoint;
 import com.kista.api.finance.application.port.output.FinanceBudgetPort;
 import com.kista.api.finance.domain.model.FinanceTransaction;
 import com.kista.api.finance.domain.model.FinanceTransactionCommand;
+import com.kista.api.finance.domain.model.FinanceTransactionCursor;
+import com.kista.api.finance.domain.model.FinanceTransactionListFilter;
+import com.kista.api.finance.domain.model.FinanceTransactionPageQuery;
+import com.kista.api.finance.domain.model.FinanceTransactionPageRow;
+import com.kista.api.finance.domain.model.FinanceTransactionSort;
+import com.kista.shared.platform.page.CursorPage;
+import com.kista.shared.platform.page.PageQuery;
 import com.kista.api.finance.application.port.output.FinanceCategoryPort;
 import com.kista.api.finance.application.port.output.FinanceGroupPort;
 import com.kista.api.finance.application.port.output.FinanceTransactionPort;
@@ -47,10 +54,56 @@ public class FinanceTransactionService {
     private record CategoryEntry(FinanceCategory.Type type, UUID rootId, String rootName, int rootSortOrder, String name) {}
 
     @Transactional(readOnly = true)
-    public List<FinanceTransaction> list(UUID userId, LocalDate from, LocalDate to,
-                                          UUID categoryId, UUID filterUserId) {
-        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
-        return transactionPort.findMyScope(userId, currentGroupId, from, to, categoryId, filterUserId);
+    public CursorPage<FinanceTransaction> list(UUID userId, FinanceTransactionListFilter filter,
+                                               FinanceTransactionSort sort, PageQuery page) {
+        if (filter.type() == FinanceCategory.Type.ASSET) {
+            throw new IllegalArgumentException("자산 유형은 거래 목록에 사용할 수 없습니다.");
+        }
+        UUID groupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        // 커서는 같은 sort로 만든 것만 받는다
+        FinanceTransactionCursor cursor = page.cursor() == null ? null : FinanceTransactionCursor.decode(page.cursor(), sort);
+        Set<UUID> categoryIds = resolveCategoryIds(userId, groupId, filter);
+        if (categoryIds != null && categoryIds.isEmpty()) {
+            return new CursorPage<>(List.of(), null, false);
+        }
+        String memo = filter.memo() == null || filter.memo().isBlank() ? null : filter.memo().trim();
+        FinanceTransactionPageQuery query = new FinanceTransactionPageQuery(userId, groupId, filter.from(), filter.to(),
+                categoryIds, filter.filterUserId(), memo, sort, cursor, page.fetchSize());
+        return CursorPage.of(transactionPort.findPage(query), page.size(), r -> cursorOf(sort, r).encode())
+                .map(FinanceTransactionPageRow::transaction);
+    }
+
+    // type·categoryId(하위 트리 포함) 교집합 — 둘 다 없으면 null(미분류 거래 포함 제한 없음)
+    private Set<UUID> resolveCategoryIds(UUID userId, UUID groupId, FinanceTransactionListFilter filter) {
+        if (filter.type() == null && filter.categoryId() == null) {
+            return null;
+        }
+        List<FinanceCategory> selectable = financeCategoryPort.findSelectable(userId, groupId, null);
+        Map<UUID, CategoryEntry> index = flowIndex(selectable);
+        Set<UUID> ids = new HashSet<>(index.keySet());
+        if (filter.categoryId() != null) {
+            ids.retainAll(FinanceCategory.subtreeIds(selectable, filter.categoryId()));
+        }
+        if (filter.type() != null) {
+            ids.removeIf(id -> index.get(id).type() != filter.type());
+        }
+        if (filter.categoryId() != null && !index.containsKey(filter.categoryId())) {
+            // 삭제됐거나 타 멤버 개인 카테고리처럼 선택 목록 밖이어도 지정한 카테고리 자체는 포함(목록 안이면 type 교집합 유지)
+            ids.add(filter.categoryId());
+        }
+        return ids;
+    }
+
+    // 마지막 행의 정렬 값 — 값 없음(null·빈 메모, 이름 없는 카테고리)은 null
+    private FinanceTransactionCursor cursorOf(FinanceTransactionSort sort, FinanceTransactionPageRow row) {
+        FinanceTransaction t = row.transaction();
+        String value = switch (sort.key()) {
+            case TRANSACTION_DATE -> t.transactionDate().toString();
+            case AMOUNT -> String.valueOf(t.amount());
+            case MEMO -> t.memo() == null || t.memo().isEmpty() ? null : t.memo();
+            case CATEGORY -> row.categoryName();
+        };
+        return new FinanceTransactionCursor(sort, value, t.id());
     }
 
     // shareToGroup=true면 소유자의 현재 그룹 소유로, false면 개인 소유로 원자적 생성한다.

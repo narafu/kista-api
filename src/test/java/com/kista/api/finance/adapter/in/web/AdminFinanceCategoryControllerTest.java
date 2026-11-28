@@ -73,8 +73,8 @@ class AdminFinanceCategoryControllerTest {
         mockMvc.perform(get("/api/admin/finance/categories")
                         .with(authentication(adminToken(DEV_ADMIN_UUID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(l1Id.toString()))
-                .andExpect(jsonPath("$[0].children[0].id").value(l2Id.toString()));
+                .andExpect(jsonPath("$.items[0].id").value(l1Id.toString()))
+                .andExpect(jsonPath("$.items[0].children[0].id").value(l2Id.toString()));
     }
 
     @Test

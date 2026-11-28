@@ -49,7 +49,7 @@ class FinanceBudgetControllerTest {
         mockMvc.perform(get("/api/finance/budgets")
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray());
+                .andExpect(jsonPath("$.items").isArray());
     }
 
     @Test
@@ -62,7 +62,7 @@ class FinanceBudgetControllerTest {
                         .param("groupId", UUID.randomUUID().toString())
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray());
+                .andExpect(jsonPath("$.items").isArray());
     }
 
     @Test

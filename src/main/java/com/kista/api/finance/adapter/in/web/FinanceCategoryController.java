@@ -4,6 +4,7 @@ import com.kista.api.finance.adapter.in.web.dto.FinanceCategoryRequest;
 import com.kista.api.finance.adapter.in.web.dto.FinanceCategoryResponse;
 import com.kista.api.finance.domain.model.FinanceCategory;
 import com.kista.api.finance.application.service.FinanceCategoryService;
+import com.kista.shared.platform.page.Items;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -29,20 +30,20 @@ public class FinanceCategoryController {
 
     private final FinanceCategoryService financeCategoryService;
 
-    @Operation(summary = "카테고리 목록 조회", description = "카테고리를 중첩된 트리로 반환합니다.")
+    @Operation(summary = "카테고리 목록 조회", description = "[전량형: 카테고리 트리] 카테고리를 중첩된 트리로 반환합니다.")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping
-    public List<FinanceCategoryResponse> list(
+    public Items<FinanceCategoryResponse> list(
             @AuthenticationPrincipal UUID userId,
             @RequestParam(required = false) FinanceCategory.Type type) {
         List<FinanceCategory> flat = financeCategoryService.list(userId, type);
         Map<UUID, List<FinanceCategory>> byParent = flat.stream()
                 .filter(c -> c.parentId() != null)
                 .collect(Collectors.groupingBy(FinanceCategory::parentId));
-        return flat.stream()
+        return Items.of(flat.stream()
                 .filter(c -> c.parentId() == null)
                 .map(root -> toResponse(root, byParent))
-                .toList();
+                .toList());
     }
 
     // 재귀적으로 카테고리 계층을 조립해 임의 depth 트리 구성

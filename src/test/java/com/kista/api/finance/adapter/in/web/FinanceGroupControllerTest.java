@@ -51,7 +51,7 @@ class FinanceGroupControllerTest {
         mockMvc.perform(get("/api/finance/groups")
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("가계부"));
+                .andExpect(jsonPath("$.items[0].name").value("가계부"));
     }
 
     @Test
@@ -65,9 +65,9 @@ class FinanceGroupControllerTest {
         mockMvc.perform(get("/api/finance/groups/{id}/members", groupId)
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].userId").value(USER_ID.toString()))
-                .andExpect(jsonPath("$[0].nickname").value("홍길동"))
-                .andExpect(jsonPath("$[0].role").value("OWNER"));
+                .andExpect(jsonPath("$.items[0].userId").value(USER_ID.toString()))
+                .andExpect(jsonPath("$.items[0].nickname").value("홍길동"))
+                .andExpect(jsonPath("$.items[0].role").value("OWNER"));
     }
 
     @Test
@@ -85,10 +85,10 @@ class FinanceGroupControllerTest {
         mockMvc.perform(get("/api/finance/groups/{id}/members", groupId)
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].userId").value(USER_ID.toString()))
-                .andExpect(jsonPath("$[0].nickname").value("홍길동"))
-                .andExpect(jsonPath("$[1].userId").value(otherUserId.toString()))
-                .andExpect(jsonPath("$[1].nickname").value("김철수"));
+                .andExpect(jsonPath("$.items[0].userId").value(USER_ID.toString()))
+                .andExpect(jsonPath("$.items[0].nickname").value("홍길동"))
+                .andExpect(jsonPath("$.items[1].userId").value(otherUserId.toString()))
+                .andExpect(jsonPath("$.items[1].nickname").value("김철수"));
     }
 
     @Test
@@ -102,8 +102,8 @@ class FinanceGroupControllerTest {
         mockMvc.perform(get("/api/finance/groups/{id}/members", groupId)
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].userId").value(USER_ID.toString()))
-                .andExpect(jsonPath("$[0].nickname").doesNotExist());
+                .andExpect(jsonPath("$.items[0].userId").value(USER_ID.toString()))
+                .andExpect(jsonPath("$.items[0].nickname").doesNotExist());
     }
 
     // 컨트롤러가 예외를 삼키지 않고 ProblemDetailExceptionHandler(@RestControllerAdvice)가 SecurityException을

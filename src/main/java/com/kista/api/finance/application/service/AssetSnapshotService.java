@@ -6,11 +6,13 @@ import com.kista.api.finance.domain.model.AssetSnapshotAggregates.*;
 import com.kista.api.finance.application.port.output.FinanceAccountPort;
 import com.kista.api.finance.domain.model.AssetSnapshotCommand;
 import com.kista.api.finance.domain.model.FinanceCategory;
+import com.kista.api.finance.domain.model.Market;
 import com.kista.api.finance.application.port.output.AssetSnapshotPort;
 import com.kista.api.finance.application.port.output.FinanceCategoryPort;
 import com.kista.api.finance.application.port.output.FinanceGroupPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,9 +48,18 @@ public class AssetSnapshotService {
     private final MonthlyClosingGuard monthlyClosingGuard;
 
     @Transactional(readOnly = true)
-    public List<AssetSnapshot> list(UUID userId, LocalDate from, LocalDate to, UUID filterUserId) {
+    public List<AssetSnapshot> list(UUID userId, YearMonth month, @Nullable UUID categoryId,
+                                    @Nullable AssetClass assetClass, @Nullable Market market, @Nullable UUID filterUserId) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
-        return assetSnapshotPort.findMyScope(userId, currentGroupId, from, to, filterUserId);
+        // 카테고리 필터는 하위 트리 포함 — 선택 가능한 자산 카테고리에서 후손 id를 구한다
+        Set<UUID> categoryIds = categoryId == null ? null : FinanceCategory.subtreeIds(
+                financeCategoryPort.findSelectable(userId, currentGroupId, FinanceCategory.Type.ASSET), categoryId);
+        // 한 달치를 읽은 뒤 나머지 조건은 메모리에서 거른다
+        return assetSnapshotPort.findMyScope(userId, currentGroupId, month.atDay(1), month.atEndOfMonth(), filterUserId).stream()
+                .filter(a -> categoryIds == null || categoryIds.contains(a.categoryId()))
+                .filter(a -> assetClass == null || a.assetClass() == assetClass)
+                .filter(a -> market == null || a.market() == market)
+                .toList();
     }
 
     // shareToGroup=true면 소유자의 현재 그룹 소유로, false면 개인 소유로 원자적 생성한다.

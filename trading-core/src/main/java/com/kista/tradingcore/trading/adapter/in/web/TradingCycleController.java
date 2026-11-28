@@ -3,8 +3,11 @@ package com.kista.tradingcore.trading.adapter.in.web;
 import com.kista.tradingcore.trading.adapter.in.web.dto.*;
 import com.kista.tradingcore.trading.application.service.DcaConfigService;
 import com.kista.tradingcore.trading.application.service.DcaExecutionQueryService;
+import com.kista.tradingcore.trading.domain.model.CycleHistoryPage;
 import com.kista.tradingcore.trading.domain.model.DcaExecutionFilter;
 import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.platform.page.CursorPage;
+import com.kista.shared.platform.page.PageQuery;
 import com.kista.tradingcore.trading.application.service.CapitalLedgerService;
 import com.kista.tradingcore.trading.application.service.CapitalWithdrawalService;
 import com.kista.tradingcore.trading.application.service.StrategyService;
@@ -258,19 +261,21 @@ public class TradingCycleController {
     }
 
     // 전략(사이클) 기준 거래 이력 조회 — 커서 기반 페이지네이션
-    @Operation(summary = "전략 거래 이력 조회")
+    @Operation(summary = "전략 거래 이력 조회", description = "[페이지형] 전략(사이클) 기준 거래 이력, 최신순.")
     @GetMapping("/api/trading-cycles/{id}/history")
-    public CycleHistoryPageResponse getStrategyHistory(
+    public CursorPage<CycleHistoryResponse> getStrategyHistory(
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String cursor,
-            @RequestParam(defaultValue = "50") int size) {
-        Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;
-        return CycleHistoryPageResponse.from(
-                tradingCycle.getByStrategy(
-                        id, userId, from, to, cursorInstant, Math.clamp(size, 1, 200)));
+            @RequestParam(required = false) Integer size) {
+        // size 기본값·상한은 PageQuery가 정한다
+        PageQuery query = PageQuery.of(cursor, size);
+        Instant cursorInstant = query.cursor() != null ? Instant.parse(query.cursor()) : null;
+        CycleHistoryPage page = tradingCycle.getByStrategy(id, userId, from, to, cursorInstant, query.size());
+        return new CursorPage<>(page.items().stream().map(CycleHistoryResponse::from).toList(),
+                page.nextCursor() != null ? page.nextCursor().toString() : null, page.hasMore());
     }
 
     // 전략(사이클) 기준 주문 내역 조회 — 사용자 전략 상세 화면용

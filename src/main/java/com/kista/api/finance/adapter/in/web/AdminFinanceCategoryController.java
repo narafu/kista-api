@@ -4,6 +4,7 @@ import com.kista.api.finance.adapter.in.web.dto.FinanceCategoryRequest;
 import com.kista.api.finance.adapter.in.web.dto.FinanceCategoryResponse;
 import com.kista.api.finance.domain.model.FinanceCategory;
 import com.kista.api.finance.application.service.FinanceCategoryService;
+import com.kista.shared.platform.page.Items;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -34,19 +35,19 @@ public class AdminFinanceCategoryController {
 
     private final FinanceCategoryService financeCategoryService;
 
-    @Operation(summary = "시스템 카테고리 목록 조회", description = "그룹 공용 시스템 카테고리를 중첩된 트리로 반환합니다.")
+    @Operation(summary = "시스템 카테고리 목록 조회", description = "[전량형: 시스템 카테고리 트리] 그룹 공용 시스템 카테고리를 중첩된 트리로 반환합니다.")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping
-    public List<FinanceCategoryResponse> list(@RequestParam(required = false) FinanceCategory.Type type) {
+    public Items<FinanceCategoryResponse> list(@RequestParam(required = false) FinanceCategory.Type type) {
         List<FinanceCategory> flat = financeCategoryService.listSystem(type);
         // FinanceCategoryController.list()와 같은 재귀 트리 조립 패턴 — 그룹 사용자용 컨트롤러는 건드리지 않는다.
         Map<UUID, List<FinanceCategory>> byParent = flat.stream()
                 .filter(c -> c.parentId() != null)
                 .collect(Collectors.groupingBy(FinanceCategory::parentId));
-        return flat.stream()
+        return Items.of(flat.stream()
                 .filter(c -> c.parentId() == null)
                 .map(root -> toResponse(root, byParent))
-                .toList();
+                .toList());
     }
 
     private FinanceCategoryResponse toResponse(FinanceCategory category, Map<UUID, List<FinanceCategory>> byParent) {

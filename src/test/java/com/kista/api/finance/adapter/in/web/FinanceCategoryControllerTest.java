@@ -52,9 +52,9 @@ class FinanceCategoryControllerTest {
         mockMvc.perform(get("/api/finance/categories")
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(l1Id.toString()))
-                .andExpect(jsonPath("$[0].children[0].id").value(l2Id.toString()))
-                .andExpect(jsonPath("$[0].children[0].name").value("외식"));
+                .andExpect(jsonPath("$.items[0].id").value(l1Id.toString()))
+                .andExpect(jsonPath("$.items[0].children[0].id").value(l2Id.toString()))
+                .andExpect(jsonPath("$.items[0].children[0].name").value("외식"));
     }
 
     @Test
@@ -73,10 +73,10 @@ class FinanceCategoryControllerTest {
         mockMvc.perform(get("/api/finance/categories")
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(l1Id.toString()))
-                .andExpect(jsonPath("$[0].children[0].id").value(l2Id.toString()))
-                .andExpect(jsonPath("$[0].children[0].children[0].id").value(l3Id.toString()))
-                .andExpect(jsonPath("$[0].children[0].children[0].name").value("배달"));
+                .andExpect(jsonPath("$.items[0].id").value(l1Id.toString()))
+                .andExpect(jsonPath("$.items[0].children[0].id").value(l2Id.toString()))
+                .andExpect(jsonPath("$.items[0].children[0].children[0].id").value(l3Id.toString()))
+                .andExpect(jsonPath("$.items[0].children[0].children[0].name").value("배달"));
     }
 
     @Test

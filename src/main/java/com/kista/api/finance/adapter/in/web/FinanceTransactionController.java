@@ -4,7 +4,11 @@ import com.kista.api.finance.adapter.in.web.dto.BudgetProgressResponse;
 import com.kista.api.finance.adapter.in.web.dto.FlowSummaryResponse;
 import com.kista.api.finance.adapter.in.web.dto.FlowTrendResponse;
 import com.kista.api.finance.domain.model.FinanceCategory;
+import com.kista.api.finance.domain.model.FinanceTransactionListFilter;
+import com.kista.api.finance.domain.model.FinanceTransactionSort;
 import com.kista.api.finance.domain.model.FlowPeriod;
+import com.kista.shared.platform.page.CursorPage;
+import com.kista.shared.platform.page.PageQuery;
 import com.kista.api.finance.adapter.in.web.dto.FinanceTransactionRequest;
 import com.kista.api.finance.adapter.in.web.dto.FinanceTransactionResponse;
 import com.kista.api.finance.application.service.FinanceTransactionService;
@@ -35,18 +39,29 @@ public class FinanceTransactionController {
 
     private final FinanceTransactionService financeTransactionService;
 
-    @Operation(summary = "거래내역 목록 조회", description = "userId=본인UUID로 필터링하면 개인 탭(내가 입력한 내역만)입니다.")
-    @ApiResponse(responseCode = "200", description = "조회 성공")
+    @Operation(summary = "거래내역 목록 조회", description = "[페이지형] sort=<field>,<asc|desc>(field는 transactionDate|category|memo|amount, 방향 필수, 생략 시 transactionDate,desc, 동순위는 id 같은 방향). "
+            + "category 정렬은 카테고리 이름, memo·category 정렬에서 값 없는 행은 방향과 무관하게 맨 뒤. "
+            + "categoryId는 하위 카테고리 포함, type은 카테고리 유형(INCOME·EXPENSE·SAVING). "
+            + "커서는 불투명 문자열이며 같은 sort로만 이어 받을 수 있습니다. 운영 거래가 수백 건 규모라 별도 인덱스 없이 조회합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "잘못된 파라미터(sort·cursor 형식, type=ASSET)")
+    })
     @GetMapping
-    public List<FinanceTransactionResponse> list(
+    public CursorPage<FinanceTransactionResponse> list(
             @AuthenticationPrincipal UUID userId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) FinanceCategory.Type type,
             @RequestParam(required = false) UUID categoryId,
-            @RequestParam(name = "userId", required = false) UUID filterUserId) {
-        return financeTransactionService.list(userId, from, to, categoryId, filterUserId).stream()
-                .map(FinanceTransactionResponse::from)
-                .toList();
+            @RequestParam(required = false) String memo,
+            @RequestParam(name = "userId", required = false) UUID filterUserId,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer size) {
+        FinanceTransactionListFilter filter = new FinanceTransactionListFilter(from, to, type, categoryId, memo, filterUserId);
+        return financeTransactionService.list(userId, filter, FinanceTransactionSort.parse(sort), PageQuery.of(cursor, size))
+                .map(FinanceTransactionResponse::from);
     }
 
     @Operation(summary = "거래 기간 요약", description = "수입·소비·저축 한 유형의 합계·건수·전월/전년 비교·월평균. 기준일은 서버 KST 오늘입니다.")

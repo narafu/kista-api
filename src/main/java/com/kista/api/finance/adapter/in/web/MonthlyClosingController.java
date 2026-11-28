@@ -3,6 +3,7 @@ package com.kista.api.finance.adapter.in.web;
 import com.kista.api.finance.adapter.in.web.dto.MonthlyClosingRequest;
 import com.kista.api.finance.adapter.in.web.dto.MonthlyClosingResponse;
 import com.kista.api.finance.application.service.MonthlyClosingService;
+import com.kista.shared.platform.page.Items;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -12,7 +13,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @Tag(name = "재무")
@@ -23,14 +23,14 @@ public class MonthlyClosingController {
 
     private final MonthlyClosingService monthlyClosingService;
 
-    @Operation(summary = "월별 마감 상태 목록 조회")
+    @Operation(summary = "월별 마감 상태 목록 조회", description = "[전량형: 월 1건]")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping
-    public List<MonthlyClosingResponse> list(
+    public Items<MonthlyClosingResponse> list(
             @AuthenticationPrincipal UUID userId) {
-        return monthlyClosingService.list(userId).stream()
+        return Items.of(monthlyClosingService.list(userId).stream()
                 .map(MonthlyClosingResponse::from)
-                .toList();
+                .toList());
     }
 
     @Operation(summary = "월별 마감 상태 전환", description = "해당 연월의 완료 상태를 등록하거나 갱신합니다(upsert). 리소스 전체 교체가 아닌 상태 전이라 PATCH를 사용합니다.")

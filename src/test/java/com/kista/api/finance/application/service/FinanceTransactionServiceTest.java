@@ -3,6 +3,13 @@ package com.kista.api.finance.application.service;
 import com.kista.api.finance.domain.model.FinanceCategory;
 import com.kista.api.finance.domain.model.FinanceTransaction;
 import com.kista.api.finance.domain.model.FinanceTransactionCommand;
+import com.kista.api.finance.domain.model.FinanceTransactionCursor;
+import com.kista.api.finance.domain.model.FinanceTransactionListFilter;
+import com.kista.api.finance.domain.model.FinanceTransactionPageQuery;
+import com.kista.api.finance.domain.model.FinanceTransactionPageRow;
+import com.kista.api.finance.domain.model.FinanceTransactionSort;
+import com.kista.shared.platform.page.CursorPage;
+import com.kista.shared.platform.page.PageQuery;
 import com.kista.api.finance.domain.model.MonthlyClosing;
 import com.kista.api.finance.application.port.output.FinanceCategoryPort;
 import com.kista.api.finance.application.port.output.FinanceGroupPort;
@@ -55,17 +62,111 @@ class FinanceTransactionServiceTest {
         return new FinanceCategory(categoryId, null, null, userId, FinanceCategory.Type.EXPENSE, "식비", 0, null);
     }
 
+    private static FinanceTransactionListFilter filter(FinanceCategory.Type type, UUID categoryId, String memo) {
+        return new FinanceTransactionListFilter(null, null, type, categoryId, memo, null);
+    }
+
+    private FinanceCategory category(UUID id, UUID parentId, FinanceCategory.Type type, String name) {
+        return new FinanceCategory(id, null, parentId, userId, type, name, 0, null);
+    }
+
     @Test
-    @DisplayName("list는 findCurrentGroupId로 얻은 currentGroupId로 조회")
-    void list_queriesWithCurrentGroupId() {
+    @DisplayName("list: type·categoryId 없으면 categoryIds=null, memo는 trim, 한 건 더 읽어 hasMore 판정")
+    void list_noCategoryFilter_passesNullAndBuildsNextCursor() {
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
-        when(transactionPort.findMyScope(userId, groupId, null, null, null, null))
-                .thenReturn(List.of(personalTransaction()));
+        FinanceTransaction t1 = new FinanceTransaction(UUID.randomUUID(), null, categoryId, userId, LocalDate.of(2026, 1, 15), 10L, "a", null);
+        FinanceTransaction t2 = new FinanceTransaction(UUID.randomUUID(), null, categoryId, userId, LocalDate.of(2026, 1, 14), 20L, "b", null);
+        when(transactionPort.findPage(any())).thenReturn(List.of(
+                new FinanceTransactionPageRow(t1, "식비"), new FinanceTransactionPageRow(t2, "식비")));
 
-        List<FinanceTransaction> result = transactionService.list(userId, null, null, null, null);
+        CursorPage<FinanceTransaction> page = transactionService.list(userId, filter(null, null, "  점심 "),
+                FinanceTransactionSort.DEFAULT, new PageQuery(null, 1));
 
-        assertThat(result).hasSize(1);
-        verify(transactionPort).findMyScope(userId, groupId, null, null, null, null);
+        var captor = org.mockito.ArgumentCaptor.forClass(FinanceTransactionPageQuery.class);
+        verify(transactionPort).findPage(captor.capture());
+        assertThat(captor.getValue().categoryIds()).isNull();
+        assertThat(captor.getValue().memo()).isEqualTo("점심");
+        assertThat(captor.getValue().limit()).isEqualTo(2);
+        assertThat(captor.getValue().groupId()).isEqualTo(groupId);
+        assertThat(page.items()).containsExactly(t1);
+        assertThat(page.hasMore()).isTrue();
+        // 다음 커서는 마지막 반환 행(t1)의 정렬 값
+        assertThat(FinanceTransactionCursor.decode(page.nextCursor(), FinanceTransactionSort.DEFAULT))
+                .isEqualTo(new FinanceTransactionCursor(FinanceTransactionSort.DEFAULT, "2026-01-15", t1.id()));
+    }
+
+    @Test
+    @DisplayName("list: 정렬 키별 커서 값 — amount·memo(빈 메모는 null)·category")
+    void list_cursorValuePerSortKey() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        FinanceTransaction t = new FinanceTransaction(UUID.randomUUID(), null, categoryId, userId, LocalDate.of(2026, 1, 15), 777L, "", null);
+        when(transactionPort.findPage(any())).thenReturn(List.of(new FinanceTransactionPageRow(t, "식비"), new FinanceTransactionPageRow(t, "식비")));
+        var amount = new FinanceTransactionSort(FinanceTransactionSort.Key.AMOUNT, true);
+        var memo = new FinanceTransactionSort(FinanceTransactionSort.Key.MEMO, true);
+        var cat = new FinanceTransactionSort(FinanceTransactionSort.Key.CATEGORY, false);
+
+        assertThat(FinanceTransactionCursor.decode(transactionService.list(userId, filter(null, null, null), amount, new PageQuery(null, 1)).nextCursor(), amount).value()).isEqualTo("777");
+        assertThat(FinanceTransactionCursor.decode(transactionService.list(userId, filter(null, null, null), memo, new PageQuery(null, 1)).nextCursor(), memo).value()).isNull();
+        assertThat(FinanceTransactionCursor.decode(transactionService.list(userId, filter(null, null, null), cat, new PageQuery(null, 1)).nextCursor(), cat).value()).isEqualTo("식비");
+    }
+
+    @Test
+    @DisplayName("list: categoryId는 하위 트리 포함·형제 제외, type 교집합")
+    void list_categoryIdSubtree_andTypeIntersection() {
+        UUID l1 = UUID.randomUUID(), l2 = UUID.randomUUID(), l3 = UUID.randomUUID(), sibling = UUID.randomUUID(), income = UUID.randomUUID();
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(financeCategoryPort.findSelectable(userId, null, null)).thenReturn(List.of(
+                category(l1, null, FinanceCategory.Type.EXPENSE, "L1"), category(l2, l1, FinanceCategory.Type.EXPENSE, "L2"),
+                category(l3, l2, FinanceCategory.Type.EXPENSE, "L3"), category(sibling, null, FinanceCategory.Type.EXPENSE, "S"),
+                category(income, null, FinanceCategory.Type.INCOME, "I")));
+        when(transactionPort.findPage(any())).thenReturn(List.of());
+
+        transactionService.list(userId, filter(null, l1, null), FinanceTransactionSort.DEFAULT, new PageQuery(null, 10));
+        transactionService.list(userId, filter(FinanceCategory.Type.EXPENSE, null, null), FinanceTransactionSort.DEFAULT, new PageQuery(null, 10));
+
+        var captor = org.mockito.ArgumentCaptor.forClass(FinanceTransactionPageQuery.class);
+        verify(transactionPort, times(2)).findPage(captor.capture());
+        assertThat(captor.getAllValues().get(0).categoryIds()).containsExactlyInAnyOrder(l1, l2, l3);
+        assertThat(captor.getAllValues().get(1).categoryIds()).containsExactlyInAnyOrder(l1, l2, l3, sibling);
+    }
+
+    @Test
+    @DisplayName("list: categoryId가 선택 목록 밖이어도 자기 자신은 포트로 전달")
+    void list_categoryIdOutsideSelectable_stillPassed() {
+        UUID outside = UUID.randomUUID();
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(financeCategoryPort.findSelectable(userId, null, null)).thenReturn(List.of());
+        when(transactionPort.findPage(any())).thenReturn(List.of());
+
+        transactionService.list(userId, filter(null, outside, null), FinanceTransactionSort.DEFAULT, new PageQuery(null, 10));
+
+        var captor = org.mockito.ArgumentCaptor.forClass(FinanceTransactionPageQuery.class);
+        verify(transactionPort).findPage(captor.capture());
+        assertThat(captor.getValue().categoryIds()).containsExactly(outside);
+    }
+
+    @Test
+    @DisplayName("list: 교집합이 비면 포트를 부르지 않고 빈 페이지")
+    void list_emptyIntersection_skipsPort() {
+        UUID income = UUID.randomUUID();
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(financeCategoryPort.findSelectable(userId, null, null)).thenReturn(List.of(category(income, null, FinanceCategory.Type.INCOME, "I")));
+
+        CursorPage<FinanceTransaction> page = transactionService.list(userId, filter(FinanceCategory.Type.EXPENSE, income, null),
+                FinanceTransactionSort.DEFAULT, new PageQuery(null, 10));
+
+        assertThat(page.items()).isEmpty();
+        assertThat(page.hasMore()).isFalse();
+        verify(transactionPort, never()).findPage(any());
+    }
+
+    @Test
+    @DisplayName("list: type=ASSET이면 IAE")
+    void list_assetType_throws() {
+        assertThatThrownBy(() -> transactionService.list(userId, filter(FinanceCategory.Type.ASSET, null, null),
+                FinanceTransactionSort.DEFAULT, new PageQuery(null, 10)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("자산 유형은 거래 목록에 사용할 수 없습니다.");
     }
 
     @Test

@@ -8,6 +8,7 @@ import com.kista.api.finance.adapter.in.web.dto.FinanceGroupResponse;
 import com.kista.api.finance.domain.model.FinanceGroupInvitation;
 import com.kista.api.finance.application.port.output.FinanceMemberPort;
 import com.kista.api.finance.application.service.FinanceGroupService;
+import com.kista.shared.platform.page.Items;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -21,7 +22,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
-import java.util.List;
 import java.util.UUID;
 
 @Tag(name = "재무")
@@ -33,28 +33,28 @@ public class FinanceGroupController {
     private final FinanceGroupService financeGroupService;
     private final FinanceMemberPort financeMemberPort; // 멤버 닉네임 조회(user 모듈 의존은 포트 어댑터가 격리)
 
-    @Operation(summary = "내 그룹 목록 조회", description = "내가 속한 그룹 목록(한 사용자는 최대 1개 그룹).")
+    @Operation(summary = "내 그룹 목록 조회", description = "[전량형: 소속 그룹 수] 내가 속한 그룹 목록(한 사용자는 최대 1개 그룹).")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping("/groups")
-    public List<FinanceGroupResponse> listMyGroups(@AuthenticationPrincipal UUID userId) {
-        return financeGroupService.listMyGroups(userId).stream()
+    public Items<FinanceGroupResponse> listMyGroups(@AuthenticationPrincipal UUID userId) {
+        return Items.of(financeGroupService.listMyGroups(userId).stream()
                 .map(FinanceGroupResponse::from)
-                .toList();
+                .toList());
     }
 
-    @Operation(summary = "그룹 멤버 목록 조회")
+    @Operation(summary = "그룹 멤버 목록 조회", description = "[전량형: 그룹 멤버 수]")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "403", description = "그룹 멤버가 아님")
     })
     @GetMapping("/groups/{id}/members")
-    public List<FinanceGroupMemberResponse> listMembers(
+    public Items<FinanceGroupMemberResponse> listMembers(
             @Parameter(description = "그룹 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
-        return financeGroupService.listMembers(id, userId).stream()
+        return Items.of(financeGroupService.listMembers(id, userId).stream()
                 // 조회와 탈퇴 사이 경합으로 방금 탈퇴한 멤버는 닉네임 없이(null) 보여준다 — 목록 전체를 404로 죽이지 않는다
                 .map(m -> FinanceGroupMemberResponse.from(m, financeMemberPort.nicknameOf(m.userId()).orElse(null)))
-                .toList();
+                .toList());
     }
 
     @Operation(summary = "그룹 초대 생성", description = "그룹 OWNER만 생성할 수 있습니다.")

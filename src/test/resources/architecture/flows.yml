@@ -1143,6 +1143,7 @@ flows:
         desc: >-
           거래 입력 창(TransactionFormDialog)과 자산 기록 폼, 일괄 등록(BulkRegisterForm)이 kista-ui의 /api/finance 프록시를 거쳐 kista-web으로 간다
           (매매 서버 경로가 아니다). "그룹에 공유" 체크 여부로 개인·그룹 소유가 정해진다. 거래는 자산 카테고리를 쓸 수 없고 자산 기록은 자산 카테고리만 쓸 수 있다.
+          목록은 거래가 커서 페이지(GET /api/finance/transactions — type·categoryId 하위 트리·memo·sort 서버 파라미터), 자산 기록은 월 단위 전량(GET /api/finance/asset-snapshots?month=)이고 나머지 가계부 목록은 {items} 봉투다.
         code: [FinanceTransactionController, AssetSnapshotController, FinanceBulkController, FinanceTransactionService#create, AssetSnapshotService#create]
         cond: 입력·수정할 때
         state: "finance_transactions / finance_asset_snapshots 행 생성"

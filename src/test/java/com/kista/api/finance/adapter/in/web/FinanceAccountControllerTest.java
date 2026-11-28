@@ -46,7 +46,7 @@ class FinanceAccountControllerTest {
         mockMvc.perform(get("/api/finance/accounts")
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray());
+                .andExpect(jsonPath("$.items").isArray());
     }
 
     @Test

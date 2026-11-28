@@ -4,7 +4,10 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 // 3-state 소유축: system(userId·groupId 둘 다 null, 전 사용자 읽기전용) /
@@ -29,6 +32,23 @@ public record FinanceCategory(
             UUID.fromString("f1000000-0000-4000-8000-000000000401"),
             SYSTEM_LOAN_ID,
             UUID.fromString("f1000000-0000-4000-8000-000000000402"));
+
+    // rootId 자신과 parentId 사슬로 이어진 모든 후손 id (임의 depth) — rootId가 목록에 없어도 자신은 포함
+    public static Set<UUID> subtreeIds(Collection<FinanceCategory> categories, UUID rootId) {
+        Set<UUID> ids = new HashSet<>();
+        ids.add(rootId);
+        // 새 후손이 더 안 잡힐 때까지 반복해 깊이와 무관하게 확장한다
+        boolean grown = true;
+        while (grown) {
+            grown = false;
+            for (FinanceCategory c : categories) {
+                if (c.parentId() != null && ids.contains(c.parentId()) && ids.add(c.id())) {
+                    grown = true;
+                }
+            }
+        }
+        return ids;
+    }
 
     public boolean isSystem() {
         return userId == null;

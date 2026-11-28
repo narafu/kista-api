@@ -58,29 +58,36 @@ class AssetSnapshotControllerTest {
     }
 
     @Test
+    void list_monthMissing_400() throws Exception {
+        mockMvc.perform(get("/api/finance/asset-snapshots")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void list_categoryIsL1_rootCategoryIdEqualsOwnId() throws Exception {
         UUID categoryId = UUID.randomUUID();
-        when(assetSnapshotService.list(any(), any(), any(), any()))
+        when(assetSnapshotService.list(any(), any(), any(), any(), any(), any()))
                 .thenReturn(List.of(snapshot(categoryId, null)));
         FinanceCategory l1Category = new FinanceCategory(categoryId, null, null, null,
                 FinanceCategory.Type.ASSET, "주식", 0, Instant.now());
         when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(l1Category);
 
-        mockMvc.perform(get("/api/finance/asset-snapshots")
+        mockMvc.perform(get("/api/finance/asset-snapshots").param("month", "2026-08")
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].rootCategoryId").value(categoryId.toString()))
-                .andExpect(jsonPath("$[0].categoryName").value("주식"))
-                .andExpect(jsonPath("$[0].accountName").value(nullValue()))
-                .andExpect(jsonPath("$[0].accountInstitution").value(nullValue()))
-                .andExpect(jsonPath("$[0].accountOwner").value(nullValue()));
+                .andExpect(jsonPath("$.items[0].rootCategoryId").value(categoryId.toString()))
+                .andExpect(jsonPath("$.items[0].categoryName").value("주식"))
+                .andExpect(jsonPath("$.items[0].accountName").value(nullValue()))
+                .andExpect(jsonPath("$.items[0].accountInstitution").value(nullValue()))
+                .andExpect(jsonPath("$.items[0].accountOwner").value(nullValue()));
     }
 
     @Test
     void list_categoryIsL2_rootCategoryIdEqualsParentId() throws Exception {
         UUID parentId = UUID.randomUUID();
         UUID categoryId = UUID.randomUUID();
-        when(assetSnapshotService.list(any(), any(), any(), any()))
+        when(assetSnapshotService.list(any(), any(), any(), any(), any(), any()))
                 .thenReturn(List.of(snapshot(categoryId, null)));
         FinanceCategory l2Category = new FinanceCategory(categoryId, null, parentId, null,
                 FinanceCategory.Type.ASSET, "국내주식", 0, Instant.now());
@@ -89,11 +96,11 @@ class AssetSnapshotControllerTest {
         when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(l2Category);
         when(financeCategoryPort.findByIdOrThrow(parentId)).thenReturn(rootCategory);
 
-        mockMvc.perform(get("/api/finance/asset-snapshots")
+        mockMvc.perform(get("/api/finance/asset-snapshots").param("month", "2026-08")
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].rootCategoryId").value(parentId.toString()))
-                .andExpect(jsonPath("$[0].categoryName").value("국내주식"));
+                .andExpect(jsonPath("$.items[0].rootCategoryId").value(parentId.toString()))
+                .andExpect(jsonPath("$.items[0].categoryName").value("국내주식"));
     }
 
     @Test
@@ -101,7 +108,7 @@ class AssetSnapshotControllerTest {
         UUID rootId = UUID.randomUUID();
         UUID parentId = UUID.randomUUID();
         UUID categoryId = UUID.randomUUID();
-        when(assetSnapshotService.list(any(), any(), any(), any()))
+        when(assetSnapshotService.list(any(), any(), any(), any(), any(), any()))
                 .thenReturn(List.of(snapshot(categoryId, null)));
         FinanceCategory l3Category = new FinanceCategory(categoryId, null, parentId, null,
                 FinanceCategory.Type.ASSET, "미국주식", 0, Instant.now());
@@ -113,18 +120,18 @@ class AssetSnapshotControllerTest {
         when(financeCategoryPort.findByIdOrThrow(parentId)).thenReturn(l2Category);
         when(financeCategoryPort.findByIdOrThrow(rootId)).thenReturn(rootCategory);
 
-        mockMvc.perform(get("/api/finance/asset-snapshots")
+        mockMvc.perform(get("/api/finance/asset-snapshots").param("month", "2026-08")
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].rootCategoryId").value(rootId.toString()))
-                .andExpect(jsonPath("$[0].categoryName").value("미국주식"));
+                .andExpect(jsonPath("$.items[0].rootCategoryId").value(rootId.toString()))
+                .andExpect(jsonPath("$.items[0].categoryName").value("미국주식"));
     }
 
     @Test
     void list_withAccountId_accountNamePresent() throws Exception {
         UUID categoryId = UUID.randomUUID();
         UUID accountId = UUID.randomUUID();
-        when(assetSnapshotService.list(any(), any(), any(), any()))
+        when(assetSnapshotService.list(any(), any(), any(), any(), any(), any()))
                 .thenReturn(List.of(snapshot(categoryId, accountId)));
         FinanceCategory category = new FinanceCategory(categoryId, null, null, null,
                 FinanceCategory.Type.ASSET, "주식", 0, Instant.now());
@@ -133,12 +140,12 @@ class AssetSnapshotControllerTest {
                 FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", null, null, "토스증권", "본인", Instant.now());
         when(financeAccountPort.findByIdOrThrow(accountId)).thenReturn(account);
 
-        mockMvc.perform(get("/api/finance/asset-snapshots")
+        mockMvc.perform(get("/api/finance/asset-snapshots").param("month", "2026-08")
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].accountName").value("토스증권 일반계좌"))
-                .andExpect(jsonPath("$[0].accountInstitution").value("토스증권"))
-                .andExpect(jsonPath("$[0].accountOwner").value("본인"));
+                .andExpect(jsonPath("$.items[0].accountName").value("토스증권 일반계좌"))
+                .andExpect(jsonPath("$.items[0].accountInstitution").value("토스증권"))
+                .andExpect(jsonPath("$.items[0].accountOwner").value("본인"));
     }
 
     @Test

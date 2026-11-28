@@ -47,8 +47,8 @@ class MonthlyClosingControllerTest {
         mockMvc.perform(get("/api/finance/monthly-closings")
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].month").value("2026-08"))
-                .andExpect(jsonPath("$[0].groupId").value(groupId.toString()));
+                .andExpect(jsonPath("$.items[0].month").value("2026-08"))
+                .andExpect(jsonPath("$.items[0].groupId").value(groupId.toString()));
     }
 
     // 개인 마감 행은 groupId=null이 응답에 명시적으로 실려야 한다(생략 아님) — 클라이언트가
@@ -62,7 +62,7 @@ class MonthlyClosingControllerTest {
         mockMvc.perform(get("/api/finance/monthly-closings")
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].groupId").value(org.hamcrest.Matchers.nullValue()));
+                .andExpect(jsonPath("$.items[0].groupId").value(org.hamcrest.Matchers.nullValue()));
     }
 
     // PATCH /{month}로 상태 전이한다 — plan §6에서 구 AssetMonthlyCheck의 PUT을 의도적으로 PATCH로 바꾼 지점.

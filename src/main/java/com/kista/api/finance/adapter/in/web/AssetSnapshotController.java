@@ -7,9 +7,12 @@ import com.kista.api.finance.adapter.in.web.dto.AssetTrendResponse;
 import com.kista.api.finance.domain.model.AssetSnapshotAggregates;
 import com.kista.api.finance.adapter.in.web.dto.AssetSnapshotRequest;
 import com.kista.api.finance.adapter.in.web.dto.AssetSnapshotResponse;
+import com.kista.api.finance.domain.model.AssetClass;
 import com.kista.api.finance.domain.model.AssetSnapshot;
 import com.kista.api.finance.domain.model.FinanceAccount;
 import com.kista.api.finance.domain.model.FinanceCategory;
+import com.kista.api.finance.domain.model.Market;
+import com.kista.shared.platform.page.Items;
 import com.kista.api.finance.application.service.AssetSnapshotService;
 import com.kista.api.finance.application.port.output.FinanceAccountPort;
 import com.kista.api.finance.application.port.output.FinanceCategoryPort;
@@ -27,9 +30,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
-import java.time.LocalDate;
 import java.time.YearMonth;
-import java.util.List;
 import java.util.UUID;
 
 @Tag(name = "재무")
@@ -44,17 +45,22 @@ public class AssetSnapshotController {
     private final FinanceCategoryPort financeCategoryPort;
     private final FinanceAccountPort financeAccountPort;
 
-    @Operation(summary = "자산 기록 목록 조회", description = "기준 날짜 최신순으로 반환합니다.")
-    @ApiResponse(responseCode = "200", description = "조회 성공")
+    @Operation(summary = "자산 기록 목록 조회", description = "[전량형: 한 달치 — month 필수] 기준 날짜 최신순(동일하면 id 역순). categoryId는 하위 카테고리를 포함합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "month 누락 또는 형식 오류")
+    })
     @GetMapping
-    public List<AssetSnapshotResponse> list(
+    public Items<AssetSnapshotResponse> list(
             @AuthenticationPrincipal UUID userId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM") YearMonth month,
+            @RequestParam(required = false) UUID categoryId,
+            @RequestParam(required = false) AssetClass assetClass,
+            @RequestParam(required = false) Market market,
             @RequestParam(name = "userId", required = false) UUID filterUserId) {
-        return assetSnapshotService.list(userId, from, to, filterUserId).stream()
+        return Items.of(assetSnapshotService.list(userId, month, categoryId, assetClass, market, filterUserId).stream()
                 .map(this::enrich)
-                .toList();
+                .toList());
     }
 
     @Operation(summary = "자산 월 요약", description = "month 생략 시 가장 최근 기록 월. 직전 기록 월 요약(previous)을 함께 반환합니다.")

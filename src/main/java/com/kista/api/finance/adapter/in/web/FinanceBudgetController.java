@@ -3,6 +3,7 @@ package com.kista.api.finance.adapter.in.web;
 import com.kista.api.finance.adapter.in.web.dto.FinanceBudgetRequest;
 import com.kista.api.finance.adapter.in.web.dto.FinanceBudgetResponse;
 import com.kista.api.finance.application.service.FinanceBudgetService;
+import com.kista.shared.platform.page.Items;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -18,7 +19,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.UUID;
 
 @Tag(name = "재무")
@@ -29,16 +29,16 @@ public class FinanceBudgetController {
 
     private final FinanceBudgetService financeBudgetService;
 
-    @Operation(summary = "예산 목록 조회", description = "date를 지정하면 그 날짜에 유효한 예산만 반환합니다.")
+    @Operation(summary = "예산 목록 조회", description = "[전량형: 예산 규칙 수] date를 지정하면 그 날짜에 유효한 예산만 반환합니다.")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping
-    public List<FinanceBudgetResponse> list(
+    public Items<FinanceBudgetResponse> list(
             @AuthenticationPrincipal UUID userId,
             @RequestParam(required = false) UUID categoryId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return financeBudgetService.list(userId, categoryId, date).stream()
+        return Items.of(financeBudgetService.list(userId, categoryId, date).stream()
                 .map(FinanceBudgetResponse::from)
-                .toList();
+                .toList());
     }
 
     @Operation(summary = "예산 등록")

@@ -1,6 +1,8 @@
 package com.kista.api.finance.application.port.output;
 
 import com.kista.api.finance.domain.model.FinanceTransaction;
+import com.kista.api.finance.domain.model.FinanceTransactionPageQuery;
+import com.kista.api.finance.domain.model.FinanceTransactionPageRow;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -11,6 +13,9 @@ import java.util.UUID;
 public interface FinanceTransactionPort {
     // from/to/categoryId/filterUserId는 선택적 필터 — null이면 무시. currentGroupId는 무그룹 유저면 null(개인 데이터만 조회).
     List<FinanceTransaction> findMyScope(UUID userId, UUID currentGroupId, LocalDate from, LocalDate to, UUID categoryId, UUID filterUserId);
+
+    // keyset 페이지 조회 — query.limit건까지 정렬 순서대로 반환
+    List<FinanceTransactionPageRow> findPage(FinanceTransactionPageQuery query);
 
     Optional<FinanceTransaction> findById(UUID id);
 

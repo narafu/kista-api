@@ -105,7 +105,7 @@
 |---|---|---|---|
 | T1 | **응답 required 정확화.** springdoc의 jspecify 지원 여부를 gradle 캐시의 sources jar로 확인 → 방식 결정 → DTO 패키지에 `@NullMarked`, null 가능 컴포넌트에 `@Nullable`. 스펙 가드 테스트 추가: 생성 스펙에서 Response 스키마의 optional 프로퍼티가 `@Nullable` 컴포넌트 집합과 일치 | Opus(방식·null 판정), Sonnet(적용) | 가드 테스트 통과. fable-ui에 "생성 타입 재생성 가능" 통지 |
 | T2 | **BigDecimal 전역 plain number.** 전역 설정 1곳, `PlainDecimalSerializer` 2벌 삭제, 직렬화 테스트 1개(`1E+2`가 `100`으로 나감), EPR·Redis 호환 확인 | Sonnet | 테스트 통과 |
-| T3 | 공용 `PageRequest`·`CursorPage<T>`·`Items<T>`를 `:shared` platform에 추가. 기존 커서 2개 엔드포인트를 이 타입으로 옮긴다(와이어 불변) | Sonnet | 기존 web 테스트 통과 |
+| T3 | 공용 `PageRequest`·`CursorPage<T>`·`Items<T>`를 `:shared` platform에 추가. 기존 커서 2개 엔드포인트를 이 타입으로 옮긴다(와이어 불변) — **완료(2026-11-29, `PageQuery`, `com.kista.shared.platform.page`)** | Sonnet | 기존 web 테스트 통과 |
 | T4 | 42개 엔드포인트 분류표 확정(`findings/07` A절 기반)과 전환. 묶음: ① 가계부 ② 전략 주문·체결·사이클 이력 ③ 관리자 ④ 내부 API. 묶음마다 keyset 인덱스가 필요한지 확인하고 필요하면 Flyway 추가. `/stats/cycles`는 쿼리 수준 페이징으로 바꾼다 | Opus(분류·keyset 키 결정), Sonnet(적용) | 묶음별 web·persistence 테스트, ui 동시 배포 |
 | T5 | 메타 통합: 누락 enum 추가, `description` 정리, `/api/runtime-config` 전략 기본값·VR 램프 기본값표 이관, 가드 테스트 | Sonnet, 캐시 정책은 Opus | 가드 테스트 통과 |
 | T6 | 상태 플래그: 전략 `allowedActions`·`blockedActions`, 계좌 `apiKeyExpiry`, 미리보기 `warnings`. 판정 로직은 도메인에 두고 단위 테스트로 고정 | Opus | 도메인 테스트 통과 |
@@ -163,5 +163,23 @@ T1·T2는 다른 태스크와 독립이고 UI 01의 차단 조건이라 **가장
 - T4의 묶음 ④(내부 API)는 하지 않는다. 05 단계 X에서 내부 API가 사라진다.
 - (정정 2026-11-25) T5의 trading-core 값 통합은 M 뒤인 지금 구조(한 프로세스)에서 처리했다. 새 내부 API 없이 `RuntimeConfigService`와 `VrRampInput.defaultsFor`를 직접 쓴다.
 - (정정 2026-11-25) T10 `fieldErrors`의 모양은 `{field, detail}`이다(2-5절). 계획서 초안의 `{field, message}`는 틀렸다.
+
+### T4 분류표 확정 (2026-11-28, N5)
+
+다시 센 수: 컬렉션·목록 래퍼를 반환하는 핸들러 52개(사용자 30, 관리자 9, 내부 13). 1절의 42는 2026-11-11 값이다. 사용자 30 중 10개(가계부 trend·composition, `stats/equity-curve`, 벤치마크 series 3개·regions, `/accounts/{id}/prices`, `/api/meta`, `admin/logs/anomalies`)는 리스트 필드를 가진 단일 객체 응답이라 목록 규약 대상이 아니다(차트 시계열은 2-2절 "기간 상한이 있는 전량형"으로 둔다).
+
+| 묶음 | 페이지형(`CursorPage`) | 전량형(`Items`) |
+|---|---|---|
+| ① 가계부 — **완료(2026-11-28)** | `GET /api/finance/transactions` | `/finance/asset-snapshots`(월 필수 — 아래), `/finance/accounts`, `/finance/categories`, `/finance/budgets`, `/finance/monthly-closings`, `/finance/groups`, `/finance/groups/{id}/members`, `/admin/finance/categories` |
+| ② 전략 주문·체결·이력 | `/trading-cycles/{id}/history`·`/accounts/{id}/cycle-history`(T3에서 `CursorPage`로 이전 완료 — 와이어 불변), `/trading-cycles/{id}/orders`, `/trading-cycles/{id}/dca-executions`(page·size → 커서), `/stats/cycles`(메모리 slice → 쿼리 keyset) | `/accounts`, `/trading-cycles`(`includeArchived` 포함 — 사용자의 전략 수), `/accounts/{id}/trading-cycles`, `/market/holidays`(월 단위), `/market/candles`(count ≤ 600·기간 ≤ 5년). `/accounts/{id}/trading-cycles/previews`는 전략 id → 미리보기 맵이라 `Items`로 바꿀지 ② 착수 때 정한다 |
+| ③ 관리자 | `/admin/trades`, `/admin/users`, `/admin/accounts`, `/admin/logs/audit`, `/admin/logs/errors`, `/admin/privacy-trade-bases`(정수 `range` → 2-2절 `range` 프리셋, U6) | `/admin/accounts/{id}/strategies` |
+| ④ 내부 13개 | 하지 않는다(위 보정) | |
+
+②에서 정할 것: `/api/daily-trades`는 2-2절 표에서 페이지형이었지만 T8로 날짜·통화별 집계(`byDate`)가 같은 응답에 실렸고 ui는 주간 캘린더 3주만 받는다. 페이지로 자르면 `byDate`가 페이지 단위가 되므로 "기간 필수 + 서버 기간 상한을 둔 전량형"으로 재분류하는 것을 기본값으로 한다.
+
+①에서 정한 것:
+- **자산 기록(`asset-snapshots`)은 페이지형이 아니라 월 필수 전량형이다**(사용자 결정 2026-11-28). 운영 실측으로 한 사용자의 한 달 행 수가 최대 89건이고(전체 1056건·23개월), ui의 정렬 9키(카테고리 트리 순서 → 소유자 → 기관 → 계좌 → 전략 → 시장·자산군 enum 순 → 금액 큰 순 → 메모)는 SQL keyset으로 옮기면 그 달 전량을 메모리에서 정렬해 자르는 반쪽 페이징이 된다. 서버는 `month`·`categoryId`(하위 트리)·`assetClass`·`market` 필터만 하고, 열 정렬은 ui가 받은 한 달 안에서 한다.
+- 거래 목록 keyset 인덱스는 추가하지 않았다. 운영 전체 815행이고 스코프 조건이 `(개인 AND group_id IS NULL) OR group_id = ?`라 `(date, id)` 복합 인덱스의 효용이 작다. 기존 `(user_id|group_id, transaction_date DESC)` 부분 인덱스가 기본 정렬의 앞 키를 받친다. 재검토 조건: 한 스코프의 거래가 수만 건을 넘을 때.
+- 정렬 파라미터 파싱(`FinanceTransactionSort`)과 커서 코덱은 가계부 도메인에 두었다. ②③에서 같은 형식이 둘 이상 생기면 `:shared` platform으로 올린다(추출 기준 3곳).
 
 배포: T5·T6·T10·T11·T12는 필드·엔드포인트 추가라 api를 먼저 내도 된다. T4(봉투 변경)와 T7 중 응답 모양이 바뀌는 것은 kista-ui와 같은 날이다(로드맵 9-4). api만 먼저 나가면 화면이 깨지므로, ui 쪽 커밋이 준비됐다는 사용자 확인이 없으면 push를 요청하지 않는다. 문제가 생기면 api와 ui를 함께 되돌린다.

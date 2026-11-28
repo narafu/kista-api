@@ -3,7 +3,10 @@ package com.kista.api.finance.adapter.in.web;
 import com.kista.api.finance.domain.model.BudgetProgress;
 import com.kista.api.finance.domain.model.FinanceCategory;
 import com.kista.api.finance.domain.model.FinanceTransaction;
+import com.kista.api.finance.domain.model.FinanceTransactionSort;
 import com.kista.api.finance.domain.model.FlowPeriod;
+import com.kista.shared.platform.page.CursorPage;
+import com.kista.shared.platform.page.PageQuery;
 import com.kista.api.finance.domain.model.FlowSummary;
 import com.kista.api.finance.domain.model.FlowTrendPoint;
 import com.kista.api.finance.domain.model.FinanceTransactionCommand;
@@ -47,29 +50,51 @@ class FinanceTransactionControllerTest {
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
-    @Test
-    void list_withNoQueryParams_returns200() throws Exception {
-        when(financeTransactionService.list(any(), any(), any(), any(), any())).thenReturn(List.of());
-
-        mockMvc.perform(get("/api/finance/transactions")
-                        .with(authentication(userToken(USER_ID))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray());
+    private FinanceTransaction sample() {
+        return new FinanceTransaction(UUID.randomUUID(), null, UUID.randomUUID(), USER_ID,
+                LocalDate.of(2026, 8, 1), 1000L, "메모", Instant.now());
     }
 
     @Test
-    void list_withAllQueryParams_returns200() throws Exception {
-        when(financeTransactionService.list(any(), any(), any(), any(), any())).thenReturn(List.of());
+    void list_withNoQueryParams_returnsEnvelopeWithoutNextCursorKey() throws Exception {
+        when(financeTransactionService.list(any(), any(), any(), any()))
+                .thenReturn(new CursorPage<>(List.of(sample()), null, false));
 
         mockMvc.perform(get("/api/finance/transactions")
-                        .param("from", "2026-08-01")
-                        .param("to", "2026-08-31")
-                        .param("categoryId", UUID.randomUUID().toString())
-                        .param("createdBy", USER_ID.toString())
-                        .param("groupId", UUID.randomUUID().toString())
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray());
+                .andExpect(jsonPath("$.items").isArray())
+                .andExpect(jsonPath("$.hasMore").value(false))
+                .andExpect(jsonPath("$.nextCursor").doesNotExist());
+        verify(financeTransactionService).list(eq(USER_ID), any(), eq(FinanceTransactionSort.DEFAULT), eq(new PageQuery(null, 50)));
+    }
+
+    @Test
+    void list_cursorRoundTrip_passesCursorAndNormalizedSize() throws Exception {
+        when(financeTransactionService.list(any(), any(), any(), any()))
+                .thenReturn(new CursorPage<>(List.of(sample()), "next-token", true));
+
+        mockMvc.perform(get("/api/finance/transactions")
+                        .param("sort", "amount,desc")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(jsonPath("$.nextCursor").value("next-token"))
+                .andExpect(jsonPath("$.hasMore").value(true));
+
+        mockMvc.perform(get("/api/finance/transactions")
+                        .param("sort", "amount,desc").param("cursor", "next-token").param("size", "500")
+                        .param("from", "2026-08-01").param("type", "EXPENSE").param("memo", "점심")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk());
+        verify(financeTransactionService).list(eq(USER_ID), any(),
+                eq(new FinanceTransactionSort(FinanceTransactionSort.Key.AMOUNT, false)), eq(new PageQuery("next-token", 200)));
+    }
+
+    @Test
+    void list_invalidSort_returns400() throws Exception {
+        mockMvc.perform(get("/api/finance/transactions")
+                        .param("sort", "price,asc")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
