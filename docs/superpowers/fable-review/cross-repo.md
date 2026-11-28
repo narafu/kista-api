@@ -67,7 +67,7 @@ ui 지침서: `kista-ui/docs/superpowers/fable-review/guides/`. api 태스크 �
 | T5 메타 통합 — **api 완료(`e13afa115`, 2026-11-28 배포)** | ui 05 메타 소비·runtime-config 통합 | api 먼저(추가만이라 안전) |
 | T6 상태 플래그 — **api 완료(`8975b9296`, 2026-11-28 배포)** | ui 05 상태 재판정 삭제 | api 먼저 |
 | T7 오류 문구 — **api 완료(2026-11-25, 2026-11-28 배포·운영 화면 확인 완료(ui 세션 2026-11-28: T7 fieldErrors·S7 A·B·C 폼·K1 통과, 쓰기는 가드로 차단), L절)** | ui 05 오류 문구 맵 삭제, 400 `fieldErrors`를 폼 필드에 연결 | **같은 날 배포**(필드 거절 400의 `detail`이 요약 문장으로 바뀐다) |
-| T3·T4 목록 규약(가계부 → 전략 주문·체결·이력 → 관리자) — **T3·묶음 ① 가계부 api 완료(2026-11-29, 미배포, N절)**. ②③은 다음 세션 | ui 05 목록 페이지형(태스크 5 가계부 묶음), ui 06 DataList 페이지형 | **묶음별 같은 날 배포**(봉투가 바뀐다). ①은 ui 커밋 준비 확인 뒤 push |
+| T3·T4 목록 규약(가계부 → 전략 주문·체결·이력 → 관리자) — **T3·묶음 ① 가계부 api 완료(2026-11-29 `003051a53`, 미배포, N절). ui 준비됨(kista-ui `40cdeeb0`, 미push)**. ②③은 다음 세션 | ui 05 목록 페이지형(태스크 5 가계부 묶음), ui 06 DataList 페이지형 | **묶음별 같은 날 배포**(봉투가 바뀐다). ①은 ui 커밋 준비 확인 뒤 push |
 | T8 가계부 집계 — **api 완료(2026-11-26, 2026-11-28 배포, M절)** | ui 05 가계부 집계 삭제(태스크 6), 그 외 집계 필드 소비(태스크 7) | api 먼저(추가만) |
 | T10 검증 전용 엔드포인트 — **api 완료(`fb9f1d1b9`, 2026-11-28 배포)** | ui 05 규칙 사본 삭제, ui 04 태스크 6(전략 폼 통합, T5·T7도 필요) | api 먼저 |
 | T12 차트 지표, `reapplyAvailableAt` — **api 완료(`dc419a66b`, 2026-11-28 배포)** | ui 05 indicators.ts·localStorage 쿨다운 삭제 | api 먼저 |
@@ -435,7 +435,7 @@ A19 보류: 누적 실현손익(`carry`)·연초 재설정 추정 손익·현금
 
 ## N. 지침서 10 T3·T4 묶음 ① — 가계부 목록 규약 전환 (2026-11-29, 로드맵 N5)
 
-봉투가 바뀌므로 **ui와 같은 날 배포**한다. api는 커밋만 했고 미배포다. 분류표는 지침서 10 8절 "T4 분류표 확정".
+봉투가 바뀌므로 **ui와 같은 날 배포**한다. api `003051a53`, **ui 준비됨(kista-ui `40cdeeb0`)** — 둘 다 미push, 사용자가 함께 push한다. 분류표는 지침서 10 8절 "T4 분류표 확정".
 
 공용 타입(`:shared` `com.kista.shared.platform.page`): 전량형 `Items<T>` = `{items}`, 페이지형 `CursorPage<T>` = `{items, nextCursor?, hasMore}`(`nextCursor`는 마지막 페이지에서 키 생략), 요청 `PageQuery` = `?cursor=&size=`(기본 50, 1~200으로 맞춤).
 
@@ -447,5 +447,7 @@ A19 보류: 누적 실현손익(`carry`)·연초 재설정 추정 손익·현금
 | `GET /api/trading-cycles/{id}/history`, `GET /api/accounts/{id}/cycle-history` | 페이지형(T3 이전, **와이어 불변**) | 그대로(커서는 ISO Instant 문자열 그대로) | 없음. OpenAPI 스키마 이름만 `CycleHistoryPageResponse` → `CursorPageCycleHistoryResponse`로 바뀐다 — `gen:types` 재생성 뒤 타입 이름 참조를 고친다 |
 
 ui 05 태스크 5 가계부 묶음에서 지울 것: `useClientPagination`(가계부 두 목록 사용처), `entities/finance/lib/period.ts`의 `windowRange`(12개월 윈도우 키 `financeKeys.transactions(from, to)` 포함 — 목록은 커서, 요약·추이는 T8 집계), `FinanceRecordList`의 `filterByType`·기간 재필터·하위트리·메모·정렬 코드, `AssetRecordList`의 필터 코드.
+
+ui 반영 결과(2026-11-29, ui 세션 회신): ① 자산 기록 메모 검색은 api에 `memo` 파라미터가 없어 ui가 받은 한 달 안에서 거른다(전량형 안 즉시 필터 — 규약 안). ② 자산 편집·복제 링크는 단건 GET이 없어 `?month=`를 싣는다. ③ 거래 탭 "분류할 수 없는 내역 N건" 안내는 서버 `type` 필터가 삭제 카테고리 거래를 빼므로 없앴다.
 
 keyset 인덱스: 추가하지 않았다(운영 거래 전체 815행, 근거는 지침서 10 8절).
