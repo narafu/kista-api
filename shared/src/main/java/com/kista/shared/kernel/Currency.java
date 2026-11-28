@@ -31,6 +31,11 @@ public enum Currency {
         return amount.setScale(amountScale, RoundingMode.HALF_UP);
     }
 
+    // 통화 자릿수로 0 방향 절사(DOWN) — 상한 금액 표시용(표시액을 그대로 요청해도 통과)
+    public BigDecimal truncate(BigDecimal amount) {
+        return amount.setScale(amountScale, RoundingMode.DOWN);
+    }
+
     // 표기: KRW는 "15,000원", 그 외는 "10.50 USD"
     public String format(BigDecimal amount) {
         String number = String.format(Locale.ROOT, "%,." + amountScale + "f", round(amount)); // 기본 로케일 무관 — 콤마 그룹·점 소수

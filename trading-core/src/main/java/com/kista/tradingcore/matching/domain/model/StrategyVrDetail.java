@@ -4,6 +4,8 @@ import com.kista.shared.kernel.Currency;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import org.jspecify.annotations.Nullable;
 import java.util.UUID;
 
 // VR 전략 버전 상세 — strategy_vr_version 테이블과 매핑
@@ -41,6 +43,11 @@ public record StrategyVrDetail(
     // 사이클 매수 상한(달러) = 개장 예수금 × poolLimitRate (USD 센트 HALF_UP)
     public static BigDecimal poolLimitOf(BigDecimal openingPool, BigDecimal poolLimitRate) {
         return openingPool.multiply(poolLimitRate).setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
+    }
+
+    // 다음 롤오버 due일 = 사이클 시작일 + intervalWeeks (당일 포함 도래). 롤오버 판정과 조회 응답이 공용하는 SSOT — 시작일이 없으면 null
+    public @Nullable LocalDate nextRolloverDate(@Nullable LocalDate cycleStartDate) {
+        return cycleStartDate == null ? null : cycleStartDate.plusWeeks(intervalWeeks);
     }
 
     // poolLimitRateAt: 경과 주수(weeks) 기준 poolLimitRate 값 — 유예 주수 이후 pStepWeeks마다 POOL_LIMIT_STEP씩 하강, poolLimitFloor에서 하한

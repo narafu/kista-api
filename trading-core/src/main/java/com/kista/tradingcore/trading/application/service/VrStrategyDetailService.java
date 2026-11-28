@@ -11,7 +11,10 @@ import com.kista.tradingcore.trading.application.port.output.StrategyVrDetailPor
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import org.jspecify.annotations.Nullable;
+
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
@@ -42,14 +45,15 @@ class VrStrategyDetailService {
 
     Optional<VrSummary> findSummary(UUID strategyId, Optional<StrategyCycle> latestCycle,
                                                     Optional<CyclePosition> openingPosition,
-                                                    Optional<CyclePosition> latestPosition) {
+                                                    Optional<CyclePosition> latestPosition,
+                                                    LocalDate rolloverBaseDate) {
         return strategyVrDetailPort.findActiveByStrategyId(strategyId)
                 .flatMap(vrDetail -> latestCycle
                         .flatMap(cycle -> strategyCycleVrPort.findByCycleId(cycle.id())
                                 .map(cycleVr -> {
                                     BigDecimal openingPool = openingPosition.map(CyclePosition::deposit).orElse(null);
                                     BigDecimal currentPool = latestPosition.map(CyclePosition::deposit).orElse(null);
-                                    return buildSummary(vrDetail, cycleVr, openingPool, currentPool);
+                                    return buildSummary(vrDetail, cycleVr, openingPool, currentPool, rolloverBaseDate);
                                 })));
     }
 
@@ -62,7 +66,7 @@ class VrStrategyDetailService {
     }
 
     VrSummary buildSummary(StrategyVrDetail vrDetail, StrategyCycleVrDetail cycleVr,
-                                          BigDecimal openingPool, BigDecimal currentPool) {
+                                          BigDecimal openingPool, BigDecimal currentPool, @Nullable LocalDate rolloverBaseDate) {
         if (openingPool == null) {
             throw new IllegalStateException("VR 시작 포지션이 없습니다.");
         }
@@ -71,6 +75,7 @@ class VrStrategyDetailService {
                 cycleVr.value(), vrDetail.bandWidth(), vrDetail.intervalWeeks(),
                 vrDetail.recurringAmount(), poolLimit, currentPool, cycleVr.poolLimitRate(), cycleVr.gradient(),
                 vrDetail.initialGradient(), vrDetail.gGraceWeeks(), vrDetail.gStepWeeks(), vrDetail.gMax(),
-                vrDetail.initialPoolLimitRate(), vrDetail.pGraceWeeks(), vrDetail.pStepWeeks(), vrDetail.poolLimitFloor());
+                vrDetail.initialPoolLimitRate(), vrDetail.pGraceWeeks(), vrDetail.pStepWeeks(), vrDetail.poolLimitFloor(),
+                vrDetail.nextRolloverDate(rolloverBaseDate));
     }
 }

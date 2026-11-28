@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 import com.kista.tradingcore.matching.domain.model.StrategyVrDetail;
@@ -24,6 +25,13 @@ class StrategyVrDetailTest {
 
     private StrategyVrDetail defaultDetail() {
         return detail(52, 26, 52, 26);
+    }
+
+    @Test
+    @DisplayName("nextRolloverDate = 사이클 시작일 + intervalWeeks(4주), 시작일 없으면 null")
+    void nextRolloverDate_addsIntervalWeeks() {
+        assertThat(defaultDetail().nextRolloverDate(LocalDate.of(2026, 11, 26))).isEqualTo(LocalDate.of(2026, 12, 24));
+        assertThat(defaultDetail().nextRolloverDate(null)).isNull();
     }
 
     @Test

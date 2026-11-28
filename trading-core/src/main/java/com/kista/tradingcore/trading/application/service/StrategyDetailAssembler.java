@@ -61,7 +61,7 @@ class StrategyDetailAssembler {
 
         // VR 전략: 최신 활성 버전 + 최신 사이클 상세를 helper가 합산 — openingPosition/latestPos는 위에서 이미 조회한 값 재사용
         VrSummary vrSummary = strategy.isVr()
-                ? vrStrategyDetailService.findSummary(strategy.id(), latestCycle, openingPosition, latestPos).orElse(null)
+                ? vrStrategyDetailService.findSummary(strategy.id(), latestCycle, openingPosition, latestPos, rolloverBaseDate(strategy, latestCycle)).orElse(null)
                 : null;
 
         DcaSummary dcaSummary = null;
@@ -143,7 +143,8 @@ class StrategyDetailAssembler {
                             .flatMap(vrDetail -> latestCycle.flatMap(cycle -> Optional.ofNullable(cycleVrDetails.get(cycle.id())))
                                     .map(cycleVr -> vrStrategyDetailService.buildSummary(
                                             vrDetail, cycleVr, openingPosition.map(CyclePosition::deposit).orElse(null),
-                                            latestPos.map(CyclePosition::deposit).orElse(null))))
+                                            latestPos.map(CyclePosition::deposit).orElse(null),
+                                            rolloverBaseDate(strategy, latestCycle))))
                             .orElse(null)
                     : null;
 
@@ -156,6 +157,13 @@ class StrategyDetailAssembler {
             return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary,
                     currencyByAccountId.get(strategy.accountId()));
         }).toList();
+    }
+
+    // 다음 롤오버 기준일 — 보관 전략·종료 사이클은 롤오버가 다시 오지 않아 null(지난 날짜를 예정일로 내보내지 않는다)
+    // 응답은 활성 버전 VR 설정, 롤오버는 사이클 버전 설정을 쓰지만 VR 재설정이 둘을 함께 교체해 같은 intervalWeeks다
+    private static LocalDate rolloverBaseDate(Strategy strategy, Optional<StrategyCycle> latestCycle) {
+        if (strategy.isArchived()) return null;
+        return latestCycle.filter(cycle -> !cycle.isEnded()).map(StrategyCycle::startDate).orElse(null);
     }
 
     // 이미 조회된 입력들을 조합만 하는 순수 조립 메서드 — toDetail/toDetails 공용
@@ -180,7 +188,8 @@ class StrategyDetailAssembler {
         // 진행 중 사이클 여부 — CapitalLedgerService NO_ACTIVE_CYCLE 거절 조건(사이클 없음·최신 사이클 종료)의 반대
         boolean cycleInProgress = latestCycle.map(cycle -> !cycle.isEnded()).orElse(false);
 
+        // 장부 예수금은 내림 — 인출 상한이라 반올림하면 표시액을 그대로 요청해도 거절될 수 있다(CapitalLedgerService 인출 거절 문장과 같은 절사). 행위 판정도 이 값을 쓴다
         return new StrategyDetail(strategy, initialDeposit, startDate, divisionCount, isReverseMode, currentRound, currentHoldings, vrSummary, dcaSummary, cycleInProgress,
-                latestPosition.map(CyclePosition::deposit).map(currency::round).orElse(null));
+                latestPosition.map(CyclePosition::deposit).map(currency::truncate).orElse(null));
     }
 }

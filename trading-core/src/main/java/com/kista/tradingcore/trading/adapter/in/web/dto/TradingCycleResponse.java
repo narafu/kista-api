@@ -99,14 +99,16 @@ public record TradingCycleResponse(
             @Schema(description = "poolLimitRate가 한 단계 하강하는 주기 (주 단위)", example = "26")
             int pStepWeeks,
             @Schema(description = "poolLimitRate 램프 하한값", example = "0.50")
-            BigDecimal poolLimitFloor
+            BigDecimal poolLimitFloor,
+            @Schema(description = "다음 리밸런싱(롤오버) 예정일 = 사이클 시작일 + 주기. 이 날 이후 첫 마감 리포트에서 교체된다(평가 종가는 이 날, 미국 휴장일이면 직전 거래일). 종가가 없으면 다음 매매일에 재시도하므로 교체 전까지 지난 날짜일 수 있다. 보관 전략·종료 사이클이면 null", example = "2026-12-24")
+            @Nullable LocalDate nextRolloverDate
     ) {
         // trading 소유 VrSummary(com.kista.tradingcore.trading.domain.model.VrSummary) → 응답 DTO 변환
         static VrSummary from(com.kista.tradingcore.trading.domain.model.VrSummary s) {
             return new VrSummary(s.value(), s.bandWidth(), s.intervalWeeks(),
                     s.recurringAmount(), s.poolLimit(), s.currentPool(), s.poolLimitRate(), s.gradient(),
                     s.initialGradient(), s.gGraceWeeks(), s.gStepWeeks(), s.gMax(),
-                    s.initialPoolLimitRate(), s.pGraceWeeks(), s.pStepWeeks(), s.poolLimitFloor());
+                    s.initialPoolLimitRate(), s.pGraceWeeks(), s.pStepWeeks(), s.poolLimitFloor(), s.nextRolloverDate());
         }
     }
 

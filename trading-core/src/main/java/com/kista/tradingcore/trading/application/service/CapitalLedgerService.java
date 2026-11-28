@@ -131,7 +131,7 @@ public class CapitalLedgerService {
         BigDecimal available = ledgerBudget.remaining(cycle, Optional.of(latest), committedOrders, cancelledOrders);
         if (amount.compareTo(available) > 0) {
             // 금액 표기는 Currency.display(USD $#,##0.00, 그 외 15,000원). 음수 가용액은 0, 표시액을 그대로 요청해도 통과하도록 내림
-            BigDecimal shown = available.max(BigDecimal.ZERO).setScale(owned.currency().amountScale(), RoundingMode.DOWN);
+            BigDecimal shown = owned.currency().truncate(available.max(BigDecimal.ZERO));
             String shownText = owned.currency().display(shown);
             throw new IllegalArgumentException(("투자금 인출 금액이 인출 가능액 %s를 초과합니다. "
                     + "장부 예수금에서 체결 전 매수 주문 금액과 장중 취소 전에 체결된 매수 금액을 뺀 만큼 인출할 수 있습니다.")

@@ -22,6 +22,13 @@ class CurrencyTest {
     }
 
     @Test
+    void truncateCutsToCurrencyScale() {
+        assertThat(Currency.USD.truncate(new BigDecimal("10.409"))).isEqualTo(new BigDecimal("10.40")); // HALF_UP이면 10.41
+        assertThat(Currency.USD.truncate(new BigDecimal("0.004"))).isEqualTo(new BigDecimal("0.00"));
+        assertThat(Currency.KRW.truncate(new BigDecimal("14999.9"))).isEqualTo(new BigDecimal("14999"));
+    }
+
+    @Test
     void formatKeepsKrwWording() {
         assertThat(Currency.KRW.format(new BigDecimal("150000000"))).isEqualTo("150,000,000원");
         assertThat(Currency.KRW.format(new BigDecimal("5000"))).isEqualTo("5,000원");

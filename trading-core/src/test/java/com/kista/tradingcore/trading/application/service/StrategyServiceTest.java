@@ -266,8 +266,8 @@ class StrategyServiceTest {
 
     // 등록 응답은 조회 경로의 findSummary로 조립되므로 buildSummary와 함께 stub한다
     private void stubVrSummary(VrSummary summary) {
-        lenient().when(vrStrategyDetailService.buildSummary(any(), any(), any(), any())).thenReturn(summary);
-        lenient().when(vrStrategyDetailService.findSummary(any(), any(), any(), any())).thenReturn(Optional.of(summary));
+        lenient().when(vrStrategyDetailService.buildSummary(any(), any(), any(), any(), any())).thenReturn(summary);
+        lenient().when(vrStrategyDetailService.findSummary(any(), any(), any(), any(), any())).thenReturn(Optional.of(summary));
     }
 
     private Account ownerAccount() {
@@ -1624,7 +1624,7 @@ class StrategyServiceTest {
         stubVrSummary(
                 new VrSummary(BigDecimal.ZERO, new BigDecimal("15.00"), 4, 0,
                         new BigDecimal("1500.00"), new BigDecimal("2000"), new BigDecimal("0.75"), 10,
-                        10, 52, 26, 20, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50")));
+                        10, 52, 26, 20, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50"), null));
 
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
@@ -1706,7 +1706,7 @@ class StrategyServiceTest {
         stubVrSummary(
                 new VrSummary(BigDecimal.ZERO, new BigDecimal("15.00"), 2, 200,
                         new BigDecimal("0.00"), BigDecimal.ZERO, BigDecimal.ONE, 10,
-                        10, 52, 26, 20, BigDecimal.ONE, 52, 26, new BigDecimal("0.50")));
+                        10, 52, 26, 20, BigDecimal.ONE, 52, 26, new BigDecimal("0.50"), null));
 
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
@@ -1773,7 +1773,7 @@ class StrategyServiceTest {
         stubVrSummary(
                 new VrSummary(BigDecimal.ZERO, new BigDecimal("15.00"), 4, 0,
                         new BigDecimal("1500.00"), new BigDecimal("2000"), new BigDecimal("0.75"), 10,
-                        10, 52, 26, 20, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50")));
+                        10, 52, 26, 20, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50"), null));
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
         verify(strategyVrDetailPort).save(argThat(d -> d.recurringAmount() == 0));
@@ -1857,7 +1857,7 @@ class StrategyServiceTest {
         stubVrSummary(
                 new VrSummary(BigDecimal.ZERO, new BigDecimal("15.00"), 4, 100,
                         new BigDecimal("1000.00"), new BigDecimal("1000"), BigDecimal.ONE, 10,
-                        10, 52, 26, 20, BigDecimal.ONE, 52, 26, new BigDecimal("0.50")));
+                        10, 52, 26, 20, BigDecimal.ONE, 52, 26, new BigDecimal("0.50"), null));
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
         verify(strategyCycleVrPort).save(argThat(cv ->
@@ -2019,7 +2019,7 @@ class StrategyServiceTest {
         stubVrSummary(
                 new VrSummary(new BigDecimal("3000"), new BigDecimal("15.00"), 4, 0,
                         new BigDecimal("500.00"), new BigDecimal("700"), new BigDecimal("0.50"), 10,
-                        10, 52, 26, 20, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50")));
+                        10, 52, 26, 20, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"), null));
 
         List<StrategyDetail> result = strategyService.listByUserId(USER_ID, false);
 
@@ -2125,8 +2125,8 @@ class StrategyServiceTest {
         // 단건 경로와 배치 경로가 동일한 VrSummary를 조립해야 동등성 검증이 성립 — 두 경로 모두 같은 fixture를 stub
         VrSummary vrSummaryFixture = new VrSummary(new BigDecimal("3000.00"), new BigDecimal("15.00"), 4, 0,
                 new BigDecimal("500.00"), null, new BigDecimal("0.50"), 10,
-                10, 52, 26, 20, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
-        when(vrStrategyDetailService.findSummary(any(), any(), any(), any())).thenReturn(Optional.of(vrSummaryFixture));
+                10, 52, 26, 20, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"), null);
+        when(vrStrategyDetailService.findSummary(any(), any(), any(), any(), any())).thenReturn(Optional.of(vrSummaryFixture));
         stubVrSummary(vrSummaryFixture);
 
         // 단건 경로
@@ -2433,7 +2433,7 @@ class StrategyServiceTest {
         stubVrSummary(
                 new VrSummary(new BigDecimal("600.00"), new BigDecimal("15.00"), 4, 0,
                         new BigDecimal("750.00"), new BigDecimal("1000"), new BigDecimal("0.75"), 10,
-                        10, 52, 26, 20, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50")));
+                        10, 52, 26, 20, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50"), null));
 
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 

@@ -109,7 +109,7 @@ class VrStrategyDetailServiceTest {
         when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(cycleVr));
 
         Optional<VrSummary> result = vrStrategyDetailService.findSummary(
-                strategyId, Optional.of(latestCycle), Optional.of(openingPosition), Optional.of(latestPosition));
+                strategyId, Optional.of(latestCycle), Optional.of(openingPosition), Optional.of(latestPosition), LocalDate.of(2026, 11, 26));
 
         assertThat(result).isPresent();
         assertThat(result.get().intervalWeeks()).isEqualTo(4);
@@ -118,6 +118,7 @@ class VrStrategyDetailServiceTest {
         assertThat(result.get().gradient()).isEqualTo(10);
         // currentPool은 최신 포지션 값(282.83) — 개장값(1000)이 아님
         assertThat(result.get().currentPool()).isEqualByComparingTo("282.83");
+        assertThat(result.get().nextRolloverDate()).isEqualTo(LocalDate.of(2026, 12, 24)); // 기준일 + 4주
     }
 
     @Test
@@ -138,7 +139,7 @@ class VrStrategyDetailServiceTest {
         when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(cycleVr));
 
         Optional<VrSummary> result = vrStrategyDetailService.findSummary(
-                strategyId, Optional.of(latestCycle), Optional.of(openingPosition), Optional.empty());
+                strategyId, Optional.of(latestCycle), Optional.of(openingPosition), Optional.empty(), null);
 
         assertThat(result).isPresent();
         assertThat(result.get().currentPool()).isNull();
@@ -160,7 +161,7 @@ class VrStrategyDetailServiceTest {
         when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(cycleVr));
 
         assertThatThrownBy(() -> vrStrategyDetailService.findSummary(
-                strategyId, Optional.of(latestCycle), Optional.empty(), Optional.empty()))
+                strategyId, Optional.of(latestCycle), Optional.empty(), Optional.empty(), null))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("VR 시작 포지션이 없습니다");
     }
@@ -175,7 +176,7 @@ class VrStrategyDetailServiceTest {
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
                 cycleId, new BigDecimal("3000"), 10, new BigDecimal("0.50"));
 
-        assertThatThrownBy(() -> vrStrategyDetailService.buildSummary(vrDetail, cycleVr, null, null))
+        assertThatThrownBy(() -> vrStrategyDetailService.buildSummary(vrDetail, cycleVr, null, null, null))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("VR 시작 포지션이 없습니다");
     }

@@ -1,6 +1,8 @@
 package com.kista.tradingcore.trading.domain.model;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import org.jspecify.annotations.Nullable;
 
 // VR 전략 조회 응답 요약 — StrategyVrDetail + StrategyCycleVrDetail 합산 (옛 StrategyDetail.VrSummary 승격)
 public record VrSummary(
@@ -20,5 +22,6 @@ public record VrSummary(
         BigDecimal initialPoolLimitRate, // 램프 시작 시점(경과 0주)의 poolLimitRate 값
         int pGraceWeeks,                 // poolLimitRate 램프 시작 전 유예 주수
         int pStepWeeks,                  // poolLimitRate가 한 단계 하강하는 주기 (주 단위)
-        BigDecimal poolLimitFloor        // poolLimitRate 램프의 하한값
+        BigDecimal poolLimitFloor,       // poolLimitRate 램프의 하한값
+        @Nullable LocalDate nextRolloverDate // 다음 롤오버 due일(StrategyVrDetail.nextRolloverDate) — 보관 전략·종료 사이클·시작일 없음이면 null
 ) {}

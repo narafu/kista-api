@@ -19,7 +19,7 @@
 - 오늘 postClose 이후 리포트 마커 전이고 리포트 대상 주문이 있으면 400(`CloseReportScope`). 수동 체결 보정도 같은 창을 거절한다
 - 인출 가능액 = 장부 예수금 − 체결 전 BUY 약정 − 리포트 전 취소 BUY의 기록 체결분(`StrategyLedgerBudget`). 강제 매도 없이 다음 주문 계산부터 반영한다. 인출 후 `startAmount ≤ 0`이거나 INFINITE 최소 시드 미만이면 400
 - 시드 수정은 비-VR 진행 중 사이클의 최신 포지션 `holdings=0`일 때만 허용, 종료 사이클이면 400(재개 후 수정)
-- 응답 `ledgerDeposit`이 UI 최대 인출 기준이다(DB `cycle_position.deposit`·도메인 `deposit`은 이름 유지)
+- 응답 `ledgerDeposit`이 UI 최대 인출 기준이다(DB `cycle_position.deposit`·도메인 `deposit`은 이름 유지). 계좌 통화 자릿수로 절사(`Currency.truncate`)해 표시액을 그대로 요청해도 통과하게 하고, `NO_WITHDRAWABLE_BALANCE` 판정도 이 내림값을 쓴다(인출 서비스 내부 계산은 원값)
 
 ### 상태 플래그·검증 엔드포인트
 - 행위 판정 SSOT: `StrategyAction.supports(type)`(종류별 지원 동작)·`StrategyActionJudgment.of(detail)`(`allowedActions`/`blockedActions{action,reasonCode}`). 불변식 allowed ∪ blocked = 지원 전체. 서비스 가드(`requireSupportedType` 등)도 `supports()`를 쓴다. 미리보기 `warnings`는 `OrderPreviewWarning`

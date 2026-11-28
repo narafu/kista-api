@@ -61,7 +61,14 @@ class VrCycleRolloverService {
         }
 
         // due 판정: startDate + intervalWeeks ≤ today (당일 포함)
-        LocalDate dueDate = cycle.startDate().plusWeeks(detail.intervalWeeks());
+        LocalDate dueDate = detail.nextRolloverDate(cycle.startDate());
+        // 시작일 없는 사이클은 due를 정할 수 없다 — NPE로 배치를 깨지 않고 격리
+        if (dueDate == null) {
+            log.warn("[strategyId={}] VR 롤오버 — 사이클 시작일 없음, skip", strategy.id());
+            eventPublisher.publishEvent(new TradingErrorEvent(null,
+                    "VR 사이클 시작일 누락 strategyId=" + strategy.id() + " cycleId=" + cycle.id()));
+            return;
+        }
         if (today.isBefore(dueDate)) {
             log.debug("[strategyId={}] VR 롤오버 미도래: dueDate={}, today={}", strategy.id(), dueDate, today);
             return;
