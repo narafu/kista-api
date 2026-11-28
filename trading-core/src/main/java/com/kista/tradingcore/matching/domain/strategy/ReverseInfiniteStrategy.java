@@ -36,7 +36,7 @@ public class ReverseInfiniteStrategy {
                 BigDecimal.ZERO, "REVERSE_INFINITE_MOC_SELL"));
     }
 
-    // 두번째 날 이후: LOC 매도(별지점 위) + LOC 쿼터매수(별지점 아래)
+    // 두번째 날 이후: LOC 쿼터매수(별지점 아래) + LOC 매도(별지점 위) — 일반모드처럼 매수를 먼저 둔다(접수 순서는 DB 재조회라 무관, 표시 순서용)
     // 쿼터매수 예산 소진 시(별지점은 있으나 1주도 못 사는 경우) 매수 대신 동일 수량 MOC 매도로 청산 가속
     public List<PlannedOrder> buildOrders(ReverseModePosition position, LocalDate tradeDate) {
         if (position.isQuotaBuyExhausted()) {
@@ -45,14 +45,6 @@ public class ReverseInfiniteStrategy {
 
         List<PlannedOrder> orders = new ArrayList<>();
 
-        // LOC 매도 — 별지점 위에서 (starPointPrice 가격으로 LOC)
-        int locSellQuantity = position.calcLocSellQuantity();
-        if (locSellQuantity >= 1 && position.starPointPrice() != null) {
-            orders.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, SELL, locSellQuantity,
-                    position.starPointPrice(), LOC_SELL_LEG));
-            log.info("[리버스모드] LOC 매도 {}주 @ 별지점={}", locSellQuantity, position.starPointPrice());
-        }
-
         // LOC 쿼터매수 — 별지점 아래에서 (starPointPrice - $0.01)
         int locBuyQuantity = position.calcLocBuyQuantity();
         if (locBuyQuantity >= 1 && position.starPointPrice() != null) {
@@ -60,6 +52,14 @@ public class ReverseInfiniteStrategy {
             orders.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, BUY, locBuyQuantity,
                     buyPrice, LOC_BUY_LEG));
             log.info("[리버스모드] LOC 쿼터매수 {}주 @ {}", locBuyQuantity, buyPrice);
+        }
+
+        // LOC 매도 — 별지점 위에서 (starPointPrice 가격으로 LOC)
+        int locSellQuantity = position.calcLocSellQuantity();
+        if (locSellQuantity >= 1 && position.starPointPrice() != null) {
+            orders.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, SELL, locSellQuantity,
+                    position.starPointPrice(), LOC_SELL_LEG));
+            log.info("[리버스모드] LOC 매도 {}주 @ 별지점={}", locSellQuantity, position.starPointPrice());
         }
 
         return orders;

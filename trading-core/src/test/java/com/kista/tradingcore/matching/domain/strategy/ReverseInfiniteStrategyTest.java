@@ -45,7 +45,7 @@ class ReverseInfiniteStrategyTest {
         List<PlannedOrder> orders = strategy.buildOrders(position, TODAY);
 
         assertThat(orders).extracting(PlannedOrder::orderLeg)
-                .containsExactly("REVERSE_INFINITE_LOC_SELL", "REVERSE_INFINITE_LOC_BUY");
+                .containsExactly("REVERSE_INFINITE_LOC_BUY", "REVERSE_INFINITE_LOC_SELL");
     }
 
     @Test

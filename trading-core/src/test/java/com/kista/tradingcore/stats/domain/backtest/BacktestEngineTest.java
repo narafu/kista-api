@@ -554,12 +554,12 @@ class BacktestEngineTest {
         Recorded secondDay = recorder.on("2024-01-02");
         assertThat(secondDay.inputs().isFirstReverseDay()).isFalse();
         assertThat(secondDay.inputs().starPointPrice()).isEqualByComparingTo("62.00");
-        assertThat(secondDay.legs()).containsExactly("REVERSE_INFINITE_LOC_SELL", "REVERSE_INFINITE_LOC_BUY");
-        // LOC 매도 = 6주 ÷ 2 = 3주 @별지점, 쿼터매수 = (예수금 405 ÷ 4) ÷ 61.99 내림 = 1주 @별지점−0.01
-        assertThat(secondDay.orders().getFirst().quantity()).isEqualTo(3);
-        assertThat(secondDay.orders().getFirst().price()).isEqualByComparingTo("62.00");
-        assertThat(secondDay.orders().get(1).quantity()).isEqualTo(1);
-        assertThat(secondDay.orders().get(1).price()).isEqualByComparingTo("61.99");
+        assertThat(secondDay.legs()).containsExactly("REVERSE_INFINITE_LOC_BUY", "REVERSE_INFINITE_LOC_SELL");
+        // 쿼터매수 = (예수금 405 ÷ 4) ÷ 61.99 내림 = 1주 @별지점−0.01, LOC 매도 = 6주 ÷ 2 = 3주 @별지점
+        assertThat(secondDay.orders().getFirst().quantity()).isEqualTo(1);
+        assertThat(secondDay.orders().getFirst().price()).isEqualByComparingTo("61.99");
+        assertThat(secondDay.orders().get(1).quantity()).isEqualTo(3);
+        assertThat(secondDay.orders().get(1).price()).isEqualByComparingTo("62.00");
 
         // 1일차 MOC 매도 5주가 2일차 종가 60에 체결 → 예수금 105 + 300 = 405 + 6주×60 = 765.00
         assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("765");
